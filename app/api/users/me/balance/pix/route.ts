@@ -6,7 +6,7 @@ import { Transaction } from '@/models/Transaction';
 import AbacatePay from 'abacatepay-nodejs-sdk';
 
 const apiKey = process.env.ABACATEPAY_API_KEY || '';
-const abacatepay = new AbacatePay(apiKey);
+const abacatepay = AbacatePay(apiKey);
 
 export async function POST(req: NextRequest) {
   try {
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
         id: billingData.id,
         transactionId: billingData.id, // Alias para compatibilidade com RechargeModal/PixCheckoutView
         url: billingData.url,
-        brCode: billingData.pix?.payload || '', // Código copia e cola
+        brCode: (billingData as any).pix?.payload || '', // Código copia e cola
         status: billingData.status,
       });
 

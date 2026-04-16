@@ -97,6 +97,7 @@ export default function LoginPage() {
             setGoogleLoading(true);
             setError('');
             alert('Conectando ao Google através do Clerk...');
+            // @ts-ignore
             await signIn.authenticateWithRedirect({
                 strategy: 'oauth_google',
                 redirectUrl: '/sso-callback',

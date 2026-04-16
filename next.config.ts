@@ -7,7 +7,9 @@ const nextConfig: NextConfig = {
         ],
     },
     experimental: {
-        allowedDevOrigins: ['600b-2804-214-4013-93-54ba-643a-6b9c-d856.ngrok-free.app'],
+        serverActions: {
+            allowedOrigins: ['600b-2804-214-4013-93-54ba-643a-6b9c-d856.ngrok-free.app'],
+        }
     },
 };
 
