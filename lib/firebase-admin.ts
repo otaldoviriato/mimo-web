@@ -1,7 +1,14 @@
 import * as admin from 'firebase-admin';
 
-const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT 
-  ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT) 
+const rawServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT?.trim();
+const normalizedServiceAccount = rawServiceAccount?.startsWith("'") && rawServiceAccount?.endsWith("'")
+  ? rawServiceAccount.slice(1, -1)
+  : rawServiceAccount?.startsWith('"') && rawServiceAccount?.endsWith('"')
+    ? rawServiceAccount.slice(1, -1)
+    : rawServiceAccount;
+
+const serviceAccount = normalizedServiceAccount 
+  ? JSON.parse(normalizedServiceAccount) 
   : null;
 
 if (serviceAccount && serviceAccount.private_key) {
