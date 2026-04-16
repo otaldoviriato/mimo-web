@@ -22,6 +22,8 @@ interface Message {
     lockedImagePrice?: number;
     originalImageUrl?: string;
     blurredImageUrl?: string;
+    isGift?: boolean;
+    receiverEarnings?: number;
 }
 
 export default function ChatPage({ params }: { params: Promise<{ userId: string }> }) {
