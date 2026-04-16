@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
-import { User } from '@/models/User';
 import { Transaction } from '@/models/Transaction';
 import AbacatePay from 'abacatepay-nodejs-sdk';
 
@@ -23,95 +22,56 @@ export async function POST(req: NextRequest) {
 
     await connectToDatabase();
 
-    const user = await User.findOne({ clerkId: userId });
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
     const externalId = `recharge_${userId}_${Date.now()}`;
-    
+
     try {
-      // O AbacatePay v1 exige cellphone e taxId no customer.
-      // Se não tivermos no banco, tentamos fallbacks ou valores de teste em dev.
-      const isDev = apiKey.startsWith('abc_dev_');
-      
-      const customerData: any = {
-        name: user.name || user.username || 'Usuário Mimo',
-        email: user.email,
-        cellphone: user.phone || (isDev ? '11999999999' : undefined),
-        taxId: user.taxId || (isDev ? '52998224725' : undefined),
-      };
+      console.log('Criando PIX QR Code AbacatePay para userId:', userId, 'valor:', amount);
 
-      console.log('Criando cobrança AbacatePay para:', customerData.email, 'valor:', amount);
-      
-      if (!customerData.cellphone || !customerData.taxId) {
-        return NextResponse.json({ 
-          error: 'Dados incompletos', 
-          details: 'CPF e Telefone são obrigatórios para pagamentos via PIX.' 
-        }, { status: 400 });
-      }
-
-      // Usar billing.create para que a cobrança apareça na dashboard oficial
-      const billingResponse = await abacatepay.billing.create({
-        frequency: "ONE_TIME",
-        methods: ["PIX"],
-        products: [{
-          externalId: "recharge",
-          name: "Recarga de Saldo - MimoChat",
-          quantity: 1,
-          price: Math.round(amount * 100), // cents
-        }],
-        returnUrl: `${process.env.NEXT_PUBLIC_API_URL}/chats`,
-        completionUrl: `${process.env.NEXT_PUBLIC_API_URL}/chats`,
-        customer: customerData,
+      // pixQrCode.create gera o brCode diretamente e aparece no dashboard em dev e prod
+      const pixResponse = await abacatepay.pixQrCode.create({
+        amount: Math.round(amount * 100), // cents
+        description: `Recarga de Saldo - MimoChat`,
+        expiresIn: 3600, // 1 hora
       });
 
-      // Log detalhado para debug
-      if (!billingResponse.data) {
-        console.error('AbacatePay Error Details:', JSON.stringify(billingResponse, null, 2));
+      if (!pixResponse.data) {
+        console.error('AbacatePay pixQrCode Error:', JSON.stringify(pixResponse, null, 2));
+        throw new Error(`Falha ao criar PIX no AbacatePay: ${(pixResponse as any).error || 'Verifique os logs'}`);
       }
 
-      if (!billingResponse.data) {
-        throw new Error(`Falha ao criar cobrança no AbacatePay: ${billingResponse.error || 'Verifique os logs'}`);
-      }
+      const pixData = pixResponse.data as any;
 
-      const billingData = billingResponse.data;
-
-      // Criar transação pendente no nosso banco
       await Transaction.create({
         userId: userId,
-        abacatePayId: billingData.id,
+        abacatePayId: pixData.id,
         amount: amount,
         status: 'PENDING',
         type: 'PIX',
         source: 'recharge',
         metadata: {
           externalId,
-          billingId: billingData.id,
-          // Guardamos o brCode se vier na resposta, ou deixamos para o front resolver via link
-          brCode: (billingData as any).pix?.brCode || '' 
+          brCode: pixData.brCode || '',
         }
       });
 
       return NextResponse.json({
         success: true,
-        id: billingData.id,
-        transactionId: billingData.id,
-        url: billingData.url, // Link direto para o checkout se necessário
-        brCode: (billingData as any).pix?.brCode || '', // PIX Copia e Cola
-        status: billingData.status,
+        id: pixData.id,
+        transactionId: pixData.id,
+        brCode: pixData.brCode || '',
+        status: pixData.status,
       });
 
     } catch (abacateError: any) {
-      console.error('AbacatePay SDK Error Details:', {
+      console.error('AbacatePay SDK Error:', {
         message: abacateError.message,
         data: abacateError.response?.data,
         status: abacateError.response?.status
       });
-      
+
       const apiError = abacateError.response?.data?.error || abacateError.message;
-      
-      return NextResponse.json({ 
+
+      return NextResponse.json({
         error: 'Erro na API do AbacatePay',
         details: apiError,
         raw: abacateError.response?.data || abacateError
