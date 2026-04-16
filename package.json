@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^7.2.1",
+    "@google-cloud/storage": "^7.19.0",
     "@tanstack/react-query": "^5.99.0",
     "@types/qrcode": "^1.5.6",
     "abacatepay": "^1.0.1",
@@ -18,14 +19,17 @@
     "expo-server-sdk": "^6.1.0",
     "firebase": "^12.12.0",
     "firebase-admin": "^13.8.0",
+    "lucide-react": "^1.8.0",
     "mongoose": "^9.4.1",
     "next": "16.2.4",
     "qrcode.react": "^4.2.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "sharp": "^0.34.5",
     "socket.io-client": "^4.8.3",
     "svix": "^1.90.0",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "vaul": "^1.1.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

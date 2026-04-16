@@ -17,8 +17,11 @@ export interface IUser extends Document {
     phone?: string;
     photoUrl?: string;
     balance: number;
-    chargeMode: boolean;
-    chargePerChar: number;
+    isProfessional: boolean;
+    subscriptionPrice: number;
+    chargePerCharSubscribers: number;
+    chargePerCharNonSubscribers: number;
+    subscribers: string[]; // Array of clerkIds
     expoPushToken?: string;
     savedCards: ICard[];
     createdAt: Date;
@@ -60,17 +63,28 @@ const UserSchema = new Schema<IUser>({
         default: 0,
         min: 0,
     },
-    chargeMode: {
+    isProfessional: {
         type: Boolean,
         default: false,
     },
-    chargePerChar: {
+    subscriptionPrice: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    chargePerCharSubscribers: {
         type: Number,
         default: 0.002,
         min: 0,
     },
-    expoPushToken: {
-        type: String,
+    chargePerCharNonSubscribers: {
+        type: Number,
+        default: 0.005,
+        min: 0,
+    },
+    subscribers: {
+        type: [String],
+        default: [],
     },
     savedCards: {
         type: [{

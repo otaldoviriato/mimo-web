@@ -78,8 +78,11 @@ export function useUpdateProfile() {
             username?: string;
             name?: string;
             photoUrl?: string;
-            chargeMode?: boolean;
-            chargePerChar?: number;
+            gallery?: string[];
+            isProfessional?: boolean;
+            subscriptionPrice?: number;
+            chargePerCharSubscribers?: number;
+            chargePerCharNonSubscribers?: number;
         }) => userApi.updateMe(data),
         onSuccess: (response) => {
             if (response?.user) {
@@ -142,12 +145,78 @@ export function useUserById(userId: string | undefined) {
             } catch (error: any) {
                 return {
                     username: `Usuário ${userId.substring(0, 8)}`,
-                    chargeMode: false,
-                    chargePerChar: 0,
+                    isProfessional: false,
+                    subscriptionPrice: 0,
                 };
             }
         },
         enabled: !!userId,
         staleTime: 2 * 60 * 1000,
+    });
+}
+
+// ─── Galeria ─────────────────────────────────────────────────────────────
+export function useMyGallery() {
+    return useQuery({
+        queryKey: ['gallery', 'me'],
+        queryFn: async () => {
+            const response = await fetch('/api/users/me/gallery');
+            if (!response.ok) return { items: [] };
+            return response.json();
+        },
+    });
+}
+
+export function usePublicGallery(userId: string | undefined) {
+    return useQuery({
+        queryKey: ['gallery', userId],
+        queryFn: async () => {
+            if (!userId) return { items: [] };
+            const response = await fetch(`/api/users/${userId}/gallery`);
+            if (!response.ok) return { items: [] };
+            return response.json();
+        },
+        enabled: !!userId,
+    });
+}
+
+export function useUploadToGallery() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (formData: FormData) => {
+            const response = await fetch('/api/users/me/gallery', {
+                method: 'POST',
+                body: formData,
+            });
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Erro ao fazer upload');
+            }
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['gallery', 'me'] });
+        },
+    });
+}
+
+export function useSubscribe() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (userId: string) => {
+            const response = await fetch(`/api/users/${userId}/subscribe`, {
+                method: 'POST',
+            });
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Erro ao realizar assinatura');
+            }
+            return response.json();
+        },
+        onSuccess: (_, userId) => {
+            queryClient.invalidateQueries({ queryKey: QueryKeys.userById(userId) });
+            queryClient.invalidateQueries({ queryKey: QueryKeys.me });
+            queryClient.invalidateQueries({ queryKey: ['gallery', userId] });
+        },
     });
 }

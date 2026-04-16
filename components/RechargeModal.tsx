@@ -8,6 +8,7 @@ import { userApi } from '@/services/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { QueryKeys } from '@/hooks/useQueries';
 import { useUser } from '@clerk/nextjs';
+import { Drawer } from 'vaul';
 
 interface RechargeModalProps {
     visible: boolean;
@@ -57,6 +58,25 @@ function formatExpiry(text: string): string {
     return clean;
 }
 
+export function formatCPF(val: string) {
+    let v = val.replace(/\D/g, '');
+    if (v.length <= 11) {
+        v = v.replace(/(\d{3})(\d)/, '$1.$2');
+        v = v.replace(/(\d{3})(\d)/, '$1.$2');
+        v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    }
+    return v;
+}
+
+export function formatPhone(val: string) {
+    let v = val.replace(/\D/g, '');
+    if (v.length <= 11) {
+        v = v.replace(/^(\d{2})(\d)/g, '($1) $2');
+        v = v.replace(/(\d)(\d{4})$/, '$1-$2');
+    }
+    return v;
+}
+
 type Step = 'amount_and_method' | 'pix_checkout' | 'processing_payment';
 
 export function RechargeModal({ visible, onClose, onRecharge, onGeneratePix }: RechargeModalProps) {
@@ -75,9 +95,12 @@ export function RechargeModal({ visible, onClose, onRecharge, onGeneratePix }: R
     const [cardExpiry, setCardExpiry] = useState('');
     const [cardCvv, setCardCvv] = useState('');
     const [savingCard, setSavingCard] = useState(false);
+    const [userCpf, setUserCpf] = useState('');
+    const [userPhone, setUserPhone] = useState('');
 
     const cardBrand = detectCardBrand(cardNumber);
     const isNewCardSelected = selectedMethod === 'new_card';
+    const isPixSelected = selectedMethod === 'pix';
 
     useEffect(() => {
         if (visible) {
@@ -92,6 +115,9 @@ export function RechargeModal({ visible, onClose, onRecharge, onGeneratePix }: R
                         brand: c.brand,
                     }));
                     setSavedCards(cards);
+
+                    if (res?.user?.taxId) setUserCpf(formatCPF(res.user.taxId));
+                    if (res?.user?.phone) setUserPhone(formatPhone(res.user.phone));
                 })
                 .catch(() => setSavedCards([]));
         }
@@ -173,6 +199,11 @@ export function RechargeModal({ visible, onClose, onRecharge, onGeneratePix }: R
         if (selectedMethod === 'pix' && onGeneratePix) {
             setLoading(true);
             try {
+                await userApi.updateMe({
+                    taxId: userCpf.replace(/\D/g, ''),
+                    phone: userPhone.replace(/\D/g, '')
+                });
+
                 const data = await onGeneratePix(amount);
                 if (data?.success) {
                     setPixData(data);
@@ -223,20 +254,23 @@ export function RechargeModal({ visible, onClose, onRecharge, onGeneratePix }: R
 
     const allMethods = [...savedCards, ...INITIAL_METHODS];
     const finalAmount = getFinalAmount();
-    const canConfirm = finalAmount > 0 && selectedMethod !== '' && selectedMethod !== 'new_card';
-
-    if (!visible) return null;
+    const isPixValid = isPixSelected 
+        ? userCpf.replace(/\D/g, '').length === 11 && userPhone.replace(/\D/g, '').length >= 10 
+        : true;
+    const canConfirm = finalAmount > 0 && selectedMethod !== '' && selectedMethod !== 'new_card' && isPixValid;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60" onClick={() => handleClose()}>
-            <div
-                className="w-full max-w-lg bg-white rounded-t-3xl p-6 max-h-[92vh] flex flex-col shadow-2xl"
-                onClick={(e) => e.stopPropagation()}
-            >
-                {step === 'amount_and_method' ? (
-                    <>
-                        <div className="flex items-center justify-between mb-5">
-                            <h2 className="text-xl font-bold text-gray-900">Recarregar Saldo</h2>
+        <Drawer.Root open={visible} onOpenChange={(open) => !open && handleClose()}>
+            <Drawer.Portal>
+                <Drawer.Overlay className="fixed inset-0 z-[100] bg-black/60" />
+                <Drawer.Content className="fixed inset-x-0 bottom-0 z-[101] flex flex-col bg-white rounded-t-[32px] max-h-[92vh] w-full max-w-lg mx-auto outline-none shadow-2xl">
+                    <div className="w-full flex-1 overflow-y-auto flex flex-col p-6 pb-8">
+                        <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-200 mb-6" />
+                        
+                        {step === 'amount_and_method' ? (
+                            <>
+                                <div className="flex items-center justify-between mb-5">
+                                    <Drawer.Title className="text-xl font-bold text-gray-900">Recarregar Saldo</Drawer.Title>
                             <button
                                 onClick={() => handleClose()}
                                 className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
@@ -349,8 +383,8 @@ export function RechargeModal({ visible, onClose, onRecharge, onGeneratePix }: R
                                                 )}
                                             </div>
                                         </div>
-                                        <div className="flex gap-3">
-                                            <div className="flex-1 flex flex-col gap-1">
+                                        <div className="flex gap-3 w-full">
+                                            <div className="flex-1 flex flex-col gap-1 min-w-0">
                                                 <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Validade</label>
                                                 <input
                                                     type="text"
@@ -358,10 +392,10 @@ export function RechargeModal({ visible, onClose, onRecharge, onGeneratePix }: R
                                                     value={cardExpiry}
                                                     onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
                                                     maxLength={5}
-                                                    className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                                    className="w-full min-w-0 bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
                                                 />
                                             </div>
-                                            <div className="flex-1 flex flex-col gap-1">
+                                            <div className="flex-1 flex flex-col gap-1 min-w-0">
                                                 <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">CVV</label>
                                                 <input
                                                     type="password"
@@ -369,7 +403,7 @@ export function RechargeModal({ visible, onClose, onRecharge, onGeneratePix }: R
                                                     value={cardCvv}
                                                     onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
                                                     maxLength={4}
-                                                    className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                                    className="w-full min-w-0 bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
                                                 />
                                             </div>
                                         </div>
@@ -380,6 +414,34 @@ export function RechargeModal({ visible, onClose, onRecharge, onGeneratePix }: R
                                         >
                                             {savingCard ? 'Salvando...' : 'Salvar Cartão'}
                                         </button>
+                                    </div>
+                                )}
+
+                                {/* Pix details form */}
+                                {isPixSelected && (
+                                    <div className="mt-3 p-4 bg-gray-50 border border-purple-200 rounded-2xl flex flex-col gap-3">
+                                        <div className="flex flex-col gap-1">
+                                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">CPF</label>
+                                            <input
+                                                type="text"
+                                                placeholder="000.000.000-00"
+                                                value={userCpf}
+                                                onChange={(e) => setUserCpf(formatCPF(e.target.value))}
+                                                maxLength={14}
+                                                className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            />
+                                        </div>
+                                        <div className="flex flex-col gap-1">
+                                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Telefone</label>
+                                            <input
+                                                type="text"
+                                                placeholder="(00) 00000-0000"
+                                                value={userPhone}
+                                                onChange={(e) => setUserPhone(formatPhone(e.target.value))}
+                                                maxLength={15}
+                                                className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            />
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -410,7 +472,9 @@ export function RechargeModal({ visible, onClose, onRecharge, onGeneratePix }: R
                         onCancel={() => resetState()}
                     />
                 )}
-            </div>
-        </div>
+                    </div>
+                </Drawer.Content>
+            </Drawer.Portal>
+        </Drawer.Root>
     );
 }

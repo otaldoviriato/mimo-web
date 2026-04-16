@@ -61,9 +61,10 @@ export async function POST(req: Request) {
                     ...(image_url ? { photoUrl: image_url } : {}),
                 },
                 $setOnInsert: {
-                    balance: 1000, // R$ 10,00 de bônus inicial (armazenado em representação decimal ou conforme schema)
-                    chargeMode: false,
-                    chargePerChar: 0.002,
+                    balance: 1000, 
+                    isProfessional: false,
+                    chargePerCharSubscribers: 0.002,
+                    chargePerCharNonSubscribers: 0.005,
                 }
             },
             { upsert: true, new: true }

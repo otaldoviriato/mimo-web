@@ -16,9 +16,12 @@ interface Message {
     content: string;
     charCount: number;
     cost: number;
-    receiverEarnings?: number;
     timestamp: string;
     isRead?: boolean;
+    isLockedImage?: boolean;
+    lockedImagePrice?: number;
+    originalImageUrl?: string;
+    blurredImageUrl?: string;
 }
 
 export default function ChatPage({ params }: { params: Promise<{ userId: string }> }) {
@@ -26,13 +29,19 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
     const router = useRouter();
     const queryClient = useQueryClient();
     const { user } = useUser();
-    const { socket, connected, socketService } = useSocket(user?.id);
+    const { socket, connected, socketService, socketVersion } = useSocket(user?.id);
 
     const [messages, setMessages] = useState<Message[]>([]);
     const [messageText, setMessageText] = useState('');
     const [sending, setSending] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
     const [menuVisible, setMenuVisible] = useState(false);
+    const [selectedImage, setSelectedImage] = useState<File | null>(null);
+    const [imagePriceStr, setImagePriceStr] = useState('');
+    const [uploadingImage, setUploadingImage] = useState(false);
+    const [giftModalVisible, setGiftModalVisible] = useState(false);
+    const [giftAmountStr, setGiftAmountStr] = useState('');
+    const [sendingGift, setSendingGift] = useState(false);
 
     const { data: userData } = useMyProfile();
     const { data: receiver } = useUserById(otherUserId);
@@ -40,6 +49,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const typingTimeoutRef = useRef<any>(null);
 
     const roomId = [user?.id, otherUserId].sort().join('_');
@@ -60,6 +70,18 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
         socket.on('room_joined', (data: { messages: Message[] }) => {
             setMessages([...data.messages]);
             socket.emit('mark_as_read', { roomId });
+
+            // Atualiza cache local de rooms
+            queryClient.setQueryData(QueryKeys.rooms(user.id!), (old: any) => {
+                if (!old) return old;
+                return old.map((r: any) => {
+                    const rId = r.roomId ?? [...r.participants].sort().join('_');
+                    if (rId === roomId) {
+                        return { ...r, unreadCount: { ...r.unreadCount, [user.id!]: 0 } };
+                    }
+                    return r;
+                });
+            });
         });
 
         socketService.onNewMessage((data: { message: Message }) => {
@@ -67,6 +89,18 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                 const newMessages = [...prev, data.message];
                 if (data.message.receiverId === user?.id) {
                     socket.emit('mark_as_read', { roomId });
+
+                    // Atualiza cache local de rooms
+                    queryClient.setQueryData(QueryKeys.rooms(user.id!), (old: any) => {
+                        if (!old) return old;
+                        return old.map((r: any) => {
+                            const rId = r.roomId ?? [...r.participants].sort().join('_');
+                            if (rId === roomId) {
+                                return { ...r, unreadCount: { ...r.unreadCount, [user.id!]: 0 } };
+                            }
+                            return r;
+                        });
+                    });
                 }
                 return newMessages;
             });
@@ -98,21 +132,57 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
             }
         });
 
+        socket.on('message_updated', (data: { message: Message }) => {
+            setMessages((prev) => prev.map(m => m._id === data.message._id ? data.message : m));
+        });
+
+        // Listener para room_read (caso seja marcado como lido de outro lugar)
+        socket.on('room_read', (data: { roomId: string; userId: string }) => {
+            if (data.roomId === roomId && data.userId === user?.id) {
+                queryClient.setQueryData(QueryKeys.rooms(user.id!), (old: any) => {
+                    if (!old) return old;
+                    return old.map((r: any) => {
+                        const rId = r.roomId ?? [...r.participants].sort().join('_');
+                        if (rId === roomId) {
+                            return { ...r, unreadCount: { ...r.unreadCount, [user.id!]: 0 } };
+                        }
+                        return r;
+                    });
+                });
+            }
+        });
+
         return () => {
+            socketService.leaveRoom(roomId);
             socket.off('room_joined');
             socketService.offNewMessage();
             socket.off('balance_update');
             socket.off('message_error');
             socket.off('user_typing');
             socket.off('messages_read');
+            socket.off('message_updated');
+            socket.off('room_read');
         };
-    }, [socket, roomId, otherUserId]);
+    }, [socket, socketVersion, roomId, otherUserId]);
 
     const handleSend = () => {
         if (!messageText.trim() || sending || !socket) return;
         setSending(true);
         socketService.sendMessage(messageText.trim(), otherUserId, roomId);
         socket.emit('mark_as_read', { roomId });
+
+        // Atualiza cache local de rooms
+        queryClient.setQueryData(QueryKeys.rooms(user?.id ?? ''), (old: any) => {
+            if (!old) return old;
+            return old.map((r: any) => {
+                const rId = r.roomId ?? [...r.participants].sort().join('_');
+                if (rId === roomId) {
+                    return { ...r, unreadCount: { ...r.unreadCount, [user?.id ?? '']: 0 } };
+                }
+                return r;
+            });
+        });
+
         setMessageText('');
         setSending(false);
         inputRef.current?.focus();
@@ -136,11 +206,134 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
         }
     };
 
+    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const file = e.target.files[0];
+            setSelectedImage(file);
+            // Se for cliente (não cobra por msg), envia direto sem pedir preço
+            if (!userData?.chargeMode) {
+                // Pequeno delay para o estado do selectedImage atualizar (ou apenas passar o file direto)
+                // Mas para manter a consistência com handleSendImage, vamos apenas disparar o envio com preço zero
+                setTimeout(() => {
+                    handleAutoSendImage(file);
+                }, 100);
+            }
+        }
+    };
+
+    const handleAutoSendImage = async (file: File) => {
+        if (!file || !user?.id) return;
+        setUploadingImage(true);
+        try {
+            const formData = new FormData();
+            formData.append('photo', file);
+            formData.append('roomId', roomId);
+            formData.append('receiverId', otherUserId);
+            formData.append('lockedImagePrice', '0');
+            
+            const res = await fetch('/api/chats/image', {
+                method: 'POST',
+                body: formData,
+            });
+            const data = await res.json();
+            if (!data.success) {
+                alert(data.error || 'Erro ao enviar imagem');
+            }
+            setSelectedImage(null);
+        } catch (e) {
+            alert('Erro ao enviar imagem');
+        } finally {
+            setUploadingImage(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const handleSendImage = async () => {
+        if (!selectedImage || !router || !user?.id) return;
+        setUploadingImage(true);
+        try {
+            const formData = new FormData();
+            formData.append('photo', selectedImage);
+            formData.append('roomId', roomId);
+            formData.append('receiverId', otherUserId);
+            formData.append('lockedImagePrice', imagePriceStr || '0');
+            
+            const res = await fetch('/api/chats/image', {
+                method: 'POST',
+                body: formData,
+            });
+            const data = await res.json();
+            if (!data.success) {
+                alert(data.error || 'Erro ao enviar imagem');
+            } else {
+                setSelectedImage(null);
+                setImagePriceStr('');
+            }
+        } catch (e) {
+            alert('Erro ao enviar imagem');
+        } finally {
+            setUploadingImage(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const handleUnlockImage = async (messageId: string, priceInCents: number) => {
+        if (confirm(`Deseja desbloquear esta imagem por R$ ${(priceInCents / 100).toFixed(2)}?`)) {
+            if (balance < priceInCents) {
+                alert(`Você não tem saldo suficiente. Recarregue sua carteira.`);
+                return;
+            }
+            try {
+                const res = await fetch(`/api/chats/message/${messageId}/unlock`, { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    alert(data.error || 'Erro ao desbloquear imagem');
+                }
+            } catch (e) {
+                alert('Erro na requisição');
+            }
+        }
+    };
+
+    const handleSendGift = async () => {
+        if (!giftAmountStr || parseFloat(giftAmountStr) <= 0) return;
+        setSendingGift(true);
+        try {
+            const res = await fetch('/api/chats/gift', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    roomId,
+                    receiverId: otherUserId,
+                    amount: giftAmountStr
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setGiftModalVisible(false);
+                setGiftAmountStr('');
+            } else {
+                alert(data.error || 'Erro ao enviar presente');
+            }
+        } catch (e) {
+            alert('Erro de conexão');
+        } finally {
+            setSendingGift(false);
+        }
+    };
+
     const charCount = messageText.length;
-    const chargePerChar = receiver?.chargeMode ? (receiver.chargePerChar ?? 0.002) : 0;
+    const isSubscriber = receiver?.subscribers?.includes(user?.id ?? '');
+    const currentRate = receiver?.isProfessional 
+        ? (isSubscriber ? receiver.chargePerCharSubscribers : receiver.chargePerCharNonSubscribers) ?? 0.005
+        : 0;
+
     let estimatedCostInReais = 0;
-    if (charCount > 0 && receiver?.chargeMode) {
-        const costPerCharInCents = chargePerChar * 100;
+    if (charCount > 0 && receiver?.isProfessional) {
+        const costPerCharInCents = currentRate * 100;
         const rawCostInCents = charCount * costPerCharInCents;
         const totalCostInCents = Math.max(1, Math.ceil(rawCostInCents));
         estimatedCostInReais = totalCostInCents / 100;
@@ -149,26 +342,40 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
     return (
         <div className="flex flex-col h-full bg-gray-50">
             {/* Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-4 py-3 flex items-center gap-3 shrink-0 shadow-sm">
+            <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 z-10 sticky top-0 shadow-md flex items-center gap-2">
                 <button
                     onClick={() => router.push('/chats')}
-                    className="text-white/80 hover:text-white transition-colors p-1 -ml-1"
+                    className="text-white hover:bg-white/10 transition-colors p-2 -ml-2 rounded-full"
                 >
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                        <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                 </button>
-
-                <Avatar uri={receiver?.photoUrl} size={36} />
-
-                <div className="flex-1 min-w-0">
-                    <p className="text-base font-bold text-white truncate">
-                        {receiver?.name || receiver?.username || 'Conversa'}
-                    </p>
-                    {!connected && (
-                        <p className="text-xs text-white/60">Conectando...</p>
-                    )}
-                </div>
+                <button 
+                    onClick={() => otherUserId && router.push(`/user/${otherUserId}`)}
+                    className="flex-1 flex items-center gap-2 min-w-0 text-left py-0.5"
+                >
+                    <div className="relative shrink-0">
+                        <Avatar uri={receiver?.photoUrl} size={34} />
+                        {connected && <div className="absolute -right-0.5 -bottom-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-purple-600 rounded-full" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-base font-black text-white truncate tracking-tight">
+                            {receiver?.name || receiver?.username || (otherUserId ? `Usuário ${otherUserId.substring(0, 8)}` : 'Conversa')}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                            {!connected ? (
+                                <span className="text-[10px] text-white/50 font-bold uppercase tracking-widest">Conectando...</span>
+                            ) : isTyping ? (
+                                <span className="text-[10px] text-white font-black animate-pulse uppercase tracking-widest">Digitando...</span>
+                            ) : (
+                                <span className="text-[10px] text-white/60 font-medium truncate uppercase tracking-tighter">
+                                    {receiver?.username ? `@${receiver.username}` : 'Ver perfil'}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                </button>
 
                 <div className="flex items-center gap-2">
                     {!connected && (
@@ -223,24 +430,67 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-1">
-                {messages.map((item) => {
+            <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col-reverse gap-1">
+                <div ref={messagesEndRef} />
+                {isTyping && (
+                    <div className="flex justify-start">
+                        <div className="bg-white rounded-2xl rounded-bl-sm px-4 py-2.5 shadow-sm">
+                            <div className="flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {[...messages].reverse().map((item) => {
                     const isMine = item.senderId === user?.id;
+                    const isLocked = item.isLockedImage;
                     return (
                         <div
                             key={item._id}
-                            className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}
+                            className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-1`}
                         >
-                            <div
-                                className={`max-w-[75%] px-4 py-3 rounded-2xl ${isMine
-                                    ? 'bg-purple-600 text-white rounded-br-sm'
-                                    : 'bg-white text-gray-900 shadow-sm rounded-bl-sm'
+                            {item.isGift ? (
+                                <div
+                                    className={`max-w-[85%] rounded-[2rem] overflow-hidden shadow-md border-2 ${
+                                        isMine 
+                                            ? 'bg-purple-600 border-purple-500 rounded-br-none' 
+                                            : 'bg-white border-purple-50 border-2 rounded-bl-none'
                                     }`}
-                            >
-                                <p className="text-sm leading-relaxed whitespace-pre-wrap">{item.content}</p>
-                                <div className="flex items-center justify-between mt-1 gap-2">
-                                    <div className="flex items-center gap-1">
-                                        <span className={`text-xs ${isMine ? 'text-purple-200' : 'text-gray-400'}`}>
+                                >
+                                    <div className="px-8 py-8 flex flex-col items-center gap-4">
+                                        <div className="relative group">
+                                            <div className={`absolute inset-0 blur-2xl opacity-20 ${isMine ? 'bg-white' : 'bg-purple-600'}`} />
+                                            <img 
+                                                src="/assets/gift.png" 
+                                                alt="Gift" 
+                                                className="w-24 h-24 object-contain relative drop-shadow-xl animate-bounce" 
+                                                style={{ animationDuration: '4s' }} 
+                                            />
+                                        </div>
+                                        
+                                        <div className="text-center">
+                                            <p className={`text-[11px] font-black uppercase tracking-[0.2em] mb-2 ${isMine ? 'text-purple-200' : 'text-purple-500'}`}>
+                                                {isMine ? 'Mimo Enviado' : 'Você recebeu um presente'}
+                                            </p>
+                                            <p className={`text-4xl font-black tracking-tight ${isMine ? 'text-white' : 'text-gray-900'}`}>
+                                                R$ {(item.cost / 100).toFixed(2)}
+                                            </p>
+                                        </div>
+
+                                        {!isMine && (
+                                            <div className="mt-2 px-4 py-1.5 bg-green-500/10 rounded-full border border-green-500/20 flex items-center gap-2">
+                                                <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                                                <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">
+                                                    Saldo Adicionado
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className={`px-5 py-3 flex items-center justify-between gap-4 ${isMine ? 'bg-purple-700/40' : 'bg-gray-50/50'}`}>
+                                        <span className={`text-[11px] font-bold ${isMine ? 'text-purple-200' : 'text-gray-400'}`}>
                                             {(() => {
                                                 try {
                                                     return new Date(item.timestamp).toLocaleTimeString('pt-BR', {
@@ -256,45 +506,120 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                                             </span>
                                         )}
                                     </div>
-                                    {item.cost > 0 && (
-                                        <span className={`text-xs font-medium ${isMine ? 'text-purple-200' : 'text-green-500'}`}>
-                                            {(() => {
-                                                const isNewSystem = item.cost >= 1;
-                                                const formattedCost = isNewSystem ? item.cost / 100 : item.cost;
-                                                const formattedEarnings = isNewSystem
-                                                    ? (item.receiverEarnings ?? item.cost * 0.9) / 100
-                                                    : (item.receiverEarnings ?? item.cost * 0.9);
-                                                return isMine ? `-R$ ${formattedCost.toFixed(2)}` : `+R$ ${formattedEarnings.toFixed(2)}`;
-                                            })()}
-                                        </span>
-                                    )}
                                 </div>
-                            </div>
+                            ) : (
+                                <div
+                                    className={`max-w-[75%] ${isLocked || item.originalImageUrl ? 'p-1 bg-transparent' : 'px-4 py-3'} rounded-2xl ${
+                                        (!isLocked && !item.originalImageUrl) 
+                                            ? (isMine ? 'bg-purple-600 text-white rounded-br-sm' : 'bg-white text-gray-900 shadow-sm rounded-bl-sm')
+                                            : (isMine ? 'rounded-br-sm' : 'rounded-bl-sm')
+                                        }`}
+                                >
+                                    {isLocked ? (
+                                        <div className="relative rounded-2xl overflow-hidden cursor-pointer bg-gray-200 shadow-sm" onClick={() => !isMine && handleUnlockImage(item._id, item.lockedImagePrice || 0)}>
+                                            <img src={isMine ? item.originalImageUrl : item.blurredImageUrl} className="w-full h-auto object-cover max-h-[300px]" alt="Locked Image" />
+                                            {!isMine ? (
+                                                <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center flex-col">
+                                                    <div className="bg-white/20 backdrop-blur-md rounded-2xl px-5 py-3 border border-white/30 shadow-xl text-center font-semibold text-white transition-transform hover:scale-105 active:scale-95">
+                                                        🔓 Desbloquear<br/><span className="text-xl">R$ {((item.lockedImagePrice || 0) / 100).toFixed(2)}</span>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="absolute top-3 right-3">
+                                                    <div className="bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 flex items-center gap-1.5 shadow-lg">
+                                                        <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                                                        <span className="text-[10px] font-bold text-white uppercase tracking-wider">Aguardando compra</span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : item.originalImageUrl ? (
+                                        <div className="relative rounded-2xl overflow-hidden bg-gray-100 shadow-sm">
+                                            <img src={item.originalImageUrl} className="w-full h-auto object-cover max-h-[300px]" alt="Image" />
+                                            {isMine && item.lockedImagePrice! > 0 && (
+                                                <div className="absolute top-3 right-3">
+                                                    <div className="bg-green-500/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 flex items-center gap-1.5 shadow-lg animate-in fade-in zoom-in duration-300">
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="text-white">
+                                                            <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                                                        </svg>
+                                                        <span className="text-[10px] font-bold text-white uppercase tracking-wider">Foto aberta</span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{item.content}</p>
+                                    )}
+                                    <div className={`flex items-center justify-between mt-1 gap-2 ${isLocked || item.originalImageUrl ? 'px-2 pb-1' : ''}`}>
+                                        <div className="flex items-center gap-1">
+                                            <span className={`text-xs ${isMine ? (isLocked || item.originalImageUrl ? 'text-gray-500' : 'text-purple-200') : 'text-gray-400'}`}>
+                                                {(() => {
+                                                    try {
+                                                        return new Date(item.timestamp).toLocaleTimeString('pt-BR', {
+                                                            hour: '2-digit',
+                                                            minute: '2-digit',
+                                                        });
+                                                    } catch { return ''; }
+                                                })()}
+                                            </span>
+                                            {isMine && (
+                                                <span className={`text-xs ${item.isRead ? 'text-blue-300' : 'text-purple-300'}`}>
+                                                    {item.isRead ? '✓✓' : '✓'}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {item.cost > 0 && (
+                                            <span className={`text-xs font-medium ${isMine ? 'text-purple-200' : 'text-green-500'}`}>
+                                                {(() => {
+                                                    const isNewSystem = item.cost >= 1;
+                                                    const formattedCost = isNewSystem ? item.cost / 100 : item.cost;
+                                                    const formattedEarnings = isNewSystem
+                                                        ? (item.receiverEarnings ?? item.cost * 0.9) / 100
+                                                        : (item.receiverEarnings ?? item.cost * 0.9);
+                                                    return isMine ? `-R$ ${formattedCost.toFixed(2)}` : `+R$ ${formattedEarnings.toFixed(2)}`;
+                                                })()}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     );
                 })}
-                {isTyping && (
-                    <div className="flex justify-start">
-                        <div className="bg-white rounded-2xl rounded-bl-sm px-4 py-2.5 shadow-sm">
-                            <div className="flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-                            </div>
-                        </div>
-                    </div>
-                )}
-                <div ref={messagesEndRef} />
             </div>
 
             {/* Input area */}
             <div className="bg-white border-t border-gray-200 px-4 py-3 shrink-0">
                 {estimatedCostInReais > 0 && (
-                    <p className="text-xs text-gray-400 text-center mb-2">
-                        Custo estimado: R$ {estimatedCostInReais.toFixed(2)} ({charCount} caracteres)
+                    <p className="text-[10px] text-gray-400 text-center mb-2">
+                        {isSubscriber ? '💎 Tarifa Assinante' : '🌍 Tarifa Público'}: R$ {estimatedCostInReais.toFixed(2)} ({charCount} chars)
                     </p>
                 )}
                 <div className="flex items-end gap-3">
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={!connected}
+                            className="w-11 h-11 rounded-2xl flex items-center justify-center transition-all bg-gray-50 hover:bg-gray-100 shrink-0"
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-gray-500">
+                                <path d="M4 16L8.586 11.414C8.96106 11.0391 9.46967 10.8284 10 10.8284C10.5303 10.8284 11.0389 11.0391 11.414 11.414L16 16M14 14L15.586 12.414C15.9611 12.0391 16.4697 11.8284 17 11.8284C17.5303 11.8284 18.0389 12.0391 18.414 12.414L20 14M14 8H14.01M6 20H18C18.5304 20 19.0391 19.7893 19.4142 19.4142C19.7893 19.0391 20 18.5304 20 18V6C20 5.46957 19.7893 4.96086 19.4142 4.58579C19.0391 4.21071 18.5304 4 18 4H6C5.46957 4 4.96086 4.21071 4.58579 4.58579C4.21071 4.96086 4 5.46957 4 6V18C4 18.5304 4.21071 19.0391 4.58579 19.4142C4.96086 19.7893 5.304 20 6 20Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                        </button>
+                        {!userData?.isProfessional && (
+                            <button
+                                onClick={() => setGiftModalVisible(true)}
+                                disabled={!connected}
+                                className="w-11 h-11 rounded-2xl flex items-center justify-center transition-all bg-purple-50 hover:bg-purple-100 shrink-0 border border-purple-100"
+                            >
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-purple-600">
+                                    <path d="M20 12V22H4V12M2 7H22V12H2V7ZM12 22V7M12 7C12 7 9.5 3 6.5 3C3.5 3 3.5 7 6.5 7H12ZM12 7H17.5C20.5 7 20.5 3 17.5 3C14.5 3 12 7 12 7Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                            </button>
+                        )}
+                    </div>
+                    <input type="file" className="hidden" ref={fileInputRef} accept="image/*" onChange={handleImageSelect} />
+
                     <div className="flex-1 flex items-end bg-gray-100 rounded-2xl px-4 py-2 min-h-[44px] max-h-[120px]">
                         <textarea
                             ref={inputRef}
@@ -334,6 +659,59 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                     </button>
                 </div>
             </div>
+
+            {selectedImage && userData?.isProfessional && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm flex flex-col items-center shadow-2xl">
+                        <h3 className="font-bold text-xl text-gray-900 mb-4 tracking-tight">Valor da foto</h3>
+                        <div className="w-full relative rounded-2xl overflow-hidden mb-6 aspect-square bg-gray-100">
+                            <img src={URL.createObjectURL(selectedImage)} className="w-full h-full object-cover" />
+                        </div>
+                        <div className="w-full relative mb-6">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-gray-400">R$</span>
+                            <input type="number" step="0.01" className="bg-gray-50 border border-gray-100 rounded-2xl p-4 pl-10 w-full text-center text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all" placeholder="0.00" value={imagePriceStr} onChange={e => setImagePriceStr(e.target.value)} />
+                        </div>
+                        <div className="flex gap-3 w-full">
+                            <button className="flex-1 h-12 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-semibold transition-colors" onClick={() => setSelectedImage(null)}>Cancelar</button>
+                            <button disabled={uploadingImage} className="flex-1 h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-semibold flex justify-center items-center transition-colors shadow-lg shadow-purple-600/30 disabled:opacity-50" onClick={handleSendImage}>
+                                {uploadingImage ? (
+                                    <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                    </svg>
+                                ) : "Enviar"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {giftModalVisible && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm flex flex-col items-center shadow-2xl relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-purple-500 to-pink-500" />
+                        <h3 className="font-bold text-xl text-gray-900 mb-4 tracking-tight">Enviar Presente 🎁</h3>
+                        <div className="w-full relative rounded-2xl overflow-hidden mb-6 aspect-square bg-purple-50 flex items-center justify-center">
+                            <img src="/assets/gift.png" className="w-40 h-40 object-contain animate-bounce" style={{ animationDuration: '3s' }} />
+                        </div>
+                        <div className="w-full relative mb-6">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-gray-400">R$</span>
+                            <input type="number" step="0.01" className="bg-gray-50 border border-gray-100 rounded-2xl p-4 pl-10 w-full text-center text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all" placeholder="Valor" value={giftAmountStr} onChange={e => setGiftAmountStr(e.target.value)} />
+                        </div>
+                        <div className="flex gap-3 w-full">
+                            <button className="flex-1 h-12 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-semibold transition-colors" onClick={() => setGiftModalVisible(false)}>Agora não</button>
+                            <button disabled={sendingGift || !giftAmountStr} className="flex-1 h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-semibold flex justify-center items-center transition-colors shadow-lg shadow-purple-600/30 disabled:opacity-50" onClick={handleSendGift}>
+                                {sendingGift ? (
+                                    <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                    </svg>
+                                ) : "Mimar"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -31,8 +31,9 @@ export async function GET() {
                     username: username,
                     name: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' '),
                     balance: 0,
-                    chargeMode: false,
-                    chargePerChar: 0.002,
+                    isProfessional: false,
+                    chargePerCharSubscribers: 0.002,
+                    chargePerCharNonSubscribers: 0.005,
                 });
             } catch (createError) {
                 console.error("Error lazy creating user:", createError);
@@ -71,8 +72,11 @@ export async function GET() {
                 taxId: user.taxId,
                 photoUrl: user.photoUrl,
                 balance: user.balance,
-                chargeMode: user.chargeMode,
-                chargePerChar: user.chargePerChar,
+                isProfessional: user.isProfessional,
+                subscriptionPrice: user.subscriptionPrice || 0,
+                chargePerCharSubscribers: user.chargePerCharSubscribers ?? 0.002,
+                chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? 0.005,
+                subscribers: user.subscribers || [],
             },
         });
     } catch (error: any) {
@@ -91,39 +95,49 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { username, name, photoUrl, chargeMode, chargePerChar, phone, taxId } = body;
+        const { username, name, photoUrl, phone, taxId, isProfessional, subscriptionPrice, chargePerCharSubscribers, chargePerCharNonSubscribers } = body;
 
         await connectToDatabase();
 
         const currentUser = await User.findOne({ clerkId: userId });
 
-        // Valida mudança de chargeMode
-        if (chargeMode !== undefined && currentUser && chargeMode !== currentUser.chargeMode) {
+        // Valida mudança de isProfessional (mesma lógica que era do chargeMode)
+        if (isProfessional !== undefined && currentUser && isProfessional !== currentUser.isProfessional) {
             if (currentUser.balance > 0) {
                 return NextResponse.json(
-                    { error: 'Você só pode alterar o modo de cobrança com saldo zerado' },
+                    { error: 'Você só pode alterar o status profissional com saldo zerado' },
                     { status: 400 }
                 );
             }
         }
 
-        const chargeModeIsChanging =
-            chargeMode !== undefined &&
+        const isProfessionalChanging =
+            isProfessional !== undefined &&
             currentUser &&
-            chargeMode !== currentUser.chargeMode;
+            isProfessional !== currentUser.isProfessional;
 
         const updateData: any = {};
         if (username !== undefined) updateData.username = username;
         if (name !== undefined) updateData.name = name.trim();
         if (photoUrl !== undefined) updateData.photoUrl = photoUrl;
-        if (chargeMode !== undefined) updateData.chargeMode = chargeMode;
         if (phone !== undefined) updateData.phone = phone;
         if (taxId !== undefined) updateData.taxId = taxId;
-        if (chargePerChar !== undefined) {
-            if (chargePerChar < 0) {
-                return NextResponse.json({ error: 'Charge per char cannot be negative' }, { status: 400 });
-            }
-            updateData.chargePerChar = chargePerChar;
+        
+        if (isProfessional !== undefined) updateData.isProfessional = isProfessional;
+        
+        if (subscriptionPrice !== undefined) {
+            if (subscriptionPrice < 0) return NextResponse.json({ error: 'Subscription price cannot be negative' }, { status: 400 });
+            updateData.subscriptionPrice = subscriptionPrice;
+        }
+
+        if (chargePerCharSubscribers !== undefined) {
+            if (chargePerCharSubscribers < 0) return NextResponse.json({ error: 'Charge per char cannot be negative' }, { status: 400 });
+            updateData.chargePerCharSubscribers = chargePerCharSubscribers;
+        }
+
+        if (chargePerCharNonSubscribers !== undefined) {
+            if (chargePerCharNonSubscribers < 0) return NextResponse.json({ error: 'Charge per char cannot be negative' }, { status: 400 });
+            updateData.chargePerCharNonSubscribers = chargePerCharNonSubscribers;
         }
 
         const user = await User.findOneAndUpdate(
@@ -139,8 +153,8 @@ export async function PATCH(request: NextRequest) {
             { returnDocument: 'after', runValidators: true, upsert: true }
         );
 
-        // Se chargeMode mudou, deleta todas as conversas do usuário
-        if (chargeModeIsChanging) {
+        // Se isProfessional mudou, deleta todas as conversas do usuário
+        if (isProfessionalChanging) {
             const rooms = await Room.find({ participants: userId }).select('_id').lean();
             const roomIds = rooms.map((r: any) => r._id);
 
@@ -161,8 +175,11 @@ export async function PATCH(request: NextRequest) {
                 taxId: user.taxId,
                 photoUrl: user.photoUrl,
                 balance: user.balance,
-                chargeMode: user.chargeMode,
-                chargePerChar: user.chargePerChar,
+                isProfessional: user.isProfessional,
+                subscriptionPrice: user.subscriptionPrice || 0,
+                chargePerCharSubscribers: user.chargePerCharSubscribers ?? 0.002,
+                chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? 0.005,
+                subscribers: user.subscribers || [],
             },
         });
     } catch (error: any) {

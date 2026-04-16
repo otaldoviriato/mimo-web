@@ -41,9 +41,13 @@ export const userApi = {
     updateMe: async (data: {
         username?: string;
         name?: string;
+        taxId?: string;
+        phone?: string;
         photoUrl?: string;
-        chargeMode?: boolean;
-        chargePerChar?: number;
+        isProfessional?: boolean;
+        subscriptionPrice?: number;
+        chargePerCharSubscribers?: number;
+        chargePerCharNonSubscribers?: number;
     }) => {
         const response = await api.patch('/api/users/me', data);
         return response.data;

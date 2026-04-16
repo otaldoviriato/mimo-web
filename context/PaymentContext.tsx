@@ -48,14 +48,12 @@ export function PaymentProvider({ children }: { children: React.ReactNode }) {
     return (
         <PaymentContext.Provider value={{ openRechargeModal }}>
             {children}
-            {isModalVisible && (
-                <RechargeModal
-                    visible={isModalVisible}
-                    onClose={closeRechargeModal}
-                    onRecharge={handleRecharge}
-                    onGeneratePix={handleGeneratePix}
-                />
-            )}
+            <RechargeModal
+                visible={isModalVisible}
+                onClose={closeRechargeModal}
+                onRecharge={handleRecharge}
+                onGeneratePix={handleGeneratePix}
+            />
         </PaymentContext.Provider>
     );
 }

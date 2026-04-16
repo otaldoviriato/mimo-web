@@ -16,47 +16,56 @@ export async function GET(request: NextRequest) {
         }
 
         const searchParams = request.nextUrl.searchParams;
-        const username = searchParams.get('username');
+        const query = searchParams.get('username') || searchParams.get('query');
 
-        if (!username) {
-            return NextResponse.json({ error: 'Username parameter required' }, { status: 400 });
+        if (!query) {
+            return NextResponse.json({ error: 'Search query required' }, { status: 400 });
         }
 
-        const cleanUsername = username.replace('@', '');
+        const cleanQuery = query.replace('@', '');
 
         await connectToDatabase();
 
-        // Busca o próprio usuário para saber seu chargeMode
-        const me = await User.findOne({ clerkId: userId }).select('chargeMode').lean() as any;
-        const myChargeMode = me?.chargeMode ?? false;
+        // Busca o próprio usuário para saber seu isProfessional
+        const me = await User.findOne({ clerkId: userId }).select('isProfessional').lean() as any;
+        const myIsProfessional = me?.isProfessional ?? false;
 
-        const foundUser = await User.findOne({
-            username: { $regex: new RegExp(`^${cleanUsername}$`, 'i') },
+        const foundUsers = await User.find({
+            $or: [
+                { username: { $regex: new RegExp(cleanQuery, 'i') } },
+                { name: { $regex: new RegExp(cleanQuery, 'i') } }
+            ],
             clerkId: { $ne: userId },
-        }).select('clerkId username email photoUrl chargeMode chargePerChar');
+            // Removido o filtro estrito de isProfessional aqui para permitir que a busca encontre o usuário,
+            // mesmo que eles tenham o mesmo status. A incompatibilidade será tratada na navegação/chat.
+        }).select('clerkId username name email photoUrl isProfessional subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers').limit(20).lean() as any[];
 
-        if (!foundUser) {
+        if (!foundUsers || foundUsers.length === 0) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        // Só permite buscar o oposto: quem cobra busca quem não cobra, e vice-versa
-        if (foundUser.chargeMode === myChargeMode) {
-            return NextResponse.json(
-                { error: 'incompatible_charge_mode' },
-                { status: 404 }
-            );
-        }
+        // Ordenação manual: Exact username matches primeiro
+        const sortedUsers = foundUsers.sort((a, b) => {
+            const aExact = a.username.toLowerCase() === cleanQuery.toLowerCase();
+            const bExact = b.username.toLowerCase() === cleanQuery.toLowerCase();
+            if (aExact && !bExact) return -1;
+            if (!aExact && bExact) return 1;
+            return 0;
+        });
 
         return NextResponse.json({
-            user: {
-                id: foundUser._id,
-                clerkId: foundUser.clerkId,
-                username: foundUser.username,
-                email: foundUser.email,
-                photoUrl: foundUser.photoUrl,
-                chargeMode: foundUser.chargeMode,
-                chargePerChar: foundUser.chargePerChar,
-            },
+            users: sortedUsers.map(u => ({
+                id: u._id,
+                clerkId: u.clerkId,
+                username: u.username,
+                name: u.name,
+                email: u.email,
+                photoUrl: u.photoUrl,
+                isProfessional: u.isProfessional,
+                subscriptionPrice: u.subscriptionPrice || 0,
+                chargePerCharSubscribers: u.chargePerCharSubscribers ?? 0.002,
+                chargePerCharNonSubscribers: u.chargePerCharNonSubscribers ?? 0.005,
+            })),
         });
     } catch (error: any) {
         console.error('Error searching user:', error);

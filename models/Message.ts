@@ -11,6 +11,11 @@ export interface IMessage extends Document {
     receiverEarnings: number;
     timestamp: Date;
     isRead: boolean;
+    isLockedImage?: boolean;
+    lockedImagePrice?: number;
+    originalImageUrl?: string;
+    blurredImageUrl?: string;
+    isGift?: boolean;
 }
 
 const MessageSchema = new Schema<IMessage>({
@@ -55,6 +60,26 @@ const MessageSchema = new Schema<IMessage>({
         index: true,
     },
     isRead: {
+        type: Boolean,
+        default: false,
+    },
+    isLockedImage: {
+        type: Boolean,
+        default: false,
+    },
+    lockedImagePrice: {
+        type: Number,
+        default: 0,
+    },
+    originalImageUrl: {
+        type: String,
+        default: null,
+    },
+    blurredImageUrl: {
+        type: String,
+        default: null,
+    },
+    isGift: {
         type: Boolean,
         default: false,
     },

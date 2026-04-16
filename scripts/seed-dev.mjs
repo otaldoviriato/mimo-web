@@ -33,8 +33,11 @@ const UserSchema = new mongoose.Schema({
     email:         { type: String, required: true, unique: true },
     photoUrl:      { type: String },
     balance:       { type: Number, default: 0 },
-    chargeMode:    { type: Boolean, default: false },
-    chargePerChar: { type: Number, default: 0.002 },
+    isProfessional: { type: Boolean, default: false },
+    subscriptionPrice: { type: Number, default: 0 },
+    chargePerCharSubscribers: { type: Number, default: 0.002 },
+    chargePerCharNonSubscribers: { type: Number, default: 0.005 },
+    subscribers: { type: [String], default: [] },
     savedCards:    { type: Array, default: [] },
 }, { timestamps: true });
 
@@ -74,8 +77,10 @@ const MOCK_USERS = [
         email:         'ana.silva@mock.com',
         photoUrl:      'https://api.dicebear.com/7.x/avataaars/svg?seed=AnaS',
         balance:       150.50,
-        chargeMode:    true,
-        chargePerChar: 0.003,
+        isProfessional: true,
+        subscriptionPrice: 20,
+        chargePerCharSubscribers: 0.003,
+        chargePerCharNonSubscribers: 0.006,
     },
     {
         clerkId:       'mock_user_carlos_002',
@@ -84,8 +89,7 @@ const MOCK_USERS = [
         email:         'carlos.mendes@mock.com',
         photoUrl:      'https://api.dicebear.com/7.x/avataaars/svg?seed=CarloM',
         balance:       80.00,
-        chargeMode:    false,
-        chargePerChar: 0.002,
+        isProfessional: false,
     },
     {
         clerkId:       'mock_user_juliana_003',
@@ -94,8 +98,10 @@ const MOCK_USERS = [
         email:         'juliana.costa@mock.com',
         photoUrl:      'https://api.dicebear.com/7.x/avataaars/svg?seed=JuliC',
         balance:       320.00,
-        chargeMode:    true,
-        chargePerChar: 0.005,
+        isProfessional: true,
+        subscriptionPrice: 49.9,
+        chargePerCharSubscribers: 0.005,
+        chargePerCharNonSubscribers: 0.008,
     },
     {
         clerkId:       'mock_user_rafael_004',
@@ -104,8 +110,7 @@ const MOCK_USERS = [
         email:         'rafael.fernandes@mock.com',
         photoUrl:      'https://api.dicebear.com/7.x/avataaars/svg?seed=RafaF',
         balance:       45.20,
-        chargeMode:    false,
-        chargePerChar: 0.002,
+        isProfessional: false,
     },
     {
         clerkId:       'mock_user_beatriz_005',
@@ -114,8 +119,10 @@ const MOCK_USERS = [
         email:         'beatriz.souza@mock.com',
         photoUrl:      'https://api.dicebear.com/7.x/avataaars/svg?seed=BeaS',
         balance:       500.00,
-        chargeMode:    true,
-        chargePerChar: 0.004,
+        isProfessional: true,
+        subscriptionPrice: 35,
+        chargePerCharSubscribers: 0.004,
+        chargePerCharNonSubscribers: 0.007,
     },
 ];
 
@@ -182,8 +189,9 @@ async function main() {
                 name: 'Meu Usuário Dev',
                 email: `${MY_CLERK_ID}@mimo.dev`,
                 balance: 100,
-                chargeMode: false,
-                chargePerChar: 0.002,
+                isProfessional: false,
+                chargePerCharSubscribers: 0.002,
+                chargePerCharNonSubscribers: 0.005,
             }
         },
         { upsert: true, new: true }

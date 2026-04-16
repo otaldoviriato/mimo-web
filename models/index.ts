@@ -9,3 +9,6 @@ export type { IMessage } from './Message';
 
 export { Transaction } from './Transaction';
 export type { ITransaction } from './Transaction';
+
+export { GalleryItem } from './GalleryItem';
+export type { IGalleryItem } from './GalleryItem';

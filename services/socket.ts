@@ -7,13 +7,26 @@ class SocketService {
     private _currentUserId: string | null = null;
 
     connect(userId?: string) {
-        if (this.socket) {
-            this.socket.disconnect();
+        const newUserId = userId ?? this._currentUserId;
+
+        // Já está conectado com o mesmo usuário — não faz nada
+        if (this.socket?.connected && this._currentUserId === newUserId) {
+            console.log('[SocketService] Já conectado como', newUserId, '— reutilizando socket');
+            return;
         }
 
-        if (userId) {
-            this._currentUserId = userId;
+        // Troca de usuário com socket ativo — desconecta e reconecta
+        if (this.socket) {
+            console.log('[SocketService] Desconectando socket anterior...');
+            this.socket.disconnect();
+            this.socket = null;
         }
+
+        if (newUserId) {
+            this._currentUserId = newUserId;
+        }
+
+        console.log('[SocketService] Conectando ao Chat Server como', newUserId);
 
         this.socket = io(CHAT_SERVER_URL, {
             transports: ['websocket'],
@@ -24,13 +37,14 @@ class SocketService {
         });
 
         this.socket.on('connect', () => {
+            console.log('[SocketService] Socket conectado! Autenticando como', this._currentUserId);
             if (this._currentUserId) {
                 this.authenticate(this._currentUserId);
             }
         });
 
         this.socket.on('connect_error', (err) => {
-            console.error('Socket connection error:', err);
+            console.error('[SocketService] Erro de conexão:', err.message);
         });
     }
 
@@ -39,10 +53,12 @@ class SocketService {
             this.socket.disconnect();
             this.socket = null;
         }
+        this._currentUserId = null;
     }
 
     authenticate(userId: string) {
         if (!this.socket) return;
+        console.log('[SocketService] Emitindo authenticate para', userId);
         this.socket.emit('authenticate', { userId });
     }
 
@@ -51,6 +67,12 @@ class SocketService {
         const roomId = [userId, targetUserId].sort().join('_');
         this.socket.emit('join_room', { roomId, otherUserId: targetUserId });
         return roomId;
+    }
+
+    leaveRoom(roomId: string) {
+        if (!this.socket) return;
+        this.socket.emit('leave_room', { roomId });
+        console.log('[SocketService] Saindo da sala', roomId);
     }
 
     sendMessage(content: string, toUserId: string, roomId: string) {

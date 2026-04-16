@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { useQueryClient } from '@tanstack/react-query';
@@ -17,6 +17,9 @@ interface Room {
     updatedAt: string;
     isTyping?: boolean;
     unreadCount?: Record<string, number>;
+    // roomId como string composta de clerkIds (ex: "user_abc_user_xyz")
+    // usado para matching com eventos WebSocket
+    roomId?: string;
     otherUser?: {
         clerkId: string;
         username: string;
@@ -42,21 +45,127 @@ export default function ChatsPage() {
     const router = useRouter();
     const { user } = useUser();
     const queryClient = useQueryClient();
-    const { socket } = useSocket(user?.id);
+    const { socket, connected, socketService, socketVersion } = useSocket(user?.id);
+
+    // Estado de "digitando" por sala: { [roomId]: boolean }
+    const [typingRooms, setTypingRooms] = useState<Record<string, boolean>>({});
 
     const { data: rooms = [], isRefetching, refetch: refetchRooms } = useChatRooms();
     const { refetch: refetchProfile } = useMyProfile();
 
-    // Atualiza saldo em tempo real via socket
+    // ─── Listeners de WebSocket em tempo real ───────────────────────────────
     useEffect(() => {
-        if (!socket) return;
-        socket.on('balance_update', (data: { balance: number }) => {
+        if (!socket || !user?.id) return;
+
+        // 1. Atualiza saldo em tempo real
+        const handleBalanceUpdate = (data: { balance: number }) => {
             queryClient.setQueryData(QueryKeys.me, (old: any) =>
                 old ? { ...old, balance: data.balance } : old
             );
-        });
-        return () => { socket.off('balance_update'); };
-    }, [socket, queryClient]);
+        };
+
+        // 2. Atualiza a última mensagem da sala em tempo real
+        // Disparado pelo servidor quando alguém envia uma mensagem para este usuário
+        const handleRoomUpdated = (data: {
+            roomId: string;
+            mongoRoomId?: string;
+            lastMessage: string;
+            lastMessageTime: string;
+            senderId: string;
+        }) => {
+            console.log('[ChatsPage] room_updated recebido:', data);
+            queryClient.setQueryData(
+                QueryKeys.rooms(user.id!),
+                (old: Room[] | undefined) => {
+                    if (!old) {
+                        console.log('[ChatsPage] Cache de rooms vazio — não atualizado');
+                        return old;
+                    }
+                    // Usa mongoRoomId (ObjectId) para encontrar a sala no cache
+                    // pois room._id vem do MongoDB como string ObjectId
+                    const updated = old.map((room) => {
+                        const match = data.mongoRoomId
+                            ? room._id === data.mongoRoomId
+                            : room.participants.includes(data.senderId);
+                        if (match) {
+                            const currentUnread = room.unreadCount?.[user.id!] ?? 0;
+                            const isMe = data.senderId === user.id;
+                            console.log('[ChatsPage] Atualizando sala:', room._id, '→', data.lastMessage);
+                            return {
+                                ...room,
+                                lastMessage: data.lastMessage,
+                                lastMessageTime: data.lastMessageTime,
+                                updatedAt: data.lastMessageTime,
+                                unreadCount: {
+                                    ...room.unreadCount,
+                                    [user.id!]: isMe ? currentUnread : currentUnread + 1,
+                                },
+                            };
+                        }
+                        return room;
+                    });
+                    // Reordena: sala com mensagem mais recente primeiro
+                    return [...updated].sort(
+                        (a, b) =>
+                            new Date(b.lastMessageTime ?? b.updatedAt).getTime() -
+                            new Date(a.lastMessageTime ?? a.updatedAt).getTime()
+                    );
+                }
+            );
+        };
+
+        // 3. Exibe "digitando..." por sala na lista
+        // O servidor emite global_typing para user:${receiverId} sempre que alguém digita
+        const handleGlobalTyping = (data: { roomId: string; userId: string; isTyping: boolean }) => {
+            setTypingRooms((prev) => ({ ...prev, [data.roomId]: data.isTyping }));
+
+            // Auto-limpa após 3s como fallback (caso o evento isTyping=false não chegue)
+            if (data.isTyping) {
+                setTimeout(() => {
+                    setTypingRooms((prev) => ({ ...prev, [data.roomId]: false }));
+                }, 3000);
+            }
+        };
+
+        // 4. Marca sala como lida
+        const handleRoomRead = (data: { roomId: string; userId: string }) => {
+            console.log('[ChatsPage] room_read recebido:', data);
+            queryClient.setQueryData(
+                QueryKeys.rooms(user.id!),
+                (old: Room[] | undefined) => {
+                    if (!old) return old;
+                    return old.map((room) => {
+                        const derivedRoomId = room.roomId ?? [...room.participants].sort().join('_');
+                        if (derivedRoomId === data.roomId) {
+                            return {
+                                ...room,
+                                unreadCount: {
+                                    ...room.unreadCount,
+                                    [user.id!]: 0,
+                                },
+                            };
+                        }
+                        return room;
+                    });
+                }
+            );
+        };
+
+        console.log('[ChatsPage] Registrando listeners de socket. userId:', user.id, '| socket.id:', socket.id);
+
+        socket.on('balance_update', handleBalanceUpdate);
+        socket.on('room_updated', handleRoomUpdated);
+        socket.on('global_typing', handleGlobalTyping);
+        socket.on('room_read', handleRoomRead);
+
+        return () => {
+            console.log('[ChatsPage] Removendo listeners de socket');
+            socket.off('balance_update', handleBalanceUpdate);
+            socket.off('room_updated', handleRoomUpdated);
+            socket.off('global_typing', handleGlobalTyping);
+            socket.off('room_read', handleRoomRead);
+        };
+    }, [socket, socketVersion, user?.id, queryClient]);
 
     const onRefresh = useCallback(() => {
         refetchRooms();
@@ -66,21 +175,10 @@ export default function ChatsPage() {
     return (
         <div className="flex flex-col h-full">
             {/* Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-4 py-4 flex items-center justify-between shrink-0">
-                <h1 className="text-xl font-bold text-white">Conversas</h1>
+            <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between z-10 sticky top-0 shadow-md">
                 <div className="flex items-center gap-3">
-                    {isRefetching && (
-                        <svg className="animate-spin h-4 w-4 text-white/70" viewBox="0 0 24 24" fill="none">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                    )}
-                    <button onClick={onRefresh} className="text-white/80 hover:text-white transition-colors p-1">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                            <path d="M1 4v6h6M23 20v-6h-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                            <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                    </button>
+                    <h1 className="text-2xl font-black text-white tracking-tighter">Mimo</h1>
+                    <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">Conversas</span>
                 </div>
             </div>
 
@@ -98,8 +196,11 @@ export default function ChatsPage() {
                     <ul>
                         {rooms.map((room: Room) => {
                             const otherUserId = room.participants.find((p) => p !== user?.id);
+                            // roomId como string de clerkIds — corresponde ao que o servidor envia no typing
+                            const derivedRoomId = room.roomId ?? room.participants.slice().sort().join('_');
                             const myUnreadCount = user?.id && room.unreadCount ? (room.unreadCount[user.id] || 0) : 0;
                             const hasUnread = myUnreadCount > 0;
+                            const isRoomTyping = typingRooms[derivedRoomId] ?? false;
 
                             return (
                                 <li key={room._id}>
@@ -118,9 +219,21 @@ export default function ChatsPage() {
                                                 </span>
                                             </div>
                                             <div className="flex items-center justify-between">
-                                                <span className={`text-sm truncate flex-1 pr-3 ${hasUnread ? 'font-semibold text-gray-800' : 'text-gray-500'}`}>
-                                                    {room.lastMessage || 'Nenhuma mensagem ainda'}
-                                                </span>
+                                                {/* Digitando... ou última mensagem */}
+                                                {isRoomTyping ? (
+                                                    <span className="text-sm text-purple-500 italic flex items-center gap-1.5">
+                                                        digitando
+                                                        <span className="flex gap-0.5">
+                                                            <span className="w-1 h-1 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                                            <span className="w-1 h-1 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                                            <span className="w-1 h-1 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                                                        </span>
+                                                    </span>
+                                                ) : (
+                                                    <span className={`text-sm truncate flex-1 pr-3 ${hasUnread ? 'font-semibold text-gray-800' : 'text-gray-500'}`}>
+                                                        {room.lastMessage || 'Nenhuma mensagem ainda'}
+                                                    </span>
+                                                )}
                                                 {hasUnread && (
                                                     <span className="shrink-0 bg-purple-600 text-white text-xs font-bold rounded-full min-w-[22px] h-[22px] flex items-center justify-center px-1">
                                                         {myUnreadCount > 99 ? '99+' : myUnreadCount}

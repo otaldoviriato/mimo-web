@@ -6,12 +6,18 @@ export async function sendPushNotification(userId: string, title: string, body: 
         await (await import('./db')).connectToDatabase();
         const user = await User.findOne({ clerkId: userId });
 
-        if (!user || !user.expoPushToken) {
-            console.log(`[Push] Nenhum token cadastrado para o usuário ${userId}`);
-            return;
+        if (!user) {
+            console.error(`[Push] Usuário ${userId} não encontrado no banco de dados.`);
+            return { error: 'User not found' };
+        }
+
+        if (!user.expoPushToken) {
+            console.warn(`[Push] O usuário ${userId} (${user.username}) não possui expoPushToken cadastrado.`);
+            return { error: 'Token missing' };
         }
 
         const pushToken = user.expoPushToken;
+        console.log(`[Push] Token encontrado para ${user.username}: ${pushToken.substring(0, 15)}...`);
 
         console.log(`[Push] Enviando via Firebase Admin (FCM) para o usuário ${userId}...`);
         
@@ -20,26 +26,31 @@ export async function sendPushNotification(userId: string, title: string, body: 
             return;
         }
 
-        try {
-            const response = await adminMessaging.send({
-                token: pushToken,
+        const payload: any = {
+            token: pushToken,
+            notification: {
+                title,
+                body,
+            },
+            data: data ? Object.entries(data).reduce((acc, [k, v]) => ({ ...acc, [k]: String(v) }), {}) : {},
+            webpush: {
                 notification: {
                     title,
                     body,
+                    icon: '/icon-192x192.png',
+                    badge: '/icon-192x192.png',
+                    tag: 'mimo-message',
                 },
-                data: data ? Object.entries(data).reduce((acc, [k, v]) => ({ ...acc, [k]: String(v) }), {}) : undefined,
-                webpush: {
-                    notification: {
-                        icon: '/icon-192x192.jpeg',
-                        badge: '/icon-192x192.jpeg',
-                        vibrate: [100, 50, 100],
-                        data: data,
-                    },
-                    fcmOptions: {
-                        link: data?.url || 'https://www.mimochat.com.br/chats'
-                    }
+                fcmOptions: {
+                    link: data?.url || 'https://www.mimochat.com.br/chats'
                 }
-            });
+            }
+        };
+
+        console.log('[Push] Payload final:', JSON.stringify(payload, null, 2));
+
+        try {
+            const response = await adminMessaging.send(payload);
             console.log('[Push] Sucesso ao enviar via Firebase:', response);
         } catch (error: any) {
             console.error('[Push] Erro ao enviar via Firebase:', error.message);
