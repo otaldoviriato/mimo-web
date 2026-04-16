@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSignIn, useSignUp, useAuth } from '@clerk/nextjs';
+import { useSignIn, useSignUp, useAuth, useClerk } from '@clerk/nextjs';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 
@@ -11,6 +11,7 @@ export default function LoginPage() {
     const { isSignedIn } = useAuth();
     const { signIn } = useSignIn();
     const { signUp } = useSignUp();
+    const clerk = useClerk();
 
     const [email, setEmail] = useState('');
     const [code, setCode] = useState('');
@@ -92,21 +93,32 @@ export default function LoginPage() {
     };
 
     const onSignInWithGoogle = async () => {
-        console.log("Clicou no botão Google OAuth");
+        console.log("Iniciando fluxo Google OAuth...");
+        if (!clerk) {
+            console.error("Clerk não inicializado");
+            setError("Erro: Clerk não inicializado.");
+            return;
+        }
+
         try {
             setGoogleLoading(true);
             setError('');
-            alert('Conectando ao Google através do Clerk...');
-            // @ts-ignore
-            await signIn.authenticateWithRedirect({
-                strategy: 'oauth_google',
-                redirectUrl: '/sso-callback',
-                redirectUrlComplete: '/chats',
-            });
+            
+            // Revertido para o método do objeto clerk.client.signIn que mantém a compatibilidade
+            if (clerk.client) {
+                await clerk.client.signIn.authenticateWithRedirect({
+                    strategy: 'oauth_google',
+                    redirectUrl: '/sso-callback',
+                    redirectUrlComplete: '/chats',
+                });
+            } else {
+                console.error("Clerk Client não disponível");
+                setError("O serviço de autenticação ainda está carregando.");
+            }
         } catch (err: any) {
             console.error("Erro SSO Clerk:", err);
-            setError(err?.errors?.[0]?.longMessage || err?.message || 'Erro no login com Google. Talvez o navegador mobile tenha bloqueado cookies de terceiros (necessários no ambiente dev do Clerk).');
-            alert(`Erro no Google Login: ${err?.errors?.[0]?.longMessage || err?.message || 'Bloqueio de Cookie/Origem'}`);
+            const msg = err?.errors?.[0]?.longMessage || err?.message || 'Erro no login com Google.';
+            setError(msg);
         } finally {
             setGoogleLoading(false);
         }

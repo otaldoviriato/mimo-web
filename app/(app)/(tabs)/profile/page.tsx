@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useUser, useAuth } from '@clerk/nextjs';
+import { useUser, useAuth, useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
@@ -18,7 +18,7 @@ function SkeletonBox({ className = '' }: { className?: string }) {
 
 export default function ProfilePage() {
     const { user } = useUser();
-    const { signOut } = useAuth();
+    const { signOut } = useClerk();
     const router = useRouter();
     const { openRechargeModal } = usePayment();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -117,8 +117,8 @@ export default function ProfilePage() {
 
     const handleLogout = async () => {
         if (confirm('Tem certeza que deseja sair da sua conta?')) {
-            await signOut();
-            router.replace('/login');
+            console.log("Iniciando logout...");
+            await signOut(() => router.replace('/login'));
         }
     };
 

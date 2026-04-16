@@ -1,6 +1,13 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
-const isPublicRoute = createRouteMatcher(['/login(.*)', '/api/webhooks(.*)', '/sso-callback(.*)']);
+const isPublicRoute = createRouteMatcher([
+    '/login(.*)',
+    '/api/webhooks(.*)',
+    '/sso-callback(.*)',
+    '/manifest.json',
+    '/firebase-messaging-sw.js',
+    '/.well-known/(.*)'
+]);
 
 export default clerkMiddleware(async (auth, req) => {
     if (!isPublicRoute(req)) {
