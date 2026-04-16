@@ -59,9 +59,9 @@ export async function POST(req: NextRequest) {
         customer: customerData,
       });
 
-      if (!pixResponse || !pixResponse.data) {
+      if (pixResponse.error || !('data' in pixResponse)) {
         console.error('AbacatePay Error Response:', pixResponse);
-        throw new Error(`Falha ao criar PIX no AbacatePay: ${JSON.stringify(pixResponse)}`);
+        throw new Error(`Falha ao criar PIX no AbacatePay: ${pixResponse.error}`);
       }
 
       const pixData = pixResponse.data;
