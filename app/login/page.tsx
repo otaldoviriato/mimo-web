@@ -2,137 +2,133 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSignIn, useSignUp, useAuth, useClerk } from '@clerk/nextjs';
+import { useAuth } from '@clerk/nextjs';
+import { useSignIn, useSignUp } from '@clerk/nextjs/legacy';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
-import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { usePWA } from '@/context/PWAContext';
 
 export default function LoginPage() {
     const router = useRouter();
     const { isSignedIn } = useAuth();
-    const { signIn } = useSignIn();
-    const { signUp } = useSignUp();
-    const clerk = useClerk();
+    const { isLoaded: signInLoaded, signIn, setActive: setSignInActive } = useSignIn();
+    const { isLoaded: signUpLoaded, signUp, setActive: setSignUpActive } = useSignUp();
     const { isInstallable, promptInstall, mounted, isStandalone } = usePWA();
 
     const [email, setEmail] = useState('');
     const [code, setCode] = useState('');
-    const [isSigningUp, setIsSigningUp] = useState(false);
+    const [flowType, setFlowType] = useState<'signIn' | 'signUp' | null>(null);
     const [pendingVerification, setPendingVerification] = useState(false);
     const [emailLoading, setEmailLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
-    const [isMobile, setIsMobile] = useState(false);
     const [error, setError] = useState('');
-
-    useEffect(() => {
-        const checkMobile = () => {
-            setIsMobile(window.innerWidth < 768);
-        };
-        checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
-    }, []);
 
     useEffect(() => {
         if (isSignedIn) {
             router.replace('/chats');
         }
-    }, [isSignedIn]);
+    }, [isSignedIn, router]);
+
+    const clerkError = (err: unknown, fallback: string): string => {
+        const e = err as any;
+        return e?.errors?.[0]?.longMessage
+            || e?.errors?.[0]?.message
+            || e?.message
+            || fallback;
+    };
 
     const onSendCode = async () => {
-        if (!email) { setError('Por favor, insira seu email'); return; }
+        if (!email.trim()) { setError('Por favor, insira seu email'); return; }
+        if (!signInLoaded || !signUpLoaded) { setError('Serviço de autenticação não carregado'); return; }
 
         setEmailLoading(true);
         setError('');
 
-        // Try sign-in first
-        const { error: signInError } = await signIn.create({ identifier: email });
+        try {
+            // Tenta login — se a conta existir, retorna os fatores disponíveis
+            await signIn!.create({ identifier: email });
+            const emailFactor = signIn!.supportedFirstFactors?.find(
+                (f: any) => f.strategy === 'email_code'
+            ) as any;
 
-        if (!signInError) {
-            // User exists — send email code
-            const { error: sendError } = await signIn.emailCode.sendCode();
-            if (sendError) {
-                setError(sendError.longMessage || sendError.message || 'Erro ao enviar código');
-            } else {
-                setIsSigningUp(false);
-                setPendingVerification(true);
+            if (!emailFactor) {
+                setError('Verificação por email não está disponível nesta conta');
+                return;
             }
-        } else if (signInError.code === 'form_identifier_not_found') {
-            // User doesn't exist — sign up
-            const { error: signUpCreateError } = await signUp.create({ emailAddress: email });
-            if (signUpCreateError) {
-                setError(signUpCreateError.longMessage || signUpCreateError.message || 'Erro ao criar conta');
-            } else {
-                const { error: sendError } = await signUp.verifications.sendEmailCode();
-                if (sendError) {
-                    setError(sendError.longMessage || sendError.message || 'Erro ao enviar código');
-                } else {
-                    setIsSigningUp(true);
+
+            await signIn!.prepareFirstFactor({
+                strategy: 'email_code',
+                emailAddressId: emailFactor.emailAddressId,
+            });
+
+            setFlowType('signIn');
+            setPendingVerification(true);
+        } catch (err: unknown) {
+            const errCode = (err as any)?.errors?.[0]?.code;
+
+            if (errCode === 'form_identifier_not_found') {
+                // Conta não existe — cria transparentemente sem o usuário perceber
+                try {
+                    await signUp!.create({ emailAddress: email });
+                    await signUp!.prepareEmailAddressVerification({ strategy: 'email_code' });
+                    setFlowType('signUp');
                     setPendingVerification(true);
+                } catch (signUpErr: unknown) {
+                    setError(clerkError(signUpErr, 'Erro ao criar conta'));
                 }
+            } else {
+                setError(clerkError(err, 'Erro ao enviar código'));
             }
-        } else {
-            setError(signInError.longMessage || signInError.message || 'Erro ao enviar código');
+        } finally {
+            setEmailLoading(false);
         }
-
-        setEmailLoading(false);
     };
 
     const onVerifyCode = async () => {
-        if (!code) { setError('Por favor, insira o código'); return; }
+        if (!code.trim()) { setError('Por favor, insira o código'); return; }
+        if (!signInLoaded || !signUpLoaded) { setError('Serviço de autenticação não carregado'); return; }
+
         setEmailLoading(true);
         setError('');
 
-        if (isSigningUp) {
-            const { error: verifyError } = await signUp.verifications.verifyEmailCode({ code });
-            if (verifyError) {
-                setError(verifyError.longMessage || verifyError.message || 'Código inválido');
-            } else if (signUp.status === 'complete') {
-                await signUp.finalize();
-                router.replace('/chats');
+        try {
+            if (flowType === 'signUp') {
+                await signUp!.attemptEmailAddressVerification({ code });
+                if (signUp!.status === 'complete') {
+                    await setSignUpActive!({ session: signUp!.createdSessionId });
+                    router.replace('/chats');
+                }
+            } else {
+                await signIn!.attemptFirstFactor({ strategy: 'email_code', code });
+                if (signIn!.status === 'complete') {
+                    await setSignInActive!({ session: signIn!.createdSessionId });
+                    router.replace('/chats');
+                }
             }
-        } else {
-            const { error: verifyError } = await signIn.emailCode.verifyCode({ code });
-            if (verifyError) {
-                setError(verifyError.longMessage || verifyError.message || 'Código inválido');
-            } else if (signIn.status === 'complete') {
-                await signIn.finalize();
-                router.replace('/chats');
-            }
+        } catch (err: unknown) {
+            setError(clerkError(err, 'Código inválido ou expirado'));
+        } finally {
+            setEmailLoading(false);
         }
-
-        setEmailLoading(false);
     };
 
     const onSignInWithGoogle = async () => {
-        console.log("Iniciando fluxo Google OAuth...");
-        if (!clerk) {
-            console.error("Clerk não inicializado");
-            setError("Erro: Clerk não inicializado.");
+        if (!signInLoaded || !signIn) {
+            setError('Serviço de autenticação não carregado');
             return;
         }
 
+        setGoogleLoading(true);
+        setError('');
+
         try {
-            setGoogleLoading(true);
-            setError('');
-            
-            // Revertido para o método do objeto clerk.client.signIn que mantém a compatibilidade
-            if (clerk.client) {
-                await clerk.client.signIn.authenticateWithRedirect({
-                    strategy: 'oauth_google',
-                    redirectUrl: '/sso-callback',
-                    redirectUrlComplete: '/chats',
-                });
-            } else {
-                console.error("Clerk Client não disponível");
-                setError("O serviço de autenticação ainda está carregando.");
-            }
-        } catch (err: any) {
-            console.error("Erro SSO Clerk:", err);
-            const msg = err?.errors?.[0]?.longMessage || err?.message || 'Erro no login com Google.';
-            setError(msg);
-        } finally {
+            await signIn.authenticateWithRedirect({
+                strategy: 'oauth_google',
+                redirectUrl: '/sso-callback',
+                redirectUrlComplete: '/chats',
+            });
+        } catch (err: unknown) {
+            setError(clerkError(err, 'Erro no login com Google'));
             setGoogleLoading(false);
         }
     };
@@ -144,8 +140,12 @@ export default function LoginPage() {
         }
     };
 
+    const isReady = signInLoaded && signUpLoaded;
+
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+            {/* Elemento exigido pelo Clerk para CAPTCHA em flows customizados */}
+            <div id="clerk-captcha" />
             <div className="w-full max-w-sm">
                 {/* Header */}
                 <div className="text-center mb-10">
@@ -170,12 +170,15 @@ export default function LoginPage() {
                                 onChange={(e) => setEmail(e.target.value)}
                                 onKeyDown={handleKeyDown}
                                 autoCapitalize="none"
+                                autoComplete="email"
                                 error={error}
+                                disabled={!isReady}
                             />
                             <Button
                                 title="Continuar com Email"
                                 onPress={onSendCode}
                                 loading={emailLoading}
+                                disabled={!isReady}
                                 size="lg"
                                 className="w-full"
                             />
@@ -190,6 +193,7 @@ export default function LoginPage() {
                                 title={googleLoading ? 'Aguarde...' : 'Entrar com Google'}
                                 onPress={onSignInWithGoogle}
                                 loading={googleLoading}
+                                disabled={!isReady}
                                 variant="outline"
                                 size="lg"
                                 icon={
@@ -205,20 +209,25 @@ export default function LoginPage() {
                         </div>
                     ) : (
                         <div className="flex flex-col gap-4">
-                            <p className="text-sm text-gray-500 text-center">
-                                Enviamos um código para <strong className="text-gray-800">{email}</strong>
-                            </p>
+                            <div className="text-center">
+                                <p className="text-sm text-gray-500">
+                                    Enviamos um código para
+                                </p>
+                                <p className="text-sm font-semibold text-gray-800 mt-0.5">{email}</p>
+                            </div>
 
                             <Input
                                 label="Código de verificação"
                                 type="text"
+                                inputMode="numeric"
                                 placeholder="000000"
                                 value={code}
-                                onChange={(e) => setCode(e.target.value)}
+                                onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
                                 onKeyDown={handleKeyDown}
                                 maxLength={6}
                                 error={error}
                                 className="text-center text-2xl tracking-widest"
+                                autoComplete="one-time-code"
                             />
 
                             <Button
@@ -230,9 +239,10 @@ export default function LoginPage() {
                             />
 
                             <Button
-                                title="Voltar"
+                                title="Usar outro email"
                                 onPress={() => {
                                     setPendingVerification(false);
+                                    setFlowType(null);
                                     setCode('');
                                     setError('');
                                 }}

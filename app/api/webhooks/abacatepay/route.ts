@@ -39,37 +39,36 @@ export async function POST(req: NextRequest) {
 
         await connectToDatabase();
 
-        const transaction = await Transaction.findOne({ abacatePayId: abacateId });
+        // Operação atômica: só atualiza se ainda estiver PENDING, evitando duplicatas
+        const transaction = await Transaction.findOneAndUpdate(
+            { abacatePayId: abacateId, status: { $ne: 'PAID' } },
+            { $set: { status: 'PAID' } },
+            { new: true }
+        );
 
         if (!transaction) {
-            console.error('Transação não encontrada:', abacateId);
-            return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
-        }
-
-        if (transaction.status === 'PAID') {
+            // Ou não existe, ou já foi processada antes
+            const exists = await Transaction.exists({ abacatePayId: abacateId });
+            if (!exists) {
+                console.error('Transação não encontrada:', abacateId);
+                return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
+            }
             console.log('Transação já paga anteriormente:', abacateId);
             return NextResponse.json({ received: true, message: 'Already paid' });
         }
 
-        // Atualiza a transação para PAID
-        transaction.status = 'PAID';
-        await transaction.save();
-
-        // Credita saldo ao usuário (amount vindo da transação)
-        const user = await User.findOne({ clerkId: transaction.userId });
+        // Credita saldo ao usuário com $inc atômico
+        const amountInCents = Math.round((transaction.amount || 0) * 100);
+        const user = await User.findOneAndUpdate(
+            { clerkId: transaction.userId },
+            { $inc: { balance: amountInCents } },
+            { new: true }
+        );
 
         if (!user) {
             console.error('Usuário da transação não encontrado:', transaction.userId);
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
-
-        // No mimo-api o saldo era incrementado em cents. 
-        // Assumindo que o transaction.amount está em reais e o balance em reais também (ou cents conforme as regras de negócio)
-        // O código original fazia: user.balance += Math.round((transaction.amount || 0) * 100);
-        // Vamos manter a consistência com o mimo-api
-        const amountInCents = Math.round((transaction.amount || 0) * 100);
-        user.balance += amountInCents;
-        await user.save();
 
         console.log(`[SUCESSO] Saldo creditado para ${user.username} via webhook.`);
 
