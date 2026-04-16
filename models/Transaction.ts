@@ -23,9 +23,6 @@ const TransactionSchema = new Schema<ITransaction>({
     },
     abacatePayId: {
         type: String,
-        unique: true,
-        sparse: true,
-        index: true,
     },
     amount: {
         type: Number,
@@ -65,6 +62,7 @@ const TransactionSchema = new Schema<ITransaction>({
 });
 
 TransactionSchema.index({ userId: 1, timestamp: -1 });
+TransactionSchema.index({ abacatePayId: 1 }, { unique: true, sparse: true });
 
 export const Transaction = (mongoose.models.Transaction as mongoose.Model<ITransaction>) ||
     mongoose.model<ITransaction>('Transaction', TransactionSchema);

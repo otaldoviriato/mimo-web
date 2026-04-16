@@ -47,6 +47,8 @@ export default function ProfilePage() {
     const [saveError, setSaveError] = useState('');
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [testingNotification, setTestingNotification] = useState(false);
+    const [showChargeModeModal, setShowChargeModeModal] = useState(false);
+    const [chargeModeLoading, setChargeModeLoading] = useState(false);
 
     const hasPopulatedFromCache = useRef(false);
     const lastSavedChargePerChar = useRef('0.002');
@@ -121,13 +123,25 @@ export default function ProfilePage() {
         }
     };
 
-    const handleChargeModeToggle = async () => {
+    const handleChargeModeToggle = () => {
+        setSaveError('');
+        setShowChargeModeModal(true);
+    };
+
+    const confirmChargeModeToggle = async () => {
         const newValue = !chargeMode;
-        setChargeMode(newValue);
+        setChargeModeLoading(true);
+        setSaveError('');
         try {
             await updateProfileMutation.mutateAsync({ chargeMode: newValue });
-        } catch {
-            setChargeMode(!newValue);
+            setChargeMode(newValue);
+            setShowChargeModeModal(false);
+        } catch (error: any) {
+            const msg = error.response?.data?.error || 'Erro ao alterar modo de cobrança';
+            setSaveError(msg);
+            setShowChargeModeModal(false);
+        } finally {
+            setChargeModeLoading(false);
         }
     };
 
@@ -203,6 +217,42 @@ export default function ProfilePage() {
 
     return (
         <div className="flex flex-col h-full">
+            {/* Modal de confirmação para alteração do modo de cobrança */}
+            {showChargeModeModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+                    <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm flex flex-col gap-4">
+                        <div className="flex flex-col items-center text-center gap-2">
+                            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-2xl">
+                                ⚠️
+                            </div>
+                            <h2 className="text-base font-bold text-gray-900">Alterar modo de cobrança</h2>
+                            <p className="text-sm text-gray-600">
+                                Ao confirmar, <strong>todas as suas conversas serão excluídas permanentemente</strong>.
+                            </p>
+                            <p className="text-sm text-gray-500">
+                                Esta ação não pode ser desfeita.
+                            </p>
+                        </div>
+                        <div className="flex gap-3">
+                            <Button
+                                title="Cancelar"
+                                onPress={() => setShowChargeModeModal(false)}
+                                variant="outline"
+                                size="md"
+                                className="flex-1"
+                                disabled={chargeModeLoading}
+                            />
+                            <Button
+                                title="Confirmar"
+                                onPress={confirmChargeModeToggle}
+                                loading={chargeModeLoading}
+                                size="md"
+                                className="flex-1 !bg-red-500 !text-white"
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
             {/* Header */}
             <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-4 py-4 flex items-center justify-between shrink-0">
                 <h1 className="text-xl font-bold text-white">Meu Perfil</h1>

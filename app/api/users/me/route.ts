@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
+import { Room } from '@/models/Room';
+import { Message } from '@/models/Message';
 
 // GET /api/users/me - Get current user
 export async function GET() {
@@ -22,7 +24,7 @@ export async function GET() {
                 const clerkUser = await client.users.getUser(userId);
                 const email = clerkUser.emailAddresses[0]?.emailAddress || `user_${userId}@placeholder.com`;
                 const username = clerkUser.username || `user_${userId.substring(userId.length - 8)}`;
-                
+
                 user = await User.create({
                     clerkId: userId,
                     email: email,
@@ -93,6 +95,23 @@ export async function PATCH(request: NextRequest) {
 
         await connectToDatabase();
 
+        const currentUser = await User.findOne({ clerkId: userId });
+
+        // Valida mudança de chargeMode
+        if (chargeMode !== undefined && currentUser && chargeMode !== currentUser.chargeMode) {
+            if (currentUser.balance > 0) {
+                return NextResponse.json(
+                    { error: 'Você só pode alterar o modo de cobrança com saldo zerado' },
+                    { status: 400 }
+                );
+            }
+        }
+
+        const chargeModeIsChanging =
+            chargeMode !== undefined &&
+            currentUser &&
+            chargeMode !== currentUser.chargeMode;
+
         const updateData: any = {};
         if (username !== undefined) updateData.username = username;
         if (name !== undefined) updateData.name = name.trim();
@@ -120,6 +139,17 @@ export async function PATCH(request: NextRequest) {
             { returnDocument: 'after', runValidators: true, upsert: true }
         );
 
+        // Se chargeMode mudou, deleta todas as conversas do usuário
+        if (chargeModeIsChanging) {
+            const rooms = await Room.find({ participants: userId }).select('_id').lean();
+            const roomIds = rooms.map((r: any) => r._id);
+
+            await Promise.all([
+                Room.deleteMany({ participants: userId }),
+                Message.deleteMany({ roomId: { $in: roomIds } }),
+            ]);
+        }
+
         return NextResponse.json({
             user: {
                 id: user._id,
@@ -145,5 +175,3 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }
-
-// Forçando recompilação para limpar cache do Turbopack

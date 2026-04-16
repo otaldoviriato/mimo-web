@@ -29,7 +29,12 @@ export default function SearchPage() {
             setFoundUser(data.user);
         } catch (err: any) {
             if (err.response?.status === 404) {
-                setError('Usuário não encontrado');
+                const code = err.response?.data?.error;
+                if (code === 'incompatible_charge_mode') {
+                    setError('Este usuário tem o mesmo modo que você. Só é possível conversar entre quem cobra e quem não cobra.');
+                } else {
+                    setError('Usuário não encontrado');
+                }
             } else {
                 setError('Erro ao buscar usuário');
             }
