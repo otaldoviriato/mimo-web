@@ -111,7 +111,7 @@ export function PixCheckoutView({ amount, pixData, onPaymentComplete, onCancel }
             <p className="text-xs text-gray-500 mb-6">Esta tela atualiza automaticamente</p>
 
             {pixCode && (
-                <div className="w-full mb-6">
+                <div className="w-full mb-4">
                     <p className="text-sm font-medium text-gray-900 mb-2">Copia e Cola:</p>
                     <div className="flex items-center rounded-xl overflow-hidden border border-gray-200">
                         <p className="flex-1 px-4 py-2 text-xs text-gray-500 truncate">{pixCode}</p>
@@ -123,6 +123,17 @@ export function PixCheckoutView({ amount, pixData, onPaymentComplete, onCancel }
                         </button>
                     </div>
                 </div>
+            )}
+
+            {pixData?.url && (
+                <a
+                    href={pixData.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-purple-600 font-medium hover:underline mb-6"
+                >
+                    Não conseguiu pagar? Abrir página oficial
+                </a>
             )}
         </div>
     );
