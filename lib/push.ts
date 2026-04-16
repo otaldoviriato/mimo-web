@@ -18,7 +18,7 @@ export async function sendPushNotification(userId: string, title: string, body: 
 
         const isExpoToken = Expo.isExpoPushToken(pushToken);
         if (!isExpoToken) {
-            console.warn(`[Push] O token ${pushToken.substring(0, 10)}... não é um formato Expo padrão. Certifique-se de que o FCM está configurado no painel da Expo para PWAs.`);
+            console.warn(`[Push] O token ${(pushToken as string).substring(0, 10)}... não é um formato Expo padrão. Certifique-se de que o FCM está configurado no painel da Expo para PWAs.`);
         }
 
         const message = {
