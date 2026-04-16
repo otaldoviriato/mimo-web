@@ -16,36 +16,60 @@ export async function sendPushNotification(userId: string, title: string, body: 
 
         const pushToken = user.expoPushToken;
 
-        console.log(`[Push] Tentando enviar notificação para o usuário ${userId} no token: ${pushToken}`);
-
-        // O expo-server-sdk pode enviar para tokens nativos (FCM/APNs) se configurado no painel da Expo.
-        // Vamos tentar enviar mesmo que não seja o formato padrão ExponentPushToken[...]
-        if (!Expo.isExpoPushToken(pushToken)) {
-            console.log(`[Push] O token ${pushToken} não é um token Expo padrão, mas tentaremos enviar como token nativo.`);
+        const isExpoToken = Expo.isExpoPushToken(pushToken);
+        if (!isExpoToken) {
+            console.warn(`[Push] O token ${pushToken.substring(0, 10)}... não é um formato Expo padrão. Certifique-se de que o FCM está configurado no painel da Expo para PWAs.`);
         }
 
-        const messages: ExpoPushMessage[] = [{
+        const message = {
             to: pushToken,
             sound: 'default',
             title,
             body,
             data,
-        }];
+        };
 
-        const chunks = expo.chunkPushNotifications(messages);
-        const tickets = [];
+        console.log(`[Push] Enviando notificação para Expo (${isExpoToken ? 'Expo Token' : 'Native/Web Token'})...`);
 
-        for (const chunk of chunks) {
-            try {
-                const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
-                tickets.push(...ticketChunk);
-            } catch (error) {
-                console.error('[Push] Error sending chunk', error);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+        try {
+            const response = await fetch('https://exp.host/--/api/v2/push/send', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    ...(process.env.EXPO_ACCESS_TOKEN ? { 'Authorization': `Bearer ${process.env.EXPO_ACCESS_TOKEN}` } : {}),
+                },
+                body: JSON.stringify(message),
+                signal: controller.signal,
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error('[Push] Erro na API da Expo:', errorData);
+                return;
+            }
+
+            const result = await response.json();
+            console.log('[Push] Resposta da Expo:', JSON.stringify(result));
+
+            if (result.data && result.data.status === 'error') {
+                console.error(`[Push] Erro no ticket: ${result.data.message}`);
+            }
+        } catch (error: any) {
+            if (error.name === 'AbortError') {
+                console.error('[Push] Timeout ao chamar API da Expo (8s)');
+            } else {
+                console.error('[Push] Erro na requisição para Expo:', error.message);
             }
         }
 
-        console.log(`[Push] Notification sent to ${userId}: ${title}`);
+        console.log(`[Push] Processo de envio finalizado para ${userId}`);
     } catch (error) {
-        console.error(`[Push] Failed to send push notification to ${userId}:`, error);
+        console.error(`[Push] Falha geral ao enviar push para ${userId}:`, error);
     }
 }

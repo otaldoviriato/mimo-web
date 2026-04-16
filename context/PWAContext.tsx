@@ -40,7 +40,7 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
 
         const handleBeforeInstallPrompt = (e: any) => {
             console.log('Evento beforeinstallprompt disparado');
-            e.preventDefault();
+            // e.preventDefault(); // Comentado para permitir que o ícone de instalação do navegador apareça
             setDeferredPrompt(e);
             setIsInstallable(true);
         };

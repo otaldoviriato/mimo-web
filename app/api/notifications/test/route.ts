@@ -13,17 +13,19 @@ export async function POST(req: NextRequest) {
         }
 
         await connectToDatabase();
-
         const user = await User.findOne({ clerkId: userId });
 
         if (!user || !user.expoPushToken) {
+            console.log(`[Test Notification] Usuário ${userId} não tem token cadastrado.`);
             return NextResponse.json({ 
                 error: 'Token não encontrado', 
                 details: 'Certifique-se de que deu permissão de notificações no navegador.' 
             }, { status: 404 });
         }
 
+        const isExpoToken = user.expoPushToken.startsWith('ExponentPushToken');
         console.log(`[Test Notification] Disparando teste para ${user.username}...`);
+        console.log(`[Test Notification] Token: ${user.expoPushToken.substring(0, 15)}... (IsExpo: ${isExpoToken})`);
 
         await sendPushNotification(
             userId,
@@ -31,7 +33,11 @@ export async function POST(req: NextRequest) {
             'Sua configuração de notificações está funcionando perfeitamente!'
         );
 
-        return NextResponse.json({ success: true, message: 'Notificação de teste enviada!' });
+        return NextResponse.json({ 
+            success: true, 
+            message: 'Notificação de teste enviada!',
+            tokenType: isExpoToken ? 'expo' : 'fcm'
+        });
 
     } catch (error: any) {
         console.error('Error in test notification route:', error);

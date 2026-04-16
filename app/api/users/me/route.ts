@@ -117,7 +117,7 @@ export async function PATCH(request: NextRequest) {
                     balance: 0
                 }
             },
-            { new: true, runValidators: true, upsert: true }
+            { returnDocument: 'after', runValidators: true, upsert: true }
         );
 
         return NextResponse.json({

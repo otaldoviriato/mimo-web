@@ -5,6 +5,11 @@ const VAPID_KEY = "BGusb3U7P9HAoIiZksBteEjThFTl4KYFawJQPvn1Mb8XqY0J_J_Wz74soTGcC
 
 export const requestNotificationPermission = async () => {
   try {
+    if (typeof window === 'undefined' || !("Notification" in window)) {
+      console.warn("Notifications not supported in this browser");
+      return null;
+    }
+
     const permission = await Notification.requestPermission();
     if (permission === "granted") {
       const msg = await messaging();
@@ -13,7 +18,7 @@ export const requestNotificationPermission = async () => {
       const token = await getToken(msg, { vapidKey: VAPID_KEY });
       return token;
     } else {
-      console.warn("Notification permission denied");
+      console.warn("Notification permission denied:", permission);
       return null;
     }
   } catch (error) {

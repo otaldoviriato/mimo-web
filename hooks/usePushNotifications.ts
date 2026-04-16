@@ -29,7 +29,7 @@ export const usePushNotifications = () => {
           if ("Notification" in window && Notification.permission === "granted") {
             new Notification(payload.notification.title || "Nova mensagem", {
               body: payload.notification.body,
-              icon: "/icon-192x192.png",
+              icon: "/icon-192x192.jpeg",
             });
           }
         }

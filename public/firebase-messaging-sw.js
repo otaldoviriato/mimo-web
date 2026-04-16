@@ -35,7 +35,8 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-// Listener de fetch vazio para satisfazer critérios de instalação do PWA (PWA Installability)
+// Listener de fetch para satisfazer critérios de instalação do PWA
 self.addEventListener('fetch', (event) => {
-  // Poderia ser usado para cache offline, mas por enquanto apenas para habilitar instalação
+  // O Chrome exige um listener de fetch registrado para habilitar a instalação (PWA Installability)
+  // Não precisamos fazer cache agressivo agora, mas o listener precisa existir.
 });

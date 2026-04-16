@@ -11,6 +11,7 @@ import { useMyProfile, useUpdateProfile, useUploadPhoto } from '@/hooks/useQueri
 import { usePayment } from '@/context/PaymentContext';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { usePWA } from '@/context/PWAContext';
+import { api } from '@/services/api';
 
 function SkeletonBox({ className = '' }: { className?: string }) {
     return (
@@ -139,22 +140,33 @@ export default function ProfilePage() {
 
     const handleTestNotification = async () => {
         setTestingNotification(true);
+        setSaveError('');
+        console.log('[TestNotification] Iniciando teste...');
+        
         try {
             // Primeiro garante que temos o token e permissão
             await handleRequestPermission();
 
-            const response = await fetch('/api/notifications/test', {
-                method: 'POST',
-            });
+            // O handleRequestPermission atualiza o estado interno e salva no DB
+            // Mas para o teste imediato, vamos verificar se o navegador permitiu
+            if (Notification.permission !== 'granted') {
+                setSaveError('Permissão de notificação negada. Ative as notificações no navegador.');
+                setTestingNotification(false);
+                return;
+            }
 
-            if (!response.ok) throw new Error('Falha ao enviar notificação');
+            console.log('[TestNotification] Chamando API de teste...');
+            const response = await api.post('/api/notifications/test');
+
+            console.log('[TestNotification] Resposta da API:', response.data);
             
             setSaveSuccess(true);
-            setTimeout(() => setSaveSuccess(false), 3000);
-        } catch (error) {
-            console.error(error);
-            setSaveError('Erro ao testar notificação. Verifique se as permissões estão ativas.');
-            setTimeout(() => setSaveError(''), 3000);
+            setTimeout(() => setSaveSuccess(false), 5000);
+        } catch (error: any) {
+            console.error('[TestNotification] Erro ao testar notificação:', error);
+            const errorMsg = error.response?.data?.error || error.message || 'Erro ao testar notificação';
+            setSaveError(`Erro ao disparar notificação: ${errorMsg}. Verifique as permissões.`);
+            setTimeout(() => setSaveError(''), 5000);
         } finally {
             setTestingNotification(false);
         }
@@ -365,6 +377,12 @@ export default function ProfilePage() {
                             <p className="text-xs text-gray-500">Teste se o seu dispositivo está recebendo avisos</p>
                         </div>
                     </div>
+                    {saveError && saveError.includes('notificação') && (
+                        <p className="text-sm text-red-500">{saveError}</p>
+                    )}
+                    {saveSuccess && !loading && (
+                        <p className="text-sm text-green-600 font-medium">✓ Notificação enviada! Verifique seu dispositivo.</p>
+                    )}
                     <Button
                         title="Enviar Notificação de Teste"
                         onPress={handleTestNotification}

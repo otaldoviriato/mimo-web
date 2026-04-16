@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
                     chargePerChar: 0.002
                 }
             },
-            { new: true, upsert: true }
+            { returnDocument: 'after', upsert: true }
         );
 
         return NextResponse.json({ success: true, message: 'Push token updated successfully' });
