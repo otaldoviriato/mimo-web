@@ -16,41 +16,37 @@ export async function GET() {
 
         let user = await User.findOne({ clerkId: userId });
 
-        // Se usuário não existe, criar (Lazy creation)
         if (!user) {
             try {
-                // Tenta buscar o email básico se disponível via Clerk (opcional, para inicialização)
+                const client = await clerkClient();
+                const clerkUser = await client.users.getUser(userId);
+                const email = clerkUser.emailAddresses[0]?.emailAddress || `user_${userId}@placeholder.com`;
+                const username = clerkUser.username || `user_${userId.substring(userId.length - 8)}`;
+                
                 user = await User.create({
                     clerkId: userId,
-                    email: `user_${userId}@placeholder.com`,
-                    username: `user_${userId.substring(0, 8)}`,
+                    email: email,
+                    username: username,
+                    name: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' '),
                     balance: 0,
                     chargeMode: false,
                     chargePerChar: 0.002,
                 });
             } catch (createError) {
                 console.error("Error lazy creating user:", createError);
-                return NextResponse.json({ error: 'User not found. Could not lazy create.' }, { status: 404 });
+                return NextResponse.json({ error: 'User not found' }, { status: 404 });
             }
-        }
-
-        // Se o nome não estiver preenchido no banco, tenta buscar do Clerk
-        if (!user.name) {
+        } else if (user.email.includes('@placeholder.com')) {
             try {
                 const client = await clerkClient();
                 const clerkUser = await client.users.getUser(userId);
-                const clerkName = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ');
-                
-                if (clerkName) {
-                    const updatedUser = await User.findOneAndUpdate(
-                        { clerkId: userId },
-                        { $set: { name: clerkName } },
-                        { new: true }
-                    );
-                    if (updatedUser) user = updatedUser;
+                const realEmail = clerkUser.emailAddresses[0]?.emailAddress;
+                if (realEmail && realEmail !== user.email) {
+                    user.email = realEmail;
+                    await user.save();
                 }
-            } catch (clerkErr) {
-                console.warn('Could not fetch name from Clerk:', clerkErr);
+            } catch (err) {
+                console.warn('Could not sync email from Clerk:', err);
             }
         }
 
@@ -61,6 +57,8 @@ export async function GET() {
                 username: user.username,
                 name: user.name,
                 email: user.email,
+                phone: user.phone,
+                taxId: user.taxId,
                 photoUrl: user.photoUrl,
                 balance: user.balance,
                 chargeMode: user.chargeMode,
@@ -83,7 +81,7 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { username, name, photoUrl, chargeMode, chargePerChar } = body;
+        const { username, name, photoUrl, chargeMode, chargePerChar, phone, taxId } = body;
 
         await connectToDatabase();
 
@@ -92,6 +90,8 @@ export async function PATCH(request: NextRequest) {
         if (name !== undefined) updateData.name = name.trim();
         if (photoUrl !== undefined) updateData.photoUrl = photoUrl;
         if (chargeMode !== undefined) updateData.chargeMode = chargeMode;
+        if (phone !== undefined) updateData.phone = phone;
+        if (taxId !== undefined) updateData.taxId = taxId;
         if (chargePerChar !== undefined) {
             if (chargePerChar < 0) {
                 return NextResponse.json({ error: 'Charge per char cannot be negative' }, { status: 400 });
@@ -105,7 +105,7 @@ export async function PATCH(request: NextRequest) {
                 $set: updateData,
                 $setOnInsert: {
                     email: `user_${userId}@placeholder.com`,
-                    ...(updateData.username ? {} : { username: `user_${userId.substring(0, 8)}` }),
+                    ...(updateData.username ? {} : { username: `user_${userId.substring(userId.length - 8)}` }),
                     balance: 0
                 }
             },
@@ -119,6 +119,8 @@ export async function PATCH(request: NextRequest) {
                 username: user.username,
                 name: user.name,
                 email: user.email,
+                phone: user.phone,
+                taxId: user.taxId,
                 photoUrl: user.photoUrl,
                 balance: user.balance,
                 chargeMode: user.chargeMode,
@@ -135,3 +137,5 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }
+
+// Forçando recompilação para limpar cache do Turbopack

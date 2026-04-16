@@ -22,7 +22,7 @@ export default function ProfilePage() {
     const { signOut } = useClerk();
     const router = useRouter();
     const { openRechargeModal } = usePayment();
-    const { isInstallable, promptInstall } = usePushNotifications();
+    const { isInstallable, promptInstall, handleRequestPermission, fcmToken } = usePushNotifications();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const { data: userData, isLoading: loadingProfile, isFetching, refetch: refetchProfile } = useMyProfile();
@@ -31,12 +31,15 @@ export default function ProfilePage() {
 
     const [username, setUsername] = useState('');
     const [name, setName] = useState('');
+    const [taxId, setTaxId] = useState('');
+    const [phone, setPhone] = useState('');
     const [localPhotoUrl, setLocalPhotoUrl] = useState<string | undefined>(undefined);
     const [chargeMode, setChargeMode] = useState(false);
     const [chargePerChar, setChargePerChar] = useState('0.002');
     const [loading, setLoading] = useState(false);
     const [saveError, setSaveError] = useState('');
     const [saveSuccess, setSaveSuccess] = useState(false);
+    const [testingNotification, setTestingNotification] = useState(false);
 
     const hasPopulatedFromCache = useRef(false);
     const lastSavedChargePerChar = useRef('0.002');
@@ -45,6 +48,8 @@ export default function ProfilePage() {
         if (userData && !hasPopulatedFromCache.current) {
             setUsername(userData.username || '');
             setName(userData.name || '');
+            setTaxId(userData.taxId || '');
+            setPhone(userData.phone || '');
             setChargeMode(!!userData.chargeMode);
             const formattedCharge = (userData.chargePerChar || 0.002).toString();
             setChargePerChar(formattedCharge);
@@ -55,6 +60,8 @@ export default function ProfilePage() {
             if (userData.photoUrl && !uploadPhotoMutation.isPending) {
                 setLocalPhotoUrl(userData.photoUrl);
             }
+            if (userData.taxId && !taxId) setTaxId(userData.taxId);
+            if (userData.phone && !phone) setPhone(userData.phone);
         }
     }, [userData]);
 
@@ -88,7 +95,7 @@ export default function ProfilePage() {
         setSaveSuccess(false);
 
         try {
-            const updateData: any = { name, username };
+            const updateData: any = { name, username, taxId, phone };
             if (chargeMode) {
                 updateData.chargePerChar = parsedCharge;
                 lastSavedChargePerChar.current = parsedCharge.toString();
@@ -121,6 +128,29 @@ export default function ProfilePage() {
         if (confirm('Tem certeza que deseja sair da sua conta?')) {
             console.log("Iniciando logout...");
             await signOut(() => router.replace('/login'));
+        }
+    };
+
+    const handleTestNotification = async () => {
+        setTestingNotification(true);
+        try {
+            // Primeiro garante que temos o token e permissão
+            await handleRequestPermission();
+
+            const response = await fetch('/api/notifications/test', {
+                method: 'POST',
+            });
+
+            if (!response.ok) throw new Error('Falha ao enviar notificação');
+            
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 3000);
+        } catch (error) {
+            console.error(error);
+            setSaveError('Erro ao testar notificação. Verifique se as permissões estão ativas.');
+            setTimeout(() => setSaveError(''), 3000);
+        } finally {
+            setTestingNotification(false);
         }
     };
 
@@ -235,6 +265,22 @@ export default function ProfilePage() {
                         autoCapitalize="none"
                     />
 
+                    <Input
+                        label="CPF"
+                        placeholder="000.000.000-00"
+                        value={taxId}
+                        onChange={(e) => setTaxId(e.target.value)}
+                        type="text"
+                    />
+
+                    <Input
+                        label="WhatsApp / Telefone"
+                        placeholder="(00) 00000-0000"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        type="tel"
+                    />
+
                     {/* Charge toggle */}
                     <div className="flex items-center justify-between py-3 border-t border-gray-100">
                         <div className="flex-1 mr-4">
@@ -301,6 +347,27 @@ export default function ProfilePage() {
                         />
                     </div>
                 )}
+
+                {/* Notifications Test */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-xl shadow-sm">
+                            🔔
+                        </div>
+                        <div>
+                            <h2 className="text-base font-bold text-gray-900">Notificações Push</h2>
+                            <p className="text-xs text-gray-500">Teste se o seu dispositivo está recebendo avisos</p>
+                        </div>
+                    </div>
+                    <Button
+                        title="Enviar Notificação de Teste"
+                        onPress={handleTestNotification}
+                        loading={testingNotification}
+                        variant="outline"
+                        size="md"
+                        className="w-full"
+                    />
+                </div>
 
                 {/* About */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3">

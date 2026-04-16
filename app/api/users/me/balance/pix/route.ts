@@ -99,16 +99,19 @@ export async function POST(req: NextRequest) {
       });
 
     } catch (abacateError: any) {
-      console.error('AbacatePay SDK Error Details:', abacateError);
+      console.error('AbacatePay SDK Error Details:', {
+        message: abacateError.message,
+        data: abacateError.response?.data,
+        status: abacateError.response?.status
+      });
       
-      // Tentar extrair mensagem de erro amigável
       const apiError = abacateError.response?.data?.error || abacateError.message;
       
       return NextResponse.json({ 
-        error: 'Erro ao processar pagamento com AbacatePay',
+        error: 'Erro na API do AbacatePay',
         details: apiError,
         raw: abacateError.response?.data || abacateError
-      }, { status: 500 });
+      }, { status: abacateError.response?.status || 500 });
     }
 
   } catch (error: any) {
