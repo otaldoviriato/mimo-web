@@ -32,14 +32,14 @@ export async function POST(req: NextRequest) {
         amount: Math.round(amount * 100), // cents
         description: `Recarga de Saldo - MimoChat`,
         expiresIn: 3600, // 1 hora
-      });
+      }) as any;
 
       if (!pixResponse.data) {
         console.error('AbacatePay pixQrCode Error:', JSON.stringify(pixResponse, null, 2));
-        throw new Error(`Falha ao criar PIX no AbacatePay: ${(pixResponse as any).error || 'Verifique os logs'}`);
+        throw new Error(`Falha ao criar PIX no AbacatePay: ${pixResponse.error || 'Verifique os logs'}`);
       }
 
-      const pixData = pixResponse.data as any;
+      const pixData = pixResponse.data;
 
       await Transaction.create({
         userId: userId,
