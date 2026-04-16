@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
           externalId,
           billingId: billingData.id,
           // Guardamos o brCode se vier na resposta, ou deixamos para o front resolver via link
-          brCode: billingData.pix?.brCode || '' 
+          brCode: (billingData as any).pix?.brCode || '' 
         }
       });
 
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
         id: billingData.id,
         transactionId: billingData.id,
         url: billingData.url, // Link direto para o checkout se necessário
-        brCode: billingData.pix?.brCode || '', // PIX Copia e Cola
+        brCode: (billingData as any).pix?.brCode || '', // PIX Copia e Cola
         status: billingData.status,
       });
 
