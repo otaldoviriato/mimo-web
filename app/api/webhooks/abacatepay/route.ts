@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import { Transaction } from '@/models/Transaction';
 import { User } from '@/models/User';
+import { sendPushNotification } from '@/lib/push';
 
 export async function POST(req: NextRequest) {
     try {
@@ -71,6 +72,14 @@ export async function POST(req: NextRequest) {
         await user.save();
 
         console.log(`[SUCESSO] Saldo creditado para ${user.username} via webhook.`);
+
+        // Envia notificação push para o usuário
+        const amountInReais = (transaction.amount || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        await sendPushNotification(
+            user.clerkId,
+            'Recarga realizada! ✅',
+            `Sua recarga de ${amountInReais} foi confirmada e já está disponível.`
+        );
 
         return NextResponse.json({
             success: true,

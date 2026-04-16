@@ -34,3 +34,8 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
+
+// Listener de fetch vazio para satisfazer critérios de instalação do PWA (PWA Installability)
+self.addEventListener('fetch', (event) => {
+  // Poderia ser usado para cache offline, mas por enquanto apenas para habilitar instalação
+});

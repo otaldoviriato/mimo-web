@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { requestNotificationPermission, onForegroundMessage } from "@/lib/notifications";
+import { userApi } from "@/services/api";
 
 export const usePushNotifications = () => {
   const [fcmToken, setFcmToken] = useState<string | null>(null);
@@ -58,7 +59,12 @@ export const usePushNotifications = () => {
     if (token) {
       setFcmToken(token);
       console.log("FCM Token obtido:", token);
-      // Aqui você idealmente salvaria o token no backend do usuário
+      try {
+        await userApi.savePushToken(token);
+        console.log("Token salvo no backend com sucesso");
+      } catch (error) {
+        console.error("Erro ao salvar token no backend:", error);
+      }
     }
   };
 

@@ -4,11 +4,13 @@ import React, { useEffect } from 'react';
 import { useAuth, useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { setupAxiosInterceptors } from '@/services/api';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     const { isLoaded, isSignedIn, getToken } = useAuth();
     const { user } = useUser();
     const router = useRouter();
+    const { handleRequestPermission } = usePushNotifications();
 
     useEffect(() => {
         if (isLoaded && !isSignedIn) {
@@ -19,6 +21,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (isSignedIn && user) {
             setupAxiosInterceptors(getToken);
+            // Tenta obter permissão e salvar o token sempre que o usuário logar
+            handleRequestPermission();
         }
     }, [isSignedIn, user, getToken]);
 

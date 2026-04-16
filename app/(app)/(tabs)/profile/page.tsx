@@ -9,6 +9,7 @@ import { BalanceDisplay } from '@/components/BalanceDisplay';
 import { Avatar } from '@/components/Avatar';
 import { useMyProfile, useUpdateProfile, useUploadPhoto } from '@/hooks/useQueries';
 import { usePayment } from '@/context/PaymentContext';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 function SkeletonBox({ className = '' }: { className?: string }) {
     return (
@@ -21,6 +22,7 @@ export default function ProfilePage() {
     const { signOut } = useClerk();
     const router = useRouter();
     const { openRechargeModal } = usePayment();
+    const { isInstallable, promptInstall } = usePushNotifications();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const { data: userData, isLoading: loadingProfile, isFetching, refetch: refetchProfile } = useMyProfile();
@@ -278,6 +280,27 @@ export default function ProfilePage() {
                         className="w-full"
                     />
                 </div>
+
+                {/* PWA Install Button */}
+                {isInstallable && (
+                    <div className="bg-gradient-to-br from-purple-50 to-white border border-purple-100 rounded-2xl p-5 flex flex-col gap-3 shadow-sm">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center text-xl shadow-sm text-white">
+                                📲
+                            </div>
+                            <div>
+                                <h2 className="text-base font-bold text-gray-900">Aplicativo Mimo</h2>
+                                <p className="text-xs text-gray-500">Instale para ter acesso rápido e notificações</p>
+                            </div>
+                        </div>
+                        <Button
+                            title="Instalar Agora"
+                            onPress={promptInstall}
+                            size="md"
+                            className="w-full bg-purple-600 hover:bg-purple-700 shadow-md !text-white"
+                        />
+                    </div>
+                )}
 
                 {/* About */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3">

@@ -91,4 +91,9 @@ export const userApi = {
         const response = await api.delete('/api/users/me/cards', { data: { cardId } });
         return response.data;
     },
+
+    savePushToken: async (expoPushToken: string) => {
+        const response = await api.post('/api/users/push-token', { expoPushToken });
+        return response.data;
+    },
 };

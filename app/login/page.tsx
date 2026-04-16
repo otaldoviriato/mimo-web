@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useSignIn, useSignUp, useAuth, useClerk } from '@clerk/nextjs';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 export default function LoginPage() {
     const router = useRouter();
@@ -12,6 +13,7 @@ export default function LoginPage() {
     const { signIn } = useSignIn();
     const { signUp } = useSignUp();
     const clerk = useClerk();
+    const { isInstallable, promptInstall } = usePushNotifications();
 
     const [email, setEmail] = useState('');
     const [code, setCode] = useState('');
@@ -19,7 +21,17 @@ export default function LoginPage() {
     const [pendingVerification, setPendingVerification] = useState(false);
     const [emailLoading, setEmailLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
     const [error, setError] = useState('');
+
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth < 768);
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     useEffect(() => {
         if (isSignedIn) {
@@ -230,6 +242,23 @@ export default function LoginPage() {
                         </div>
                     )}
                 </div>
+
+                {isInstallable && isMobile && (
+                    <div className="mt-8 p-4 bg-purple-50 rounded-2xl border border-purple-100 flex flex-col items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div className="flex items-center gap-2">
+                            <span className="text-xl">📱</span>
+                            <p className="text-sm text-purple-900 font-bold">
+                                MimoChat fica melhor no App!
+                            </p>
+                        </div>
+                        <Button
+                            title="Instalar Aplicativo"
+                            onPress={promptInstall}
+                            size="sm"
+                            className="w-full bg-purple-600 shadow-md font-bold !text-white"
+                        />
+                    </div>
+                )}
 
                 <p className="text-xs text-gray-400 text-center mt-6">
                     Ao continuar, você concorda com nossos Termos e Política de Privacidade
