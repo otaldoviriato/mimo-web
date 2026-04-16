@@ -3,6 +3,7 @@ import { ClerkProvider } from '@clerk/nextjs';
 import './globals.css';
 import { QueryProvider } from '@/context/QueryProvider';
 import { PaymentProvider } from '@/context/PaymentContext';
+import { PWAProvider } from '@/context/PWAContext';
 import { Viewport } from 'next';
 
 export const metadata: Metadata = {
@@ -21,9 +22,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <body className="h-full">
                 <ClerkProvider>
                     <QueryProvider>
-                        <PaymentProvider>
-                            {children}
-                        </PaymentProvider>
+                        <PWAProvider>
+                            <PaymentProvider>
+                                {children}
+                            </PaymentProvider>
+                        </PWAProvider>
                     </QueryProvider>
                 </ClerkProvider>
             </body>

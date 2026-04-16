@@ -42,8 +42,16 @@ export async function GET() {
                 const clerkUser = await client.users.getUser(userId);
                 const realEmail = clerkUser.emailAddresses[0]?.emailAddress;
                 if (realEmail && realEmail !== user.email) {
-                    user.email = realEmail;
-                    await user.save();
+                    try {
+                        user.email = realEmail;
+                        await user.save();
+                    } catch (saveErr: any) {
+                        if (saveErr.code === 11000) {
+                            console.warn('Email already exists in another account, skipping sync:', realEmail);
+                        } else {
+                            throw saveErr;
+                        }
+                    }
                 }
             } catch (err) {
                 console.warn('Could not sync email from Clerk:', err);

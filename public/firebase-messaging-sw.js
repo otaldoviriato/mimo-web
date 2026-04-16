@@ -20,7 +20,7 @@ messaging.onBackgroundMessage(function(payload) {
   const notificationTitle = payload.notification?.title || 'Nova mensagem Mimo';
   const notificationOptions = {
     body: payload.notification?.body,
-    icon: '/icon-192x192.png'
+    icon: '/icon-192x192.jpeg'
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);

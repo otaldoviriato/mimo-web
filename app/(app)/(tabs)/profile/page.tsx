@@ -10,6 +10,7 @@ import { Avatar } from '@/components/Avatar';
 import { useMyProfile, useUpdateProfile, useUploadPhoto } from '@/hooks/useQueries';
 import { usePayment } from '@/context/PaymentContext';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { usePWA } from '@/context/PWAContext';
 
 function SkeletonBox({ className = '' }: { className?: string }) {
     return (
@@ -22,8 +23,13 @@ export default function ProfilePage() {
     const { signOut } = useClerk();
     const router = useRouter();
     const { openRechargeModal } = usePayment();
-    const { isInstallable, promptInstall, handleRequestPermission, fcmToken } = usePushNotifications();
+    const { handleRequestPermission, fcmToken } = usePushNotifications();
+    const { isInstallable, promptInstall, mounted, isStandalone } = usePWA();
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        console.log('ProfilePage: isInstallable =', isInstallable);
+    }, [isInstallable]);
 
     const { data: userData, isLoading: loadingProfile, isFetching, refetch: refetchProfile } = useMyProfile();
     const updateProfileMutation = useUpdateProfile();
@@ -328,7 +334,7 @@ export default function ProfilePage() {
                 </div>
 
                 {/* PWA Install Button */}
-                {isInstallable && (
+                {mounted && isInstallable && !isStandalone && (
                     <div className="bg-gradient-to-br from-purple-50 to-white border border-purple-100 rounded-2xl p-5 flex flex-col gap-3 shadow-sm">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center text-xl shadow-sm text-white">

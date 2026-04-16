@@ -6,8 +6,6 @@ import { userApi } from "@/services/api";
 
 export const usePushNotifications = () => {
   const [fcmToken, setFcmToken] = useState<string | null>(null);
-  const [isInstallable, setIsInstallable] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   useEffect(() => {
     // Registrar o Service Worker automaticamente
@@ -39,19 +37,6 @@ export const usePushNotifications = () => {
     };
 
     setupForegroundListener();
-
-    // Lógica para detectar se o app pode ser instalado (PWA)
-    const handleBeforeInstallPrompt = (e: any) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setIsInstallable(true);
-    };
-
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    };
   }, []);
 
   const handleRequestPermission = async () => {
@@ -68,20 +53,8 @@ export const usePushNotifications = () => {
     }
   };
 
-  const promptInstall = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      console.log(`User response to the install prompt: ${outcome}`);
-      setDeferredPrompt(null);
-      setIsInstallable(false);
-    }
-  };
-
   return {
     fcmToken,
     handleRequestPermission,
-    isInstallable,
-    promptInstall,
   };
 };

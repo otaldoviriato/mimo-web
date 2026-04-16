@@ -6,6 +6,7 @@ import { useSignIn, useSignUp, useAuth, useClerk } from '@clerk/nextjs';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { usePWA } from '@/context/PWAContext';
 
 export default function LoginPage() {
     const router = useRouter();
@@ -13,7 +14,7 @@ export default function LoginPage() {
     const { signIn } = useSignIn();
     const { signUp } = useSignUp();
     const clerk = useClerk();
-    const { isInstallable, promptInstall } = usePushNotifications();
+    const { isInstallable, promptInstall, mounted, isStandalone } = usePWA();
 
     const [email, setEmail] = useState('');
     const [code, setCode] = useState('');
@@ -243,7 +244,7 @@ export default function LoginPage() {
                     )}
                 </div>
 
-                {isInstallable && isMobile && (
+                {mounted && isInstallable && !isStandalone && (
                     <div className="mt-8 p-4 bg-purple-50 rounded-2xl border border-purple-100 flex flex-col items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="flex items-center gap-2">
                             <span className="text-xl">📱</span>

@@ -51,51 +51,42 @@ export async function POST(req: NextRequest) {
         }, { status: 400 });
       }
 
-      // O SDK espera products e valores em centavos
-      const billing = await abacatepay.billing.create({
-        frequency: "ONE_TIME",
-        methods: ['PIX'],
-        products: [
-          {
-            externalId: externalId,
-            name: "Recarga de Saldo - MimoChat",
-            quantity: 1,
-            price: Math.round(amount * 100), // cents
-          },
-        ],
+      // Usar pixQrCode para obter o brCode (PIX copia e cola) e QR Code imediatamente
+      const pixResponse = await abacatepay.pixQrCode.create({
+        amount: Math.round(amount * 100), // cents
+        expiresIn: 3600, // 1 hora
+        description: "Recarga de Saldo - MimoChat",
         customer: customerData,
-        returnUrl: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/profile`,
-        completionUrl: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/profile`,
       });
 
-      if (!billing || !billing.data) {
-        console.error('AbacatePay Error Response:', billing);
-        throw new Error(`Falha ao criar cobrança no AbacatePay: ${JSON.stringify(billing)}`);
+      if (!pixResponse || !pixResponse.data) {
+        console.error('AbacatePay Error Response:', pixResponse);
+        throw new Error(`Falha ao criar PIX no AbacatePay: ${JSON.stringify(pixResponse)}`);
       }
 
-      const billingData = billing.data;
+      const pixData = pixResponse.data;
 
       // Criar transação pendente no nosso banco
       await Transaction.create({
         userId: userId,
-        abacatePayId: billingData.id,
+        abacatePayId: pixData.id,
         amount: amount,
         status: 'PENDING',
         type: 'PIX',
         source: 'recharge',
         metadata: {
           externalId,
-          checkoutUrl: billingData.url
+          brCode: pixData.brCode
         }
       });
 
       return NextResponse.json({
         success: true,
-        id: billingData.id,
-        transactionId: billingData.id, // Alias para compatibilidade com RechargeModal/PixCheckoutView
-        url: billingData.url,
-        brCode: (billingData as any).pix?.payload || '', // Código copia e cola
-        status: billingData.status,
+        id: pixData.id,
+        transactionId: pixData.id, // Alias para compatibilidade com RechargeModal/PixCheckoutView
+        url: '', // pixQrCode não possui URL de checkout como o billing
+        brCode: pixData.brCode,
+        status: pixData.status,
       });
 
     } catch (abacateError: any) {
