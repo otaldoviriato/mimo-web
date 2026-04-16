@@ -4,6 +4,8 @@ import { uploadToGCS } from '@/lib/gcs';
 import { v4 as uuidv4 } from 'uuid';
 import sharp from 'sharp';
 
+export const dynamic = 'force-dynamic';
+
 const CHAT_SERVER_URL = process.env.NEXT_PUBLIC_CHAT_SERVER_URL || 'http://localhost:3001';
 
 export async function POST(request: NextRequest) {

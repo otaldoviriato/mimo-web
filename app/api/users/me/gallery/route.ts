@@ -5,6 +5,8 @@ import { User, GalleryItem } from '@/models';
 import { uploadToGCS } from '@/lib/gcs';
 import { v4 as uuidv4 } from 'uuid';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
     try {
         const { userId } = await auth();
