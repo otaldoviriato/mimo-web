@@ -60,18 +60,20 @@ export async function POST(
             // Registrar transações (Opcional, mas boa prática)
             await Transaction.create([
                 {
-                    clerkId: requesterId,
+                    userId: requesterId,
                     type: 'debit',
                     amount: price,
-                    description: `Assinatura do perfil @${owner.username}`,
-                    status: 'completed',
+                    source: 'subscription',
+                    status: 'COMPLETED',
+                    relatedUserId: ownerId,
                 },
                 {
-                    clerkId: ownerId,
+                    userId: ownerId,
                     type: 'credit',
                     amount: price,
-                    description: `Nova assinatura de @${requester.username}`,
-                    status: 'completed',
+                    source: 'subscription',
+                    status: 'COMPLETED',
+                    relatedUserId: requesterId,
                 }
             ]);
         }

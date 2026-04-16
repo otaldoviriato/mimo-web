@@ -54,8 +54,8 @@ export async function POST(request: NextRequest) {
                 .blur(60) // high blur
                 .toBuffer();
 
-            const originalFileWrap = new File([buffer], originalFileName, { type: file.type });
-            const blurredFileWrap = new File([blurredBuffer], blurredFileName, { type: file.type });
+            const originalFileWrap = new File([new Uint8Array(buffer)], originalFileName, { type: file.type });
+            const blurredFileWrap = new File([new Uint8Array(blurredBuffer)], blurredFileName, { type: file.type });
 
             const [origUrl, blurUrl] = await Promise.all([
                 uploadToGCS(originalFileWrap, originalFileName),
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
             originalImageUrl = origUrl;
             blurredImageUrl = blurUrl;
         } else {
-            const originalFileWrap = new File([buffer], originalFileName, { type: file.type });
+            const originalFileWrap = new File([new Uint8Array(buffer)], originalFileName, { type: file.type });
             originalImageUrl = await uploadToGCS(originalFileWrap, originalFileName);
         }
 
