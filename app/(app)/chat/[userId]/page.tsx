@@ -99,7 +99,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                     const index = prev.findIndex(m => m.tempId === data.tempId || m._id === data.tempId);
                     if (index !== -1) {
                         const newMessages = [...prev];
-                        newMessages[index] = { ...data.message, status: 'sent' };
+                        newMessages[index] = { ...data.message, status: 'sent' as const };
                         return newMessages;
                     }
                 }
@@ -107,7 +107,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                 // Se a mensagem já existe (evitar duplicatas), não faz nada
                 if (prev.find(m => m._id === data.message._id)) return prev;
 
-                const newMessages = [...prev, { ...data.message, status: 'sent' }];
+                const newMessages = [...prev, { ...data.message, status: 'sent' as const }];
                 if (data.message.receiverId === user?.id) {
                     socket.emit('mark_as_read', { roomId });
 
@@ -533,7 +533,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                     return (
                         <div
                             key={item._id}
-                            className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-1 transition-colors duration-300 ${selectedMessageId === item._id ? 'bg-purple-100/50 -mx-4 px-4 py-1' : ''}`}
+                            className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-1 transition-colors duration-300 ${selectedMessageId === item._id ? 'bg-purple-100/50 -mx-4 px-4 py-0.5' : ''}`}
                             onMouseDown={() => handleStartPress(item._id)}
                             onMouseUp={handleEndPress}
                             onMouseLeave={handleEndPress}
@@ -550,7 +550,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                                             : 'bg-white border-purple-50 border-2 rounded-bl-none'
                                     }`}
                                 >
-                                    <div className="px-8 py-8 flex flex-col items-center gap-4">
+                                    <div className="px-6 py-6 flex flex-col items-center gap-4">
                                         <div className="relative group">
                                             <div className={`absolute inset-0 blur-2xl opacity-20 ${isMine ? 'bg-white' : 'bg-purple-600'}`} />
                                             <img 
@@ -583,7 +583,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                                     <div className={`px-5 py-3 flex items-end justify-between gap-4 ${isMine ? 'bg-purple-700/40' : 'bg-gray-50/50'}`}>
                                         <div className="flex-1" />
                                         <div className="flex items-center gap-2 mb-[-1px]">
-                                            <span className={`text-[10px] font-bold ${isMine ? 'text-purple-200/70' : 'text-gray-400'}`}>
+                                            <span className={`text-[10px] font-medium ${isMine ? 'text-purple-200/70' : 'text-gray-400'}`}>
                                                 {(() => {
                                                     try {
                                                         return new Date(item.timestamp).toLocaleTimeString('pt-BR', {
@@ -614,7 +614,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                                 </div>
                             ) : (
                                 <div
-                                    className={`max-w-[75%] ${isLocked || item.originalImageUrl ? 'p-1 bg-transparent' : 'px-4 py-3'} rounded-2xl ${
+                                    className={`max-w-[75%] ${isLocked || item.originalImageUrl ? 'p-1 bg-transparent' : 'px-3 py-1.5'} rounded-2xl ${
                                         (!isLocked && !item.originalImageUrl) 
                                             ? (isMine ? 'bg-purple-600 text-white rounded-br-sm' : 'bg-white text-gray-900 shadow-sm rounded-bl-sm')
                                             : (isMine ? 'rounded-br-sm' : 'rounded-bl-sm')
@@ -658,7 +658,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                                             <div className="flex items-end justify-between mt-1.5 gap-3 px-2 pb-2">
                                                 <div className="flex-1 min-w-0" />
                                                 <div className="flex items-center gap-1.5 mb-[-1px]">
-                                                    <span className={`text-[10px] font-bold ${isMine ? 'text-gray-500' : 'text-gray-400'}`}>
+                                                    <span className={`text-[10px] font-medium ${isMine ? 'text-gray-500' : 'text-gray-400'}`}>
                                                         {(() => {
                                                             try {
                                                                 return new Date(item.timestamp).toLocaleTimeString('pt-BR', {
@@ -693,7 +693,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                                                 {item.content}
                                             </span>
                                             <div className="inline-flex items-center gap-1.5 float-right mt-2 ml-2 mb-[-2px]">
-                                                <span className={`text-[10px] font-bold ${isMine ? 'text-purple-200/70' : 'text-gray-400'}`}>
+                                                <span className={`text-[10px] font-medium ${isMine ? 'text-purple-200/70' : 'text-gray-400'}`}>
                                                     {(() => {
                                                         try {
                                                             return new Date(item.timestamp).toLocaleTimeString('pt-BR', {
