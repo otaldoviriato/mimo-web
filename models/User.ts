@@ -86,6 +86,9 @@ const UserSchema = new Schema<IUser>({
         type: [String],
         default: [],
     },
+    expoPushToken: {
+        type: String,
+    },
     savedCards: {
         type: [{
             id: { type: String, required: true },

@@ -65,7 +65,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ userId: 
     }
 
     return (
-        <div className="flex flex-col h-full bg-white overflow-y-auto pb-10">
+        <div className="flex flex-col h-full bg-white overflow-y-auto pb-10 no-scrollbar">
             {/* Cover and Header */}
             <div className="relative shrink-0">
                 <div className="h-40 bg-gradient-to-br from-purple-600 to-fuchsia-500 shadow-inner" />

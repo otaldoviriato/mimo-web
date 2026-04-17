@@ -44,6 +44,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
     const [giftModalVisible, setGiftModalVisible] = useState(false);
     const [giftAmountStr, setGiftAmountStr] = useState('');
     const [sendingGift, setSendingGift] = useState(false);
+    const [attachMenuVisible, setAttachMenuVisible] = useState(false);
 
     const { data: userData } = useMyProfile();
     const { data: receiver } = useUserById(otherUserId);
@@ -386,7 +387,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                         </svg>
                     )}
-                    <BalanceDisplay balance={balance} size="sm" variant="transparent" clickable={false} />
+                    <BalanceDisplay balance={balance} size="sm" variant="transparent" clickable={true} />
 
                     <div className="relative">
                         <button
@@ -598,26 +599,64 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                     </p>
                 )}
                 <div className="flex items-end gap-3">
-                    <div className="flex items-center gap-2">
+                    <div className="relative shrink-0">
                         <button
-                            onClick={() => fileInputRef.current?.click()}
+                            onClick={() => setAttachMenuVisible(!attachMenuVisible)}
                             disabled={!connected}
-                            className="w-11 h-11 rounded-2xl flex items-center justify-center transition-all bg-gray-50 hover:bg-gray-100 shrink-0"
+                            className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shrink-0 ${
+                                attachMenuVisible ? 'bg-purple-600 text-white rotate-45' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                            }`}
                         >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-gray-500">
-                                <path d="M4 16L8.586 11.414C8.96106 11.0391 9.46967 10.8284 10 10.8284C10.5303 10.8284 11.0389 11.0391 11.414 11.414L16 16M14 14L15.586 12.414C15.9611 12.0391 16.4697 11.8284 17 11.8284C17.5303 11.8284 18.0389 12.0391 18.414 12.414L20 14M14 8H14.01M6 20H18C18.5304 20 19.0391 19.7893 19.4142 19.4142C19.7893 19.0391 20 18.5304 20 18V6C20 5.46957 19.7893 4.96086 19.4142 4.58579C19.0391 4.21071 18.5304 4 18 4H6C5.46957 4 4.96086 4.21071 4.58579 4.58579C4.21071 4.96086 4 5.46957 4 6V18C4 18.5304 4.21071 19.0391 4.58579 19.4142C4.96086 19.7893 5.304 20 6 20Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                         </button>
-                        {!userData?.isProfessional && (
-                            <button
-                                onClick={() => setGiftModalVisible(true)}
-                                disabled={!connected}
-                                className="w-11 h-11 rounded-2xl flex items-center justify-center transition-all bg-purple-50 hover:bg-purple-100 shrink-0 border border-purple-100"
-                            >
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-purple-600">
-                                    <path d="M20 12V22H4V12M2 7H22V12H2V7ZM12 22V7M12 7C12 7 9.5 3 6.5 3C3.5 3 3.5 7 6.5 7H12ZM12 7H17.5C20.5 7 20.5 3 17.5 3C14.5 3 12 7 12 7Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                            </button>
+
+                        {attachMenuVisible && (
+                            <>
+                                <div 
+                                    className="fixed inset-0 z-20" 
+                                    onClick={() => setAttachMenuVisible(false)} 
+                                />
+                                <div className="absolute bottom-14 left-0 bg-white rounded-2xl shadow-xl border border-gray-100 w-48 overflow-hidden z-30 animate-in slide-in-from-bottom-2 duration-200">
+                                    <button
+                                        onClick={() => {
+                                            setAttachMenuVisible(false);
+                                            fileInputRef.current?.click();
+                                        }}
+                                        className="flex items-center gap-3 w-full px-4 py-3.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors border-b border-gray-50"
+                                    >
+                                        <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                                <path d="M4 16L8.586 11.414C8.96106 11.0391 9.46967 10.8284 10 10.8284C10.5303 10.8284 11.0389 11.0391 11.414 11.414L16 16M14 14L15.586 12.414C15.9611 12.0391 16.4697 11.8284 17 11.8284C17.5303 11.8284 18.0389 12.0391 18.414 12.414L20 14M14 8H14.01M6 20H18C18.5304 20 19.0391 19.7893 19.4142 19.4142C19.7893 19.0391 20 18.5304 20 18V6C20 5.46957 19.7893 4.96086 19.4142 4.58579C19.0391 4.21071 18.5304 4 18 4H6C5.46957 4 4.96086 4.21071 4.58579 4.58579C4.21071 4.96086 4 5.46957 4 6V18C4 18.5304 4.21071 19.0391 4.58579 19.4142C4.96086 19.7893 5.304 20 6 20Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-gray-900">Enviar Foto</p>
+                                            <p className="text-[10px] text-gray-500">Galeria ou Câmera</p>
+                                        </div>
+                                    </button>
+                                    {!userData?.isProfessional && (
+                                        <button
+                                            onClick={() => {
+                                                setAttachMenuVisible(false);
+                                                setGiftModalVisible(true);
+                                            }}
+                                            className="flex items-center gap-3 w-full px-4 py-3.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                        >
+                                            <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                                    <path d="M20 12V22H4V12M2 7H22V12H2V7ZM12 22V7M12 7C12 7 9.5 3 6.5 3C3.5 3 3.5 7 6.5 7H12ZM12 7H17.5C20.5 7 20.5 3 17.5 3C14.5 3 12 7 12 7Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-gray-900">Enviar Mimo</p>
+                                                <p className="text-[10px] text-gray-500">Presente em dinheiro</p>
+                                            </div>
+                                        </button>
+                                    )}
+                                </div>
+                            </>
                         )}
                     </div>
                     <input type="file" className="hidden" ref={fileInputRef} accept="image/*" onChange={handleImageSelect} />
@@ -643,7 +682,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                     <button
                         onClick={handleSend}
                         disabled={!messageText.trim() || !connected}
-                        className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${messageText.trim() && connected
+                        className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shrink-0 ${messageText.trim() && connected
                             ? 'bg-purple-600 hover:bg-purple-700 shadow-sm'
                             : 'bg-gray-200'
                             }`}
