@@ -305,7 +305,12 @@ export default function ProfilePage() {
                     <div>
                         <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 block mb-1">Saldo na Carteira</span>
                         <div className="text-2xl font-black text-gray-900 tracking-tight">
-                            {((userData?.balance ?? 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            {((userData?.balance ?? 0) / 100).toLocaleString('pt-BR', { 
+                                style: 'currency', 
+                                currency: 'BRL',
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2
+                            })}
                         </div>
                     </div>
 

@@ -41,6 +41,25 @@ function formatMessageTime(dateStr: string): string {
     return messageDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
 }
 
+function ChatListSkeleton() {
+    return (
+        <div className="flex-1 overflow-y-auto">
+            {[...Array(8)].map((_, i) => (
+                <div key={i} className="w-full flex items-center px-4 py-4 border-b border-gray-50 animate-pulse">
+                    <div className="w-[52px] h-[52px] rounded-full bg-gray-100 shrink-0" />
+                    <div className="flex-1 ml-4 min-w-0">
+                        <div className="flex items-baseline justify-between mb-2.5">
+                            <div className="h-4 bg-gray-100 rounded-lg w-32" />
+                            <div className="h-2.5 bg-gray-50 rounded-lg w-10" />
+                        </div>
+                        <div className="h-3 bg-gray-50 rounded-lg w-3/4" />
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
 export default function ChatsPage() {
     const router = useRouter();
     const { user } = useUser();
@@ -50,8 +69,8 @@ export default function ChatsPage() {
     // Estado de "digitando" por sala: { [roomId]: boolean }
     const [typingRooms, setTypingRooms] = useState<Record<string, boolean>>({});
 
-    const { data: rooms = [], isRefetching, refetch: refetchRooms } = useChatRooms();
-    const { refetch: refetchProfile } = useMyProfile();
+    const { data: rooms = [], isLoading, isRefetching, refetch: refetchRooms } = useChatRooms();
+    const { data: myProfile, refetch: refetchProfile } = useMyProfile();
 
     // ─── Listeners de WebSocket em tempo real ───────────────────────────────
     useEffect(() => {
@@ -62,6 +81,7 @@ export default function ChatsPage() {
             queryClient.setQueryData(QueryKeys.me, (old: any) =>
                 old ? { ...old, balance: data.balance } : old
             );
+            queryClient.invalidateQueries({ queryKey: ['earnings', 'recent'] });
         };
 
         // 2. Atualiza a última mensagem da sala em tempo real
@@ -180,16 +200,25 @@ export default function ChatsPage() {
                     <h1 className="text-2xl font-black text-white tracking-tighter">Mimo</h1>
                     <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">Conversas</span>
                 </div>
+                <BalanceDisplay 
+                    balance={myProfile?.balance ?? 0} 
+                    size="sm" 
+                    variant="glass" 
+                />
             </div>
 
             {/* List */}
             <div className="flex-1 overflow-y-auto pb-16 md:pb-0">
-                {rooms.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full px-8 text-center">
-                        <span className="text-6xl mb-4">💬</span>
-                        <h2 className="text-xl font-bold text-gray-800 mb-2">Nenhuma conversa ainda</h2>
-                        <p className="text-gray-500 text-sm">
-                            Use a busca para encontrar usuários e começar a conversar
+                {isLoading ? (
+                    <ChatListSkeleton />
+                ) : rooms.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full px-8 text-center animate-in fade-in duration-500">
+                        <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mb-6">
+                            <span className="text-5xl">💬</span>
+                        </div>
+                        <h2 className="text-xl font-bold text-gray-800 mb-2">Sem conversas ainda</h2>
+                        <p className="text-gray-500 text-sm max-w-[240px] leading-relaxed">
+                            Quando você começar a conversar com alguém, elas aparecerão aqui.
                         </p>
                     </div>
                 ) : (

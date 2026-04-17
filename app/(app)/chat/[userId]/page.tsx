@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Avatar } from '@/components/Avatar';
 import { BalanceDisplay } from '@/components/BalanceDisplay';
 import { useSocket } from '@/hooks/useSocket';
-import { useUserById, useMyProfile, QueryKeys } from '@/hooks/useQueries';
+import { useUserById, useMyProfile, QueryKeys, useRecentEarnings } from '@/hooks/useQueries';
 
 interface Message {
     _id: string;
@@ -22,6 +22,9 @@ interface Message {
     lockedImagePrice?: number;
     originalImageUrl?: string;
     blurredImageUrl?: string;
+    isVideo?: boolean;
+    videoUrl?: string;
+    thumbnailUrl?: string;
     isGift?: boolean;
     receiverEarnings?: number;
     status?: 'sending' | 'sent' | 'error';
@@ -36,22 +39,30 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
     const { socket, connected, socketService, socketVersion } = useSocket(user?.id);
 
     const [messages, setMessages] = useState<Message[]>([]);
+    const [loadingMessages, setLoadingMessages] = useState(true);
     const [messageText, setMessageText] = useState('');
     const [sending, setSending] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
     const [menuVisible, setMenuVisible] = useState(false);
-    const [selectedImage, setSelectedImage] = useState<File | null>(null);
-    const [imagePriceStr, setImagePriceStr] = useState('');
-    const [uploadingImage, setUploadingImage] = useState(false);
     const [giftModalVisible, setGiftModalVisible] = useState(false);
     const [giftAmountStr, setGiftAmountStr] = useState('');
     const [sendingGift, setSendingGift] = useState(false);
     const [attachMenuVisible, setAttachMenuVisible] = useState(false);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [isVideo, setIsVideo] = useState(false);
+    const [uploadingMedia, setUploadingMedia] = useState(false);
+    const [mediaPriceStr, setMediaPriceStr] = useState('');
     const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+    const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
     const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+    const [unlockModalVisible, setUnlockModalVisible] = useState(false);
+    const [unlockData, setUnlockData] = useState<{ id: string; price: number; isVideo: boolean } | null>(null);
+    const [unlocking, setUnlocking] = useState(false);
     const pressTimer = useRef<any>(null);
 
     const { data: userData } = useMyProfile();
+    const { data: earningsData } = useRecentEarnings(otherUserId);
     const { data: receiver } = useUserById(otherUserId);
     const balance = userData?.balance ?? 0;
 
@@ -77,6 +88,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
 
         socket.on('room_joined', (data: { messages: Message[] }) => {
             setMessages([...data.messages]);
+            setLoadingMessages(false);
             socket.emit('mark_as_read', { roomId });
 
             // Atualiza cache local de rooms
@@ -131,6 +143,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
             queryClient.setQueryData(QueryKeys.me, (old: any) =>
                 old ? { ...old, balance: data.balance } : old
             );
+            queryClient.invalidateQueries({ queryKey: ['earnings', 'recent'] });
         });
 
         socket.on('message_error', (data: { error: string }) => {
@@ -170,6 +183,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                         return r;
                     });
                 });
+                queryClient.invalidateQueries({ queryKey: ['earnings', 'recent'] });
             }
         });
 
@@ -185,6 +199,31 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
             socket.off('room_read');
         };
     }, [socket, socketVersion, roomId, otherUserId]);
+
+    const generateVideoThumbnail = (file: File): Promise<string> => {
+        return new Promise((resolve) => {
+            const video = document.createElement('video');
+            video.preload = 'metadata';
+            video.src = URL.createObjectURL(file);
+            video.muted = true;
+            video.playsInline = true;
+
+            video.onloadeddata = () => {
+                video.currentTime = 1; 
+            };
+
+            video.onseeked = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const thumbData = canvas.toDataURL('image/jpeg');
+                URL.revokeObjectURL(video.src);
+                resolve(thumbData);
+            };
+        });
+    };
 
     const handleStartPress = (msgId: string) => {
         pressTimer.current = setTimeout(() => {
@@ -205,6 +244,24 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
     const handleMessageDoubleClick = (msgId: string) => {
         setSelectedMessageId(msgId);
     };
+
+    function MessageSkeleton() {
+    return (
+        <div className="flex-1 overflow-y-auto px-4 py-8 flex flex-col gap-6">
+            {[...Array(8)].map((_, i) => {
+                const isMine = i % 3 === 0;
+                return (
+                    <div key={i} className={`flex ${isMine ? 'justify-end' : 'justify-start'} animate-pulse`}>
+                        <div className={`
+                            h-14 rounded-2xl 
+                            ${isMine ? 'bg-purple-100 w-[60%] rounded-br-sm' : 'bg-gray-100 w-[45%] rounded-bl-sm'}
+                        `} />
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
 
     const handleSend = () => {
         if (!messageText.trim() || sending || !socket) return;
@@ -261,95 +318,189 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
         }
     };
 
-    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
         if (e.target.files && e.target.files.length > 0) {
             const file = e.target.files[0];
-            setSelectedImage(file);
-            // Se for cliente (não cobra por msg), envia direto sem pedir preço
-            if (!userData?.chargeMode) {
-                // Pequeno delay para o estado do selectedImage atualizar (ou apenas passar o file direto)
-                // Mas para manter a consistência com handleSendImage, vamos apenas disparar o envio com preço zero
+            setSelectedFile(file);
+            setIsVideo(type === 'video');
+            
+            if (type === 'video') {
+                const thumb = await generateVideoThumbnail(file);
+                setPreviewUrl(thumb);
+            } else {
+                setPreviewUrl(URL.createObjectURL(file));
+            }
+
+            if (!userData?.isProfessional) {
                 setTimeout(() => {
-                    handleAutoSendImage(file);
+                    handleAutoSendMedia(file, type === 'video');
                 }, 100);
             }
         }
     };
 
-    const handleAutoSendImage = async (file: File) => {
+    const handleAutoSendMedia = async (file: File, isVideoFile: boolean) => {
         if (!file || !user?.id) return;
-        setUploadingImage(true);
+        setUploadingMedia(true);
         try {
-            const formData = new FormData();
-            formData.append('photo', file);
-            formData.append('roomId', roomId);
-            formData.append('receiverId', otherUserId);
-            formData.append('lockedImagePrice', '0');
+            let finalVideoUrl = '';
             
-            const res = await fetch('/api/chats/image', {
-                method: 'POST',
-                body: formData,
-            });
-            const data = await res.json();
-            if (!data.success) {
-                alert(data.error || 'Erro ao enviar imagem');
-            }
-            setSelectedImage(null);
-        } catch (e) {
-            alert('Erro ao enviar imagem');
-        } finally {
-            setUploadingImage(false);
-            if (fileInputRef.current) fileInputRef.current.value = '';
-        }
-    };
-
-    const handleSendImage = async () => {
-        if (!selectedImage || !router || !user?.id) return;
-        setUploadingImage(true);
-        try {
-            const formData = new FormData();
-            formData.append('photo', selectedImage);
-            formData.append('roomId', roomId);
-            formData.append('receiverId', otherUserId);
-            formData.append('lockedImagePrice', imagePriceStr || '0');
-            
-            const res = await fetch('/api/chats/image', {
-                method: 'POST',
-                body: formData,
-            });
-            const data = await res.json();
-            if (!data.success) {
-                alert(data.error || 'Erro ao enviar imagem');
-            } else {
-                setSelectedImage(null);
-                setImagePriceStr('');
-            }
-        } catch (e) {
-            alert('Erro ao enviar imagem');
-        } finally {
-            setUploadingImage(false);
-            if (fileInputRef.current) fileInputRef.current.value = '';
-        }
-    };
-
-    const handleUnlockImage = async (messageId: string, priceInCents: number) => {
-        if (confirm(`Deseja desbloquear esta imagem por R$ ${(priceInCents / 100).toFixed(2)}?`)) {
-            if (balance < priceInCents) {
-                alert(`Você não tem saldo suficiente. Recarregue sua carteira.`);
-                return;
-            }
-            try {
-                const res = await fetch(`/api/chats/message/${messageId}/unlock`, { 
+            if (isVideoFile) {
+                const signedRes = await fetch('/api/chats/media/signed-url', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        roomId,
+                        contentType: file.type,
+                        fileName: file.name,
+                        isVideo: true
+                    })
                 });
-                const data = await res.json();
-                if (!data.success) {
-                    alert(data.error || 'Erro ao desbloquear imagem');
+                const signedData = await signedRes.json();
+                
+                if (signedData.signedUrl) {
+                    await fetch(signedData.signedUrl, {
+                        method: 'PUT',
+                        body: file,
+                        headers: { 'Content-Type': file.type }
+                    });
+                    finalVideoUrl = signedData.publicUrl;
                 }
-            } catch (e) {
-                alert('Erro na requisição');
             }
+
+            const formData = new FormData();
+            if (isVideoFile) {
+                formData.append('videoUrl', finalVideoUrl);
+            } else {
+                formData.append('file', file);
+            }
+            
+            formData.append('roomId', roomId);
+            formData.append('receiverId', otherUserId);
+            formData.append('lockedPrice', '0');
+            formData.append('isVideo', isVideoFile.toString());
+            
+            if (isVideoFile) {
+                const thumbUrl = await generateVideoThumbnail(file);
+                const thumbBlob = await (await fetch(thumbUrl)).blob();
+                formData.append('thumbnail', new File([thumbBlob], 'thumb.jpg', { type: 'image/jpeg' }));
+            }
+
+            const res = await fetch('/api/chats/media', {
+                method: 'POST',
+                body: formData,
+            });
+            const data = await res.json();
+            if (!data.success) {
+                alert(data.error || 'Erro ao enviar mídia');
+            }
+            setSelectedFile(null);
+            setPreviewUrl(null);
+        } catch (e) {
+            console.error(e);
+            alert('Erro ao enviar mídia');
+        } finally {
+            setUploadingMedia(false);
+        }
+    };
+
+    const handleSendMedia = async () => {
+        if (!selectedFile || !user?.id) return;
+        setUploadingMedia(true);
+        try {
+            let finalVideoUrl = '';
+            
+            if (isVideo) {
+                const signedRes = await fetch('/api/chats/media/signed-url', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        roomId,
+                        contentType: selectedFile.type,
+                        fileName: selectedFile.name,
+                        isVideo: true
+                    })
+                });
+                const signedData = await signedRes.json();
+                
+                if (signedData.signedUrl) {
+                    await fetch(signedData.signedUrl, {
+                        method: 'PUT',
+                        body: selectedFile,
+                        headers: { 'Content-Type': selectedFile.type }
+                    });
+                    finalVideoUrl = signedData.publicUrl;
+                }
+            }
+
+            const formData = new FormData();
+            if (isVideo) {
+                formData.append('videoUrl', finalVideoUrl);
+            } else {
+                formData.append('file', selectedFile);
+            }
+            
+            formData.append('roomId', roomId);
+            formData.append('receiverId', otherUserId);
+            formData.append('lockedPrice', mediaPriceStr || '0');
+            formData.append('isVideo', isVideo.toString());
+
+            if (isVideo) {
+                const thumbUrl = await generateVideoThumbnail(selectedFile);
+                const thumbBlob = await (await fetch(thumbUrl)).blob();
+                formData.append('thumbnail', new File([thumbBlob], 'thumb.jpg', { type: 'image/jpeg' }));
+            }
+
+            const res = await fetch('/api/chats/media', {
+                method: 'POST',
+                body: formData,
+            });
+            const data = await res.json();
+            if (!data.success) {
+                alert(data.error || 'Erro ao enviar mídia');
+            }
+            setSelectedFile(null);
+            setPreviewUrl(null);
+            setMediaPriceStr('');
+            setAttachMenuVisible(false);
+        } catch (e) {
+            console.error(e);
+            alert('Erro ao enviar mídia');
+        } finally {
+            setUploadingMedia(false);
+        }
+    };
+
+    const handleUnlockImage = async (messageId: string, priceInCents: number, isVideoMessage: boolean = false) => {
+        setUnlockData({ id: messageId, price: priceInCents, isVideo: isVideoMessage });
+        setUnlockModalVisible(true);
+    };
+
+    const confirmUnlock = async () => {
+        if (!unlockData) return;
+        
+        if (balance < unlockData.price) {
+            alert(`Você não tem saldo suficiente. Recarregue sua carteira.`);
+            return;
+        }
+
+        setUnlocking(true);
+        try {
+            const res = await fetch(`/api/chats/message/${unlockData.id}/unlock`, { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            const data = await res.json();
+            if (data.success) {
+                setUnlockModalVisible(false);
+                setUnlockData(null);
+            } else {
+                alert(data.error || 'Erro ao desbloquear conteúdo');
+            }
+        } catch (e) {
+            alert('Erro na requisição');
+        } finally {
+            setUnlocking(false);
         }
     };
 
@@ -466,7 +617,13 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                 </svg>
                             )}
-                            <BalanceDisplay balance={balance} size="sm" variant="transparent" clickable={true} />
+                            <BalanceDisplay 
+                                balance={balance} 
+                                earnings={userData?.isProfessional ? earningsData?.lastSessionEarnings : 0}
+                                size="sm" 
+                                variant="glass" 
+                                clickable={true} 
+                            />
 
                             <div className="relative">
                                 <button
@@ -514,8 +671,13 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col-reverse gap-1">
-                <div ref={messagesEndRef} />
+            <div className={`flex-1 overflow-y-auto flex flex-col ${loadingMessages ? '' : 'flex-col-reverse'} gap-1`}>
+                {loadingMessages ? (
+                    <MessageSkeleton />
+                ) : (
+                    <>
+                        <div ref={messagesEndRef} />
+                        <div className="px-4 py-3 flex flex-col-reverse gap-1">
                 {isTyping && (
                     <div className="flex justify-start">
                         <div className="bg-white rounded-2xl rounded-bl-sm px-4 py-2.5 shadow-sm">
@@ -614,17 +776,29 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                                 </div>
                             ) : (
                                 <div
-                                    className={`max-w-[75%] ${isLocked || item.originalImageUrl ? 'p-1 bg-transparent' : 'px-3 py-1.5'} rounded-2xl ${
-                                        (!isLocked && !item.originalImageUrl) 
+                                    className={`max-w-[75%] ${isLocked || item.originalImageUrl || item.isVideo ? 'p-1 bg-transparent' : 'px-3 py-1.5'} rounded-2xl ${
+                                        (!isLocked && !item.originalImageUrl && !item.isVideo) 
                                             ? (isMine ? 'bg-purple-600 text-white rounded-br-sm' : 'bg-white text-gray-900 shadow-sm rounded-bl-sm')
                                             : (isMine ? 'rounded-br-sm' : 'rounded-bl-sm')
                                         }`}
                                 >
-                                    {isLocked || item.originalImageUrl ? (
+                                    {isLocked || item.originalImageUrl || item.isVideo ? (
                                         <>
                                             {isLocked ? (
-                                                <div className="relative rounded-2xl overflow-hidden cursor-pointer bg-gray-200 shadow-sm" onClick={() => !isMine && handleUnlockImage(item._id, item.lockedImagePrice || 0)}>
-                                                    <img src={isMine ? item.originalImageUrl : item.blurredImageUrl} className="w-full h-auto object-cover max-h-[300px]" alt="Locked Image" />
+                                                <div className="relative rounded-2xl overflow-hidden cursor-pointer bg-gray-200 shadow-sm" onClick={() => {
+                                                    if (!isMine) {
+                                                        const price = 'lockedImagePrice' in item ? item.lockedImagePrice : (item as any).lockedPrice;
+                                                        handleUnlockImage(item._id, price || 0, item.isVideo);
+                                                    } else {
+                                                        const url = item.isVideo ? item.videoUrl : item.originalImageUrl;
+                                                        if (url) setFullscreenImage(url);
+                                                    }
+                                                }}>
+                                                    <img 
+                                                        src={(isMine ? (item.isVideo ? item.thumbnailUrl : item.originalImageUrl) : item.blurredImageUrl) || ''} 
+                                                        className="w-full h-auto object-cover max-h-[300px]" 
+                                                        alt="Locked Media" 
+                                                    />
                                                     {!isMine ? (
                                                         <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center flex-col">
                                                             <div className="bg-white/20 backdrop-blur-md rounded-2xl px-5 py-3 border border-white/30 shadow-xl text-center font-semibold text-white transition-transform hover:scale-105 active:scale-95">
@@ -641,15 +815,38 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                                                     )}
                                                 </div>
                                             ) : (
-                                                <div className="relative rounded-2xl overflow-hidden bg-gray-100 shadow-sm">
-                                                    <img src={item.originalImageUrl} className="w-full h-auto object-cover max-h-[300px]" alt="Image" />
+                                                <div 
+                                                    className="relative rounded-2xl overflow-hidden bg-gray-100 shadow-sm cursor-pointer group"
+                                                    onClick={() => {
+                                                        if (item.isVideo && item.videoUrl) {
+                                                            setFullscreenImage(item.videoUrl);
+                                                        } else {
+                                                            const url = item.isVideo ? item.videoUrl : item.originalImageUrl;
+                                                            if (url) setFullscreenImage(url);
+                                                        }
+                                                    }}
+                                                >
+                                                    <img 
+                                                        src={(item.isVideo ? item.thumbnailUrl : item.originalImageUrl) || ''} 
+                                                        className="w-full h-auto object-cover max-h-[300px]" 
+                                                        alt="Media" 
+                                                    />
+                                                    {item.isVideo && (
+                                                        <div className="absolute inset-0 flex items-center justify-center">
+                                                            <div className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white border border-white/20 group-hover:scale-110 transition-transform">
+                                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                                                    <path d="M8 5v14l11-7z" />
+                                                                </svg>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                     {isMine && item.lockedImagePrice! > 0 && (
                                                         <div className="absolute top-3 right-3">
                                                             <div className="bg-green-500/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 flex items-center gap-1.5 shadow-lg animate-in fade-in zoom-in duration-300">
                                                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="text-white">
                                                                     <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                                                                 </svg>
-                                                                <span className="text-[10px] font-bold text-white uppercase tracking-wider">Foto aberta</span>
+                                                                <span className="text-[10px] font-bold text-white uppercase tracking-wider">{item.isVideo ? 'Vídeo aberto' : 'Foto aberta'}</span>
                                                             </div>
                                                         </div>
                                                     )}
@@ -728,15 +925,13 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                         </div>
                     );
                 })}
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* Input area */}
             <div className="bg-white border-t border-gray-200 px-4 py-3 shrink-0">
-                {estimatedCostInReais > 0 && (
-                    <p className="text-[10px] text-gray-400 text-center mb-2">
-                        {isSubscriber ? '💎 Tarifa Assinante' : '🌍 Tarifa Público'}: R$ {estimatedCostInReais.toFixed(2)} ({charCount} chars)
-                    </p>
-                )}
                 <div className="flex items-end gap-3">
                     <div className="relative shrink-0">
                         <button
@@ -798,7 +993,11 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                             </>
                         )}
                     </div>
-                    <input type="file" className="hidden" ref={fileInputRef} accept="image/*" onChange={handleImageSelect} />
+                    <input type="file" className="hidden" ref={fileInputRef} accept="image/*,video/*" onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file?.type.startsWith('video/')) handleFileSelect(e, 'video');
+                        else handleFileSelect(e, 'image');
+                    }} />
 
                     <div className="flex-1 flex items-end bg-gray-100 rounded-2xl px-4 py-2 min-h-[44px] max-h-[120px]">
                         <textarea
@@ -840,21 +1039,41 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                 </div>
             </div>
 
-            {selectedImage && userData?.isProfessional && (
+             {selectedFile && userData?.isProfessional && (
                 <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
                     <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm flex flex-col items-center shadow-2xl">
-                        <h3 className="font-bold text-xl text-gray-900 mb-4 tracking-tight">Valor da foto</h3>
-                        <div className="w-full relative rounded-2xl overflow-hidden mb-6 aspect-square bg-gray-100">
-                            <img src={URL.createObjectURL(selectedImage)} className="w-full h-full object-cover" />
+                        <h3 className="font-bold text-xl text-gray-900 mb-4 tracking-tight">
+                            Valor d{isVideo ? 'o vídeo' : 'a foto'}
+                        </h3>
+                        <div className="w-full relative rounded-2xl overflow-hidden mb-6 aspect-square bg-gray-100 flex items-center justify-center">
+                            {previewUrl ? (
+                                <div className="relative w-full h-full">
+                                    <img src={previewUrl} className="w-full h-full object-cover" />
+                                    {isVideo && (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                            <div className="w-12 h-12 rounded-full bg-white/30 backdrop-blur-md flex items-center justify-center text-white border border-white/40">
+                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                                    <path d="M8 5v14l11-7z" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="animate-pulse flex flex-col items-center gap-2">
+                                     <div className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
+                                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Processando...</span>
+                                </div>
+                            )}
                         </div>
                         <div className="w-full relative mb-6">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-gray-400">R$</span>
-                            <input type="number" step="0.01" className="bg-gray-50 border border-gray-100 rounded-2xl p-4 pl-10 w-full text-center text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all" placeholder="0.00" value={imagePriceStr} onChange={e => setImagePriceStr(e.target.value)} />
+                            <input type="number" step="0.01" className="bg-gray-50 border border-gray-100 rounded-2xl p-4 pl-10 w-full text-center text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all" placeholder="0.00" value={mediaPriceStr} onChange={e => setMediaPriceStr(e.target.value)} />
                         </div>
                         <div className="flex gap-3 w-full">
-                            <button className="flex-1 h-12 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-semibold transition-colors" onClick={() => setSelectedImage(null)}>Cancelar</button>
-                            <button disabled={uploadingImage} className="flex-1 h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-semibold flex justify-center items-center transition-colors shadow-lg shadow-purple-600/30 disabled:opacity-50" onClick={handleSendImage}>
-                                {uploadingImage ? (
+                            <button className="flex-1 h-12 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-semibold transition-colors" onClick={() => { setSelectedFile(null); setPreviewUrl(null); }}>Cancelar</button>
+                            <button disabled={uploadingMedia || (isVideo && !previewUrl)} className="flex-1 h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-semibold flex justify-center items-center transition-colors shadow-lg shadow-purple-600/30 disabled:opacity-50" onClick={handleSendMedia}>
+                                {uploadingMedia ? (
                                     <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
                                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -892,6 +1111,54 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                     </div>
                 </div>
             )}
+
+            {unlockModalVisible && unlockData && (
+                <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm flex flex-col items-center shadow-2xl relative overflow-hidden animate-in zoom-in duration-200">
+                        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-green-400 to-emerald-500" />
+                        <div className="w-16 h-16 rounded-2xl bg-green-50 flex items-center justify-center text-green-500 mb-4">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+                            </svg>
+                        </div>
+                        <h3 className="font-bold text-xl text-gray-900 mb-2 tracking-tight text-center">
+                            Desbloquear {unlockData.isVideo ? 'Vídeo' : 'Foto'}?
+                        </h3>
+                        <p className="text-gray-500 text-sm text-center mb-6">
+                            Você usará seu saldo para liberar este conteúdo exclusivo permanentemente.
+                        </p>
+                        
+                        <div className="w-full bg-gray-50 rounded-2xl p-4 flex flex-col items-center mb-6 border border-gray-100">
+                            <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1">Custo do desbloqueio</span>
+                            <span className="text-3xl font-black text-gray-900 leading-none">
+                                R$ {(unlockData.price / 100).toFixed(2)}
+                            </span>
+                        </div>
+
+                        <div className="flex gap-3 w-full">
+                            <button 
+                                className="flex-1 h-12 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-bold transition-all active:scale-95" 
+                                onClick={() => { setUnlockModalVisible(false); setUnlockData(null); }}
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                disabled={unlocking}
+                                className="flex-1 h-12 bg-green-500 hover:bg-green-600 text-white rounded-2xl font-bold flex justify-center items-center transition-all shadow-lg shadow-green-500/30 active:scale-95 disabled:opacity-50" 
+                                onClick={confirmUnlock}
+                            >
+                                {unlocking ? (
+                                    <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                    </svg>
+                                ) : "Desbloquear"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
 
             {detailsModalVisible && selectedMessageId && (
                 <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center backdrop-blur-sm" onClick={() => setDetailsModalVisible(false)}>
@@ -957,6 +1224,37 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                             );
                         })()}
                     </div>
+                </div>
+            )}
+
+            {fullscreenImage && (
+                <div 
+                    className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300"
+                    onClick={() => setFullscreenImage(null)}
+                >
+                    <button 
+                        className="absolute top-6 right-6 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+                        onClick={() => setFullscreenImage(null)}
+                    >
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                    <img 
+                        src={fullscreenImage} 
+                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-300" 
+                        alt="Fullscreen" 
+                    />
+                    {fullscreenImage.includes('_video') && (
+                         <video 
+                            src={fullscreenImage} 
+                            controls 
+                            autoPlay 
+                            className="max-w-full max-h-full rounded-lg shadow-2xl animate-in zoom-in-95 duration-300" 
+                            onClick={e => e.stopPropagation()}
+                        />
+                    )}
                 </div>
             )}
         </div>

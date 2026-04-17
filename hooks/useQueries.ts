@@ -220,3 +220,19 @@ export function useSubscribe() {
         },
     });
 }
+
+export function useRecentEarnings(otherUserId?: string) {
+    return useQuery({
+        queryKey: ['earnings', 'recent', otherUserId || 'all'],
+        queryFn: async () => {
+            const url = otherUserId 
+                ? `/api/users/me/earnings?otherUserId=${otherUserId}`
+                : '/api/users/me/earnings';
+            const response = await fetch(url);
+            if (!response.ok) return { lastSessionEarnings: 0 };
+            return response.json() as Promise<{ lastSessionEarnings: number }>;
+        },
+        refetchInterval: 30 * 1000, 
+    });
+}
+

@@ -15,6 +15,9 @@ export interface IMessage extends Document {
     lockedImagePrice?: number;
     originalImageUrl?: string;
     blurredImageUrl?: string;
+    isVideo?: boolean;
+    videoUrl?: string;
+    thumbnailUrl?: string;
     isGift?: boolean;
 }
 
@@ -76,6 +79,18 @@ const MessageSchema = new Schema<IMessage>({
         default: null,
     },
     blurredImageUrl: {
+        type: String,
+        default: null,
+    },
+    isVideo: {
+        type: Boolean,
+        default: false,
+    },
+    videoUrl: {
+        type: String,
+        default: null,
+    },
+    thumbnailUrl: {
         type: String,
         default: null,
     },

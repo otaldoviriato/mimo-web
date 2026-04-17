@@ -32,11 +32,22 @@ export async function uploadToGCS(file: File, path: string): Promise<string> {
     resumable: false,
   });
 
-  try {
-    await blob.makePublic();
-  } catch (err) {
-    console.warn('Could not make blob public, bucket might have Uniform Bucket-Level Access:', err);
-  }
-
   return `https://storage.googleapis.com/${bucketName}/${path}`;
+}
+export async function getSignedUploadURL(path: string, contentType: string): Promise<string> {
+  const bucketName = process.env.GCS_BUCKET_NAME;
+  if (!bucketName) throw new Error('GCS_BUCKET_NAME not set');
+
+  const storage = getStorage();
+  const bucket = storage.bucket(bucketName);
+  const file = bucket.file(path);
+
+  const [url] = await file.getSignedUrl({
+    version: 'v4',
+    action: 'write',
+    expires: Date.now() + 15 * 60 * 1000, // 15 minutos
+    contentType,
+  });
+
+  return url;
 }
