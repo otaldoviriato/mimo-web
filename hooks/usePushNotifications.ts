@@ -45,7 +45,7 @@ export const usePushNotifications = () => {
                 badge: "/icon-192x192.png",
                 tag: 'mimo-foreground-notification',
                 renotify: true
-              });
+              } as any);
             });
           }
         }
