@@ -24,6 +24,8 @@ interface Message {
     blurredImageUrl?: string;
     isGift?: boolean;
     receiverEarnings?: number;
+    status?: 'sending' | 'sent' | 'error';
+    tempId?: string;
 }
 
 export default function ChatPage({ params }: { params: Promise<{ userId: string }> }) {
@@ -45,6 +47,9 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
     const [giftAmountStr, setGiftAmountStr] = useState('');
     const [sendingGift, setSendingGift] = useState(false);
     const [attachMenuVisible, setAttachMenuVisible] = useState(false);
+    const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+    const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+    const pressTimer = useRef<any>(null);
 
     const { data: userData } = useMyProfile();
     const { data: receiver } = useUserById(otherUserId);
@@ -87,9 +92,22 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
             });
         });
 
-        socketService.onNewMessage((data: { message: Message }) => {
+        socketService.onNewMessage((data: { message: Message; tempId?: string }) => {
             setMessages((prev) => {
-                const newMessages = [...prev, data.message];
+                // Se for uma mensagem que nós enviamos (tem tempId), atualiza a mensagem otimista
+                if (data.tempId) {
+                    const index = prev.findIndex(m => m.tempId === data.tempId || m._id === data.tempId);
+                    if (index !== -1) {
+                        const newMessages = [...prev];
+                        newMessages[index] = { ...data.message, status: 'sent' };
+                        return newMessages;
+                    }
+                }
+
+                // Se a mensagem já existe (evitar duplicatas), não faz nada
+                if (prev.find(m => m._id === data.message._id)) return prev;
+
+                const newMessages = [...prev, { ...data.message, status: 'sent' }];
                 if (data.message.receiverId === user?.id) {
                     socket.emit('mark_as_read', { roomId });
 
@@ -168,10 +186,48 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
         };
     }, [socket, socketVersion, roomId, otherUserId]);
 
+    const handleStartPress = (msgId: string) => {
+        pressTimer.current = setTimeout(() => {
+            setSelectedMessageId(msgId);
+        }, 500);
+    };
+
+    const handleEndPress = () => {
+        if (pressTimer.current) clearTimeout(pressTimer.current);
+    };
+
+    const handleMessageClick = (msgId: string) => {
+        if (selectedMessageId) {
+            setSelectedMessageId(selectedMessageId === msgId ? null : msgId);
+        }
+    };
+
+    const handleMessageDoubleClick = (msgId: string) => {
+        setSelectedMessageId(msgId);
+    };
+
     const handleSend = () => {
         if (!messageText.trim() || sending || !socket) return;
-        setSending(true);
-        socketService.sendMessage(messageText.trim(), otherUserId, roomId);
+        
+        const tempId = `temp-${Date.now()}`;
+        const newMsg: Message = {
+            _id: tempId,
+            tempId: tempId,
+            senderId: user?.id ?? '',
+            receiverId: otherUserId,
+            content: messageText.trim(),
+            charCount: messageText.trim().length,
+            cost: estimatedCostInReais * 100, // aproximado
+            timestamp: new Date().toISOString(),
+            status: 'sending'
+        };
+
+        setMessages(prev => [...prev, newMsg]);
+        setMessageText('');
+        inputRef.current?.focus();
+        
+        // setSending(true); // Removido para permitir múltiplas mensagens rápidas
+        socketService.sendMessage(messageText.trim(), otherUserId, roomId, tempId);
         socket.emit('mark_as_read', { roomId });
 
         // Atualiza cache local de rooms
@@ -185,10 +241,6 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                 return r;
             });
         });
-
-        setMessageText('');
-        setSending(false);
-        inputRef.current?.focus();
     };
 
     const handleTyping = (text: string) => {
@@ -345,91 +397,120 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
     return (
         <div className="flex flex-col h-full bg-gray-50">
             {/* Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 z-10 sticky top-0 shadow-md flex items-center gap-2">
-                <button
-                    onClick={() => router.push('/chats')}
-                    className="text-white hover:bg-white/10 transition-colors p-2 -ml-2 rounded-full"
-                >
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                </button>
-                <button 
-                    onClick={() => otherUserId && router.push(`/user/${otherUserId}`)}
-                    className="flex-1 flex items-center gap-2 min-w-0 text-left py-0.5"
-                >
-                    <div className="relative shrink-0">
-                        <Avatar uri={receiver?.photoUrl} size={34} />
-                        {connected && <div className="absolute -right-0.5 -bottom-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-purple-600 rounded-full" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <p className="text-base font-black text-white truncate tracking-tight">
-                            {receiver?.name || receiver?.username || (otherUserId ? `Usuário ${otherUserId.substring(0, 8)}` : 'Conversa')}
-                        </p>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                            {!connected ? (
-                                <span className="text-[10px] text-white/50 font-bold uppercase tracking-widest">Conectando...</span>
-                            ) : isTyping ? (
-                                <span className="text-[10px] text-white font-black animate-pulse uppercase tracking-widest">Digitando...</span>
-                            ) : (
-                                <span className="text-[10px] text-white/60 font-medium truncate uppercase tracking-tighter">
-                                    {receiver?.username ? `@${receiver.username}` : 'Ver perfil'}
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                </button>
-
-                <div className="flex items-center gap-2">
-                    {!connected && (
-                        <svg className="animate-spin h-4 w-4 text-white/60" viewBox="0 0 24 24" fill="none">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                    )}
-                    <BalanceDisplay balance={balance} size="sm" variant="transparent" clickable={true} />
-
-                    <div className="relative">
+            <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 z-20 sticky top-0 shadow-md flex items-center gap-2">
+                {selectedMessageId ? (
+                    <>
                         <button
-                            onClick={() => setMenuVisible(!menuVisible)}
-                            className="text-white/80 hover:text-white p-1 transition-colors"
+                            onClick={() => setSelectedMessageId(null)}
+                            className="text-white hover:bg-white/10 transition-colors p-2 -ml-2 rounded-full"
                         >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                <circle cx="12" cy="5" r="1.5" />
-                                <circle cx="12" cy="12" r="1.5" />
-                                <circle cx="12" cy="19" r="1.5" />
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                         </button>
-
-                        {menuVisible && (
-                            <>
-                                <div className="fixed inset-0 z-10" onClick={() => setMenuVisible(false)} />
-                                <div className="absolute right-0 top-8 bg-white rounded-xl shadow-lg border border-gray-100 w-44 z-20 overflow-hidden">
-                                    <button
-                                        onClick={() => setMenuVisible(false)}
-                                        className="flex items-center gap-3 w-full px-4 py-3 text-sm text-red-500 hover:bg-red-50 transition-colors"
-                                    >
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
-                                            <path d="M4.93 4.93l14.14 14.14" stroke="currentColor" strokeWidth="2" />
-                                        </svg>
-                                        Bloquear
-                                    </button>
-                                    <div className="border-t border-gray-100" />
-                                    <button
-                                        onClick={() => setMenuVisible(false)}
-                                        className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                    >
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                            <path d="M3 3l18 18M11.05 4.05C5.5 4.56 1 9.4 1 15.22V17h2c0-4.43 3.06-8.14 7.18-9.14M17.77 6.23a10.1 10.1 0 0 1 4.23 8v1.74h-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                        </svg>
-                                        Denunciar
-                                    </button>
+                        <div className="flex-1">
+                            <p className="text-white font-bold">1 selecionada</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => setDetailsModalVisible(true)}
+                                className="text-white/90 hover:text-white p-2 hover:bg-white/10 rounded-full transition-colors"
+                                title="Detalhes"
+                            >
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <button
+                            onClick={() => router.push('/chats')}
+                            className="text-white hover:bg-white/10 transition-colors p-2 -ml-2 rounded-full"
+                        >
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                        </button>
+                        <button 
+                            onClick={() => otherUserId && router.push(`/user/${otherUserId}`)}
+                            className="flex-1 flex items-center gap-2 min-w-0 text-left py-0.5"
+                        >
+                            <div className="relative shrink-0">
+                                <Avatar uri={receiver?.photoUrl} size={34} />
+                                {connected && <div className="absolute -right-0.5 -bottom-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-purple-600 rounded-full" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-base font-black text-white truncate tracking-tight">
+                                    {receiver?.name || receiver?.username || (otherUserId ? `Usuário ${otherUserId.substring(0, 8)}` : 'Conversa')}
+                                </p>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    {!connected ? (
+                                        <span className="text-[10px] text-white/50 font-bold uppercase tracking-widest">Conectando...</span>
+                                    ) : isTyping ? (
+                                        <span className="text-[10px] text-white font-black animate-pulse uppercase tracking-widest">Digitando...</span>
+                                    ) : (
+                                        <span className="text-[10px] text-white/60 font-medium truncate uppercase tracking-tighter">
+                                            {receiver?.username ? `@${receiver.username}` : 'Ver perfil'}
+                                        </span>
+                                    )}
                                 </div>
-                            </>
-                        )}
-                    </div>
-                </div>
+                            </div>
+                        </button>
+
+                        <div className="flex items-center gap-2">
+                            {!connected && (
+                                <svg className="animate-spin h-4 w-4 text-white/60" viewBox="0 0 24 24" fill="none">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                            )}
+                            <BalanceDisplay balance={balance} size="sm" variant="transparent" clickable={true} />
+
+                            <div className="relative">
+                                <button
+                                    onClick={() => setMenuVisible(!menuVisible)}
+                                    className="text-white/80 hover:text-white p-1 transition-colors"
+                                >
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                        <circle cx="12" cy="5" r="1.5" />
+                                        <circle cx="12" cy="12" r="1.5" />
+                                        <circle cx="12" cy="19" r="1.5" />
+                                    </svg>
+                                </button>
+
+                                {menuVisible && (
+                                    <>
+                                        <div className="fixed inset-0 z-10" onClick={() => setMenuVisible(false)} />
+                                        <div className="absolute right-0 top-8 bg-white rounded-xl shadow-lg border border-gray-100 w-44 z-20 overflow-hidden">
+                                            <button
+                                                onClick={() => setMenuVisible(false)}
+                                                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-red-500 hover:bg-red-50 transition-colors"
+                                            >
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+                                                    <path d="M4.93 4.93l14.14 14.14" stroke="currentColor" strokeWidth="2" />
+                                                </svg>
+                                                Bloquear
+                                            </button>
+                                            <div className="border-t border-gray-100" />
+                                            <button
+                                                onClick={() => setMenuVisible(false)}
+                                                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                            >
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                                    <path d="M3 3l18 18M11.05 4.05C5.5 4.56 1 9.4 1 15.22V17h2c0-4.43 3.06-8.14 7.18-9.14M17.77 6.23a10.1 10.1 0 0 1 4.23 8v1.74h-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                                </svg>
+                                                Denunciar
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* Messages */}
@@ -452,7 +533,14 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                     return (
                         <div
                             key={item._id}
-                            className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-1`}
+                            className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-1 transition-colors duration-300 ${selectedMessageId === item._id ? 'bg-purple-100/50 -mx-4 px-4 py-1' : ''}`}
+                            onMouseDown={() => handleStartPress(item._id)}
+                            onMouseUp={handleEndPress}
+                            onMouseLeave={handleEndPress}
+                            onTouchStart={() => handleStartPress(item._id)}
+                            onTouchEnd={handleEndPress}
+                            onDoubleClick={() => handleMessageDoubleClick(item._id)}
+                            onClick={() => handleMessageClick(item._id)}
                         >
                             {item.isGift ? (
                                 <div
@@ -492,70 +580,10 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                                         )}
                                     </div>
 
-                                    <div className={`px-5 py-3 flex items-center justify-between gap-4 ${isMine ? 'bg-purple-700/40' : 'bg-gray-50/50'}`}>
-                                        <span className={`text-[11px] font-bold ${isMine ? 'text-purple-200' : 'text-gray-400'}`}>
-                                            {(() => {
-                                                try {
-                                                    return new Date(item.timestamp).toLocaleTimeString('pt-BR', {
-                                                        hour: '2-digit',
-                                                        minute: '2-digit',
-                                                    });
-                                                } catch { return ''; }
-                                            })()}
-                                        </span>
-                                        {isMine && (
-                                            <span className={`text-xs ${item.isRead ? 'text-blue-300' : 'text-purple-300'}`}>
-                                                {item.isRead ? '✓✓' : '✓'}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div
-                                    className={`max-w-[75%] ${isLocked || item.originalImageUrl ? 'p-1 bg-transparent' : 'px-4 py-3'} rounded-2xl ${
-                                        (!isLocked && !item.originalImageUrl) 
-                                            ? (isMine ? 'bg-purple-600 text-white rounded-br-sm' : 'bg-white text-gray-900 shadow-sm rounded-bl-sm')
-                                            : (isMine ? 'rounded-br-sm' : 'rounded-bl-sm')
-                                        }`}
-                                >
-                                    {isLocked ? (
-                                        <div className="relative rounded-2xl overflow-hidden cursor-pointer bg-gray-200 shadow-sm" onClick={() => !isMine && handleUnlockImage(item._id, item.lockedImagePrice || 0)}>
-                                            <img src={isMine ? item.originalImageUrl : item.blurredImageUrl} className="w-full h-auto object-cover max-h-[300px]" alt="Locked Image" />
-                                            {!isMine ? (
-                                                <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center flex-col">
-                                                    <div className="bg-white/20 backdrop-blur-md rounded-2xl px-5 py-3 border border-white/30 shadow-xl text-center font-semibold text-white transition-transform hover:scale-105 active:scale-95">
-                                                        🔓 Desbloquear<br/><span className="text-xl">R$ {((item.lockedImagePrice || 0) / 100).toFixed(2)}</span>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="absolute top-3 right-3">
-                                                    <div className="bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 flex items-center gap-1.5 shadow-lg">
-                                                        <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                                                        <span className="text-[10px] font-bold text-white uppercase tracking-wider">Aguardando compra</span>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ) : item.originalImageUrl ? (
-                                        <div className="relative rounded-2xl overflow-hidden bg-gray-100 shadow-sm">
-                                            <img src={item.originalImageUrl} className="w-full h-auto object-cover max-h-[300px]" alt="Image" />
-                                            {isMine && item.lockedImagePrice! > 0 && (
-                                                <div className="absolute top-3 right-3">
-                                                    <div className="bg-green-500/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 flex items-center gap-1.5 shadow-lg animate-in fade-in zoom-in duration-300">
-                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="text-white">
-                                                            <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                                                        </svg>
-                                                        <span className="text-[10px] font-bold text-white uppercase tracking-wider">Foto aberta</span>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{item.content}</p>
-                                    )}
-                                    <div className={`flex items-center justify-between mt-1 gap-2 ${isLocked || item.originalImageUrl ? 'px-2 pb-1' : ''}`}>
-                                        <div className="flex items-center gap-1">
-                                            <span className={`text-xs ${isMine ? (isLocked || item.originalImageUrl ? 'text-gray-500' : 'text-purple-200') : 'text-gray-400'}`}>
+                                    <div className={`px-5 py-3 flex items-end justify-between gap-4 ${isMine ? 'bg-purple-700/40' : 'bg-gray-50/50'}`}>
+                                        <div className="flex-1" />
+                                        <div className="flex items-center gap-2 mb-[-1px]">
+                                            <span className={`text-[10px] font-bold ${isMine ? 'text-purple-200/70' : 'text-gray-400'}`}>
                                                 {(() => {
                                                     try {
                                                         return new Date(item.timestamp).toLocaleTimeString('pt-BR', {
@@ -566,24 +594,135 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                                                 })()}
                                             </span>
                                             {isMine && (
-                                                <span className={`text-xs ${item.isRead ? 'text-blue-300' : 'text-purple-300'}`}>
-                                                    {item.isRead ? '✓✓' : '✓'}
+                                                <span className={`text-[11px] ${item.isRead ? 'text-blue-300' : (item.status === 'sending' ? 'text-purple-300 animate-pulse' : 'text-purple-300')}`}>
+                                                    {item.status === 'sending' ? (
+                                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                                                        </svg>
+                                                    ) : (
+                                                        item.isRead ? (
+                                                            <div className="inline-flex items-center">
+                                                                <span className="relative">✓</span>
+                                                                <span className="relative -ml-1.5">✓</span>
+                                                            </div>
+                                                        ) : '✓'
+                                                    )}
                                                 </span>
                                             )}
                                         </div>
-                                        {item.cost > 0 && (
-                                            <span className={`text-xs font-medium ${isMine ? 'text-purple-200' : 'text-green-500'}`}>
-                                                {(() => {
-                                                    const isNewSystem = item.cost >= 1;
-                                                    const formattedCost = isNewSystem ? item.cost / 100 : item.cost;
-                                                    const formattedEarnings = isNewSystem
-                                                        ? (item.receiverEarnings ?? item.cost * 0.9) / 100
-                                                        : (item.receiverEarnings ?? item.cost * 0.9);
-                                                    return isMine ? `-R$ ${formattedCost.toFixed(2)}` : `+R$ ${formattedEarnings.toFixed(2)}`;
-                                                })()}
-                                            </span>
-                                        )}
                                     </div>
+                                </div>
+                            ) : (
+                                <div
+                                    className={`max-w-[75%] ${isLocked || item.originalImageUrl ? 'p-1 bg-transparent' : 'px-4 py-3'} rounded-2xl ${
+                                        (!isLocked && !item.originalImageUrl) 
+                                            ? (isMine ? 'bg-purple-600 text-white rounded-br-sm' : 'bg-white text-gray-900 shadow-sm rounded-bl-sm')
+                                            : (isMine ? 'rounded-br-sm' : 'rounded-bl-sm')
+                                        }`}
+                                >
+                                    {isLocked || item.originalImageUrl ? (
+                                        <>
+                                            {isLocked ? (
+                                                <div className="relative rounded-2xl overflow-hidden cursor-pointer bg-gray-200 shadow-sm" onClick={() => !isMine && handleUnlockImage(item._id, item.lockedImagePrice || 0)}>
+                                                    <img src={isMine ? item.originalImageUrl : item.blurredImageUrl} className="w-full h-auto object-cover max-h-[300px]" alt="Locked Image" />
+                                                    {!isMine ? (
+                                                        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center flex-col">
+                                                            <div className="bg-white/20 backdrop-blur-md rounded-2xl px-5 py-3 border border-white/30 shadow-xl text-center font-semibold text-white transition-transform hover:scale-105 active:scale-95">
+                                                                🔓 Desbloquear<br/><span className="text-xl">R$ {((item.lockedImagePrice || 0) / 100).toFixed(2)}</span>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="absolute top-3 right-3">
+                                                            <div className="bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 flex items-center gap-1.5 shadow-lg">
+                                                                <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                                                                <span className="text-[10px] font-bold text-white uppercase tracking-wider">Aguardando compra</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="relative rounded-2xl overflow-hidden bg-gray-100 shadow-sm">
+                                                    <img src={item.originalImageUrl} className="w-full h-auto object-cover max-h-[300px]" alt="Image" />
+                                                    {isMine && item.lockedImagePrice! > 0 && (
+                                                        <div className="absolute top-3 right-3">
+                                                            <div className="bg-green-500/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 flex items-center gap-1.5 shadow-lg animate-in fade-in zoom-in duration-300">
+                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="text-white">
+                                                                    <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                                                                </svg>
+                                                                <span className="text-[10px] font-bold text-white uppercase tracking-wider">Foto aberta</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                            <div className="flex items-end justify-between mt-1.5 gap-3 px-2 pb-2">
+                                                <div className="flex-1 min-w-0" />
+                                                <div className="flex items-center gap-1.5 mb-[-1px]">
+                                                    <span className={`text-[10px] font-bold ${isMine ? 'text-gray-500' : 'text-gray-400'}`}>
+                                                        {(() => {
+                                                            try {
+                                                                return new Date(item.timestamp).toLocaleTimeString('pt-BR', {
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit',
+                                                                });
+                                                            } catch { return ''; }
+                                                        })()}
+                                                    </span>
+                                                    {isMine && (
+                                                        <span className={`text-[11px] ${item.isRead ? 'text-blue-300' : (item.status === 'sending' ? 'text-purple-300 animate-pulse' : 'text-purple-300/80')}`}>
+                                                            {item.status === 'sending' ? (
+                                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                                                                </svg>
+                                                            ) : (
+                                                                item.isRead ? (
+                                                                    <div className="inline-flex items-center">
+                                                                        <span className="relative">✓</span>
+                                                                        <span className="relative -ml-1.5">✓</span>
+                                                                    </div>
+                                                                ) : '✓'
+                                                            )}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="relative">
+                                            <span className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                                                {item.content}
+                                            </span>
+                                            <div className="inline-flex items-center gap-1.5 float-right mt-2 ml-2 mb-[-2px]">
+                                                <span className={`text-[10px] font-bold ${isMine ? 'text-purple-200/70' : 'text-gray-400'}`}>
+                                                    {(() => {
+                                                        try {
+                                                            return new Date(item.timestamp).toLocaleTimeString('pt-BR', {
+                                                                hour: '2-digit',
+                                                                minute: '2-digit',
+                                                            });
+                                                        } catch { return ''; }
+                                                    })()}
+                                                </span>
+                                                {isMine && (
+                                                    <span className={`text-[11px] ${item.isRead ? 'text-blue-300' : (item.status === 'sending' ? 'text-purple-300 animate-pulse' : 'text-purple-300/80')}`}>
+                                                        {item.status === 'sending' ? (
+                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                                                            </svg>
+                                                        ) : (
+                                                            item.isRead ? (
+                                                                <div className="inline-flex items-center">
+                                                                    <span className="relative">✓</span>
+                                                                    <span className="relative -ml-1.5">✓</span>
+                                                                </div>
+                                                            ) : '✓'
+                                                        )}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="clear-both" />
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -750,6 +889,73 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                                 ) : "Mimar"}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {detailsModalVisible && selectedMessageId && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center backdrop-blur-sm" onClick={() => setDetailsModalVisible(false)}>
+                    <div className="bg-white rounded-t-[2.5rem] w-full max-w-lg p-8 animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
+                        <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-8" />
+                        
+                        <h3 className="text-2xl font-black text-gray-900 mb-6 tracking-tight">Detalhes da Mensagem</h3>
+                        
+                        {(() => {
+                            const msg = messages.find(m => m._id === selectedMessageId);
+                            if (!msg) return null;
+                            const isMine = msg.senderId === user?.id;
+                            const date = new Date(msg.timestamp);
+                            
+                            return (
+                                <div className="space-y-6">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-gray-50 p-4 rounded-2xl">
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Data</p>
+                                            <p className="font-bold text-gray-900">{date.toLocaleDateString('pt-BR')}</p>
+                                        </div>
+                                        <div className="bg-gray-50 p-4 rounded-2xl">
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Horário</p>
+                                            <p className="font-bold text-gray-900">{date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-purple-50 p-5 rounded-[2rem] border border-purple-100">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <p className="text-xs font-bold text-purple-600 uppercase tracking-widest">
+                                                {isMine ? 'Seu Investimento' : 'Seu Ganho'}
+                                            </p>
+                                            <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${isMine ? 'bg-purple-200 text-purple-700' : 'bg-green-200 text-green-700'}`}>
+                                                {isMine ? 'Débito' : 'Crédito'}
+                                            </div>
+                                        </div>
+                                        <p className="text-4xl font-black text-gray-900 tracking-tight">
+                                            R$ {((isMine ? msg.cost : (msg.receiverEarnings ?? msg.cost * 0.9)) / 100).toFixed(2)}
+                                        </p>
+                                        <p className="text-[10px] text-gray-500 mt-2 font-medium">
+                                            {msg.charCount} caracteres enviados
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between text-sm py-2 border-b border-gray-100">
+                                            <span className="text-gray-500">Status</span>
+                                            <span className="font-bold text-gray-900">{msg.isRead ? 'Visualizada' : 'Entregue'}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm py-2 border-b border-gray-100">
+                                            <span className="text-gray-500">ID da Mensagem</span>
+                                            <span className="text-[10px] font-mono text-gray-400">{msg._id}</span>
+                                        </div>
+                                    </div>
+
+                                    <button 
+                                        onClick={() => setDetailsModalVisible(false)}
+                                        className="w-full h-14 bg-gray-900 text-white rounded-2xl font-bold mt-4 hover:bg-gray-800 transition-colors"
+                                    >
+                                        Fechar
+                                    </button>
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
             )}
