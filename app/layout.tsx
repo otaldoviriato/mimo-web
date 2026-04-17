@@ -5,6 +5,7 @@ import { QueryProvider } from '@/context/QueryProvider';
 import { PaymentProvider } from '@/context/PaymentContext';
 import { PWAProvider } from '@/context/PWAContext';
 import { Viewport } from 'next';
+import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
     title: 'MimoChat',
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                         <PWAProvider>
                             <PaymentProvider>
                                 {children}
+                                <Toaster position="top-center" />
                             </PaymentProvider>
                         </PWAProvider>
                     </QueryProvider>

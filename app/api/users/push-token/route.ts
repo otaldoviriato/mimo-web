@@ -19,19 +19,21 @@ export async function POST(request: NextRequest) {
             console.error('Error parsing body:', e);
         }
 
-        const { expoPushToken } = body;
+        const { fcmToken } = body;
 
         // Permitimos nulo/vazio para remover o token (logout)
-        if (expoPushToken === undefined) {
-            return NextResponse.json({ error: 'expoPushToken is required' }, { status: 400 });
+        if (fcmToken === undefined) {
+            return NextResponse.json({ error: 'fcmToken is required' }, { status: 400 });
         }
 
         await connectToDatabase();
 
-        await User.findOneAndUpdate(
+        console.log(`[Push Token API] Salvando token para ${userId}: ${fcmToken.substring(0, 10)}...`);
+
+        const updatedUser = await User.findOneAndUpdate(
             { clerkId: userId },
             {
-                $set: { expoPushToken: expoPushToken },
+                $set: { fcmToken: fcmToken },
                 $setOnInsert: {
                     email: `user_${userId}@placeholder.com`,
                     username: `user_${userId.substring(0, 8)}`,
@@ -42,6 +44,8 @@ export async function POST(request: NextRequest) {
             },
             { returnDocument: 'after', upsert: true }
         );
+
+        console.log(`[Push Token API] Usuário atualizado. fcmToken no doc: ${updatedUser?.fcmToken ? 'SIM' : 'NÃO'}`);
 
         return NextResponse.json({ success: true, message: 'Push token updated successfully' });
     } catch (error: any) {

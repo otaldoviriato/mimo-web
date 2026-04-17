@@ -96,8 +96,8 @@ export const userApi = {
         return response.data;
     },
 
-    savePushToken: async (expoPushToken: string) => {
-        const response = await api.post('/api/users/push-token', { expoPushToken });
+    savePushToken: async (fcmToken: string) => {
+        const response = await api.post('/api/users/push-token', { fcmToken });
         return response.data;
     },
 };

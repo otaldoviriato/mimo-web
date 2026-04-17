@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { requestNotificationPermission, onForegroundMessage } from "@/lib/notifications";
 import { userApi } from "@/services/api";
+import { toast } from "react-hot-toast";
 
 export const usePushNotifications = () => {
   const [fcmToken, setFcmToken] = useState<string | null>(null);
@@ -24,12 +25,27 @@ export const usePushNotifications = () => {
     const setupForegroundListener = async () => {
       await onForegroundMessage((payload) => {
         console.log("Notificação recebida em foreground:", payload);
-        // Aqui você pode disparar um toast (ex: react-hot-toast) ou custom UI
+        
         if (payload.notification) {
+          const { title, body } = payload.notification;
+
+          // 1. Mostrar Toast (UI interna)
+          toast(title || "Nova mensagem", {
+            description: body,
+            icon: '💬',
+            duration: 5000,
+          } as any);
+
+          // 2. Mostrar Notificação de Sistema (Banner)
           if ("Notification" in window && Notification.permission === "granted") {
-            new Notification(payload.notification.title || "Nova mensagem", {
-              body: payload.notification.body,
-              icon: "/icon-192x192.png",
+            navigator.serviceWorker.ready.then((registration) => {
+              registration.showNotification(title || "Nova mensagem", {
+                body: body,
+                icon: "/icon-192x192.png",
+                badge: "/icon-192x192.png",
+                tag: 'mimo-foreground-notification',
+                renotify: true
+              });
             });
           }
         }

@@ -22,7 +22,7 @@ export interface IUser extends Document {
     chargePerCharSubscribers: number;
     chargePerCharNonSubscribers: number;
     subscribers: string[]; // Array of clerkIds
-    expoPushToken?: string;
+    fcmToken?: string;
     savedCards: ICard[];
     createdAt: Date;
     updatedAt: Date;
@@ -86,7 +86,7 @@ const UserSchema = new Schema<IUser>({
         type: [String],
         default: [],
     },
-    expoPushToken: {
+    fcmToken: {
         type: String,
     },
     savedCards: {
@@ -102,6 +102,11 @@ const UserSchema = new Schema<IUser>({
 }, {
     timestamps: true,
 });
+
+// No Next.js dev mode, o modelo pode ficar em cache com schema antigo.
+if (process.env.NODE_ENV === 'development' && mongoose.models.User) {
+    delete (mongoose.models as any).User;
+}
 
 export const User = (mongoose.models.User as mongoose.Model<IUser>) ||
     mongoose.model<IUser>('User', UserSchema);

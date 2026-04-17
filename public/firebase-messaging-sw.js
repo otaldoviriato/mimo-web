@@ -14,16 +14,14 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 // Hook para receber mensagens em background
+// Nota: Se o payload contiver o campo 'notification', o FCM SDK Web
+// exibirá a notificação automaticamente se o app estiver em segundo plano.
 messaging.onBackgroundMessage(function(payload) {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
   
-  const notificationTitle = payload.notification?.title || 'Nova mensagem Mimo';
-  const notificationOptions = {
-    body: payload.notification?.body,
-    icon: '/icon-192x192.png'
-  };
-
-  self.registration.showNotification(notificationTitle, notificationOptions);
+  // Se por algum motivo o browser não exibir (ex: data-only payload), 
+  // poderíamos usar self.registration.showNotification aqui.
+  // Como enviamos 'notification' no payload via admin, deixamos o SDK lidar para evitar duplicidade.
 });
 
 // Listener para instalar o SW imediatamente (PWA)
