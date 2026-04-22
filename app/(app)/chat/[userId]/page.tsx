@@ -1079,7 +1079,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                         <div className="w-full relative rounded-2xl overflow-hidden mb-6 aspect-square bg-gray-100 flex items-center justify-center">
                             {previewUrl ? (
                                 <div className="relative w-full h-full">
-                                    <img src={previewUrl} className="w-full h-full object-cover" />
+                                    <img src={previewUrl} className="w-full h-full object-cover" alt="Preview" />
                                     {isVideo && (
                                         <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                                             <div className="w-12 h-12 rounded-full bg-white/30 backdrop-blur-md flex items-center justify-center text-white border border-white/40">
