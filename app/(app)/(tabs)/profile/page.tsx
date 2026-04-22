@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useUser, useAuth, useClerk } from '@clerk/nextjs';
+import { useUser, useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
@@ -9,9 +9,7 @@ import { BalanceDisplay } from '@/components/BalanceDisplay';
 import { Avatar } from '@/components/Avatar';
 import { useMyProfile, useUpdateProfile, useUploadPhoto, useMyGallery, useUploadToGallery } from '@/hooks/useQueries';
 import { usePayment } from '@/context/PaymentContext';
-import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { usePWA } from '@/context/PWAContext';
-import { api } from '@/services/api';
 import { formatCPF, formatPhone } from '@/components/RechargeModal';
 
 function SkeletonBox({ className = '' }: { className?: string }) {
@@ -25,16 +23,11 @@ export default function ProfilePage() {
     const { signOut } = useClerk();
     const router = useRouter();
     const { openRechargeModal } = usePayment();
-    const { handleRequestPermission, fcmToken } = usePushNotifications();
     const { isInstallable, promptInstall, mounted, isStandalone } = usePWA();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const galleryInputRef = useRef<HTMLInputElement>(null);
     const { data: galleryData } = useMyGallery();
     const uploadGalleryMutation = useUploadToGallery();
-
-    useEffect(() => {
-        console.log('ProfilePage: isInstallable =', isInstallable);
-    }, [isInstallable]);
 
     const { data: userData, isLoading: loadingProfile, isFetching, refetch: refetchProfile } = useMyProfile();
     const updateProfileMutation = useUpdateProfile();
@@ -52,11 +45,8 @@ export default function ProfilePage() {
     const [chargePerCharNonSubscribers, setChargePerCharNonSubscribers] = useState('0.005');
     const [saveError, setSaveError] = useState('');
     const [saveSuccess, setSaveSuccess] = useState(false);
-    const [notificationSuccess, setNotificationSuccess] = useState(false);
-    const [notificationError, setNotificationError] = useState('');
     const [uploadingGallery, setUploadingGallery] = useState(false);
     const [visibilityModal, setVisibilityModal] = useState<{ open: boolean, file?: File }>({ open: false });
-    const [testingNotification, setTestingNotification] = useState(false);
 
     const hasPopulatedFromCache = useRef(false);
 
@@ -155,39 +145,7 @@ export default function ProfilePage() {
 
     const handleLogout = async () => {
         if (confirm('Tem certeza que deseja sair da sua conta?')) {
-            console.log("Iniciando logout...");
             await signOut(() => router.replace('/login'));
-        }
-    };
-
-    const handleTestNotification = async () => {
-        setTestingNotification(true);
-        setNotificationError('');
-        console.log('[TestNotification] Iniciando teste...');
-        
-        try {
-            await handleRequestPermission();
-
-            if (Notification.permission !== 'granted') {
-                setNotificationError('Permissão de notificação negada. Ative as notificações no navegador.');
-                setTestingNotification(false);
-                return;
-            }
-
-            console.log('[TestNotification] Chamando API de teste...');
-            const response = await api.post('/api/notifications/test');
-
-            console.log('[TestNotification] Resposta da API:', response.data);
-            
-            setNotificationSuccess(true);
-            setTimeout(() => setNotificationSuccess(false), 5000);
-        } catch (error: any) {
-            console.error('[TestNotification] Erro ao testar notificação:', error);
-            const errorMsg = error.response?.data?.error || error.message || 'Erro ao testar notificação';
-            setNotificationError(`Erro ao disparar notificação: ${errorMsg}. Verifique as permissões.`);
-            setTimeout(() => setNotificationError(''), 5000);
-        } finally {
-            setTestingNotification(false);
         }
     };
 
@@ -461,33 +419,6 @@ export default function ProfilePage() {
                         />
                     </div>
                 )}
-
-                {/* Notifications Test */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-xl shadow-sm">
-                            🔔
-                        </div>
-                        <div>
-                            <h2 className="text-base font-bold text-gray-900">Notificações Push</h2>
-                            <p className="text-xs text-gray-500">Teste se o seu dispositivo está recebendo avisos</p>
-                        </div>
-                    </div>
-                    {notificationError && (
-                        <p className="text-sm text-red-500">{notificationError}</p>
-                    )}
-                    {notificationSuccess && !testingNotification && (
-                        <p className="text-sm text-green-600 font-medium">✓ Notificação enviada! Verifique seu dispositivo.</p>
-                    )}
-                    <Button
-                        title="Enviar Notificação de Teste"
-                        onPress={handleTestNotification}
-                        loading={testingNotification}
-                        variant="outline"
-                        size="md"
-                        className="w-full"
-                    />
-                </div>
 
                 {/* Gallery Section */}
                 {isProfessional && (

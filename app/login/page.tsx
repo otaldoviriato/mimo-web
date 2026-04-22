@@ -1,12 +1,23 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useSignIn, useSignUp } from '@clerk/nextjs/legacy';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { usePWA } from '@/context/PWAContext';
+
+function GiftCapture() {
+    const searchParams = useSearchParams();
+    useEffect(() => {
+        const gift = searchParams.get('gift');
+        if (gift?.trim()) {
+            sessionStorage.setItem('mimo_pending_gift', gift.trim());
+        }
+    }, [searchParams]);
+    return null;
+}
 
 export default function LoginPage() {
     const router = useRouter();
@@ -144,6 +155,9 @@ export default function LoginPage() {
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+            <Suspense fallback={null}>
+                <GiftCapture />
+            </Suspense>
             {/* Elemento exigido pelo Clerk para CAPTCHA em flows customizados */}
             <div id="clerk-captcha" />
             <div className="w-full max-w-sm">

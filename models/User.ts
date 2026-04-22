@@ -24,6 +24,7 @@ export interface IUser extends Document {
     subscribers: string[]; // Array of clerkIds
     fcmToken?: string;
     savedCards: ICard[];
+    claimedGiftCodes: string[];
     createdAt: Date;
     updatedAt: Date;
 }
@@ -97,6 +98,10 @@ const UserSchema = new Schema<IUser>({
             brand: { type: String, required: true },
             createdAt: { type: Date, default: Date.now },
         }],
+        default: [],
+    },
+    claimedGiftCodes: {
+        type: [String],
         default: [],
     },
 }, {

@@ -53,6 +53,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
     const [isVideo, setIsVideo] = useState(false);
     const [uploadingMedia, setUploadingMedia] = useState(false);
     const [mediaPriceStr, setMediaPriceStr] = useState('');
+    const [showFreeMediaConfirm, setShowFreeMediaConfirm] = useState(false);
     const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
     const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
     const [detailsModalVisible, setDetailsModalVisible] = useState(false);
@@ -60,6 +61,9 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
     const [unlockData, setUnlockData] = useState<{ id: string; price: number; isVideo: boolean } | null>(null);
     const [unlocking, setUnlocking] = useState(false);
     const pressTimer = useRef<any>(null);
+    // Stores a file selected before userData finished loading, so we can decide
+    // professional vs non-professional routing once userData becomes available.
+    const pendingMediaRef = useRef<{ file: File; isVideoFile: boolean } | null>(null);
 
     const { data: userData } = useMyProfile();
     const { data: earningsData } = useRecentEarnings(otherUserId);
@@ -200,6 +204,20 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
         };
     }, [socket, socketVersion, roomId, otherUserId]);
 
+    // Handles the edge case where the user selects a file before userData finishes
+    // loading. Once userData is available we decide: auto-send (non-professional)
+    // or let the price modal appear (professional — selectedFile is already set).
+    useEffect(() => {
+        const pending = pendingMediaRef.current;
+        if (!pending || userData === undefined) return;
+        pendingMediaRef.current = null;
+        if (!userData.isProfessional) {
+            handleAutoSendMedia(pending.file, pending.isVideoFile);
+        }
+        // isProfessional === true: selectedFile is already set, the modal renders automatically.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userData]);
+
     const generateVideoThumbnail = (file: File): Promise<string> => {
         return new Promise((resolve) => {
             const video = document.createElement('video');
@@ -319,24 +337,34 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
     };
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
-        if (e.target.files && e.target.files.length > 0) {
-            const file = e.target.files[0];
-            setSelectedFile(file);
-            setIsVideo(type === 'video');
-            
-            if (type === 'video') {
-                const thumb = await generateVideoThumbnail(file);
-                setPreviewUrl(thumb);
-            } else {
-                setPreviewUrl(URL.createObjectURL(file));
-            }
+        if (!e.target.files || e.target.files.length === 0) return;
+        const file = e.target.files[0];
+        const isVideoFile = type === 'video';
 
-            if (!userData?.isProfessional) {
-                setTimeout(() => {
-                    handleAutoSendMedia(file, type === 'video');
-                }, 100);
-            }
+        setSelectedFile(file);
+        setIsVideo(isVideoFile);
+
+        if (isVideoFile) {
+            const thumb = await generateVideoThumbnail(file);
+            setPreviewUrl(thumb);
+        } else {
+            setPreviewUrl(URL.createObjectURL(file));
         }
+
+        if (userData === undefined) {
+            // userData hasn't loaded yet — defer the routing decision to the
+            // useEffect above so we never auto-send for a professional by mistake.
+            pendingMediaRef.current = { file, isVideoFile };
+            return;
+        }
+
+        // userData is loaded: only auto-send when we are 100% sure the user
+        // is NOT a professional. Using strict `=== false` prevents the case
+        // where userData is undefined from being treated as "non-professional".
+        if (userData.isProfessional === false) {
+            handleAutoSendMedia(file, isVideoFile);
+        }
+        // isProfessional === true: the price modal renders because selectedFile is set.
     };
 
     const handleAutoSendMedia = async (file: File, isVideoFile: boolean) => {
@@ -462,6 +490,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
             setSelectedFile(null);
             setPreviewUrl(null);
             setMediaPriceStr('');
+            setShowFreeMediaConfirm(false);
             setAttachMenuVisible(false);
         } catch (e) {
             console.error(e);
@@ -680,8 +709,8 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                         <div className="px-4 py-3 flex flex-col-reverse gap-1">
                 {isTyping && (
                     <div className="flex justify-start">
-                        <div className="bg-white rounded-2xl rounded-bl-sm px-4 py-2.5 shadow-sm">
-                            <div className="flex items-center gap-1">
+                        <div className="bg-white text-gray-900 shadow-sm rounded-2xl rounded-bl-sm px-3 py-1.5">
+                            <div className="flex items-center gap-1 h-[22.75px]">
                                 <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }} />
                                 <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }} />
                                 <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }} />
@@ -846,7 +875,9 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                                                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="text-white">
                                                                     <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                                                                 </svg>
-                                                                <span className="text-[10px] font-bold text-white uppercase tracking-wider">{item.isVideo ? 'Vídeo aberto' : 'Foto aberta'}</span>
+                                                                <span className="text-[10px] font-bold text-white uppercase tracking-wider">
+                                                                    {item.isVideo ? 'Vídeo aberto' : 'Foto aberta'} • R$ {((item.lockedImagePrice || 0) / 100).toFixed(2)}
+                                                                </span>
                                                             </div>
                                                         </div>
                                                     )}
@@ -1071,14 +1102,66 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                             <input type="number" step="0.01" className="bg-gray-50 border border-gray-100 rounded-2xl p-4 pl-10 w-full text-center text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all" placeholder="0.00" value={mediaPriceStr} onChange={e => setMediaPriceStr(e.target.value)} />
                         </div>
                         <div className="flex gap-3 w-full">
-                            <button className="flex-1 h-12 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-semibold transition-colors" onClick={() => { setSelectedFile(null); setPreviewUrl(null); }}>Cancelar</button>
-                            <button disabled={uploadingMedia || (isVideo && !previewUrl)} className="flex-1 h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-semibold flex justify-center items-center transition-colors shadow-lg shadow-purple-600/30 disabled:opacity-50" onClick={handleSendMedia}>
+                            <button className="flex-1 h-12 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-semibold transition-colors" onClick={() => { setSelectedFile(null); setPreviewUrl(null); setMediaPriceStr(''); setShowFreeMediaConfirm(false); }}>Cancelar</button>
+                            <button
+                                disabled={uploadingMedia || (isVideo && !previewUrl)}
+                                className="flex-1 h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-semibold flex justify-center items-center transition-colors shadow-lg shadow-purple-600/30 disabled:opacity-50"
+                                onClick={() => {
+                                    const price = parseFloat(mediaPriceStr || '0');
+                                    if (!price || price <= 0) {
+                                        setShowFreeMediaConfirm(true);
+                                    } else {
+                                        handleSendMedia();
+                                    }
+                                }}
+                            >
                                 {uploadingMedia ? (
                                     <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
                                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                     </svg>
                                 ) : "Enviar"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showFreeMediaConfirm && (
+                <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm flex flex-col items-center shadow-2xl">
+                        <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mb-4">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                                <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="#D97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                        </div>
+                        <h3 className="font-bold text-xl text-gray-900 mb-2 tracking-tight text-center">
+                            Enviar gratuitamente?
+                        </h3>
+                        <p className="text-sm text-gray-500 text-center mb-6 leading-relaxed">
+                            Você está prestes a enviar {isVideo ? 'este vídeo' : 'esta foto'} de forma <span className="font-semibold text-gray-700">gratuita (R$&nbsp;0,00)</span>. Tem certeza?
+                        </p>
+                        <div className="flex gap-3 w-full">
+                            <button
+                                className="flex-1 h-12 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-semibold transition-colors"
+                                onClick={() => setShowFreeMediaConfirm(false)}
+                            >
+                                Voltar
+                            </button>
+                            <button
+                                disabled={uploadingMedia}
+                                className="flex-1 h-12 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-semibold flex justify-center items-center transition-colors shadow-lg shadow-amber-500/30 disabled:opacity-50"
+                                onClick={() => {
+                                    setShowFreeMediaConfirm(false);
+                                    handleSendMedia();
+                                }}
+                            >
+                                {uploadingMedia ? (
+                                    <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                    </svg>
+                                ) : "Sim, enviar grátis"}
                             </button>
                         </div>
                     </div>

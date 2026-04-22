@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { useQueryClient } from '@tanstack/react-query';
@@ -69,6 +69,10 @@ export default function ChatsPage() {
     // Estado de "digitando" por sala: { [roomId]: boolean }
     const [typingRooms, setTypingRooms] = useState<Record<string, boolean>>({});
 
+    // Modal de presente (gift code)
+    const [giftModal, setGiftModal] = useState(false);
+    const giftClaimedRef = useRef(false);
+
     const { data: rooms = [], isLoading, isRefetching, refetch: refetchRooms } = useChatRooms();
     const { data: myProfile, refetch: refetchProfile } = useMyProfile();
 
@@ -93,14 +97,10 @@ export default function ChatsPage() {
             lastMessageTime: string;
             senderId: string;
         }) => {
-            console.log('[ChatsPage] room_updated recebido:', data);
             queryClient.setQueryData(
                 QueryKeys.rooms(user.id!),
                 (old: Room[] | undefined) => {
-                    if (!old) {
-                        console.log('[ChatsPage] Cache de rooms vazio — não atualizado');
-                        return old;
-                    }
+                    if (!old) return old;
                     // Usa mongoRoomId (ObjectId) para encontrar a sala no cache
                     // pois room._id vem do MongoDB como string ObjectId
                     const updated = old.map((room) => {
@@ -110,7 +110,6 @@ export default function ChatsPage() {
                         if (match) {
                             const currentUnread = room.unreadCount?.[user.id!] ?? 0;
                             const isMe = data.senderId === user.id;
-                            console.log('[ChatsPage] Atualizando sala:', room._id, '→', data.lastMessage);
                             return {
                                 ...room,
                                 lastMessage: data.lastMessage,
@@ -149,7 +148,6 @@ export default function ChatsPage() {
 
         // 4. Marca sala como lida
         const handleRoomRead = (data: { roomId: string; userId: string }) => {
-            console.log('[ChatsPage] room_read recebido:', data);
             queryClient.setQueryData(
                 QueryKeys.rooms(user.id!),
                 (old: Room[] | undefined) => {
@@ -171,21 +169,45 @@ export default function ChatsPage() {
             );
         };
 
-        console.log('[ChatsPage] Registrando listeners de socket. userId:', user.id, '| socket.id:', socket.id);
-
         socket.on('balance_update', handleBalanceUpdate);
         socket.on('room_updated', handleRoomUpdated);
         socket.on('global_typing', handleGlobalTyping);
         socket.on('room_read', handleRoomRead);
 
         return () => {
-            console.log('[ChatsPage] Removendo listeners de socket');
             socket.off('balance_update', handleBalanceUpdate);
             socket.off('room_updated', handleRoomUpdated);
             socket.off('global_typing', handleGlobalTyping);
             socket.off('room_read', handleRoomRead);
         };
     }, [socket, socketVersion, user?.id, queryClient]);
+
+    // ─── Resgate de gift code ────────────────────────────────────────────────
+    // Funciona em dois cenários:
+    // 1. Usuário não logado acessa /login?gift=X → GiftCapture salva no sessionStorage → redireciona para /chats
+    // 2. Usuário já logado acessa /chats?gift=X diretamente → lemos window.location.search aqui
+    useEffect(() => {
+        if (!user?.id || giftClaimedRef.current) return;
+
+        const stored = sessionStorage.getItem('mimo_pending_gift');
+        const fromUrl = new URLSearchParams(window.location.search).get('gift');
+        const code = stored || fromUrl;
+        if (!code) return;
+
+        giftClaimedRef.current = true;
+        sessionStorage.removeItem('mimo_pending_gift');
+
+        fetch('/api/gift/claim', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code }),
+        }).then(async (res) => {
+            if (res.ok) {
+                setGiftModal(true);
+                queryClient.invalidateQueries({ queryKey: QueryKeys.me });
+            }
+        }).catch(() => {});
+    }, [user?.id, queryClient]);
 
     const onRefresh = useCallback(() => {
         refetchRooms();
@@ -206,6 +228,73 @@ export default function ChatsPage() {
                     variant="glass" 
                 />
             </div>
+
+            {/* Modal de presente */}
+            {giftModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-5">
+                    <div
+                        className="absolute inset-0 bg-black/65 backdrop-blur-sm animate-in fade-in duration-300"
+                        onClick={() => setGiftModal(false)}
+                    />
+                    <div className="relative w-full max-w-sm animate-in fade-in slide-in-from-bottom-10 zoom-in-95 duration-500">
+                        <div className="relative bg-gradient-to-b from-purple-700 via-purple-600 to-purple-800 rounded-3xl overflow-hidden shadow-2xl border border-purple-400/30">
+
+                            {/* Estrelas decorativas */}
+                            <span className="absolute top-5 left-7 text-yellow-300 text-xl animate-spin pointer-events-none" style={{ animationDuration: '4s' }}>✦</span>
+                            <span className="absolute top-8 left-16 text-white/30 text-sm animate-pulse pointer-events-none">★</span>
+                            <span className="absolute top-4 right-8 text-yellow-200 text-lg animate-spin pointer-events-none" style={{ animationDuration: '6s', animationDirection: 'reverse' }}>✦</span>
+                            <span className="absolute top-10 right-20 text-white/40 text-xs animate-pulse pointer-events-none" style={{ animationDelay: '500ms' }}>✦</span>
+                            <span className="absolute bottom-24 left-5 text-yellow-300/50 text-sm animate-ping pointer-events-none" style={{ animationDuration: '2s' }}>★</span>
+                            <span className="absolute bottom-28 right-6 text-white/30 text-xs animate-ping pointer-events-none" style={{ animationDuration: '2.5s', animationDelay: '700ms' }}>✦</span>
+
+                            <div className="px-8 pt-10 pb-8 text-center">
+                                {/* Ícone de presente com bounce */}
+                                <div className="mb-1">
+                                    <span
+                                        className="text-[72px] inline-block animate-bounce"
+                                        style={{ animationDuration: '1.2s', filter: 'drop-shadow(0 0 20px rgba(250,204,21,0.6))' }}
+                                    >
+                                        🎁
+                                    </span>
+                                </div>
+
+                                {/* Linha de estrelas animadas */}
+                                <div className="flex justify-center items-center gap-3 mb-5 text-yellow-300">
+                                    <span className="animate-ping text-xs" style={{ animationDuration: '1.5s' }}>✦</span>
+                                    <span className="animate-bounce text-base" style={{ animationDuration: '1s', animationDelay: '200ms' }}>★</span>
+                                    <span className="animate-ping text-xs" style={{ animationDuration: '1.5s', animationDelay: '400ms' }}>✦</span>
+                                </div>
+
+                                {/* Título */}
+                                <h2 className="text-white text-[26px] font-black leading-tight mb-1">Você ganhou!</h2>
+                                <p className="text-purple-200 text-sm mb-6 leading-relaxed">Um presente especial está esperando por você 🎉</p>
+
+                                {/* Card de valor */}
+                                <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-6 py-5 mb-6 border border-white/20 shadow-inner">
+                                    <p className="text-purple-300 text-[10px] font-bold uppercase tracking-widest mb-1.5">Crédito adicionado ao seu saldo</p>
+                                    <p className="text-yellow-300 font-black tracking-tight leading-none" style={{ fontSize: '56px', textShadow: '0 0 30px rgba(250,204,21,0.5)' }}>
+                                        R$50
+                                    </p>
+                                    <p className="text-white/60 text-xs mt-1.5">para gastar como quiser no MimoChat</p>
+                                </div>
+
+                                {/* Descrição */}
+                                <p className="text-purple-200 text-sm mb-7 leading-relaxed px-2">
+                                    Seu saldo já foi creditado e está disponível para você usar agora mesmo!
+                                </p>
+
+                                {/* Botão CTA */}
+                                <button
+                                    onClick={() => setGiftModal(false)}
+                                    className="w-full bg-gradient-to-r from-yellow-400 to-amber-400 hover:from-yellow-300 hover:to-amber-300 text-gray-900 font-black text-base py-4 rounded-2xl shadow-lg hover:shadow-yellow-400/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+                                >
+                                    Aproveitar agora! 🎉
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* List */}
             <div className="flex-1 overflow-y-auto pb-16 md:pb-0">
