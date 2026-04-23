@@ -77,6 +77,7 @@ export async function GET() {
                 chargePerCharSubscribers: user.chargePerCharSubscribers ?? 0.002,
                 chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? 0.005,
                 subscribers: user.subscribers || [],
+                pixKey: user.pixKey,
             },
         });
     } catch (error: any) {
@@ -95,7 +96,7 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { username, name, photoUrl, phone, taxId, isProfessional, subscriptionPrice, chargePerCharSubscribers, chargePerCharNonSubscribers } = body;
+        const { username, name, photoUrl, phone, taxId, pixKey, isProfessional, subscriptionPrice, chargePerCharSubscribers, chargePerCharNonSubscribers } = body;
 
         await connectToDatabase();
 
@@ -122,6 +123,7 @@ export async function PATCH(request: NextRequest) {
         if (photoUrl !== undefined) updateData.photoUrl = photoUrl;
         if (phone !== undefined) updateData.phone = phone;
         if (taxId !== undefined) updateData.taxId = taxId;
+        if (pixKey !== undefined) updateData.pixKey = pixKey;
         
         if (isProfessional !== undefined) updateData.isProfessional = isProfessional;
         
@@ -180,6 +182,7 @@ export async function PATCH(request: NextRequest) {
                 chargePerCharSubscribers: user.chargePerCharSubscribers ?? 0.002,
                 chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? 0.005,
                 subscribers: user.subscribers || [],
+                pixKey: user.pixKey,
             },
         });
     } catch (error: any) {

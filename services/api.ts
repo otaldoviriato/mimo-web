@@ -48,6 +48,7 @@ export const userApi = {
         subscriptionPrice?: number;
         chargePerCharSubscribers?: number;
         chargePerCharNonSubscribers?: number;
+        pixKey?: string;
     }) => {
         const response = await api.patch('/api/users/me', data);
         return response.data;
@@ -98,6 +99,16 @@ export const userApi = {
 
     savePushToken: async (fcmToken: string) => {
         const response = await api.post('/api/users/push-token', { fcmToken });
+        return response.data;
+    },
+
+    requestWithdraw: async () => {
+        const response = await api.post('/api/withdraw');
+        return response.data;
+    },
+
+    getPendingWithdrawal: async () => {
+        const response = await api.get('/api/withdraw');
         return response.data;
     },
 };

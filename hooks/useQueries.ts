@@ -83,6 +83,7 @@ export function useUpdateProfile() {
             subscriptionPrice?: number;
             chargePerCharSubscribers?: number;
             chargePerCharNonSubscribers?: number;
+            pixKey?: string;
         }) => userApi.updateMe(data),
         onSuccess: (response) => {
             if (response?.user) {
@@ -236,3 +237,24 @@ export function useRecentEarnings(otherUserId?: string) {
     });
 }
 
+// ─── Saques (Withdrawals) ───────────────────────────────────────────────────
+export function usePendingWithdrawal() {
+    return useQuery({
+        queryKey: ['withdraw', 'pending'],
+        queryFn: async () => {
+            const data = await userApi.getPendingWithdrawal();
+            return data.pendingWithdrawal ?? null;
+        },
+    });
+}
+
+export function useRequestWithdraw() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: () => userApi.requestWithdraw(),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['withdraw', 'pending'] });
+            queryClient.invalidateQueries({ queryKey: QueryKeys.me }); // Atualiza saldo para 0
+        },
+    });
+}

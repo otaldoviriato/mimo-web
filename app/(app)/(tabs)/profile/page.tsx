@@ -7,7 +7,7 @@ import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { BalanceDisplay } from '@/components/BalanceDisplay';
 import { Avatar } from '@/components/Avatar';
-import { useMyProfile, useUpdateProfile, useUploadPhoto, useMyGallery, useUploadToGallery } from '@/hooks/useQueries';
+import { useMyProfile, useUpdateProfile, useUploadPhoto, useMyGallery, useUploadToGallery, usePendingWithdrawal, useRequestWithdraw } from '@/hooks/useQueries';
 import { usePayment } from '@/context/PaymentContext';
 import { usePWA } from '@/context/PWAContext';
 import { formatCPF, formatPhone } from '@/components/RechargeModal';
@@ -43,6 +43,13 @@ export default function ProfilePage() {
     const [subscriptionPrice, setSubscriptionPrice] = useState('0');
     const [chargePerCharSubscribers, setChargePerCharSubscribers] = useState('0.002');
     const [chargePerCharNonSubscribers, setChargePerCharNonSubscribers] = useState('0.005');
+    const [pixKey, setPixKey] = useState('');
+    const [pixModalOpen, setPixModalOpen] = useState(false);
+    const [withdrawConfirmModalOpen, setWithdrawConfirmModalOpen] = useState(false);
+
+    const { data: pendingWithdrawal } = usePendingWithdrawal();
+    const requestWithdrawMutation = useRequestWithdraw();
+
     const [saveError, setSaveError] = useState('');
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [uploadingGallery, setUploadingGallery] = useState(false);
@@ -60,6 +67,7 @@ export default function ProfilePage() {
             setSubscriptionPrice((userData.subscriptionPrice || 0).toString());
             setChargePerCharSubscribers((userData.chargePerCharSubscribers || 0.002).toString());
             setChargePerCharNonSubscribers((userData.chargePerCharNonSubscribers || 0.005).toString());
+            setPixKey(userData.pixKey || '');
             if (userData.photoUrl) setLocalPhotoUrl(userData.photoUrl);
             hasPopulatedFromCache.current = true;
         } else if (userData) {
@@ -68,6 +76,7 @@ export default function ProfilePage() {
             }
             if (userData.taxId && !taxId) setTaxId(formatCPF(userData.taxId));
             if (userData.phone && !phone) setPhone(formatPhone(userData.phone));
+            if (userData.pixKey && !pixKey) setPixKey(userData.pixKey);
         }
     }, [userData]);
 
@@ -110,7 +119,8 @@ export default function ProfilePage() {
                 phone: phone.replace(/\D/g, ''),
                 subscriptionPrice: parseFloat(subscriptionPrice) || 0,
                 chargePerCharSubscribers: parsedSubRate,
-                chargePerCharNonSubscribers: parsedNonSubRate
+                chargePerCharNonSubscribers: parsedNonSubRate,
+                pixKey: pixKey
             };
             
             await updateProfileMutation.mutateAsync(updateData);
@@ -259,39 +269,65 @@ export default function ProfilePage() {
                 </div>
 
                 {/* Balance Card - Discreet */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 shrink-0 flex items-center justify-between">
-                    <div>
-                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 block mb-1">Saldo na Carteira</span>
-                        <div className="text-2xl font-black text-gray-900 tracking-tight">
-                            {((userData?.balance ?? 0) / 100).toLocaleString('pt-BR', { 
-                                style: 'currency', 
-                                currency: 'BRL',
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2
-                            })}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 shrink-0 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 block mb-1">Saldo na Carteira</span>
+                            <div className="text-2xl font-black text-gray-900 tracking-tight">
+                                {((userData?.balance ?? 0) / 100).toLocaleString('pt-BR', { 
+                                    style: 'currency', 
+                                    currency: 'BRL',
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2
+                                })}
+                            </div>
                         </div>
-                    </div>
 
-                    <button
-                        onClick={isProfessional ? () => alert('Configuração de PIX para retirada disponível em breve!') : openRechargeModal}
-                        className="h-10 px-4 bg-purple-50 hover:bg-purple-100 border border-purple-100 rounded-xl text-purple-700 font-bold text-sm transition-colors active:scale-[0.98] flex items-center justify-center gap-2"
-                    >
-                        {isProfessional ? (
-                            <>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M12 5v14M5 12l7 7 7-7" />
-                                </svg>
-                                <span>Retirar</span>
-                            </>
-                        ) : (
-                            <>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M12 19V5M5 12l7-7 7 7" />
-                                </svg>
-                                <span>Recarregar</span>
-                            </>
-                        )}
-                    </button>
+                        <button
+                            onClick={isProfessional 
+                                ? () => {
+                                    if (!pixKey) {
+                                        setPixModalOpen(true);
+                                    } else {
+                                        setWithdrawConfirmModalOpen(true);
+                                    }
+                                } 
+                                : openRechargeModal}
+                            disabled={isProfessional && pendingWithdrawal != null}
+                            className={`h-10 px-4 rounded-xl font-bold text-sm transition-colors active:scale-[0.98] flex items-center justify-center gap-2 ${
+                                isProfessional && pendingWithdrawal != null
+                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                    : 'bg-purple-50 hover:bg-purple-100 border border-purple-100 text-purple-700'
+                            }`}
+                        >
+                            {isProfessional ? (
+                                <>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M12 5v14M5 12l7 7 7-7" />
+                                    </svg>
+                                    <span>Retirar</span>
+                                </>
+                            ) : (
+                                <>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M12 19V5M5 12l7-7 7 7" />
+                                    </svg>
+                                    <span>Recarregar</span>
+                                </>
+                            )}
+                        </button>
+                    </div>
+                    {pendingWithdrawal && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center gap-2 mt-1">
+                            <span className="text-amber-500">⏳</span>
+                            <div>
+                                <p className="text-xs font-bold text-amber-800">Saque Pendente</p>
+                                <p className="text-[10px] text-amber-700">
+                                    Valor: {((pendingWithdrawal.amount ?? 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}. Pode levar até 24h.
+                                </p>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Settings */}
@@ -547,6 +583,116 @@ export default function ProfilePage() {
                             className="w-full"
                             disabled={uploadingGallery}
                         />
+                    </div>
+                </div>
+            )}
+
+            {/* Pix Key Config Modal */}
+            {pixModalOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-sm flex flex-col gap-5 animate-in fade-in zoom-in duration-300">
+                        <div className="flex flex-col items-center text-center gap-3">
+                            <div className="w-16 h-16 rounded-2xl bg-purple-100 flex items-center justify-center text-3xl shadow-inner">
+                                🔑
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-900">Cadastrar Chave PIX</h2>
+                                <p className="text-sm text-gray-500 mt-1">
+                                    Para realizar saques, você precisa de uma chave Pix cadastrada.
+                                </p>
+                            </div>
+                        </div>
+
+                        <Input
+                            label="Sua Chave PIX"
+                            placeholder="CPF, E-mail, Telefone ou Aleatória"
+                            value={pixKey}
+                            onChange={(e) => setPixKey(e.target.value)}
+                        />
+
+                        <div className="flex gap-3 mt-2">
+                            <Button
+                                title="Cancelar"
+                                onPress={() => setPixModalOpen(false)}
+                                variant="outline"
+                                size="md"
+                                className="flex-1"
+                            />
+                            <Button
+                                title="Salvar e Continuar"
+                                onPress={async () => {
+                                    if (!pixKey.trim()) return;
+                                    await handleSaveAll();
+                                    setPixModalOpen(false);
+                                    setWithdrawConfirmModalOpen(true);
+                                }}
+                                size="md"
+                                className="flex-1"
+                                disabled={loading}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Withdraw Confirm Modal */}
+            {withdrawConfirmModalOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-sm flex flex-col gap-5 animate-in fade-in zoom-in duration-300">
+                        <div className="flex flex-col items-center text-center gap-3">
+                            <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center text-3xl shadow-inner">
+                                💸
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-900">Confirmar Saque</h2>
+                                <p className="text-sm text-gray-500 mt-1">
+                                    Deseja solicitar o saque de todo o seu saldo?
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="bg-gray-50 p-4 rounded-xl flex flex-col gap-2 text-sm text-gray-700">
+                            <div className="flex justify-between">
+                                <span>Valor do Saque:</span>
+                                <span className="font-bold text-gray-900">
+                                    {((userData?.balance ?? 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                </span>
+                            </div>
+                            <div className="flex justify-between border-t border-gray-200 pt-2">
+                                <span>Chave PIX:</span>
+                                <span className="font-bold text-gray-900">{pixKey}</span>
+                            </div>
+                            <p className="text-xs text-amber-600 mt-2 text-center bg-amber-50 p-2 rounded">
+                                O processo de transferência pode levar até 24 horas úteis.
+                            </p>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <Button
+                                title="Cancelar"
+                                onPress={() => setWithdrawConfirmModalOpen(false)}
+                                variant="outline"
+                                size="md"
+                                className="flex-1"
+                                disabled={requestWithdrawMutation.isPending}
+                            />
+                            <Button
+                                title="Solicitar Saque"
+                                onPress={async () => {
+                                    try {
+                                        await requestWithdrawMutation.mutateAsync();
+                                        setWithdrawConfirmModalOpen(false);
+                                        refetchProfile();
+                                    } catch (err) {
+                                        alert('Erro ao solicitar saque.');
+                                    }
+                                }}
+                                size="md"
+                                className="flex-1 bg-green-600 hover:bg-green-700 !border-green-600 text-white"
+                                disabled={requestWithdrawMutation.isPending || !userData?.balance || userData.balance <= 0}
+                                loading={requestWithdrawMutation.isPending}
+                            />
+                        </div>
                     </div>
                 </div>
             )}
