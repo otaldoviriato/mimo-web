@@ -26,6 +26,7 @@ export interface IUser extends Document {
     pixKey?: string;
     savedCards: ICard[];
     claimedGiftCodes: string[];
+    isHighSpender: boolean;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -107,6 +108,10 @@ const UserSchema = new Schema<IUser>({
     claimedGiftCodes: {
         type: [String],
         default: [],
+    },
+    isHighSpender: {
+        type: Boolean,
+        default: false,
     },
 }, {
     timestamps: true,

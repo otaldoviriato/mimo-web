@@ -54,13 +54,14 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
     const [uploadingMedia, setUploadingMedia] = useState(false);
     const [mediaPriceStr, setMediaPriceStr] = useState('');
     const [showFreeMediaConfirm, setShowFreeMediaConfirm] = useState(false);
-    const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+    const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
     const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
     const [detailsModalVisible, setDetailsModalVisible] = useState(false);
     const [unlockModalVisible, setUnlockModalVisible] = useState(false);
     const [unlockData, setUnlockData] = useState<{ id: string; price: number; isVideo: boolean } | null>(null);
     const [unlocking, setUnlocking] = useState(false);
     const pressTimer = useRef<any>(null);
+    const longPressActivated = useRef(false);
     // Stores a file selected before userData finished loading, so we can decide
     // professional vs non-professional routing once userData becomes available.
     const pendingMediaRef = useRef<{ file: File; isVideoFile: boolean } | null>(null);
@@ -174,6 +175,10 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
             setMessages((prev) => prev.map(m => m._id === data.message._id ? data.message : m));
         });
 
+        socket.on('message_deleted', (data: { messageId: string }) => {
+            setMessages((prev) => prev.filter(m => m._id !== data.messageId));
+        });
+
         // Listener para room_read (caso seja marcado como lido de outro lugar)
         socket.on('room_read', (data: { roomId: string; userId: string }) => {
             if (data.roomId === roomId && data.userId === user?.id) {
@@ -200,6 +205,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
             socket.off('user_typing');
             socket.off('messages_read');
             socket.off('message_updated');
+            socket.off('message_deleted');
             socket.off('room_read');
         };
     }, [socket, socketVersion, roomId, otherUserId]);
@@ -243,9 +249,17 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
         });
     };
 
-    const handleStartPress = (msgId: string) => {
+    const handleStartPress = (msgId: string, e: React.TouchEvent | React.MouseEvent) => {
+        // Previne seleção nativa de texto no long press
+        e.preventDefault();
+        longPressActivated.current = false;
         pressTimer.current = setTimeout(() => {
-            setSelectedMessageId(msgId);
+            longPressActivated.current = true;
+            setSelectedMessageIds(prev => {
+                const next = new Set(prev);
+                next.add(msgId);
+                return next;
+            });
         }, 500);
     };
 
@@ -253,14 +267,35 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
         if (pressTimer.current) clearTimeout(pressTimer.current);
     };
 
+    // Click em modo de seleção: toggle da mensagem no set
     const handleMessageClick = (msgId: string) => {
-        if (selectedMessageId) {
-            setSelectedMessageId(selectedMessageId === msgId ? null : msgId);
+        // Se foi um long press, ignora o click disparado logo após soltar
+        if (longPressActivated.current) {
+            longPressActivated.current = false;
+            return;
+        }
+        if (selectedMessageIds.size > 0) {
+            setSelectedMessageIds(prev => {
+                const next = new Set(prev);
+                if (next.has(msgId)) {
+                    next.delete(msgId);
+                } else {
+                    next.add(msgId);
+                }
+                return next;
+            });
         }
     };
 
-    const handleMessageDoubleClick = (msgId: string) => {
-        setSelectedMessageId(msgId);
+    const handleDeleteMessage = () => {
+        if (!selectedMessageIds.size || !socket) return;
+        // Remove imediatamente do estado local
+        setMessages(prev => prev.filter(m => !selectedMessageIds.has(m._id)));
+        // Emite para o servidor fazer o soft delete de cada mensagem
+        selectedMessageIds.forEach(id => {
+            socket.emit('delete_message', { messageId: id });
+        });
+        setSelectedMessageIds(new Set());
     };
 
     function MessageSkeleton() {
@@ -578,10 +613,10 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
         <div className="flex flex-col h-full bg-gray-50">
             {/* Header */}
             <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 z-20 sticky top-0 shadow-md flex items-center gap-2">
-                {selectedMessageId ? (
+                {selectedMessageIds.size > 0 ? (
                     <>
                         <button
-                            onClick={() => setSelectedMessageId(null)}
+                            onClick={() => setSelectedMessageIds(new Set())}
                             className="text-white hover:bg-white/10 transition-colors p-2 -ml-2 rounded-full"
                         >
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -589,18 +624,29 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                             </svg>
                         </button>
                         <div className="flex-1">
-                            <p className="text-white font-bold">1 selecionada</p>
+                            <p className="text-white font-bold">{selectedMessageIds.size} selecionada{selectedMessageIds.size > 1 ? 's' : ''}</p>
                         </div>
                         <div className="flex items-center gap-3">
                             <button
-                                onClick={() => setDetailsModalVisible(true)}
-                                className="text-white/90 hover:text-white p-2 hover:bg-white/10 rounded-full transition-colors"
-                                title="Detalhes"
+                                onClick={handleDeleteMessage}
+                                className="text-red-300 hover:text-red-100 p-2 hover:bg-white/10 rounded-full transition-colors"
+                                title="Excluir"
                             >
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
                                 </svg>
                             </button>
+                            {selectedMessageIds.size === 1 && (
+                                <button
+                                    onClick={() => setDetailsModalVisible(true)}
+                                    className="text-white/90 hover:text-white p-2 hover:bg-white/10 rounded-full transition-colors"
+                                    title="Detalhes"
+                                >
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                                    </svg>
+                                </button>
+                            )}
                         </div>
                     </>
                 ) : (
@@ -724,13 +770,12 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                     return (
                         <div
                             key={item._id}
-                            className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-1 transition-colors duration-300 ${selectedMessageId === item._id ? 'bg-purple-100/50 -mx-4 px-4 py-0.5' : ''}`}
-                            onMouseDown={() => handleStartPress(item._id)}
+                            className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-1 transition-colors duration-300 ${selectedMessageIds.has(item._id) ? 'bg-purple-100/50 -mx-4 px-4 py-0.5' : ''} select-none no-select`}
+                            onMouseDown={(e) => handleStartPress(item._id, e)}
                             onMouseUp={handleEndPress}
                             onMouseLeave={handleEndPress}
-                            onTouchStart={() => handleStartPress(item._id)}
+                            onTouchStart={(e) => handleStartPress(item._id, e)}
                             onTouchEnd={handleEndPress}
-                            onDoubleClick={() => handleMessageDoubleClick(item._id)}
                             onClick={() => handleMessageClick(item._id)}
                         >
                             {item.isGift ? (
@@ -1243,7 +1288,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
             )}
 
 
-            {detailsModalVisible && selectedMessageId && (
+            {detailsModalVisible && selectedMessageIds.size === 1 && (
                 <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center backdrop-blur-sm" onClick={() => setDetailsModalVisible(false)}>
                     <div className="bg-white rounded-t-[2.5rem] w-full max-w-lg p-8 animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
                         <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-8" />
@@ -1251,7 +1296,8 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                         <h3 className="text-2xl font-black text-gray-900 mb-6 tracking-tight">Detalhes da Mensagem</h3>
                         
                         {(() => {
-                            const msg = messages.find(m => m._id === selectedMessageId);
+                            const selectedId = Array.from(selectedMessageIds)[0];
+                            const msg = messages.find(m => m._id === selectedId);
                             if (!msg) return null;
                             const isMine = msg.senderId === user?.id;
                             const date = new Date(msg.timestamp);

@@ -25,6 +25,9 @@ interface Room {
         username: string;
         name?: string;
         photoUrl?: string;
+        isProfessional?: boolean;
+        balance?: number;
+        isHighSpender?: boolean;
     };
 }
 
@@ -328,10 +331,24 @@ export default function ChatsPage() {
                                     >
                                         <Avatar size={52} uri={room.otherUser?.photoUrl} />
                                         <div className="flex-1 ml-3 min-w-0">
-                                            <div className="flex items-baseline justify-between mb-1">
-                                                <span className={`text-base truncate ${hasUnread ? 'font-bold text-gray-900' : 'font-semibold text-gray-800'}`}>
-                                                    {room.otherUser?.name || room.otherUser?.username || `Usuário ${otherUserId?.substring(0, 8)}`}
-                                                </span>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <div className="flex items-center min-w-0 gap-2">
+                                                    <span className={`text-base truncate ${hasUnread ? 'font-bold text-gray-900' : 'font-semibold text-gray-800'}`}>
+                                                        {room.otherUser?.name || room.otherUser?.username || `Usuário ${otherUserId?.substring(0, 8)}`}
+                                                    </span>
+                                                    {myProfile?.isProfessional && (
+                                                        <>
+                                                            <div className="shrink-0 bg-purple-50 rounded-full px-2 py-0.5 border border-purple-100 flex items-center gap-1">
+                                                                <span className="text-[10px] font-bold text-purple-700 tracking-tight">
+                                                                    R$ {((room.otherUser?.balance || 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                </span>
+                                                            </div>
+                                                            {room.otherUser?.isHighSpender && (
+                                                                <span className="text-sm leading-none drop-shadow-sm" title="Cliente VIP">💎</span>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </div>
                                                 <span className={`text-xs ml-2 shrink-0 ${hasUnread ? 'font-semibold text-purple-600' : 'text-gray-400'}`}>
                                                     {room.lastMessageTime ? formatMessageTime(room.lastMessageTime) : ''}
                                                 </span>

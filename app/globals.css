@@ -55,3 +55,11 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Previne seleção de texto nativa e menu de contexto no long press (mobile) */
+.no-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}

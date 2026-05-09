@@ -39,6 +39,11 @@ export function useSocket(userId: string | undefined) {
             setConnected(true);
             // Re-autentica sempre que conecta/reconecta
             socketService.authenticate(userId);
+            // Incrementa a versão AQUI — só após conexão real — para que o ChatPage
+            // chame joinRoom com o socket já pronto. Se incrementássemos antes, o
+            // joinRoom seria emitido enquanto o socket ainda estava conectando (ex:
+            // servidor dormindo), o evento se perderia e o room_joined nunca chegaria.
+            setSocketVersion((v) => v + 1);
         };
 
         const handleDisconnect = (reason: string) => {
@@ -49,14 +54,11 @@ export function useSocket(userId: string | undefined) {
         s.on('connect', handleConnect);
         s.on('disconnect', handleDisconnect);
 
-        // Socket já estava conectado quando o hook montou
+        // Socket já estava conectado quando o hook montou: dispara imediatamente
         if (s.connected) {
             setConnected(true);
+            setSocketVersion((v) => v + 1);
         }
-
-        // Incrementa versão para forçar re-render nos consumidores
-        // (garante que useEffects com [socket] como dep rodem com o socket correto)
-        setSocketVersion((v) => v + 1);
 
         cleanupRef.current = () => {
             s.off('connect', handleConnect);

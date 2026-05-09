@@ -19,6 +19,7 @@ export interface IMessage extends Document {
     videoUrl?: string;
     thumbnailUrl?: string;
     isGift?: boolean;
+    deletedFor?: string[];
 }
 
 const MessageSchema = new Schema<IMessage>({
@@ -97,6 +98,10 @@ const MessageSchema = new Schema<IMessage>({
     isGift: {
         type: Boolean,
         default: false,
+    },
+    deletedFor: {
+        type: [String],
+        default: [],
     },
 });
 

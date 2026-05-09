@@ -31,7 +31,7 @@ export async function GET(
             let otherUser = null;
             if (otherParticipantId) {
                 const found = await User.findOne({ clerkId: otherParticipantId })
-                    .select('clerkId name username photoUrl')
+                    .select('clerkId name username photoUrl isProfessional balance isHighSpender')
                     .lean() as any;
                 if (found) {
                     otherUser = {
@@ -39,6 +39,9 @@ export async function GET(
                         name: found.name,
                         username: found.username,
                         photoUrl: found.photoUrl,
+                        isProfessional: found.isProfessional,
+                        balance: found.balance,
+                        isHighSpender: found.isHighSpender,
                     };
                 }
             }
