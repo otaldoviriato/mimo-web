@@ -56,8 +56,10 @@ export function useSocket(userId: string | undefined) {
 
         // Socket já estava conectado quando o hook montou: dispara imediatamente
         if (s.connected) {
-            setConnected(true);
-            setSocketVersion((v) => v + 1);
+            setTimeout(() => {
+                setConnected(true);
+                setSocketVersion((v) => v + 1);
+            }, 0);
         }
 
         cleanupRef.current = () => {

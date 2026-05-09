@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from './Button';
 import { userApi } from '@/services/api';
 
@@ -14,7 +14,7 @@ export function ProcessingPaymentView({ transactionId, onPaymentComplete, onCanc
     const [isPaid, setIsPaid] = useState(false);
     const [isChecking, setIsChecking] = useState(false);
 
-    const checkStatus = async () => {
+    const checkStatus = useCallback(async () => {
         if (!transactionId || isPaid) return;
         try {
             const statusData = await userApi.checkPixStatus(transactionId);
@@ -27,13 +27,13 @@ export function ProcessingPaymentView({ transactionId, onPaymentComplete, onCanc
         } catch (error) {
             console.error('Error checking payment status:', error);
         }
-    };
+    }, [transactionId, isPaid, onPaymentComplete, onCancel]);
 
     useEffect(() => {
         if (isPaid || !transactionId) return;
         const pollInterval = setInterval(checkStatus, 5000);
         return () => clearInterval(pollInterval);
-    }, [isPaid, transactionId]);
+    }, [isPaid, transactionId, checkStatus]);
 
     const handleManualCheck = async () => {
         setIsChecking(true);

@@ -103,7 +103,7 @@ export function useUploadPhoto() {
         mutationFn: (formData: FormData) => userApi.uploadPhoto(formData),
         onSuccess: (response) => {
             if (response?.photoUrl) {
-                queryClient.setQueryData(QueryKeys.me, (old: any) =>
+                queryClient.setQueryData(QueryKeys.me, (old: Record<string, unknown> | null) =>
                     old ? { ...old, photoUrl: response.photoUrl } : old
                 );
             }
@@ -119,7 +119,7 @@ export function useAddBalance() {
         mutationFn: (amount: number) => userApi.addBalance(amount),
         onSuccess: (response) => {
             if (response?.balance !== undefined) {
-                queryClient.setQueryData(QueryKeys.me, (old: any) =>
+                queryClient.setQueryData(QueryKeys.me, (old: Record<string, unknown> | null) =>
                     old ? { ...old, balance: response.balance } : old
                 );
             }
@@ -143,7 +143,7 @@ export function useUserById(userId: string | undefined) {
             try {
                 const data = await userApi.getUserById(userId);
                 return data.user ?? null;
-            } catch (error: any) {
+            } catch {
                 return {
                     username: `Usuário ${userId.substring(0, 8)}`,
                     isProfessional: false,

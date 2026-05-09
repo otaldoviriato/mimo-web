@@ -12,15 +12,20 @@ interface PWAContextType {
 
 const PWAContext = createContext<PWAContextType | undefined>(undefined);
 
+interface BeforeInstallPromptEvent extends Event {
+    prompt(): Promise<void>;
+    userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
+
 export function PWAProvider({ children }: { children: React.ReactNode }) {
     const [isInstallable, setIsInstallable] = useState(false);
     const [isIOS, setIsIOS] = useState(false);
     const [isStandalone, setIsStandalone] = useState(false);
     const [mounted, setMounted] = useState(false);
-    const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+    const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
     useEffect(() => {
-        setMounted(true);
+        setTimeout(() => setMounted(true), 0);
 
         // Registra o Service Worker
         if ('serviceWorker' in navigator) {
@@ -35,13 +40,13 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
         setIsIOS(ios);
 
         // Detecta se já está instalado
-        const standalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+        const standalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any as { standalone?: boolean }).standalone;
         setIsStandalone(!!standalone);
 
-        const handleBeforeInstallPrompt = (e: any) => {
+        const handleBeforeInstallPrompt = (e: Event) => {
             console.log('Evento beforeinstallprompt disparado');
             // e.preventDefault(); // Comentado para permitir que o ícone de instalação do navegador apareça
-            setDeferredPrompt(e);
+            setDeferredPrompt(e as BeforeInstallPromptEvent);
             setIsInstallable(true);
         };
 

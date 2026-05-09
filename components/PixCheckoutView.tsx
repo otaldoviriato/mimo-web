@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from './Button';
 import { userApi } from '@/services/api';
 
 interface PixCheckoutViewProps {
     amount: number;
-    pixData?: any;
+    pixData?: Record<string, any>;
     onPaymentComplete: () => void;
     onCancel: () => void;
 }
@@ -31,7 +31,7 @@ export function PixCheckoutView({ amount, pixData, onPaymentComplete, onCancel }
         return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
     };
 
-    const checkStatus = async () => {
+    const checkStatus = useCallback(async () => {
         const tId = pixData?.transactionId || pixData?.id;
         if (!tId || isPaid) return;
         try {
@@ -43,14 +43,14 @@ export function PixCheckoutView({ amount, pixData, onPaymentComplete, onCancel }
         } catch (error) {
             console.error('Error checking pix status:', error);
         }
-    };
+    }, [pixData, isPaid, onPaymentComplete]);
 
     useEffect(() => {
         const tId = pixData?.transactionId || pixData?.id;
         if (isPaid || !tId) return;
         const pollInterval = setInterval(checkStatus, 5000);
         return () => clearInterval(pollInterval);
-    }, [isPaid, pixData]);
+    }, [isPaid, pixData, checkStatus]);
 
     const handleCopy = async () => {
         try {

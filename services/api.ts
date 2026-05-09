@@ -10,10 +10,10 @@ export const api = axios.create({
 });
 
 export const setupAxiosInterceptors = (getToken: () => Promise<string | null>) => {
-    // @ts-ignore - clear previous handlers to avoid duplicates
-    if (api.interceptors.request.handlers) {
-        // @ts-ignore
-        api.interceptors.request.handlers = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((api.interceptors.request as any).handlers) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (api.interceptors.request as any).handlers = [];
     }
 
     api.interceptors.request.use(
