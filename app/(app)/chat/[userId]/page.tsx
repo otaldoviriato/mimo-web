@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, use } from 'react';
-import { useRouter } from 'next/navigation';
+import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useUser } from '@clerk/nextjs';
 import { useQueryClient } from '@tanstack/react-query';
 import { Avatar } from '@/components/Avatar';
@@ -33,7 +33,7 @@ interface Message {
 
 export default function ChatPage({ params }: { params: Promise<{ userId: string }> }) {
     const { userId: otherUserId } = use(params);
-    const router = useRouter();
+    const router = useTransitionRouter();
     const queryClient = useQueryClient();
     const { user } = useUser();
     const { socket, connected, socketService, socketVersion } = useSocket(user?.id);
@@ -60,6 +60,14 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
     const [unlockModalVisible, setUnlockModalVisible] = useState(false);
     const [unlockData, setUnlockData] = useState<{ id: string; price: number; isVideo: boolean } | null>(null);
     const [unlocking, setUnlocking] = useState(false);
+    const [isLeaving, setIsLeaving] = useState(false);
+    const [useNativeTransition, setUseNativeTransition] = useState(false);
+
+    useEffect(() => {
+        if (typeof document !== 'undefined' && 'startViewTransition' in document) {
+            setUseNativeTransition(true);
+        }
+    }, []);
     const pressTimer = useRef<any>(null);
     const longPressActivated = useRef(false);
     const touchStartCoords = useRef<{ x: number; y: number } | null>(null);
@@ -73,6 +81,8 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
     const balance = userData?.balance ?? 0;
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
+    const isFirstLoadRef = useRef(true);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const typingTimeoutRef = useRef<any>(null);
@@ -106,13 +116,39 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
         }
     }, [messages, user?.id, otherUserId, loadingMessages]);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Notifica que o DOM está pronto e pré-populado com dados para iniciar a animação nativa
+    useEffect(() => {
+        if (receiver && !loadingMessages) {
+            if (typeof window !== 'undefined' && (window as any).__resolveTransition) {
+                (window as any).__resolveTransition();
+                (window as any).__resolveTransition = null;
+            }
+        }
+    }, [receiver, loadingMessages]);
+
+    const scrollToBottom = (behavior: 'auto' | 'smooth' = 'smooth') => {
+        setTimeout(() => {
+            const container = messagesContainerRef.current;
+            if (container) {
+                if (behavior === 'auto') {
+                    container.scrollTop = 0; // No flex-col-reverse, 0 é o final das mensagens (bottom)
+                } else {
+                    container.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            }
+        }, 0);
     };
 
     useEffect(() => {
-        scrollToBottom();
-    }, [messages]);
+        if (!loadingMessages && messages.length > 0) {
+            if (isFirstLoadRef.current) {
+                scrollToBottom('auto');
+                isFirstLoadRef.current = false;
+            } else {
+                scrollToBottom('smooth');
+            }
+        }
+    }, [messages, loadingMessages]);
 
     useEffect(() => {
         if (!socket || !user?.id) return;
@@ -669,6 +705,17 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
         }
     };
 
+    const handleBack = () => {
+        if (useNativeTransition) {
+            router.back();
+        } else {
+            setIsLeaving(true);
+            setTimeout(() => {
+                router.push('/chats');
+            }, 220);
+        }
+    };
+
     const charCount = messageText.length;
     const isSubscriber = receiver?.subscribers?.includes(user?.id ?? '');
     const currentRate = receiver?.isProfessional 
@@ -683,10 +730,14 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
         estimatedCostInReais = totalCostInCents / 100;
     }
 
+    const animationClass = useNativeTransition
+        ? ''
+        : (isLeaving ? 'animate-android-slide-out' : 'animate-android-slide-in');
+
     return (
-        <div className="flex flex-col h-full bg-gray-50">
+        <div className={`flex flex-col h-full bg-gray-50 overflow-hidden ${animationClass}`}>
             {/* Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 z-20 sticky top-0 shadow-md flex items-center gap-2">
+            <div className="shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 z-20 sticky top-0 shadow-md flex items-center gap-2">
                 {selectedMessageIds.size > 0 ? (
                     <>
                         <button
@@ -726,7 +777,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                 ) : (
                     <>
                         <button
-                            onClick={() => router.push('/chats')}
+                            onClick={handleBack}
                             className="text-white hover:bg-white/10 transition-colors p-2 -ml-2 rounded-full"
                         >
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -820,7 +871,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
             </div>
 
             {/* Messages */}
-            <div className={`flex-1 overflow-y-auto flex flex-col ${loadingMessages ? '' : 'flex-col-reverse'} gap-1`}>
+            <div ref={messagesContainerRef} className={`flex-1 overflow-y-auto flex flex-col ${loadingMessages ? '' : 'flex-col-reverse'} gap-1`}>
                 {loadingMessages ? (
                     <MessageSkeleton />
                 ) : (

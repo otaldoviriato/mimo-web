@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useEffect, useCallback, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useUser } from '@clerk/nextjs';
 import { useQueryClient } from '@tanstack/react-query';
-import { Avatar } from '@/components/Avatar';
-import { BalanceDisplay } from '@/components/BalanceDisplay';
+import { Avatar, BalanceDisplay, TouchableRipple } from '@/components';
 import { useChatRooms, useMyProfile, QueryKeys } from '@/hooks/useQueries';
 import { useSocket } from '@/hooks/useSocket';
 
@@ -64,7 +63,7 @@ function ChatListSkeleton() {
 }
 
 export default function ChatsPage() {
-    const router = useRouter();
+    const router = useTransitionRouter();
     const { user } = useUser();
     const queryClient = useQueryClient();
     const { socket, connected, socketService, socketVersion } = useSocket(user?.id);
@@ -75,6 +74,14 @@ export default function ChatsPage() {
     // Modal de presente (gift code)
     const [giftModal, setGiftModal] = useState(false);
     const giftClaimedRef = useRef(false);
+
+    // Resolve a transição pendente assim que a lista de chats é montada
+    useEffect(() => {
+        if (typeof window !== 'undefined' && (window as any).__resolveTransition) {
+            (window as any).__resolveTransition();
+            (window as any).__resolveTransition = null;
+        }
+    }, []);
 
     const { data: rooms = [], isLoading, isRefetching, refetch: refetchRooms } = useChatRooms();
     const { data: myProfile, refetch: refetchProfile } = useMyProfile();
@@ -220,7 +227,7 @@ export default function ChatsPage() {
     return (
         <div className="flex flex-col h-full">
             {/* Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between z-10 sticky top-0 shadow-md">
+            <div className="shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between z-10 sticky top-0 shadow-md">
                 <div className="flex items-center gap-3">
                     <img
                         src="/icon-192x192.png"
@@ -330,7 +337,7 @@ export default function ChatsPage() {
 
                             return (
                                 <li key={room._id}>
-                                    <button
+                                    <TouchableRipple
                                         onClick={() => router.push(`/chat/${otherUserId}`)}
                                         className="w-full flex items-center px-4 py-3.5 bg-white border-b border-gray-100 hover:bg-gray-50 transition-colors text-left"
                                     >
@@ -381,7 +388,7 @@ export default function ChatsPage() {
                                                 )}
                                             </div>
                                         </div>
-                                    </button>
+                                    </TouchableRipple>
                                 </li>
                             );
                         })}

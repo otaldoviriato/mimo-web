@@ -5,3 +5,6 @@ export { BalanceDisplay } from './BalanceDisplay';
 export { RechargeModal } from './RechargeModal';
 export { PixCheckoutView } from './PixCheckoutView';
 export { ProcessingPaymentView } from './ProcessingPaymentView';
+export { TouchableOpacity } from './TouchableOpacity';
+export { TouchableRipple } from './TouchableRipple';
+

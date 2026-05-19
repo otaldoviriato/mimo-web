@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { useAuth, useUser } from '@clerk/nextjs';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { setupAxiosInterceptors } from '@/services/api';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 
@@ -10,7 +10,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const { isLoaded, isSignedIn, getToken } = useAuth();
     const { user } = useUser();
     const router = useRouter();
+    const pathname = usePathname();
     const { handleRequestPermission } = usePushNotifications();
+
+    useEffect(() => {
+        // Se a rota for o chat, deixamos a própria página de chat gerenciar a resolução
+        // para aguardar o carregamento das mensagens do cache.
+        // Para outras rotas, resolvemos a transição pendente imediatamente.
+        if (pathname && !pathname.includes('/chat/')) {
+            if (typeof window !== 'undefined' && (window as any).__resolveTransition) {
+                (window as any).__resolveTransition();
+                (window as any).__resolveTransition = null;
+            }
+        }
+    }, [pathname]);
+
+
 
     useEffect(() => {
         if (isLoaded && !isSignedIn) {

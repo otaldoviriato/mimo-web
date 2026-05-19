@@ -70,3 +70,85 @@ body {
     font-size: 16px !important;
   }
 }
+
+/* Reseta o destaque de clique cinza/azul padrão do mobile nos elementos clicáveis */
+button, a, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* --- EFEITOS E TRANSIÇÕES ESTILO ANDROID --- */
+
+/* Animação do Efeito Ripple (Onda de Toque) */
+@keyframes ripple {
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+/* Keyframes de transições deslizantes */
+@keyframes slideToLeft {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-30%, 0, 0); }
+}
+
+@keyframes slideFromRight {
+  from { transform: translate3d(100%, 0, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes slideFromLeft {
+  from { transform: translate3d(-30%, 0, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes slideToRight {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(100%, 0, 0); }
+}
+
+/* Configuração de animações do View Transition (API Nativa) */
+.transition-forward::view-transition-old(root) {
+  animation: slideToLeft 320ms cubic-bezier(0.1, 0.76, 0.55, 0.94) both;
+}
+
+.transition-forward::view-transition-new(root) {
+  animation: slideFromRight 320ms cubic-bezier(0.1, 0.76, 0.55, 0.94) both;
+}
+
+.transition-backward::view-transition-old(root) {
+  animation: slideToRight 300ms cubic-bezier(0.1, 0.76, 0.55, 0.94) both;
+}
+
+.transition-backward::view-transition-new(root) {
+  animation: slideFromLeft 300ms cubic-bezier(0.1, 0.76, 0.55, 0.94) both;
+}
+
+/* Garante o ordenamento z-index correto das camadas para simular o comportamento nativo */
+.transition-forward::view-transition-new(root) {
+  z-index: 10;
+}
+.transition-forward::view-transition-old(root) {
+  z-index: 1;
+}
+
+.transition-backward::view-transition-new(root) {
+  z-index: 1;
+}
+.transition-backward::view-transition-old(root) {
+  z-index: 10;
+}
+
+/* Classes de animações utilitárias para transições controladas por JS */
+.animate-android-slide-in {
+  animation: slideFromRight 320ms cubic-bezier(0.1, 0.76, 0.55, 0.94) both;
+}
+
+.animate-android-slide-out {
+  animation: slideToRight 300ms cubic-bezier(0.1, 0.76, 0.55, 0.94) both;
+}
+
+/* Header compartilhado para transição persistente e suave (estilo nativo) */
+.shared-header {
+  view-transition-name: main-header;
+}

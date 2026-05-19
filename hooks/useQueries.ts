@@ -189,6 +189,9 @@ export function useGeneratePix() {
 
 // ─── Hook: buscar usuário por ID ────────────────────────────────────────────
 export function useUserById(userId: string | undefined) {
+    const queryClient = useQueryClient();
+    const { user: currentUser } = useUser();
+
     const query = useQuery({
         queryKey: QueryKeys.userById(userId ?? ''),
         queryFn: async () => {
@@ -217,7 +220,17 @@ export function useUserById(userId: string | undefined) {
                     try {
                         return JSON.parse(cached);
                     } catch (e) {
-                        return undefined;
+                        // ignore
+                    }
+                }
+            }
+            // Tenta obter das salas salvas no cache do react-query
+            if (currentUser?.id && userId) {
+                const rooms = queryClient.getQueryData<any[]>(QueryKeys.rooms(currentUser.id));
+                if (rooms) {
+                    const room = rooms.find((r) => r.participants.includes(userId));
+                    if (room?.otherUser) {
+                        return room.otherUser;
                     }
                 }
             }
