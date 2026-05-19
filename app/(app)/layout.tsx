@@ -21,8 +21,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (isSignedIn && user) {
             setupAxiosInterceptors(getToken);
-            // Tenta obter permissão e salvar o token sempre que o usuário logar
-            handleRequestPermission();
+            // Apenas renova/atualiza o token se a permissão já foi dada
+            // Evita disparar prompt automático no carregamento (bloqueado no iOS)
+            if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+                handleRequestPermission();
+            }
         }
     }, [isSignedIn, user, getToken]);
 

@@ -62,6 +62,7 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
     const [unlocking, setUnlocking] = useState(false);
     const pressTimer = useRef<any>(null);
     const longPressActivated = useRef(false);
+    const touchStartCoords = useRef<{ x: number; y: number } | null>(null);
     // Stores a file selected before userData finished loading, so we can decide
     // professional vs non-professional routing once userData becomes available.
     const pendingMediaRef = useRef<{ file: File; isVideoFile: boolean } | null>(null);
@@ -250,9 +251,23 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
     };
 
     const handleStartPress = (msgId: string, e: React.TouchEvent | React.MouseEvent) => {
-        // Previne seleção nativa de texto no long press
-        e.preventDefault();
         longPressActivated.current = false;
+
+        let clientX = 0;
+        let clientY = 0;
+        if ('touches' in e) {
+            if (e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            }
+        } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+        touchStartCoords.current = { x: clientX, y: clientY };
+
+        if (pressTimer.current) clearTimeout(pressTimer.current);
+
         pressTimer.current = setTimeout(() => {
             longPressActivated.current = true;
             setSelectedMessageIds(prev => {
@@ -263,8 +278,40 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
         }, 500);
     };
 
+    const handleMovePress = (e: React.TouchEvent | React.MouseEvent) => {
+        if (!touchStartCoords.current || !pressTimer.current) return;
+
+        let clientX = 0;
+        let clientY = 0;
+        if ('touches' in e) {
+            if (e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            }
+        } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+
+        const deltaX = clientX - touchStartCoords.current.x;
+        const deltaY = clientY - touchStartCoords.current.y;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+        // Se mover mais de 10 pixels, cancelamos o temporizador do long press
+        if (distance > 10) {
+            if (pressTimer.current) {
+                clearTimeout(pressTimer.current);
+                pressTimer.current = null;
+            }
+        }
+    };
+
     const handleEndPress = () => {
-        if (pressTimer.current) clearTimeout(pressTimer.current);
+        if (pressTimer.current) {
+            clearTimeout(pressTimer.current);
+            pressTimer.current = null;
+        }
+        touchStartCoords.current = null;
     };
 
     // Click em modo de seleção: toggle da mensagem no set
@@ -772,9 +819,11 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
                             key={item._id}
                             className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-1 transition-colors duration-300 ${selectedMessageIds.has(item._id) ? 'bg-purple-100/50 -mx-4 px-4 py-0.5' : ''} select-none no-select`}
                             onMouseDown={(e) => handleStartPress(item._id, e)}
+                            onMouseMove={handleMovePress}
                             onMouseUp={handleEndPress}
                             onMouseLeave={handleEndPress}
                             onTouchStart={(e) => handleStartPress(item._id, e)}
+                            onTouchMove={handleMovePress}
                             onTouchEnd={handleEndPress}
                             onClick={() => handleMessageClick(item._id)}
                         >

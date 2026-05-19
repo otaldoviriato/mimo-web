@@ -7,8 +7,13 @@ import { toast } from "react-hot-toast";
 
 export const usePushNotifications = () => {
   const [fcmToken, setFcmToken] = useState<string | null>(null);
+  const [permission, setPermission] = useState<NotificationPermission>("default");
 
   useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      setPermission(Notification.permission);
+    }
+
     // Registrar o Service Worker automaticamente
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
@@ -57,6 +62,9 @@ export const usePushNotifications = () => {
 
   const handleRequestPermission = async () => {
     const token = await requestNotificationPermission();
+    if (typeof window !== "undefined" && "Notification" in window) {
+      setPermission(Notification.permission);
+    }
     if (token) {
       setFcmToken(token);
       console.log("FCM Token obtido:", token);
@@ -71,6 +79,7 @@ export const usePushNotifications = () => {
 
   return {
     fcmToken,
+    permission,
     handleRequestPermission,
   };
 };

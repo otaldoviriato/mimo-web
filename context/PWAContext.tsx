@@ -27,6 +27,22 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         setTimeout(() => setMounted(true), 0);
 
+        // Prevenir zoom por pinça (pinch-to-zoom) no iOS/Android
+        const preventZoom = (e: TouchEvent) => {
+            if (e.touches.length > 1) {
+                e.preventDefault();
+            }
+        };
+
+        // Evento de gesto específico do Safari no iOS
+        const preventGesture = (e: Event) => {
+            e.preventDefault();
+        };
+
+        document.addEventListener('touchstart', preventZoom, { passive: false });
+        document.addEventListener('gesturestart', preventGesture);
+        document.addEventListener('gesturechange', preventGesture);
+
         // Registra o Service Worker
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/firebase-messaging-sw.js')
@@ -62,6 +78,9 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
 
         return () => {
             window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+            document.removeEventListener('touchstart', preventZoom);
+            document.removeEventListener('gesturestart', preventGesture);
+            document.removeEventListener('gesturechange', preventGesture);
         };
     }, []);
 

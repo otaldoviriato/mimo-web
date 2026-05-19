@@ -163,11 +163,11 @@ export default function LoginPage() {
             <div className="w-full max-w-sm">
                 {/* Header */}
                 <div className="text-center mb-10">
-                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-purple-500 to-purple-700 mb-5 shadow-lg">
-                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" className="text-white">
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                    </div>
+                    <img
+                        src="/icon-192x192.png"
+                        alt="MimoChat"
+                        className="inline-block w-20 h-20 rounded-3xl mb-5 shadow-lg object-cover"
+                    />
                     <h1 className="text-3xl font-bold text-gray-900 mb-1">MimoChat</h1>
                     <p className="text-gray-500 text-base">Conectando você de verdade</p>
                 </div>

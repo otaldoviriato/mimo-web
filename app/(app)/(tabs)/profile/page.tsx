@@ -10,6 +10,7 @@ import { Avatar } from '@/components/Avatar';
 import { useMyProfile, useUpdateProfile, useUploadPhoto, useMyGallery, useUploadToGallery, usePendingWithdrawal, useRequestWithdraw } from '@/hooks/useQueries';
 import { usePayment } from '@/context/PaymentContext';
 import { usePWA } from '@/context/PWAContext';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { formatCPF, formatPhone } from '@/components/RechargeModal';
 
 function SkeletonBox({ className = '' }: { className?: string }) {
@@ -24,6 +25,7 @@ export default function ProfilePage() {
     const router = useRouter();
     const { openRechargeModal } = usePayment();
     const { isInstallable, promptInstall, mounted, isStandalone } = usePWA();
+    const { permission: notificationPermission, handleRequestPermission } = usePushNotifications();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const galleryInputRef = useRef<HTMLInputElement>(null);
     const { data: galleryData } = useMyGallery();
@@ -219,6 +221,11 @@ export default function ProfilePage() {
             {/* Header */}
             <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between z-10 sticky top-0 shadow-md">
                 <div className="flex items-center gap-3">
+                    <img
+                        src="/icon-192x192.png"
+                        alt="MimoChat"
+                        className="w-8 h-8 rounded-lg object-cover border border-white/20 shrink-0"
+                    />
                     <h1 className="text-2xl font-black text-white tracking-tighter">Mimo</h1>
                     <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">Perfil</span>
                 </div>
@@ -434,6 +441,37 @@ export default function ProfilePage() {
                         className="w-full"
                     />
                 </div>
+
+                {/* Push Notifications Card */}
+                {mounted && (
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-xl text-purple-700 font-bold shrink-0">
+                                🔔
+                            </div>
+                            <div>
+                                <h2 className="text-base font-bold text-gray-900">Notificações no Celular</h2>
+                                <p className="text-xs text-gray-500 leading-snug">
+                                    {notificationPermission === 'granted'
+                                        ? 'Ativadas para este dispositivo.'
+                                        : notificationPermission === 'denied'
+                                            ? 'Bloqueadas nas configurações do seu navegador.'
+                                            : 'Receba alertas de novas mensagens em tempo real.'}
+                                </p>
+                            </div>
+                        </div>
+                        {notificationPermission !== 'granted' && (
+                            <Button
+                                title={notificationPermission === 'denied' ? "Como Desbloquear" : "Ativar Notificações"}
+                                onPress={notificationPermission === 'denied'
+                                    ? () => alert('Acesse as configurações do seu navegador ou celular, procure as permissões de notificação deste site e marque como "Permitir".')
+                                    : handleRequestPermission}
+                                size="md"
+                                className="w-full bg-purple-600 hover:bg-purple-700 shadow-md !text-white"
+                            />
+                        )}
+                    </div>
+                )}
 
                 {/* PWA Install Button */}
                 {mounted && isInstallable && !isStandalone && (
