@@ -8,6 +8,7 @@
  * e valida/atualiza em background — sem skeleton na troca de abas.
  */
 
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@clerk/nextjs';
 import { userApi } from '@/services/api';
@@ -24,20 +25,46 @@ export const QueryKeys = {
 
 // ─── Hook: dados do perfil do usuário logado ────────────────────────────────
 export function useMyProfile() {
-    return useQuery({
+    const query = useQuery({
         queryKey: QueryKeys.me,
         queryFn: async () => {
             const response = await userApi.getMe();
-            return response?.user ?? null;
+            const user = response?.user ?? null;
+            if (typeof window !== 'undefined' && user) {
+                localStorage.setItem('mimo_profile', JSON.stringify(user));
+            }
+            return user;
         },
+        initialData: () => {
+            if (typeof window !== 'undefined') {
+                const cached = localStorage.getItem('mimo_profile');
+                if (cached) {
+                    try {
+                        return JSON.parse(cached);
+                    } catch (e) {
+                        return undefined;
+                    }
+                }
+            }
+            return undefined;
+        },
+        initialDataUpdatedAt: 0,
     });
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && query.data) {
+            localStorage.setItem('mimo_profile', JSON.stringify(query.data));
+        }
+    }, [query.data]);
+
+    return query;
 }
 
 // ─── Hook: salas de chat ────────────────────────────────────────────────────
 export function useChatRooms() {
     const { user } = useUser();
 
-    return useQuery({
+    const query = useQuery({
         queryKey: QueryKeys.rooms(user?.id ?? ''),
         queryFn: async () => {
             if (!user?.id) return [];
@@ -46,10 +73,36 @@ export function useChatRooms() {
             if (!response.ok) throw new Error('Falha ao buscar salas');
             const data = await response.json();
             // A rota Next.js retorna array diretamente (enriquecido com otherParticipant)
-            return Array.isArray(data) ? data : (data.rooms ?? []);
+            const rooms = Array.isArray(data) ? data : (data.rooms ?? []);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(`mimo_rooms_${user.id}`, JSON.stringify(rooms));
+            }
+            return rooms;
         },
         enabled: !!user?.id,
+        initialData: () => {
+            if (typeof window !== 'undefined' && user?.id) {
+                const cached = localStorage.getItem(`mimo_rooms_${user.id}`);
+                if (cached) {
+                    try {
+                        return JSON.parse(cached);
+                    } catch (e) {
+                        return undefined;
+                    }
+                }
+            }
+            return undefined;
+        },
+        initialDataUpdatedAt: 0,
     });
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && user?.id && query.data) {
+            localStorage.setItem(`mimo_rooms_${user.id}`, JSON.stringify(query.data));
+        }
+    }, [query.data, user?.id]);
+
+    return query;
 }
 
 // ─── Hook: saldo (chat server) ──────────────────────────────────────────────
@@ -136,13 +189,17 @@ export function useGeneratePix() {
 
 // ─── Hook: buscar usuário por ID ────────────────────────────────────────────
 export function useUserById(userId: string | undefined) {
-    return useQuery({
+    const query = useQuery({
         queryKey: QueryKeys.userById(userId ?? ''),
         queryFn: async () => {
             if (!userId) return null;
             try {
                 const data = await userApi.getUserById(userId);
-                return data.user ?? null;
+                const fetchedUser = data.user ?? null;
+                if (typeof window !== 'undefined' && fetchedUser) {
+                    localStorage.setItem(`mimo_user_${userId}`, JSON.stringify(fetchedUser));
+                }
+                return fetchedUser;
             } catch {
                 return {
                     username: `Usuário ${userId.substring(0, 8)}`,
@@ -153,7 +210,29 @@ export function useUserById(userId: string | undefined) {
         },
         enabled: !!userId,
         staleTime: 2 * 60 * 1000,
+        initialData: () => {
+            if (typeof window !== 'undefined' && userId) {
+                const cached = localStorage.getItem(`mimo_user_${userId}`);
+                if (cached) {
+                    try {
+                        return JSON.parse(cached);
+                    } catch (e) {
+                        return undefined;
+                    }
+                }
+            }
+            return undefined;
+        },
+        initialDataUpdatedAt: 0,
     });
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && userId && query.data) {
+            localStorage.setItem(`mimo_user_${userId}`, JSON.stringify(query.data));
+        }
+    }, [query.data, userId]);
+
+    return query;
 }
 
 // ─── Galeria ─────────────────────────────────────────────────────────────

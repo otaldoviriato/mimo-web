@@ -79,6 +79,33 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
 
     const roomId = [user?.id, otherUserId].sort().join('_');
 
+    // Carrega mensagens do cache local no primeiro render
+    useEffect(() => {
+        if (typeof window !== 'undefined' && user?.id && otherUserId) {
+            const currentRoomId = [user.id, otherUserId].sort().join('_');
+            const cached = localStorage.getItem(`mimo_messages_${currentRoomId}`);
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        setMessages(parsed);
+                        setLoadingMessages(false);
+                    }
+                } catch (e) {
+                    console.error('Erro ao ler mensagens do cache:', e);
+                }
+            }
+        }
+    }, [user?.id, otherUserId]);
+
+    // Salva mensagens no cache local sempre que elas mudarem
+    useEffect(() => {
+        if (typeof window !== 'undefined' && user?.id && otherUserId && !loadingMessages) {
+            const currentRoomId = [user.id, otherUserId].sort().join('_');
+            localStorage.setItem(`mimo_messages_${currentRoomId}`, JSON.stringify(messages));
+        }
+    }, [messages, user?.id, otherUserId, loadingMessages]);
+
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
