@@ -46,8 +46,32 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     if (!isLoaded) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
-                <div className="animate-spin rounded-full h-10 w-10 border-4 border-purple-600 border-t-transparent" />
+            <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gradient-to-br from-[#4C1D95] via-[#6D28D9] to-[#8B5CF6] select-none">
+                <div className="flex flex-col items-center animate-fade-in-up">
+                    {/* Logo do MimoChat */}
+                    <div className="relative w-28 h-28 md:w-32 md:h-32 mb-6 rounded-3xl overflow-hidden shadow-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 animate-pulse">
+                        <img 
+                            src="/icon-192x192.png" 
+                            alt="MimoChat Logo" 
+                            className="w-20 h-20 md:w-24 md:h-24 object-contain"
+                        />
+                    </div>
+                    {/* Nome do Aplicativo */}
+                    <h1 className="text-white text-3xl md:text-4xl font-extrabold tracking-wider drop-shadow-md">
+                        MimoChat
+                    </h1>
+                    <p className="text-purple-200 text-xs md:text-sm tracking-widest mt-1 uppercase font-semibold opacity-80">
+                        Conectando você de verdade
+                    </p>
+                </div>
+                {/* Loader Sutil */}
+                <div className="absolute bottom-12 flex flex-col items-center">
+                    <div className="flex space-x-1.5 justify-center items-center">
+                        <div className="w-2.5 h-2.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2.5 h-2.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2.5 h-2.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
+                </div>
             </div>
         );
     }

@@ -39,7 +39,7 @@ export async function sendPushNotification(userId: string, title: string, body: 
                     title,
                     body,
                     icon: '/icon-192x192.png',
-                    badge: '/icon-192x192.png',
+                    badge: '/notification-badge.png',
                     tag: 'mimo-message',
                     vibrate: [200, 100, 200],
                 },
