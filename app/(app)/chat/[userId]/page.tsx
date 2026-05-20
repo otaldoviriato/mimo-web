@@ -31,8 +31,17 @@ interface Message {
     tempId?: string;
 }
 
-export default function ChatPage({ params }: { params: Promise<{ userId: string }> }) {
-    const { userId: otherUserId } = use(params);
+interface ChatPageProps {
+    params?: Promise<{ userId: string }>;
+    userId?: string;
+    onBack?: () => void;
+    isSubPage?: boolean;
+    isClosing?: boolean;
+}
+
+export default function ChatPage({ params, userId: propUserId, onBack, isSubPage = false, isClosing = false }: ChatPageProps) {
+    const resolvedParams = params ? use(params) : null;
+    const otherUserId = propUserId || resolvedParams?.userId || '';
     const router = useTransitionRouter();
     const queryClient = useQueryClient();
     const { user } = useUser();
@@ -706,7 +715,9 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
     };
 
     const handleBack = () => {
-        if (useNativeTransition) {
+        if (onBack) {
+            onBack();
+        } else if (useNativeTransition) {
             router.back();
         } else {
             setIsLeaving(true);
@@ -730,12 +741,18 @@ export default function ChatPage({ params }: { params: Promise<{ userId: string 
         estimatedCostInReais = totalCostInCents / 100;
     }
 
-    const animationClass = useNativeTransition
+    const isClosingOrLeaving = isClosing || isLeaving;
+
+    const layoutClass = isSubPage
+        ? 'fixed inset-0 z-50 w-full h-full'
+        : 'w-full h-full';
+
+    const animationClass = (useNativeTransition && !isSubPage)
         ? ''
-        : (isLeaving ? 'animate-android-slide-out' : 'animate-android-slide-in');
+        : (isClosingOrLeaving ? 'animate-android-slide-out' : 'animate-android-slide-in');
 
     return (
-        <div className={`flex flex-col h-full bg-gray-50 overflow-hidden ${animationClass}`}>
+        <div className={`flex flex-col bg-gray-50 overflow-hidden ${layoutClass} ${animationClass}`}>
             {/* Header */}
             <div className="shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 z-20 sticky top-0 shadow-md flex items-center gap-2">
                 {selectedMessageIds.size > 0 ? (

@@ -11,11 +11,13 @@ interface Ripple {
 
 interface TouchableRippleProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
     rippleColor?: string;
+    activeOpacity?: number; // Opacidade ao pressionar
     children: React.ReactNode;
 }
 
 export function TouchableRipple({
     rippleColor = 'rgba(0, 0, 0, 0.08)', // Sombreamento cinza sutil padrão do Android
+    activeOpacity = 0.7, // Padrão sutil para TouchableOpacity do Android
     className = '',
     children,
     onClick,
@@ -66,11 +68,12 @@ export function TouchableRipple({
             onMouseDown={handleMouseDown}
             onTouchStart={handleTouchStart}
             onClick={onClick}
-            className={`relative overflow-hidden outline-none cursor-pointer select-none ${className}`}
+            className={`relative overflow-hidden outline-none cursor-pointer select-none transition-opacity duration-150 active:opacity-[var(--active-opacity)] ${className}`}
             style={{
+                '--active-opacity': activeOpacity,
                 WebkitTapHighlightColor: 'transparent',
                 ...style,
-            }}
+            } as React.CSSProperties}
             {...props}
         >
             {children}

@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Avatar, BalanceDisplay, TouchableRipple } from '@/components';
 import { useChatRooms, useMyProfile, QueryKeys } from '@/hooks/useQueries';
 import { useSocket } from '@/hooks/useSocket';
+import ChatPage from '@/app/(app)/chat/[userId]/page';
 
 interface Room {
     _id: string;
@@ -74,6 +75,10 @@ export default function ChatsPage() {
     // Modal de presente (gift code)
     const [giftModal, setGiftModal] = useState(false);
     const giftClaimedRef = useRef(false);
+
+    // Controle da SPA para o chat individual
+    const [activeChatUserId, setActiveChatUserId] = useState<string | null>(null);
+    const [isClosingChat, setIsClosingChat] = useState<boolean>(false);
 
     // Resolve a transição pendente assim que a lista de chats é montada
     useEffect(() => {
@@ -219,6 +224,40 @@ export default function ChatsPage() {
         }).catch(() => {});
     }, [user?.id, queryClient]);
 
+    // Histórico e navegação SPA para o chat individual
+    const handleOpenChat = (userId: string) => {
+        window.history.pushState({ chatUserId: userId }, '', `/chat/${userId}`);
+        setActiveChatUserId(userId);
+        setIsClosingChat(false);
+    };
+
+    const handleCloseChat = () => {
+        window.history.back();
+    };
+
+    useEffect(() => {
+        const handlePopState = (event: PopStateEvent) => {
+            const state = event.state;
+            if (activeChatUserId && (!state || state.chatUserId !== activeChatUserId)) {
+                // Inicia animação de fechar
+                setIsClosingChat(true);
+                setTimeout(() => {
+                    setActiveChatUserId(null);
+                    setIsClosingChat(false);
+                }, 300);
+            } else if (!activeChatUserId && state && state.chatUserId) {
+                // Se o usuário navegou para a frente no histórico
+                setActiveChatUserId(state.chatUserId);
+                setIsClosingChat(false);
+            }
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        return () => {
+            window.removeEventListener('popstate', handlePopState);
+        };
+    }, [activeChatUserId]);
+
     const onRefresh = useCallback(() => {
         refetchRooms();
         refetchProfile();
@@ -338,7 +377,7 @@ export default function ChatsPage() {
                             return (
                                 <li key={room._id}>
                                     <TouchableRipple
-                                        onClick={() => router.push(`/chat/${otherUserId}`)}
+                                        onClick={() => otherUserId && handleOpenChat(otherUserId)}
                                         className="w-full flex items-center px-4 py-3.5 bg-white border-b border-gray-100 hover:bg-gray-50 transition-colors text-left"
                                     >
                                         <Avatar size={52} uri={room.otherUser?.photoUrl} />
@@ -395,6 +434,15 @@ export default function ChatsPage() {
                     </ul>
                 )}
             </div>
+
+            {activeChatUserId && (
+                <ChatPage
+                    userId={activeChatUserId}
+                    onBack={handleCloseChat}
+                    isSubPage={true}
+                    isClosing={isClosingChat}
+                />
+            )}
         </div>
     );
 }
