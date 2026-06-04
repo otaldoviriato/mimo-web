@@ -3,7 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { GiftCode } from '@/models/GiftCode';
-import { Transaction } from '@/models/Transaction';
+import { MicroTransaction } from '@/models/MicroTransaction';
 
 export async function POST(req: NextRequest) {
     try {
@@ -64,10 +64,9 @@ export async function POST(req: NextRequest) {
             GiftCode.findByIdAndUpdate(giftCode._id, { $inc: { totalUses: 1 } }),
         ]);
 
-        await Transaction.create({
+        await MicroTransaction.create({
             userId,
             amount,
-            status: 'COMPLETED',
             type: 'credit',
             source: 'gift',
             metadata: { giftCode: rawCode },

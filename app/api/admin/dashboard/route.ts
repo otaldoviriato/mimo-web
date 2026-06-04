@@ -196,21 +196,15 @@ export async function GET(request: NextRequest) {
             const relatedUser = usersList.find(u => u.clerkId === tx.userId);
             const userName = relatedUser 
                 ? (relatedUser.name || `@${relatedUser.username}`) 
-                : tx.userId === 'platform' ? 'Taxa da Plataforma' : `Usuário (${tx.userId.substring(0, 8)}...)`;
+                : `Usuário (${tx.userId.substring(0, 8)}...)`;
 
-            // Normalização do valor: recharge está em reais, outros em centavos
-            const valInReais = tx.source === 'recharge' ? (tx.amount || 0) : ((tx.amount || 0) / 100);
+            // Agora todos os valores na coleção Transaction estão salvos em Reais!
+            const valInReais = tx.amount || 0;
 
             // Mapeia o tipo amigável
             let typeLabel = 'Movimentação';
             if (tx.source === 'recharge') {
                 typeLabel = tx.type === 'PIX' ? 'Recarga Pix' : 'Recarga Cartão';
-            } else if (tx.source === 'message') {
-                typeLabel = tx.type === 'platform_fee' ? 'Intermediação' : 'Mensagem';
-            } else if (tx.source === 'gift') {
-                typeLabel = 'Presente';
-            } else if (tx.source === 'image_unlock') {
-                typeLabel = 'Desbloqueio Mídia';
             } else if (tx.source === 'withdrawal') {
                 typeLabel = 'Saque';
             }
@@ -221,8 +215,6 @@ export async function GET(request: NextRequest) {
                 statusLabel = 'Aprovado';
             } else if (tx.status === 'CANCELLED') {
                 statusLabel = 'Cancelado';
-            } else if (tx.status === 'debit') {
-                statusLabel = 'Débito'; // Transações internas de débito são imediatas
             }
 
             // Formatação do tempo

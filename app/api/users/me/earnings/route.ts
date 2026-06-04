@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
-import { Transaction } from '@/models/Transaction';
+import { MicroTransaction } from '@/models/MicroTransaction';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
             query.relatedUserId = otherUserId;
         }
 
-        const recentCredits = await Transaction.find(query)
+        const recentCredits = await MicroTransaction.find(query)
         .sort({ timestamp: -1 })
         .limit(100)
         .lean();

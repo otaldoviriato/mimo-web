@@ -28,7 +28,9 @@ import {
     ShieldAlert,
     AlertTriangle,
     Search,
-    Loader2
+    Loader2,
+    Wallet,
+    Check
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -67,6 +69,19 @@ interface RichAdmin {
     photoUrl: string | null;
 }
 
+interface WithdrawRequest {
+    id: string;
+    userId: string;
+    userName: string;
+    userEmail: string;
+    userPhotoUrl: string | null;
+    amount: number;
+    pixKey: string;
+    status: 'pendente' | 'concluido' | 'rejeitado';
+    createdAt: string;
+    updatedAt: string;
+}
+
 export default function AdminPage() {
     const { isLoaded, isSignedIn, userId } = useAuth();
     const router = useRouter();
@@ -87,6 +102,10 @@ export default function AdminPage() {
     // Estados de Gerenciamento de Administradores Ricos
     const [adminListRich, setAdminListRich] = useState<RichAdmin[]>([]);
     
+    // Estados de Saques Manuais
+    const [withdrawals, setWithdrawals] = useState<WithdrawRequest[]>([]);
+    const [loadingWithdrawals, setLoadingWithdrawals] = useState(true);
+    
     // Estados do Autocomplete de Admins
     const [adminSearch, setAdminSearch] = useState('');
     const [adminSearchResults, setAdminSearchResults] = useState<RichAdmin[]>([]);
@@ -102,6 +121,7 @@ export default function AdminPage() {
         users: 'Gerenciamento de Usuários',
         rooms: 'Auditoria de Conversas',
         financial: 'Movimentações Financeiras',
+        withdrawals: 'Solicitações de Saque',
         settings: 'Configurações do Sistema',
     };
 
@@ -195,6 +215,89 @@ export default function AdminPage() {
         }
     };
 
+    // Busca solicitações de saques reais
+    const fetchWithdrawals = async () => {
+        setLoadingWithdrawals(true);
+        try {
+            const response = await fetch('/api/admin/withdrawals');
+            if (response.ok) {
+                const data = await response.json();
+                setWithdrawals(data.withdrawals || []);
+            } else {
+                toast.error('Erro ao buscar solicitações de saque.');
+            }
+        } catch (error) {
+            console.error('Erro de conexão ao buscar saques:', error);
+            toast.error('Erro de conexão com o servidor.');
+        } finally {
+            setLoadingWithdrawals(false);
+        }
+    };
+
+    // Aprovar saque e registrar na coleção Transaction (em Reais)
+    const handleApproveWithdrawal = async (id: string) => {
+        const confirmApprove = window.confirm('Deseja realmente confirmar que este Pix foi pago manualmente? Essa ação não pode ser desfeita.');
+        if (!confirmApprove) return;
+
+        try {
+            const response = await fetch(`/api/admin/withdrawals/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'approve' })
+            });
+
+            if (response.ok) {
+                toast.success('Saque concluído com sucesso e registrado no financeiro!', {
+                    style: {
+                        borderRadius: '12px',
+                        background: '#1E293B',
+                        color: '#FFF',
+                        fontWeight: 600,
+                    }
+                });
+                fetchWithdrawals();
+            } else {
+                const data = await response.json();
+                toast.error(data.error || 'Erro ao aprovar saque.');
+            }
+        } catch (error) {
+            console.error('Erro ao aprovar saque:', error);
+            toast.error('Erro de conexão com o servidor.');
+        }
+    };
+
+    // Rejeitar saque e devolver saldo para a carteira da profissional
+    const handleRejectWithdrawal = async (id: string) => {
+        const confirmReject = window.confirm('Deseja realmente rejeitar este saque? O saldo correspondente será devolvido imediatamente à carteira da profissional.');
+        if (!confirmReject) return;
+
+        try {
+            const response = await fetch(`/api/admin/withdrawals/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'reject' })
+            });
+
+            if (response.ok) {
+                toast.success('Saque rejeitado com sucesso. Saldo devolvido para a profissional!', {
+                    style: {
+                        borderRadius: '12px',
+                        background: '#1E293B',
+                        color: '#FFF',
+                        fontWeight: 600,
+                    }
+                });
+                fetchWithdrawals();
+            } else {
+                const data = await response.json();
+                toast.error(data.error || 'Erro ao rejeitar saque.');
+            }
+        } catch (error) {
+            console.error('Erro ao rejeitar saque:', error);
+            toast.error('Erro de conexão com o servidor.');
+        }
+    };
+
     // Efeito para carregar dados conforme aba e período ativo
     useEffect(() => {
         if (!isAuthorized) return;
@@ -202,6 +305,8 @@ export default function AdminPage() {
             fetchDashboard(selectedPeriod);
         } else if (activeTab === 'rooms') {
             fetchRooms();
+        } else if (activeTab === 'withdrawals') {
+            fetchWithdrawals();
         }
     }, [activeTab, selectedPeriod, isAuthorized]);
 
@@ -707,6 +812,146 @@ export default function AdminPage() {
                                             <tr>
                                                 <td colSpan={6} className="py-20 text-center text-sm font-semibold text-slate-400">
                                                     Nenhuma transação real registrada na base de dados.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* TAB: WITHDRAWALS (SOLICITAÇÕES DE SAQUE) */}
+                    {activeTab === 'withdrawals' && (
+                        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden p-6 space-y-6 animate-fade-in-up">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-800 tracking-tight">
+                                        Solicitações de Saque Manuais
+                                    </h3>
+                                    <p className="text-xs text-slate-500 font-medium">
+                                        Analise as solicitações de saque das profissionais, efetue o Pix manual no seu banco e confirme ou rejeite o pedido aqui.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={fetchWithdrawals}
+                                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition-all border border-slate-200 cursor-pointer flex items-center gap-1.5 shadow-sm"
+                                >
+                                    Atualizar Lista
+                                </button>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+                                            <th className="py-4 px-6">Profissional</th>
+                                            <th className="py-4 px-6">Chave Pix</th>
+                                            <th className="py-4 px-6">Valor do Saque</th>
+                                            <th className="py-4 px-6">Solicitado Em</th>
+                                            <th className="py-4 px-6">Status</th>
+                                            <th className="py-4 px-6 text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {loadingWithdrawals ? (
+                                            <tr>
+                                                <td colSpan={6} className="py-20 text-center text-sm font-semibold text-slate-400">
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        <div className="animate-spin h-6 w-6 text-purple-600 rounded-full border-2 border-slate-200 border-t-purple-600" />
+                                                        <span>Buscando solicitações no banco...</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ) : withdrawals.length > 0 ? (
+                                            withdrawals.map((withdraw) => (
+                                                <tr key={withdraw.id} className="hover:bg-slate-50/40 transition-colors group">
+                                                    {/* Profissional */}
+                                                    <td className="py-4 px-6">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-full bg-purple-50 text-purple-600 border border-purple-100 flex items-center justify-center font-bold text-xs overflow-hidden shrink-0 shadow-sm">
+                                                                {withdraw.userPhotoUrl ? (
+                                                                    <img src={withdraw.userPhotoUrl} alt={withdraw.userName} className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    getInitials(withdraw.userName)
+                                                                )}
+                                                            </div>
+                                                            <div className="flex flex-col min-w-0">
+                                                                <span className="text-xs font-bold text-slate-800 truncate">
+                                                                    {withdraw.userName}
+                                                                </span>
+                                                                <span className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">
+                                                                    {withdraw.userEmail}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    {/* Chave Pix */}
+                                                    <td className="py-4 px-6">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-xs font-mono font-bold text-slate-700 bg-slate-100/80 px-2.5 py-1 rounded-lg border border-slate-200/60 w-fit break-all">
+                                                                {withdraw.pixKey}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    {/* Valor */}
+                                                    <td className="py-4 px-6">
+                                                        <span className="text-sm font-extrabold text-slate-800">
+                                                            {withdraw.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                        </span>
+                                                    </td>
+                                                    {/* Solicitado Em */}
+                                                    <td className="py-4 px-6 text-xs text-slate-500 font-semibold">
+                                                        {withdraw.createdAt}
+                                                    </td>
+                                                    {/* Status */}
+                                                    <td className="py-4 px-6">
+                                                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                                                            withdraw.status === 'concluido' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                                            withdraw.status === 'pendente' ? 'bg-amber-50 text-amber-700 border-amber-100 animate-pulse' :
+                                                            'bg-rose-50 text-rose-700 border-rose-100'
+                                                        }`}>
+                                                            <span className={`w-1.5 h-1.5 rounded-full ${
+                                                                withdraw.status === 'concluido' ? 'bg-emerald-500' :
+                                                                withdraw.status === 'pendente' ? 'bg-amber-500' : 'bg-rose-500'
+                                                            }`} />
+                                                            {withdraw.status === 'concluido' ? 'Pago' :
+                                                             withdraw.status === 'pendente' ? 'Pendente' : 'Rejeitado'}
+                                                        </span>
+                                                    </td>
+                                                    {/* Ações */}
+                                                    <td className="py-4 px-6 text-center">
+                                                        {withdraw.status === 'pendente' ? (
+                                                            <div className="flex gap-2 justify-center">
+                                                                <button
+                                                                    onClick={() => handleApproveWithdrawal(withdraw.id)}
+                                                                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 text-xs font-bold rounded-lg transition-all border border-emerald-100 cursor-pointer shadow-sm active:scale-95"
+                                                                    title="Confirmar que o Pix foi pago"
+                                                                >
+                                                                    <Check size={12} />
+                                                                    Pago (Pix Feito)
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleRejectWithdrawal(withdraw.id)}
+                                                                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold rounded-lg transition-all border border-rose-100 cursor-pointer shadow-sm active:scale-95"
+                                                                    title="Rejeitar saque e devolver saldo"
+                                                                >
+                                                                    <X size={12} />
+                                                                    Rejeitar
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                                                Resolvido
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={6} className="py-20 text-center text-sm font-semibold text-slate-400">
+                                                    Nenhuma solicitação de saque cadastrada.
                                                 </td>
                                             </tr>
                                         )}

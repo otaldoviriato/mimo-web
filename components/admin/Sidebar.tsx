@@ -8,7 +8,8 @@ import {
     DollarSign, 
     Settings, 
     ArrowLeft,
-    ShieldAlert
+    ShieldAlert,
+    Wallet
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -23,6 +24,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         { id: 'users', label: 'Usuários', icon: Users },
         { id: 'rooms', label: 'Conversas', icon: MessageSquare },
         { id: 'financial', label: 'Financeiro', icon: DollarSign },
+        { id: 'withdrawals', label: 'Solicitações de Saque', icon: Wallet },
     ];
 
     return (
