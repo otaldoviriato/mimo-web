@@ -47,7 +47,7 @@ export async function PATCH(
         const updatedUser = await User.findOneAndUpdate(
             { clerkId },
             { $set: updateFields },
-            { new: true }
+            { returnDocument: 'after' }
         );
 
         if (!updatedUser) {
@@ -60,8 +60,12 @@ export async function PATCH(
             await client.users.updateUser(clerkId, {
                 ...(name !== undefined && { firstName: name.split(' ')[0], lastName: name.split(' ').slice(1).join(' ') }),
             });
-        } catch (clerkErr) {
-            console.warn('Falha ao atualizar dados no Clerk para o usuário:', clerkId, clerkErr);
+        } catch (clerkErr: any) {
+            if (clerkErr.status === 404 || (clerkErr.errors && clerkErr.errors[0]?.code === 'resource_not_found')) {
+                console.info(`[Clerk Sync] Usuário ${clerkId} não encontrado no Clerk (provavelmente usuário mockado local). Sincronização ignorada.`);
+            } else {
+                console.warn('[Clerk Sync] Falha ao atualizar dados no Clerk:', clerkErr.message || clerkErr);
+            }
         }
 
         return NextResponse.json({ success: true, user: updatedUser });
