@@ -15,6 +15,7 @@ interface RechargeModalProps {
     onClose: () => void;
     onRecharge: (amount: number) => Promise<any>;
     onGeneratePix?: (amount: number) => Promise<any>;
+    insufficientBalanceMessage?: string | null;
 }
 
 interface SavedCard {
@@ -79,7 +80,7 @@ export function formatPhone(val: string) {
 
 type Step = 'amount_and_method' | 'pix_checkout' | 'processing_payment';
 
-export function RechargeModal({ visible, onClose, onRecharge, onGeneratePix }: RechargeModalProps) {
+export function RechargeModal({ visible, onClose, onRecharge, onGeneratePix, insufficientBalanceMessage }: RechargeModalProps) {
     const queryClient = useQueryClient();
     const { user } = useUser();
     const [step, setStep] = useState<Step>('amount_and_method');
@@ -263,7 +264,7 @@ export function RechargeModal({ visible, onClose, onRecharge, onGeneratePix }: R
         <Drawer.Root open={visible} onOpenChange={(open) => !open && handleClose()}>
             <Drawer.Portal>
                 <Drawer.Overlay className="fixed inset-0 z-[100] bg-black/60" />
-                <Drawer.Content className="fixed inset-x-0 bottom-0 z-[101] flex flex-col bg-white rounded-t-[32px] max-h-[92vh] w-full max-w-lg mx-auto outline-none shadow-2xl">
+                <Drawer.Content className="fixed inset-x-0 bottom-0 z-[101] flex flex-col bg-white rounded-t-[32px] max-h-[78vh] w-full max-w-lg mx-auto outline-none shadow-2xl">
                     <div className="w-full flex-1 overflow-y-auto flex flex-col p-6 pb-8">
                         <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-200 mb-6" />
                         
@@ -271,15 +272,27 @@ export function RechargeModal({ visible, onClose, onRecharge, onGeneratePix }: R
                             <>
                                 <div className="flex items-center justify-between mb-5">
                                     <Drawer.Title className="text-xl font-bold text-gray-900">Recarregar Saldo</Drawer.Title>
-                            <button
-                                onClick={() => handleClose()}
-                                className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                            >
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                                    <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                </svg>
-                            </button>
-                        </div>
+                                    <button
+                                        onClick={() => handleClose()}
+                                        className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                                    >
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                            <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                        </svg>
+                                    </button>
+                                </div>
+
+                                {insufficientBalanceMessage && (
+                                    <div className="mb-5 bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-200 shadow-sm shrink-0">
+                                        <span className="text-xl leading-none">⚠️</span>
+                                        <div className="flex-1">
+                                            <h4 className="text-xs font-bold text-amber-800 uppercase tracking-wider mb-0.5">Saldo Insuficiente</h4>
+                                            <p className="text-xs text-amber-700 font-medium leading-relaxed">
+                                                {insufficientBalanceMessage}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
 
                         <div className="overflow-y-auto flex-1 pr-1">
                             {/* Valor */}

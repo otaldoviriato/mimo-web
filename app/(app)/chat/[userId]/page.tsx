@@ -8,6 +8,7 @@ import { Avatar } from '@/components/Avatar';
 import { BalanceDisplay } from '@/components/BalanceDisplay';
 import { useSocket } from '@/hooks/useSocket';
 import { useUserById, useMyProfile, QueryKeys, useRecentEarnings } from '@/hooks/useQueries';
+import { usePayment } from '@/context/PaymentContext';
 
 interface Message {
     _id: string;
@@ -42,6 +43,7 @@ interface ChatPageProps {
 export default function ChatPage({ params, userId: propUserId, onBack, isSubPage = false, isClosing = false }: ChatPageProps) {
     const resolvedParams = params ? use(params) : null;
     const otherUserId = propUserId || resolvedParams?.userId || '';
+    const { openRechargeModal } = usePayment();
     const router = useTransitionRouter();
     const queryClient = useQueryClient();
     const { user } = useUser();
@@ -481,6 +483,19 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
     const handleSend = () => {
         if (!messageText.trim() || sending || !socket) return;
         
+        const charCount = messageText.trim().length;
+        let costInCents = 0;
+        if (charCount > 0 && receiver?.isProfessional) {
+            const costPerCharInCents = currentRate * 100;
+            const rawCostInCents = charCount * costPerCharInCents;
+            costInCents = Math.max(1, Math.ceil(rawCostInCents));
+        }
+
+        if (receiver?.isProfessional && balance < costInCents) {
+            openRechargeModal('Você não tem saldo suficiente para enviar esta mensagem. Por favor, recarregue sua carteira.');
+            return;
+        }
+
         const tempId = `temp-${Date.now()}`;
         const newMsg: Message = {
             _id: tempId,
@@ -488,8 +503,8 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
             senderId: user?.id ?? '',
             receiverId: otherUserId,
             content: messageText.trim(),
-            charCount: messageText.trim().length,
-            cost: estimatedCostInReais * 100, // aproximado
+            charCount: charCount,
+            cost: costInCents,
             timestamp: new Date().toISOString(),
             status: 'sending'
         };
@@ -706,7 +721,8 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
         if (!unlockData) return;
         
         if (balance < unlockData.price) {
-            alert(`Você não tem saldo suficiente. Recarregue sua carteira.`);
+            setUnlockModalVisible(false);
+            openRechargeModal('Você não tem saldo suficiente para desbloquear este conteúdo. Por favor, recarregue sua carteira.');
             return;
         }
 
@@ -732,6 +748,14 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
 
     const handleSendGift = async () => {
         if (!giftAmountStr || parseFloat(giftAmountStr) <= 0) return;
+        
+        const giftAmountInCents = parseFloat(giftAmountStr) * 100;
+        if (balance < giftAmountInCents) {
+            setGiftModalVisible(false);
+            openRechargeModal('Você não tem saldo suficiente para enviar este presente. Por favor, recarregue sua carteira.');
+            return;
+        }
+
         setSendingGift(true);
         try {
             const res = await fetch('/api/chats/gift', {
@@ -748,7 +772,12 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                 setGiftModalVisible(false);
                 setGiftAmountStr('');
             } else {
-                alert(data.error || 'Erro ao enviar presente');
+                if (data.error?.toLowerCase().includes('saldo') || data.error?.toLowerCase().includes('insuficiente')) {
+                    setGiftModalVisible(false);
+                    openRechargeModal('Você não tem saldo suficiente para enviar este presente. Por favor, recarregue sua carteira.');
+                } else {
+                    alert(data.error || 'Erro ao enviar presente');
+                }
             }
         } catch (e) {
             alert('Erro de conexão');
