@@ -1,81 +1,181 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { Search, Ban, CheckCircle, MoreVertical, ShieldCheck, Mail, Calendar, Coins } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, MoreVertical, ShieldCheck, Mail, Calendar, Coins, Edit, Trash2, X, FileText, Phone, Key, UserCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-interface UserMock {
-    id: string;
-    name: string;
-    email: string;
-    status: 'Ativo' | 'Banido';
-    balance: number;
-    createdAt: string;
-    role: string;
-}
-
-const initialUsers: UserMock[] = [
-    { id: '1', name: 'Carlos Oliveira', email: 'c.oliveira@gmail.com', status: 'Ativo', balance: 150.00, createdAt: '15/05/2026', role: 'Cliente' },
-    { id: '2', name: 'Mariana Costa', email: 'mari.costa@mimo.chat', status: 'Ativo', balance: 450.00, createdAt: '22/05/2026', role: 'Profissional' },
-    { id: '3', name: 'João Sousa', email: 'joao.sousa@yahoo.com', status: 'Banido', balance: 0.00, createdAt: '10/04/2026', role: 'Cliente' },
-    { id: '4', name: 'Beatriz Lima', email: 'beatriz.l@outlook.com', status: 'Ativo', balance: 80.00, createdAt: '01/06/2026', role: 'Cliente' },
-    { id: '5', name: 'Roberto Santos', email: 'roberto.s@gmail.com', status: 'Ativo', balance: 25.00, createdAt: '03/06/2026', role: 'Cliente' },
-    { id: '6', name: 'Amanda Silva', email: 'amandinha@mimo.chat', status: 'Banido', balance: 12.50, createdAt: '18/05/2026', role: 'Profissional' },
-    { id: '7', name: 'Felipe Rodrigues', email: 'felipe.rod@gmail.com', status: 'Ativo', balance: 1200.00, createdAt: '30/05/2026', role: 'Cliente' },
-];
-
 export function UserTable() {
-    const [users, setUsers] = useState<UserMock[]>(initialUsers);
+    const [users, setUsers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState<'Todos' | 'Ativo' | 'Banido'>('Todos');
+    const [roleFilter, setRoleFilter] = useState<'Todos' | 'Cliente' | 'Profissional'>('Todos');
     const [selectedUserMenu, setSelectedUserMenu] = useState<string | null>(null);
 
-    // Lógica de busca e filtros
-    const filteredUsers = useMemo(() => {
-        return users.filter(user => {
-            const matchesSearch = 
-                user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                user.email.toLowerCase().includes(searchQuery.toLowerCase());
-            
-            const matchesStatus = 
-                statusFilter === 'Todos' || 
-                user.status === statusFilter;
+    // Estados da Modal de Edição
+    const [editingUser, setEditingUser] = useState<any | null>(null);
+    const [editName, setEditName] = useState('');
+    const [editEmail, setEditEmail] = useState('');
+    const [editBalance, setEditBalance] = useState<number>(0);
+    const [editIsProfessional, setEditIsProfessional] = useState(false);
+    const [editTaxId, setEditTaxId] = useState('');
+    const [editPhone, setEditPhone] = useState('');
+    const [editPixKey, setEditPixKey] = useState('');
+    const [saving, setSaving] = useState(false);
 
-            return matchesSearch && matchesStatus;
-        });
-    }, [users, searchQuery, statusFilter]);
-
-    // Função para alterar status do usuário (Banir / Reativar)
-    const toggleUserStatus = (id: string, currentStatus: 'Ativo' | 'Banido') => {
-        const newStatus = currentStatus === 'Ativo' ? 'Banido' : 'Ativo';
-        
-        setUsers(prev => prev.map(u => u.id === id ? { ...u, status: newStatus } : u));
-        setSelectedUserMenu(null);
-
-        if (newStatus === 'Banido') {
-            toast.success(`Usuário banido com sucesso! (Simulado)`, {
-                icon: '🚫',
-                style: {
-                    borderRadius: '12px',
-                    background: '#1E293B',
-                    color: '#FFF',
-                    fontWeight: 600,
-                }
-            });
-        } else {
-            toast.success(`Usuário reativado com sucesso! (Simulado)`, {
-                icon: '✅',
-                style: {
-                    borderRadius: '12px',
-                    background: '#1E293B',
-                    color: '#FFF',
-                    fontWeight: 600,
-                }
-            });
+    // Busca os usuários da API
+    const fetchUsers = async (query: string = '') => {
+        setLoading(true);
+        try {
+            const res = await fetch(`/api/admin/users?q=${encodeURIComponent(query)}`);
+            if (res.ok) {
+                const data = await res.json();
+                setUsers(data.users || []);
+            } else {
+                toast.error('Erro ao buscar usuários do banco de dados.');
+            }
+        } catch (err) {
+            console.error('Erro ao carregar usuários:', err);
+            toast.error('Falha de conexão com o servidor.');
+        } finally {
+            setLoading(false);
         }
     };
 
-    // Gera um avatar inicial circular elegante baseado nas iniciais
+    // Debounce para a barra de pesquisa
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            fetchUsers(searchQuery);
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
+    // Filtros combinados no frontend para tipo de usuário
+    const filteredUsers = useMemo(() => {
+        return users.filter(user => {
+            if (roleFilter === 'Todos') return true;
+            if (roleFilter === 'Profissional') return user.isProfessional;
+            if (roleFilter === 'Cliente') return !user.isProfessional;
+            return true;
+        });
+    }, [users, roleFilter]);
+
+    // Ação: Excluir Usuário permanentemente do banco e do Clerk
+    const handleDeleteUser = async (clerkId: string, name: string) => {
+        if (!confirm(`ATENÇÃO: Você tem certeza que deseja EXCLUIR permanentemente o usuário "${name}"?\nEsta ação apagará a conta do banco de dados e do Clerk de forma definitiva. Esta ação não poderá ser desfeita.`)) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/admin/users/${clerkId}`, {
+                method: 'DELETE'
+            });
+
+            if (res.ok) {
+                toast.success('Usuário excluído com sucesso!', {
+                    style: { borderRadius: '12px', background: '#1E293B', color: '#FFF' }
+                });
+                setUsers(prev => prev.filter(u => u.clerkId !== clerkId));
+                setSelectedUserMenu(null);
+                if (editingUser?.clerkId === clerkId) {
+                    setEditingUser(null);
+                }
+            } else {
+                const data = await res.json();
+                toast.error(data.error || 'Erro ao excluir usuário.');
+            }
+        } catch (err) {
+            console.error('Erro ao excluir:', err);
+            toast.error('Erro de conexão ao tentar excluir.');
+        }
+    };
+
+    // Ação rápida: Alterar tipo de perfil (Profissional / Cliente)
+    const handleToggleProfessional = async (clerkId: string, currentIsProfessional: boolean) => {
+        const newIsProfessional = !currentIsProfessional;
+        try {
+            const res = await fetch(`/api/admin/users/${clerkId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isProfessional: newIsProfessional })
+            });
+
+            if (res.ok) {
+                toast.success(newIsProfessional ? 'Usuário promovido a Profissional!' : 'Usuário alterado para Cliente!', {
+                    style: { borderRadius: '12px', background: '#1E293B', color: '#FFF' }
+                });
+                setUsers(prev => prev.map(u => u.clerkId === clerkId ? { ...u, isProfessional: newIsProfessional } : u));
+                setSelectedUserMenu(null);
+            } else {
+                const data = await res.json();
+                toast.error(data.error || 'Erro ao alterar tipo do usuário.');
+            }
+        } catch (err) {
+            console.error('Erro ao atualizar tipo:', err);
+            toast.error('Erro de conexão ao tentar atualizar.');
+        }
+    };
+
+    // Ação: Abrir modal de edição completa
+    const handleOpenEdit = (user: any) => {
+        setEditingUser(user);
+        setEditName(user.name || '');
+        setEditEmail(user.email || '');
+        setEditBalance(user.balance || 0);
+        setEditIsProfessional(user.isProfessional || false);
+        setEditTaxId(user.taxId || '');
+        setEditPhone(user.phone || '');
+        setEditPixKey(user.pixKey || '');
+        setSelectedUserMenu(null);
+    };
+
+    // Ação: Salvar edição completa do usuário
+    const handleSaveEdit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingUser) return;
+        setSaving(true);
+
+        try {
+            const res = await fetch(`/api/admin/users/${editingUser.clerkId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: editName,
+                    email: editEmail,
+                    balance: editBalance,
+                    isProfessional: editIsProfessional,
+                    taxId: editTaxId,
+                    phone: editPhone,
+                    pixKey: editPixKey,
+                })
+            });
+
+            if (res.ok) {
+                toast.success('Usuário atualizado com sucesso!', {
+                    style: { borderRadius: '12px', background: '#1E293B', color: '#FFF' }
+                });
+                setUsers(prev => prev.map(u => u.clerkId === editingUser.clerkId ? {
+                    ...u,
+                    name: editName,
+                    email: editEmail,
+                    balance: editBalance,
+                    isProfessional: editIsProfessional,
+                    taxId: editTaxId,
+                    phone: editPhone,
+                    pixKey: editPixKey,
+                } : u));
+                setEditingUser(null);
+            } else {
+                const data = await res.json();
+                toast.error(data.error || 'Erro ao atualizar usuário.');
+            }
+        } catch (err) {
+            console.error('Erro ao salvar edições:', err);
+            toast.error('Erro de conexão ao salvar.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const getInitials = (name: string) => {
         const parts = name.split(' ');
         if (parts.length >= 2) {
@@ -85,7 +185,7 @@ export function UserTable() {
     };
 
     return (
-        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full">
+        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full relative">
             {/* Título e Ações Superiores */}
             <div className="p-6 border-b border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -93,7 +193,7 @@ export function UserTable() {
                         Gerenciamento de Usuários
                     </h3>
                     <p className="text-xs text-slate-500 font-medium">
-                        Pesquise, filtre e gerencie as contas cadastradas na plataforma.
+                        Pesquise, edite saldos e perfis, ou remova contas cadastradas na base.
                     </p>
                 </div>
 
@@ -103,21 +203,21 @@ export function UserTable() {
                         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                         <input
                             type="text"
-                            placeholder="Buscar nome ou e-mail..."
+                            placeholder="Buscar nome, username ou e-mail..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="w-full pl-10 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 transition-all font-medium placeholder-slate-400 text-slate-700"
                         />
                     </div>
 
-                    {/* Filtro de Status */}
+                    {/* Filtro de Tipo */}
                     <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 w-full sm:w-auto">
-                        {(['Todos', 'Ativo', 'Banido'] as const).map((filter) => (
+                        {(['Todos', 'Cliente', 'Profissional'] as const).map((filter) => (
                             <button
                                 key={filter}
-                                onClick={() => setStatusFilter(filter)}
+                                onClick={() => setRoleFilter(filter)}
                                 className={`flex-1 sm:flex-initial px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-150 ${
-                                    statusFilter === filter
+                                    roleFilter === filter
                                         ? 'bg-white text-purple-600 shadow-sm'
                                         : 'text-slate-500 hover:text-slate-800'
                                 }`}
@@ -131,146 +231,294 @@ export function UserTable() {
 
             {/* Tabela */}
             <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                            <th className="py-4 px-6">Usuário</th>
-                            <th className="py-4 px-6">Tipo</th>
-                            <th className="py-4 px-6">Saldo</th>
-                            <th className="py-4 px-6">Cadastro</th>
-                            <th className="py-4 px-6">Status</th>
-                            <th className="py-4 px-6 text-center">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {filteredUsers.length > 0 ? (
-                            filteredUsers.map((user) => (
-                                <tr key={user.id} className="hover:bg-slate-50/40 transition-colors group">
-                                    {/* Info Usuário */}
-                                    <td className="py-4 px-6">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-sm border border-purple-100">
-                                                {getInitials(user.name)}
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-bold text-slate-800 group-hover:text-purple-600 transition-colors">
-                                                    {user.name}
-                                                </span>
-                                                <span className="text-xs text-slate-400 font-medium flex items-center gap-1 mt-0.5">
-                                                    <Mail size={12} />
-                                                    {user.email}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </td>
-
-                                    {/* Cargo/Tipo */}
-                                    <td className="py-4 px-6">
-                                        <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                                            user.role === 'Profissional'
-                                                ? 'bg-indigo-50 text-indigo-600 border border-indigo-100'
-                                                : 'bg-slate-100 text-slate-600 border border-slate-200'
-                                        }`}>
-                                            {user.role === 'Profissional' && <ShieldCheck size={12} />}
-                                            {user.role}
-                                        </span>
-                                    </td>
-
-                                    {/* Saldo */}
-                                    <td className="py-4 px-6">
-                                        <span className="text-sm font-semibold text-slate-700 flex items-center gap-1">
-                                            <Coins size={14} className="text-amber-500" />
-                                            {user.balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                        </span>
-                                    </td>
-
-                                    {/* Cadastro */}
-                                    <td className="py-4 px-6">
-                                        <span className="text-xs text-slate-500 font-medium flex items-center gap-1">
-                                            <Calendar size={13} className="text-slate-400" />
-                                            {user.createdAt}
-                                        </span>
-                                    </td>
-
-                                    {/* Status */}
-                                    <td className="py-4 px-6">
-                                        <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${
-                                            user.status === 'Ativo'
-                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                                                : 'bg-rose-50 text-rose-700 border border-rose-100'
-                                        }`}>
-                                            <span className={`w-1.5 h-1.5 rounded-full ${user.status === 'Ativo' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                                            {user.status}
-                                        </span>
-                                    </td>
-
-                                    {/* Ações */}
-                                    <td className="py-4 px-6 text-center relative">
-                                        <button
-                                            onClick={() => setSelectedUserMenu(selectedUserMenu === user.id ? null : user.id)}
-                                            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
-                                        >
-                                            <MoreVertical size={16} />
-                                        </button>
-
-                                        {/* Dropdown de Ações */}
-                                        {selectedUserMenu === user.id && (
-                                            <>
-                                                {/* Overlay para fechar */}
-                                                <div 
-                                                    className="fixed inset-0 z-20" 
-                                                    onClick={() => setSelectedUserMenu(null)}
-                                                />
-                                                <div className="absolute right-6 mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-xl z-30 py-1.5 animate-fade-in-up">
-                                                    <button
-                                                        onClick={() => toggleUserStatus(user.id, user.status)}
-                                                        className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-left cursor-pointer transition-colors ${
-                                                            user.status === 'Ativo' 
-                                                                ? 'text-rose-600 hover:bg-rose-50' 
-                                                                : 'text-emerald-600 hover:bg-emerald-50'
-                                                        }`}
-                                                    >
-                                                        {user.status === 'Ativo' ? (
-                                                            <>
-                                                                <Ban size={14} />
-                                                                Banir Usuário
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <CheckCircle size={14} />
-                                                                Ativar Usuário
-                                                            </>
-                                                        )}
-                                                    </button>
+                {loading ? (
+                    <div className="py-20 flex flex-col items-center justify-center gap-3">
+                        <div className="animate-spin h-8 w-8 text-purple-600 rounded-full border-4 border-slate-200 border-t-purple-600" />
+                        <span className="text-sm font-semibold text-slate-500">Buscando contas no banco...</span>
+                    </div>
+                ) : (
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+                                <th className="py-4 px-6">Usuário</th>
+                                <th className="py-4 px-6">Tipo</th>
+                                <th className="py-4 px-6">Saldo</th>
+                                <th className="py-4 px-6">Cadastro</th>
+                                <th className="py-4 px-6 text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {filteredUsers.length > 0 ? (
+                                filteredUsers.map((user) => (
+                                    <tr key={user.clerkId} className="hover:bg-slate-50/40 transition-colors group">
+                                        {/* Info Usuário */}
+                                        <td className="py-4 px-6">
+                                            <div className="flex items-center gap-3">
+                                                {user.photoUrl ? (
+                                                    <img src={user.photoUrl} alt={user.name} className="w-10 h-10 rounded-xl object-cover border border-slate-100 shadow-sm" />
+                                                ) : (
+                                                    <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-sm border border-purple-100">
+                                                        {getInitials(user.name)}
+                                                    </div>
+                                                )}
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-bold text-slate-800 group-hover:text-purple-600 transition-colors">
+                                                        {user.name}
+                                                    </span>
+                                                    <span className="text-xs text-slate-400 font-medium flex items-center gap-1 mt-0.5">
+                                                        <Mail size={12} />
+                                                        {user.email}
+                                                    </span>
                                                 </div>
-                                            </>
-                                        )}
+                                            </div>
+                                        </td>
+
+                                        {/* Cargo/Tipo */}
+                                        <td className="py-4 px-6">
+                                            <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                                                user.isProfessional
+                                                    ? 'bg-indigo-50 text-indigo-600 border border-indigo-100'
+                                                    : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                            }`}>
+                                                {user.isProfessional && <ShieldCheck size={12} />}
+                                                {user.isProfessional ? 'Profissional' : 'Cliente'}
+                                            </span>
+                                        </td>
+
+                                        {/* Saldo */}
+                                        <td className="py-4 px-6">
+                                            <span className="text-sm font-semibold text-slate-700 flex items-center gap-1">
+                                                <Coins size={14} className="text-amber-500" />
+                                                {user.balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                            </span>
+                                        </td>
+
+                                        {/* Cadastro */}
+                                        <td className="py-4 px-6">
+                                            <span className="text-xs text-slate-500 font-medium flex items-center gap-1">
+                                                <Calendar size={13} className="text-slate-400" />
+                                                {user.createdAt}
+                                            </span>
+                                        </td>
+
+                                        {/* Ações */}
+                                        <td className="py-4 px-6 text-center relative">
+                                            <button
+                                                onClick={() => setSelectedUserMenu(selectedUserMenu === user.clerkId ? null : user.clerkId)}
+                                                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
+                                            >
+                                                <MoreVertical size={16} />
+                                            </button>
+
+                                            {/* Dropdown de Ações */}
+                                            {selectedUserMenu === user.clerkId && (
+                                                <>
+                                                    <div 
+                                                        className="fixed inset-0 z-20" 
+                                                        onClick={() => setSelectedUserMenu(null)}
+                                                    />
+                                                    <div className="absolute right-6 mt-1 w-48 bg-white border border-slate-200 rounded-xl shadow-xl z-30 py-1.5 divide-y divide-slate-50 animate-fade-in-up">
+                                                        <div className="py-1">
+                                                            <button
+                                                                onClick={() => handleOpenEdit(user)}
+                                                                className="w-full flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer text-left"
+                                                            >
+                                                                <Edit size={14} className="text-slate-400" />
+                                                                Editar Completo
+                                                            </button>
+
+                                                            <button
+                                                                onClick={() => handleToggleProfessional(user.clerkId, user.isProfessional)}
+                                                                className="w-full flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer text-left"
+                                                            >
+                                                                <UserCheck size={14} className="text-indigo-500" />
+                                                                {user.isProfessional ? 'Tornar Cliente' : 'Tornar Profissional'}
+                                                            </button>
+                                                        </div>
+
+                                                        <div className="py-1">
+                                                            <button
+                                                                onClick={() => handleDeleteUser(user.clerkId, user.name)}
+                                                                className="w-full flex items-center gap-2 px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 cursor-pointer text-left"
+                                                            >
+                                                                <Trash2 size={14} className="text-rose-500" />
+                                                                Excluir Usuário
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={5} className="py-20 text-center text-sm font-semibold text-slate-400">
+                                        Nenhum usuário encontrado na base de dados.
                                     </td>
                                 </tr>
-                            ))
-                        ) : (
-                            <tr>
-                                <td colSpan={6} className="py-12 text-center text-sm font-semibold text-slate-400">
-                                    Nenhum usuário encontrado para esta busca ou filtro.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
+                            )}
+                        </tbody>
+                    </table>
+                )}
             </div>
 
-            {/* Paginação Mockada */}
+            {/* Rodapé / Informações */}
             <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 font-bold bg-slate-50/50 mt-auto">
-                <span>Exibindo {filteredUsers.length} de {users.length} usuários</span>
-                <div className="flex gap-2">
-                    <button disabled className="px-3 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-400 cursor-not-allowed opacity-50 font-bold">
-                        Anterior
-                    </button>
-                    <button disabled className="px-3 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-400 cursor-not-allowed opacity-50 font-bold">
-                        Próxima
-                    </button>
-                </div>
+                <span>Total de registros mostrados: {filteredUsers.length}</span>
+                <span className="text-[10px] text-purple-500 uppercase tracking-widest font-black">MimoAdmin Base Real</span>
             </div>
+
+            {/* Modal de Edição Completa */}
+            {editingUser && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
+                    <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden animate-fade-in-up">
+                        {/* Header Modal */}
+                        <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center font-bold shadow-md shadow-purple-200">
+                                    <Edit size={18} />
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-slate-800 text-base leading-tight">Editar Conta do Usuário</h4>
+                                    <p className="text-xs text-slate-400 font-semibold mt-0.5">Clerk ID: {editingUser.clerkId}</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => setEditingUser(null)}
+                                className="p-1.5 hover:bg-slate-200/60 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Form Body */}
+                        <form onSubmit={handleSaveEdit} className="p-6 space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5 col-span-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Nome do Usuário</label>
+                                    <input 
+                                        type="text" 
+                                        required
+                                        value={editName}
+                                        onChange={(e) => setEditName(e.target.value)}
+                                        className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-bold text-slate-700"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5 col-span-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">E-mail</label>
+                                    <input 
+                                        type="email" 
+                                        required
+                                        value={editEmail}
+                                        onChange={(e) => setEditEmail(e.target.value)}
+                                        className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-bold text-slate-700"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block flex items-center gap-1">
+                                        <Coins size={12} className="text-amber-500" />
+                                        Saldo da Carteira (R$)
+                                    </label>
+                                    <input 
+                                        type="number" 
+                                        step="0.01"
+                                        required
+                                        value={editBalance}
+                                        onChange={(e) => setEditBalance(Number(e.target.value))}
+                                        className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-bold text-slate-700"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block flex items-center gap-1">
+                                        <FileText size={12} className="text-slate-400" />
+                                        CPF/CNPJ
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        value={editTaxId}
+                                        onChange={(e) => setEditTaxId(e.target.value)}
+                                        className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-bold text-slate-700"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block flex items-center gap-1">
+                                        <Phone size={12} className="text-slate-400" />
+                                        Telefone
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        value={editPhone}
+                                        onChange={(e) => setEditPhone(e.target.value)}
+                                        className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-bold text-slate-700"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block flex items-center gap-1">
+                                        <Key size={12} className="text-slate-400" />
+                                        Chave PIX
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        value={editPixKey}
+                                        onChange={(e) => setEditPixKey(e.target.value)}
+                                        className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-bold text-slate-700"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                                <label className="flex items-center gap-2.5 cursor-pointer group">
+                                    <input 
+                                        type="checkbox"
+                                        checked={editIsProfessional}
+                                        onChange={(e) => setEditIsProfessional(e.target.checked)}
+                                        className="accent-purple-600 rounded cursor-pointer w-4 h-4"
+                                    />
+                                    <div>
+                                        <span className="text-xs font-bold text-slate-700 group-hover:text-purple-600 transition-colors block">Perfil Profissional</span>
+                                        <span className="text-[10px] text-slate-400 font-medium block">Pode definir preços por caractere e receber pagamentos.</span>
+                                    </div>
+                                </label>
+                            </div>
+
+                            {/* Footer Modal Actions */}
+                            <div className="pt-6 border-t border-slate-100 flex items-center justify-between gap-3">
+                                <button 
+                                    type="button"
+                                    onClick={() => handleDeleteUser(editingUser.clerkId, editName)}
+                                    className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold rounded-xl border border-rose-100 cursor-pointer transition-colors flex items-center gap-1.5"
+                                >
+                                    <Trash2 size={13} />
+                                    Excluir Conta
+                                </button>
+                                
+                                <div className="flex gap-2">
+                                    <button 
+                                        type="button"
+                                        onClick={() => setEditingUser(null)}
+                                        className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl cursor-pointer transition-colors"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button 
+                                        type="submit"
+                                        disabled={saving}
+                                        className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-lg shadow-purple-600/10"
+                                    >
+                                        {saving ? 'Salvando...' : 'Salvar Alterações'}
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
