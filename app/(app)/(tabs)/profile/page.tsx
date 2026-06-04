@@ -7,7 +7,7 @@ import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { BalanceDisplay } from '@/components/BalanceDisplay';
 import { Avatar } from '@/components/Avatar';
-import { useMyProfile, useUpdateProfile, useUploadPhoto, useMyGallery, useUploadToGallery, usePendingWithdrawal, useRequestWithdraw } from '@/hooks/useQueries';
+import { useMyProfile, useUpdateProfile, useUploadPhoto, useMyGallery, useUploadToGallery, usePendingWithdrawal, useRequestWithdraw, useDeleteFromGallery } from '@/hooks/useQueries';
 import { usePayment } from '@/context/PaymentContext';
 import { usePWA } from '@/context/PWAContext';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -30,6 +30,7 @@ export default function ProfilePage() {
     const galleryInputRef = useRef<HTMLInputElement>(null);
     const { data: galleryData } = useMyGallery();
     const uploadGalleryMutation = useUploadToGallery();
+    const deleteGalleryMutation = useDeleteFromGallery();
 
     const { data: userData, isLoading: loadingProfile, isFetching, refetch: refetchProfile } = useMyProfile();
     const updateProfileMutation = useUpdateProfile();
@@ -45,6 +46,11 @@ export default function ProfilePage() {
     const [pixKey, setPixKey] = useState('');
     const [pixModalOpen, setPixModalOpen] = useState(false);
     const [withdrawConfirmModalOpen, setWithdrawConfirmModalOpen] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isAboutExpanded, setIsAboutExpanded] = useState(false);
+    const [subscriptionPrice, setSubscriptionPrice] = useState('');
+    const [chargePerCharSubscribers, setChargePerCharSubscribers] = useState('');
+    const [chargePerCharNonSubscribers, setChargePerCharNonSubscribers] = useState('');
 
     const { data: pendingWithdrawal } = usePendingWithdrawal();
     const requestWithdrawMutation = useRequestWithdraw();
@@ -64,6 +70,9 @@ export default function ProfilePage() {
             setPhone(userData.phone ? formatPhone(userData.phone) : '');
             setIsProfessional(!!userData.isProfessional);
             setPixKey(userData.pixKey || '');
+            setSubscriptionPrice(userData.subscriptionPrice?.toString() ?? '0');
+            setChargePerCharSubscribers(userData.chargePerCharSubscribers?.toString() ?? '0.002');
+            setChargePerCharNonSubscribers(userData.chargePerCharNonSubscribers?.toString() ?? '0.005');
             if (userData.photoUrl) setLocalPhotoUrl(userData.photoUrl);
             hasPopulatedFromCache.current = true;
         } else if (userData) {
@@ -73,6 +82,9 @@ export default function ProfilePage() {
             if (userData.taxId && !taxId) setTaxId(formatCPF(userData.taxId));
             if (userData.phone && !phone) setPhone(formatPhone(userData.phone));
             if (userData.pixKey && !pixKey) setPixKey(userData.pixKey);
+            if (userData.subscriptionPrice !== undefined && !subscriptionPrice) setSubscriptionPrice(userData.subscriptionPrice.toString());
+            if (userData.chargePerCharSubscribers !== undefined && !chargePerCharSubscribers) setChargePerCharSubscribers(userData.chargePerCharSubscribers.toString());
+            if (userData.chargePerCharNonSubscribers !== undefined && !chargePerCharNonSubscribers) setChargePerCharNonSubscribers(userData.chargePerCharNonSubscribers.toString());
         }
     }, [userData]);
 
@@ -107,6 +119,12 @@ export default function ProfilePage() {
                 phone: phone.replace(/\D/g, ''),
                 pixKey: pixKey
             };
+
+            if (isProfessional) {
+                updateData.subscriptionPrice = Number(subscriptionPrice) || 0;
+                updateData.chargePerCharSubscribers = Number(chargePerCharSubscribers) || 0;
+                updateData.chargePerCharNonSubscribers = Number(chargePerCharNonSubscribers) || 0;
+            }
             
             await updateProfileMutation.mutateAsync(updateData);
             setSaveSuccess(true);
@@ -119,6 +137,15 @@ export default function ProfilePage() {
             }
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDeleteGalleryItem = async (itemId: string) => {
+        if (!confirm('Tem certeza que deseja remover esta foto da sua galeria?')) return;
+        try {
+            await deleteGalleryMutation.mutateAsync(itemId);
+        } catch (error: any) {
+            alert(error.message || 'Erro ao deletar foto');
         }
     };
 
@@ -199,15 +226,26 @@ export default function ProfilePage() {
                     <h1 className="text-2xl font-black text-white tracking-tighter">Mimo</h1>
                     <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">Perfil</span>
                 </div>
-                {isFetching && !loadingProfile && (
-                    <div className="flex items-center gap-2">
-                        <svg className="animate-spin h-4 w-4 text-white/70" viewBox="0 0 24 24" fill="none">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                <div className="flex items-center gap-3">
+                    {isFetching && !loadingProfile && (
+                        <div className="flex items-center gap-2">
+                            <svg className="animate-spin h-4 w-4 text-white/70" viewBox="0 0 24 24" fill="none">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                        </div>
+                    )}
+                    <button
+                        onClick={() => setIsSettingsOpen(true)}
+                        className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center"
+                        title="Configurações"
+                    >
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="3" />
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                         </svg>
-                        <span className="text-xs text-white/70 font-medium">Atualizando...</span>
-                    </div>
-                )}
+                    </button>
+                </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 pb-20 md:pb-4 flex flex-col gap-4">
@@ -243,6 +281,11 @@ export default function ProfilePage() {
                         {userData?.name || userData?.username || user?.username || ''}
                     </p>
                     <p className="text-sm text-gray-400">@{userData?.username || ''}</p>
+                    {isProfessional && (
+                        <span className="mt-2 inline-flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
+                            ⭐ Profissional
+                        </span>
+                    )}
                 </div>
 
                 {/* Balance Card - Discreet */}
@@ -307,114 +350,6 @@ export default function ProfilePage() {
                     )}
                 </div>
 
-                {/* Settings */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-4">
-                    <h2 className="text-base font-bold text-gray-900">Configurações</h2>
-
-                    <Input
-                        label="Nome de Exibição"
-                        placeholder="Seu nome real ou apelido"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                    />
-
-                    <Input
-                        label="Username"
-                        placeholder="@username"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        autoCapitalize="none"
-                    />
-
-                    <Input
-                        label="CPF"
-                        placeholder="000.000.000-00"
-                        value={taxId}
-                        onChange={(e) => setTaxId(formatCPF(e.target.value))}
-                        maxLength={14}
-                        type="text"
-                    />
-
-                    <Input
-                        label="WhatsApp / Telefone"
-                        placeholder="(00) 00000-0000"
-                        value={phone}
-                        onChange={(e) => setPhone(formatPhone(e.target.value))}
-                        maxLength={15}
-                        type="tel"
-                    />
-
-
-
-
-                    {saveError && (
-                        <p className="text-sm text-red-500">{saveError}</p>
-                    )}
-                    {saveSuccess && (
-                        <p className="text-sm text-green-600 font-medium">✓ Perfil atualizado com sucesso!</p>
-                    )}
-
-                    <Button
-                        title="Salvar Alterações"
-                        onPress={handleSaveAll}
-                        loading={loading}
-                        size="md"
-                        className="w-full"
-                    />
-                </div>
-
-                {/* Push Notifications Card */}
-                {mounted && (
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-xl text-purple-700 font-bold shrink-0">
-                                🔔
-                            </div>
-                            <div>
-                                <h2 className="text-base font-bold text-gray-900">Notificações no Celular</h2>
-                                <p className="text-xs text-gray-500 leading-snug">
-                                    {notificationPermission === 'granted'
-                                        ? 'Ativadas para este dispositivo.'
-                                        : notificationPermission === 'denied'
-                                            ? 'Bloqueadas nas configurações do seu navegador.'
-                                            : 'Receba alertas de novas mensagens em tempo real.'}
-                                </p>
-                            </div>
-                        </div>
-                        {notificationPermission !== 'granted' && (
-                            <Button
-                                title={notificationPermission === 'denied' ? "Como Desbloquear" : "Ativar Notificações"}
-                                onPress={notificationPermission === 'denied'
-                                    ? () => alert('Acesse as configurações do seu navegador ou celular, procure as permissões de notificação deste site e marque como "Permitir".')
-                                    : handleRequestPermission}
-                                size="md"
-                                className="w-full bg-purple-600 hover:bg-purple-700 shadow-md !text-white"
-                            />
-                        )}
-                    </div>
-                )}
-
-                {/* PWA Install Button */}
-                {mounted && isInstallable && !isStandalone && (
-                    <div className="bg-gradient-to-br from-purple-50 to-white border border-purple-100 rounded-2xl p-5 flex flex-col gap-3 shadow-sm">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center text-xl shadow-sm text-white">
-                                📲
-                            </div>
-                            <div>
-                                <h2 className="text-base font-bold text-gray-900">Aplicativo Mimo</h2>
-                                <p className="text-xs text-gray-500">Instale para ter acesso rápido e notificações</p>
-                            </div>
-                        </div>
-                        <Button
-                            title="Instalar Agora"
-                            onPress={promptInstall}
-                            size="md"
-                            className="w-full bg-purple-600 hover:bg-purple-700 shadow-md !text-white"
-                        />
-                    </div>
-                )}
-
                 {/* Gallery Section */}
                 {isProfessional && (
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-4">
@@ -452,33 +387,262 @@ export default function ProfilePage() {
                                         <div className="absolute top-1 right-1 px-1.5 py-0.5 rounded-md bg-black/50 text-[10px] text-white">
                                             {item.visibility === 'public' ? 'Pública' : 'Assinantes'}
                                         </div>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteGalleryItem(item._id);
+                                            }}
+                                            disabled={deleteGalleryMutation.isPending}
+                                            className="absolute bottom-1 right-1 p-1 rounded-md bg-red-600/80 hover:bg-red-600 text-white transition-colors"
+                                            title="Excluir foto"
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="3 6 5 6 21 6" />
+                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                            </svg>
+                                        </button>
                                     </div>
                                 ))}
                             </div>
                         )}
                     </div>
                 )}
-
-                {/* About */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3">
-                    <h2 className="text-base font-bold text-gray-900">Sobre</h2>
-                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                        <span className="text-sm text-gray-500">Versão</span>
-                        <span className="text-sm font-medium text-gray-800">1.0.0</span>
-                    </div>
-                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                        <span className="text-sm text-gray-500">ID do Usuário</span>
-                        <span className="text-sm font-medium text-gray-800 font-mono">{user?.id?.substring(0, 12)}...</span>
-                    </div>
-                    <Button
-                        title="Sair da Conta"
-                        onPress={handleLogout}
-                        variant="outline"
-                        size="md"
-                        className="w-full mt-1 !border-red-400 !text-red-500 hover:!bg-red-50"
-                    />
-                </div>
             </div>
+
+            {/* Configurações Overlay */}
+            {isSettingsOpen && (
+                <div className="fixed inset-0 z-50 bg-gray-50 flex flex-col overflow-y-auto pb-16 md:pb-4 animate-in slide-in-from-right duration-200">
+                    {/* Header Config */}
+                    <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center gap-3 z-10 sticky top-0 shadow-md">
+                        <button
+                            onClick={() => {
+                                setIsSettingsOpen(false);
+                                setSaveError('');
+                                setSaveSuccess(false);
+                            }}
+                            className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-colors text-white mr-1 flex items-center justify-center"
+                            title="Voltar"
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="19" y1="12" x2="5" y2="12" />
+                                <polyline points="12 19 5 12 12 5" />
+                            </svg>
+                        </button>
+                        <h1 className="text-xl font-bold text-white">Configurações</h1>
+                    </div>
+
+                    <div className="p-4 flex flex-col gap-4">
+                        {/* Dados Pessoais */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-4">
+                            <h2 className="text-base font-bold text-gray-900 border-b border-gray-100 pb-2">Dados Gerais</h2>
+                            
+                            <Input
+                                label="Nome de Exibição"
+                                placeholder="Seu nome real ou apelido"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                            />
+
+                            <Input
+                                label="Username"
+                                placeholder="@username"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                autoCapitalize="none"
+                            />
+
+                            <Input
+                                label="CPF"
+                                placeholder="000.000.000-00"
+                                value={taxId}
+                                onChange={(e) => setTaxId(formatCPF(e.target.value))}
+                                maxLength={14}
+                                type="text"
+                            />
+
+                            <Input
+                                label="WhatsApp / Telefone"
+                                placeholder="(00) 00000-0000"
+                                value={phone}
+                                onChange={(e) => setPhone(formatPhone(e.target.value))}
+                                maxLength={15}
+                                type="tel"
+                            />
+                        </div>
+
+                        {/* Configurações Profissionais */}
+                        {isProfessional && (
+                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-4">
+                                <h2 className="text-base font-bold text-gray-900 border-b border-gray-100 pb-2">Preços e Ganhos</h2>
+
+                                <Input
+                                    label="Preço da Assinatura Mensal (R$)"
+                                    placeholder="0.00"
+                                    value={subscriptionPrice}
+                                    onChange={(e) => setSubscriptionPrice(e.target.value)}
+                                    type="number"
+                                    step="0.01"
+                                />
+
+                                <div className="flex flex-col gap-1">
+                                    <Input
+                                        label="Valor por caractere (Assinantes) em R$"
+                                        placeholder="0.002"
+                                        value={chargePerCharSubscribers}
+                                        onChange={(e) => setChargePerCharSubscribers(e.target.value)}
+                                        type="number"
+                                        step="0.0001"
+                                    />
+                                    {chargePerCharSubscribers && !isNaN(Number(chargePerCharSubscribers)) && (
+                                        <span className="text-[11px] text-gray-500 italic px-1">
+                                            💡 Uma mensagem de 100 caracteres custará <strong>
+                                                {(Number(chargePerCharSubscribers) * 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })}
+                                            </strong> para seus assinantes.
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="flex flex-col gap-1">
+                                    <Input
+                                        label="Valor por caractere (Não Assinantes) em R$"
+                                        placeholder="0.005"
+                                        value={chargePerCharNonSubscribers}
+                                        onChange={(e) => setChargePerCharNonSubscribers(e.target.value)}
+                                        type="number"
+                                        step="0.0001"
+                                    />
+                                    {chargePerCharNonSubscribers && !isNaN(Number(chargePerCharNonSubscribers)) && (
+                                        <span className="text-[11px] text-gray-500 italic px-1">
+                                            💡 Uma mensagem de 100 caracteres custará <strong>
+                                                {(Number(chargePerCharNonSubscribers) * 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })}
+                                            </strong> para não assinantes.
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Push Notifications Card */}
+                        {mounted && (
+                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-xl text-purple-700 font-bold shrink-0">
+                                        🔔
+                                    </div>
+                                    <div>
+                                        <h2 className="text-base font-bold text-gray-900">Notificações no Celular</h2>
+                                        <p className="text-xs text-gray-500 leading-snug">
+                                            {notificationPermission === 'granted'
+                                                ? 'Ativadas para este dispositivo.'
+                                                : notificationPermission === 'denied'
+                                                    ? 'Bloqueadas nas configurações do seu navegador.'
+                                                    : 'Receba alertas de novas mensagens em tempo real.'}
+                                        </p>
+                                    </div>
+                                </div>
+                                {notificationPermission !== 'granted' && (
+                                    <Button
+                                        title={notificationPermission === 'denied' ? "Como Desbloquear" : "Ativar Notificações"}
+                                        onPress={notificationPermission === 'denied'
+                                            ? () => alert('Acesse as configurações do seu navegador ou celular, procure as permissões de notificação deste site e marque como "Permitir".')
+                                            : handleRequestPermission}
+                                        size="md"
+                                        className="w-full bg-purple-600 hover:bg-purple-700 shadow-md !text-white"
+                                    />
+                                )}
+                            </div>
+                        )}
+
+                        {/* PWA Install Button */}
+                        {mounted && isInstallable && !isStandalone && (
+                            <div className="bg-gradient-to-br from-purple-50 to-white border border-purple-100 rounded-2xl p-5 flex flex-col gap-3 shadow-sm">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center text-xl shadow-sm text-white">
+                                        📲
+                                    </div>
+                                    <div>
+                                        <h2 className="text-base font-bold text-gray-900">Aplicativo Mimo</h2>
+                                        <p className="text-xs text-gray-500">Instale para ter acesso rápido e notificações</p>
+                                    </div>
+                                </div>
+                                <Button
+                                    title="Instalar Agora"
+                                    onPress={promptInstall}
+                                    size="md"
+                                    className="w-full bg-purple-600 hover:bg-purple-700 shadow-md !text-white"
+                                />
+                            </div>
+                        )}
+
+                        {/* Accordion Sobre o Mimo */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3">
+                            <button
+                                onClick={() => setIsAboutExpanded(!isAboutExpanded)}
+                                className="flex items-center justify-between w-full text-left font-bold text-gray-900 focus:outline-none"
+                            >
+                                <span>Sobre o Mimo</span>
+                                <span className="text-gray-400 transition-transform duration-200" style={{ transform: isAboutExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                                    ▼
+                                </span>
+                            </button>
+                            {isAboutExpanded && (
+                                <div className="flex flex-col gap-3 mt-2 border-t border-gray-100 pt-3 text-sm animate-in fade-in slide-in-from-top-2 duration-200">
+                                    <div className="flex items-center justify-between py-1">
+                                        <span className="text-gray-500">Versão</span>
+                                        <span className="font-medium text-gray-800">1.0.0</span>
+                                    </div>
+                                    <div className="flex items-center justify-between py-1">
+                                        <span className="text-gray-500">ID do Usuário</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-medium text-gray-800 font-mono text-[11px] truncate max-w-[150px]">{user?.id}</span>
+                                            <button
+                                                onClick={() => {
+                                                    if (user?.id) {
+                                                        navigator.clipboard.writeText(user.id);
+                                                        alert('ID copiado para a área de transferência!');
+                                                    }
+                                                }}
+                                                className="text-xs text-purple-600 hover:text-purple-700 font-semibold"
+                                            >
+                                                Copiar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Botão de Salvar Alterações e Logs */}
+                        <div className="mt-2 flex flex-col gap-2">
+                            {saveError && (
+                                <p className="text-sm text-red-500">{saveError}</p>
+                            )}
+                            {saveSuccess && (
+                                <p className="text-sm text-green-600 font-medium">✓ Perfil atualizado com sucesso!</p>
+                            )}
+
+                            <Button
+                                title="Salvar Alterações"
+                                onPress={handleSaveAll}
+                                loading={loading}
+                                size="md"
+                                className="w-full bg-purple-600 hover:bg-purple-700 shadow-md !text-white"
+                            />
+                        </div>
+
+                        {/* Logout no fim */}
+                        <div className="mt-4">
+                            <Button
+                                title="Sair da Conta"
+                                onPress={handleLogout}
+                                variant="outline"
+                                size="md"
+                                className="w-full !border-red-400 !text-red-500 hover:!bg-red-50"
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Visibility Selection Modal */}
             {visibilityModal.open && (

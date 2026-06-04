@@ -319,6 +319,25 @@ export function useUploadToGallery() {
     });
 }
 
+export function useDeleteFromGallery() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (itemId: string) => {
+            const response = await fetch(`/api/users/me/gallery?itemId=${itemId}`, {
+                method: 'DELETE',
+            });
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Erro ao deletar imagem');
+            }
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['gallery', 'me'] });
+        },
+    });
+}
+
 export function useSubscribe() {
     const queryClient = useQueryClient();
     return useMutation({

@@ -77,3 +77,34 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }
+
+export async function DELETE(request: NextRequest) {
+    try {
+        const { userId } = await auth();
+
+        if (!userId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const { searchParams } = new URL(request.url);
+        const itemId = searchParams.get('itemId');
+
+        if (!itemId) {
+            return NextResponse.json({ error: 'ID do item é obrigatório' }, { status: 400 });
+        }
+
+        await connectToDatabase();
+
+        const deletedItem = await GalleryItem.findOneAndDelete({ _id: itemId, ownerId: userId });
+
+        if (!deletedItem) {
+            return NextResponse.json({ error: 'Item não encontrado ou você não tem permissão' }, { status: 404 });
+        }
+
+        return NextResponse.json({ success: true, message: 'Item removido com sucesso' });
+    } catch (error: any) {
+        console.error('Error deleting from gallery:', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
+}
+

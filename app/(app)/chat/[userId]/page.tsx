@@ -71,6 +71,49 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
     const [unlocking, setUnlocking] = useState(false);
     const [isLeaving, setIsLeaving] = useState(false);
     const [useNativeTransition, setUseNativeTransition] = useState(false);
+    const [viewportStyle, setViewportStyle] = useState<React.CSSProperties>({});
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || !window.visualViewport) return;
+
+        const handleResize = () => {
+            requestAnimationFrame(() => {
+                const vv = window.visualViewport;
+                if (!vv) return;
+
+                setViewportStyle({
+                    height: `${vv.height}px`,
+                    transform: `translateY(${vv.offsetTop}px)`,
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                });
+            });
+        };
+
+        window.visualViewport.addEventListener('resize', handleResize);
+        window.visualViewport.addEventListener('scroll', handleResize);
+        
+        // Execute immediately
+        handleResize();
+
+        // Extra fallback to ensure it runs a little bit after focus events to handle keyboard animations
+        const handleFocus = () => {
+            setTimeout(handleResize, 100);
+            setTimeout(handleResize, 300);
+        };
+        
+        document.addEventListener('focusin', handleFocus);
+        document.addEventListener('focusout', handleFocus);
+
+        return () => {
+            window.visualViewport?.removeEventListener('resize', handleResize);
+            window.visualViewport?.removeEventListener('scroll', handleResize);
+            document.removeEventListener('focusin', handleFocus);
+            document.removeEventListener('focusout', handleFocus);
+        };
+    }, []);
 
     useEffect(() => {
         if (typeof document !== 'undefined' && 'startViewTransition' in document) {
@@ -752,7 +795,10 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
         : (isClosingOrLeaving ? 'animate-android-slide-out' : 'animate-android-slide-in');
 
     return (
-        <div className={`flex flex-col bg-gray-50 overflow-hidden ${layoutClass} ${animationClass}`}>
+        <div 
+            className={`flex flex-col bg-gray-50 overflow-hidden ${layoutClass} ${animationClass}`}
+            style={viewportStyle}
+        >
             {/* Header */}
             <div className="shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 z-20 sticky top-0 shadow-md flex items-center gap-2">
                 {selectedMessageIds.size > 0 ? (
