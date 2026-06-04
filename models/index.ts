@@ -12,3 +12,7 @@ export type { ITransaction } from './Transaction';
 
 export { GalleryItem } from './GalleryItem';
 export type { IGalleryItem } from './GalleryItem';
+
+export { AppSettings } from './AppSettings';
+export type { IAppSettings } from './AppSettings';
+

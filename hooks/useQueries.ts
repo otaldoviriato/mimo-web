@@ -248,6 +248,32 @@ export function useUserById(userId: string | undefined) {
     return query;
 }
 
+export function useUserByUsername(username: string | undefined) {
+    const queryClient = useQueryClient();
+
+    const query = useQuery({
+        queryKey: ['user', 'username', username ?? ''],
+        queryFn: async () => {
+            if (!username) return null;
+            try {
+                const data = await userApi.getUserByUsername(username);
+                const fetchedUser = data.user ?? null;
+                if (typeof window !== 'undefined' && fetchedUser) {
+                    localStorage.setItem(`mimo_user_${fetchedUser.clerkId}`, JSON.stringify(fetchedUser));
+                    queryClient.setQueryData(QueryKeys.userById(fetchedUser.clerkId), fetchedUser);
+                }
+                return fetchedUser;
+            } catch {
+                return null;
+            }
+        },
+        enabled: !!username,
+        staleTime: 2 * 60 * 1000,
+    });
+
+    return query;
+}
+
 // ─── Galeria ─────────────────────────────────────────────────────────────
 export function useMyGallery() {
     return useQuery({

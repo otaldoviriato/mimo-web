@@ -80,6 +80,11 @@ export const userApi = {
         return response.data;
     },
 
+    getUserByUsername: async (username: string) => {
+        const response = await api.get(`/api/users/username/${encodeURIComponent(username)}`);
+        return response.data;
+    },
+
     uploadPhoto: async (formData: FormData) => {
         const response = await api.post('/api/users/me/photo', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },

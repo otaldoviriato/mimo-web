@@ -3,8 +3,8 @@ import type { NextConfig } from "next";
 import fs from 'fs';
 import path from 'path';
 
-const allowedOrigins = ['192.168.1.4:3000'];
-const allowedDevOrigins = ['192.168.1.4'];
+const allowedOrigins = ['192.168.1.7:3000'];
+const allowedDevOrigins = ['192.168.1.7'];
 
 try {
     const logPath = path.resolve(process.cwd(), '../ngrok_capture.log');

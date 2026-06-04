@@ -26,9 +26,7 @@ export async function GET(request: NextRequest) {
 
         await connectToDatabase();
 
-        // Busca o próprio usuário para saber seu isProfessional
-        const me = await User.findOne({ clerkId: userId }).select('isProfessional').lean() as any;
-        const myIsProfessional = me?.isProfessional ?? false;
+
 
         const foundUsers = await User.find({
             $or: [
@@ -36,8 +34,7 @@ export async function GET(request: NextRequest) {
                 { name: { $regex: new RegExp(cleanQuery, 'i') } }
             ],
             clerkId: { $ne: userId },
-            // Removido o filtro estrito de isProfessional aqui para permitir que a busca encontre o usuário,
-            // mesmo que eles tenham o mesmo status. A incompatibilidade será tratada na navegação/chat.
+            isProfessional: true, // Busca retorna apenas perfis profissionais
         }).select('clerkId username name email photoUrl isProfessional subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers').limit(20).lean() as any[];
 
         if (!foundUsers || foundUsers.length === 0) {

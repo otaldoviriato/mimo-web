@@ -42,9 +42,6 @@ export default function ProfilePage() {
     const [localPhotoUrl, setLocalPhotoUrl] = useState<string | undefined>(undefined);
     const [loading, setLoading] = useState(false);
     const [isProfessional, setIsProfessional] = useState(false);
-    const [subscriptionPrice, setSubscriptionPrice] = useState('0');
-    const [chargePerCharSubscribers, setChargePerCharSubscribers] = useState('0.002');
-    const [chargePerCharNonSubscribers, setChargePerCharNonSubscribers] = useState('0.005');
     const [pixKey, setPixKey] = useState('');
     const [pixModalOpen, setPixModalOpen] = useState(false);
     const [withdrawConfirmModalOpen, setWithdrawConfirmModalOpen] = useState(false);
@@ -66,9 +63,6 @@ export default function ProfilePage() {
             setTaxId(userData.taxId ? formatCPF(userData.taxId) : '');
             setPhone(userData.phone ? formatPhone(userData.phone) : '');
             setIsProfessional(!!userData.isProfessional);
-            setSubscriptionPrice((userData.subscriptionPrice || 0).toString());
-            setChargePerCharSubscribers((userData.chargePerCharSubscribers || 0.002).toString());
-            setChargePerCharNonSubscribers((userData.chargePerCharNonSubscribers || 0.005).toString());
             setPixKey(userData.pixKey || '');
             if (userData.photoUrl) setLocalPhotoUrl(userData.photoUrl);
             hasPopulatedFromCache.current = true;
@@ -101,14 +95,6 @@ export default function ProfilePage() {
     };
 
     const handleSaveAll = async () => {
-        const parsedSubRate = parseFloat(chargePerCharSubscribers);
-        const parsedNonSubRate = parseFloat(chargePerCharNonSubscribers);
-        
-        if (isProfessional && (isNaN(parsedSubRate) || parsedSubRate < 0 || isNaN(parsedNonSubRate) || parsedNonSubRate < 0)) {
-            setSaveError('Insira valores válidos para as tarifas por caractere.');
-            return;
-        }
-
         setLoading(true);
         setSaveError('');
         setSaveSuccess(false);
@@ -119,9 +105,6 @@ export default function ProfilePage() {
                 username, 
                 taxId: taxId.replace(/\D/g, ''), 
                 phone: phone.replace(/\D/g, ''),
-                subscriptionPrice: parseFloat(subscriptionPrice) || 0,
-                chargePerCharSubscribers: parsedSubRate,
-                chargePerCharNonSubscribers: parsedNonSubRate,
                 pixKey: pixKey
             };
             
@@ -139,20 +122,7 @@ export default function ProfilePage() {
         }
     };
 
-    const handleIsProfessionalToggle = async () => {
-        const newValue = !isProfessional;
-        if (confirm(`Ao tornar seu perfil ${newValue ? 'profissional' : 'comum'}, todas as suas conversas atuais serão excluídas para garantir a integridade da cobrança. Deseja continuar?`)) {
-            setLoading(true);
-            try {
-                await updateProfileMutation.mutateAsync({ isProfessional: newValue });
-                setIsProfessional(newValue);
-            } catch (error: any) {
-                setSaveError(error.response?.data?.error || 'Erro ao alterar status profissional');
-            } finally {
-                setLoading(false);
-            }
-        }
-    };
+
 
 
     const handleLogout = async () => {
@@ -374,56 +344,7 @@ export default function ProfilePage() {
                         type="tel"
                     />
 
-                    {/* Professional toggle */}
-                    <div className="flex items-center justify-between py-3 border-t border-gray-100">
-                        <div className="flex-1 mr-4">
-                            <p className="text-sm font-medium text-gray-900">Perfil Profissional</p>
-                            <p className="text-xs text-gray-500 mt-0.5">Ative para aceitar assinantes e conteúdos exclusivos</p>
-                        </div>
-                        <button
-                            onClick={handleIsProfessionalToggle}
-                            disabled={loading}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${isProfessional ? 'bg-purple-600' : 'bg-gray-300'}`}
-                        >
-                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${isProfessional ? 'translate-x-6' : 'translate-x-1'}`} />
-                        </button>
-                    </div>
 
-                    {isProfessional && (
-                        <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 flex flex-col gap-4">
-                             <Input
-                                label="Valor da Assinatura Mensal (R$)"
-                                placeholder="49.90"
-                                value={subscriptionPrice}
-                                onChange={(e) => setSubscriptionPrice(e.target.value)}
-                                type="number"
-                                step="0.01"
-                            />
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <Input
-                                    label="Tarifa Assinantes"
-                                    placeholder="0.002"
-                                    value={chargePerCharSubscribers}
-                                    onChange={(e) => setChargePerCharSubscribers(e.target.value)}
-                                    type="number"
-                                    step="0.001"
-                                />
-                                <Input
-                                    label="Tarifa Público"
-                                    placeholder="0.005"
-                                    value={chargePerCharNonSubscribers}
-                                    onChange={(e) => setChargePerCharNonSubscribers(e.target.value)}
-                                    type="number"
-                                    step="0.001"
-                                />
-                            </div>
-                            
-                            <p className="text-[10px] text-purple-700 leading-tight">
-                                💡 Tarifa por caractere. Recomendado: Público R$ 0,005 / Assinantes R$ 0,002.
-                            </p>
-                        </div>
-                    )}
 
 
                     {saveError && (

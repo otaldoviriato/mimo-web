@@ -802,7 +802,7 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                             </svg>
                         </button>
                         <button 
-                            onClick={() => otherUserId && router.push(`/user/${otherUserId}`)}
+                            onClick={() => receiver?.username && router.push(`/${receiver.username}`)}
                             className="flex-1 flex items-center gap-2 min-w-0 text-left py-0.5"
                         >
                             <div className="relative shrink-0">
