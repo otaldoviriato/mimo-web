@@ -17,6 +17,7 @@ async function getOrCreateSettings() {
             autoModeration: true,
             professionalsOnlyCreateRooms: false,
             adminClerkIds: [FALLBACK_ADMIN],
+            comparisonPeriod: 'none',
         });
     }
     return settings;
@@ -99,7 +100,8 @@ export async function PUT(request: NextRequest) {
             uploadLimitMB, 
             autoModeration, 
             professionalsOnlyCreateRooms, 
-            adminClerkIds 
+            adminClerkIds,
+            comparisonPeriod
         } = body;
 
         // Validações básicas
@@ -125,6 +127,13 @@ export async function PUT(request: NextRequest) {
 
         if (professionalsOnlyCreateRooms !== undefined) {
             settings.professionalsOnlyCreateRooms = Boolean(professionalsOnlyCreateRooms);
+        }
+
+        if (comparisonPeriod !== undefined) {
+            if (!['none', 'week', 'month'].includes(comparisonPeriod)) {
+                return NextResponse.json({ error: 'Período comparativo inválido' }, { status: 400 });
+            }
+            settings.comparisonPeriod = comparisonPeriod;
         }
 
         if (adminClerkIds !== undefined) {

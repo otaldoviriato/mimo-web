@@ -120,7 +120,7 @@ export function UserTable() {
         setEditingUser(user);
         setEditName(user.name || '');
         setEditEmail(user.email || '');
-        setEditBalance(user.balance || 0);
+        setEditBalance((user.balance || 0) / 100);
         setEditIsProfessional(user.isProfessional || false);
         setEditTaxId(user.taxId || '');
         setEditPhone(user.phone || '');
@@ -141,7 +141,7 @@ export function UserTable() {
                 body: JSON.stringify({
                     name: editName,
                     email: editEmail,
-                    balance: editBalance,
+                    balance: editBalance * 100,
                     isProfessional: editIsProfessional,
                     taxId: editTaxId,
                     phone: editPhone,
@@ -157,7 +157,7 @@ export function UserTable() {
                     ...u,
                     name: editName,
                     email: editEmail,
-                    balance: editBalance,
+                    balance: editBalance * 100,
                     isProfessional: editIsProfessional,
                     taxId: editTaxId,
                     phone: editPhone,
@@ -289,7 +289,7 @@ export function UserTable() {
                                         <td className="py-4 px-6">
                                             <span className="text-sm font-semibold text-slate-700 flex items-center gap-1">
                                                 <Coins size={14} className="text-amber-500" />
-                                                {user.balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                {((user.balance || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                             </span>
                                         </td>
 

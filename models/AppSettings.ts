@@ -7,6 +7,7 @@ export interface IAppSettings extends Document {
     autoModeration: boolean;
     professionalsOnlyCreateRooms: boolean;
     adminClerkIds: string[];
+    comparisonPeriod: 'none' | 'week' | 'month';
     createdAt: Date;
     updatedAt: Date;
 }
@@ -46,6 +47,11 @@ const AppSettingsSchema = new Schema<IAppSettings>({
         type: [String],
         required: true,
         default: ['user_39WqqlzJvRKuC6Xhp9ToiGmBFNM'],
+    },
+    comparisonPeriod: {
+        type: String,
+        enum: ['none', 'week', 'month'],
+        default: 'none',
     },
 }, {
     timestamps: true,

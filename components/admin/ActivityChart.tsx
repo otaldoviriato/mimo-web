@@ -9,7 +9,7 @@ interface DataPoint {
     users: number;
 }
 
-const data: DataPoint[] = [
+const defaultData: DataPoint[] = [
     { label: 'Seg', messages: 4200, users: 95 },
     { label: 'Ter', messages: 5100, users: 120 },
     { label: 'Qua', messages: 4800, users: 105 },
@@ -19,7 +19,7 @@ const data: DataPoint[] = [
     { label: 'Dom', messages: 8200, users: 215 },
 ];
 
-export function ActivityChart() {
+export function ActivityChart({ data = defaultData }: { data?: DataPoint[] }) {
     const [activeMetric, setActiveMetric] = useState<'messages' | 'users'>('messages');
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 

@@ -38,16 +38,17 @@ interface SettingsData {
     autoModeration: boolean;
     professionalsOnlyCreateRooms: boolean;
     adminClerkIds: string[];
+    comparisonPeriod: 'none' | 'week' | 'month';
 }
 
-interface ChatMessageMock {
+interface ChatMessage {
     sender: string;
     text: string;
     time: string;
     cost: number;
 }
 
-interface ChatMock {
+interface ChatRoom {
     id: string;
     userA: { name: string; email: string; clerkId: string };
     userB: { name: string; email: string; clerkId: string };
@@ -55,7 +56,7 @@ interface ChatMock {
     lastMessage: string;
     time: string;
     totalRevenue: number;
-    history: ChatMessageMock[];
+    history: ChatMessage[];
 }
 
 interface RichAdmin {
@@ -80,6 +81,7 @@ export default function AdminPage() {
     const [uploadLimit, setUploadLimit] = useState(50);
     const [autoModeration, setAutoModeration] = useState(true);
     const [professionalsOnly, setProfessionalsOnly] = useState(false);
+    const [comparisonPeriod, setComparisonPeriod] = useState<'none' | 'week' | 'month'>('none');
     const [saving, setSaving] = useState(false);
 
     // Estados de Gerenciamento de Administradores Ricos
@@ -92,7 +94,7 @@ export default function AdminPage() {
     const [searchingAdmin, setSearchingAdmin] = useState(false);
 
     // Estado do Modal de Auditoria de Conversa
-    const [selectedAuditChat, setSelectedAuditChat] = useState<ChatMock | null>(null);
+    const [selectedAuditChat, setSelectedAuditChat] = useState<ChatRoom | null>(null);
 
     // Mapeamento de títulos para o Header
     const tabTitles: { [key: string]: string } = {
@@ -103,64 +105,16 @@ export default function AdminPage() {
         settings: 'Configurações do Sistema',
     };
 
-    // Dados fictícios de conversas 1-para-1 (estilo WhatsApp)
-    const chatsMock: ChatMock[] = [
-        { 
-            id: 'chat1', 
-            userA: { name: 'Carlos Oliveira', email: 'c.oliveira@gmail.com', clerkId: 'user_1' },
-            userB: { name: 'Mariana Costa', email: 'mari.costa@mimo.chat', clerkId: 'user_2' },
-            messagesCount: 48,
-            lastMessage: 'Sim, eu posso te atender amanhã às 14h.',
-            time: 'Há 5 min',
-            totalRevenue: 24.50,
-            history: [
-                { sender: 'user_1', text: 'Oi Mariana, tudo bem? Queria agendar uma mentoria.', time: '18:12', cost: 0.15 },
-                { sender: 'user_2', text: 'Olá Carlos! Tudo ótimo. Claro, podemos agendar.', time: '18:15', cost: 0.0 },
-                { sender: 'user_1', text: 'Perfeito. Qual o seu valor por caractere?', time: '18:18', cost: 0.22 },
-                { sender: 'user_2', text: 'Cobro R$ 0,05 por caractere nas conversas de texto.', time: '18:20', cost: 0.0 },
-                { sender: 'user_1', text: 'Combinado. Vou recarregar meus créditos.', time: '18:21', cost: 0.18 },
-                { sender: 'user_2', text: 'Sim, eu posso te atender amanhã às 14h.', time: '18:23', cost: 0.0 }
-            ]
-        },
-        {
-            id: 'chat2',
-            userA: { name: 'Roberto Santos', email: 'roberto.s@gmail.com', clerkId: 'user_5' },
-            userB: { name: 'Mariana Costa', email: 'mari.costa@mimo.chat', clerkId: 'user_2' },
-            messagesCount: 14,
-            lastMessage: 'Vou realizar o pagamento e te aviso.',
-            time: 'Há 1 hora',
-            totalRevenue: 8.20,
-            history: [
-                { sender: 'user_5', text: 'Olá, gostaria de tirar uma dúvida sobre o plano.', time: '17:15', cost: 0.12 },
-                { sender: 'user_2', text: 'Claro, pode mandar sua dúvida!', time: '17:20', cost: 0.0 },
-                { sender: 'user_5', text: 'Vou realizar o pagamento e te aviso.', time: '17:30', cost: 0.18 }
-            ]
-        },
-        {
-            id: 'chat3',
-            userA: { name: 'Beatriz Lima', email: 'beatriz.l@outlook.com', clerkId: 'user_4' },
-            userB: { name: 'Felipe Rodrigues', email: 'felipe.rod@gmail.com', clerkId: 'user_7' },
-            messagesCount: 92,
-            lastMessage: 'Perfeito, o projeto foi finalizado com sucesso.',
-            time: 'Ontem',
-            totalRevenue: 52.40,
-            history: [
-                { sender: 'user_4', text: 'Olá Felipe, como está o andamento da entrega?', time: 'Ontem, 14:10', cost: 0.25 },
-                { sender: 'user_7', text: 'Terminei as telas e estou subindo para o repositório.', time: 'Ontem, 14:15', cost: 0.0 },
-                { sender: 'user_4', text: 'Maravilhoso. Me avisa quando puder olhar.', time: 'Ontem, 14:20', cost: 0.22 },
-                { sender: 'user_7', text: 'Prontinho! Pode acessar o link.', time: 'Ontem, 14:25', cost: 0.0 },
-                { sender: 'user_4', text: 'Perfeito, o projeto foi finalizado com sucesso.', time: 'Ontem, 14:30', cost: 0.30 }
-            ]
-        }
-    ];
+    // Período comparativo selecionado na Dashboard
+    const [selectedPeriod, setSelectedPeriod] = useState<'none' | 'week' | 'month'>('none');
 
-    const transactionsMock = [
-        { id: 'TX-10024', user: 'Felipe Rodrigues', val: 500.00, type: 'Recarga Pix', time: 'Há 5 min', status: 'Aprovado' },
-        { id: 'TX-10023', user: 'Mariana Costa', val: 120.00, type: 'Recarga Pix', time: 'Há 25 min', status: 'Aprovado' },
-        { id: 'TX-10022', user: 'Carlos Oliveira', val: 75.00, type: 'Recarga Pix', time: 'Há 1 hora', status: 'Pendente' },
-        { id: 'TX-10021', user: 'Beatriz Lima', val: 80.00, type: 'Recarga Pix', time: 'Ontem', status: 'Aprovado' },
-        { id: 'TX-10020', user: 'João Sousa', val: 15.00, type: 'Saque', time: 'Ontem', status: 'Falhou' },
-    ];
+    // Dados reais da dashboard
+    const [dashboardData, setDashboardData] = useState<any>(null);
+    const [loadingDashboard, setLoadingDashboard] = useState(true);
+
+    // Salas reais para auditoria
+    const [chats, setChats] = useState<ChatRoom[]>([]);
+    const [loadingChats, setLoadingChats] = useState(true);
 
     // Busca as configurações da API e valida autorização
     useEffect(() => {
@@ -183,6 +137,8 @@ export default function AdminPage() {
                     setUploadLimit(s.uploadLimitMB);
                     setAutoModeration(s.autoModeration);
                     setProfessionalsOnly(s.professionalsOnlyCreateRooms);
+                    setComparisonPeriod(s.comparisonPeriod || 'none');
+                    setSelectedPeriod(s.comparisonPeriod || 'none');
                     setAdminListRich(data.richAdmins || []);
                     setIsAuthorized(true);
                 } else if (response.status === 403) {
@@ -200,6 +156,78 @@ export default function AdminPage() {
 
         fetchSettings();
     }, [isLoaded, isSignedIn]);
+
+    // Função para buscar dados do dashboard real
+    const fetchDashboard = async (periodParam: string) => {
+        setLoadingDashboard(true);
+        try {
+            const response = await fetch(`/api/admin/dashboard?period=${periodParam}`);
+            if (response.ok) {
+                const data = await response.json();
+                setDashboardData(data);
+            } else {
+                toast.error('Erro ao carregar métricas do dashboard.');
+            }
+        } catch (error) {
+            console.error('Erro de conexão ao buscar dashboard:', error);
+            toast.error('Erro de conexão com o servidor.');
+        } finally {
+            setLoadingDashboard(false);
+        }
+    };
+
+    // Função para buscar conversas reais
+    const fetchRooms = async () => {
+        setLoadingChats(true);
+        try {
+            const response = await fetch('/api/admin/rooms');
+            if (response.ok) {
+                const data = await response.json();
+                setChats(data.rooms || []);
+            } else {
+                toast.error('Erro ao buscar conversas para auditoria.');
+            }
+        } catch (error) {
+            console.error('Erro de conexão ao buscar salas:', error);
+            toast.error('Erro de conexão com o servidor.');
+        } finally {
+            setLoadingChats(false);
+        }
+    };
+
+    // Efeito para carregar dados conforme aba e período ativo
+    useEffect(() => {
+        if (!isAuthorized) return;
+        if (activeTab === 'dashboard' || activeTab === 'financial') {
+            fetchDashboard(selectedPeriod);
+        } else if (activeTab === 'rooms') {
+            fetchRooms();
+        }
+    }, [activeTab, selectedPeriod, isAuthorized]);
+
+    // Abrir modal de auditoria buscando histórico de mensagens reais
+    const handleOpenAuditModal = async (chat: ChatRoom) => {
+        setSelectedAuditChat({
+            ...chat,
+            history: []
+        });
+
+        try {
+            const response = await fetch(`/api/admin/rooms/${chat.id}/messages`);
+            if (response.ok) {
+                const data = await response.json();
+                setSelectedAuditChat({
+                    ...chat,
+                    history: data.history || []
+                });
+            } else {
+                toast.error('Erro ao buscar mensagens do chat.');
+            }
+        } catch (error) {
+            console.error('Erro de conexão ao buscar mensagens:', error);
+            toast.error('Erro de conexão com o servidor.');
+        }
+    };
 
     // Busca de usuários geral (Autocomplete) com debounce
     useEffect(() => {
@@ -244,6 +272,7 @@ export default function AdminPage() {
                     autoModeration,
                     professionalsOnlyCreateRooms: professionalsOnly,
                     adminClerkIds: adminListRich.map(a => a.clerkId),
+                    comparisonPeriod,
                 }),
             });
 
@@ -380,37 +409,57 @@ export default function AdminPage() {
                     {/* TAB: DASHBOARD */}
                     {activeTab === 'dashboard' && (
                         <>
+                            {/* Filtro Rápido de Período da Dashboard */}
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white border border-slate-200/80 px-6 py-4 rounded-2xl shadow-sm gap-4">
+                                <div>
+                                    <h4 className="text-sm font-bold text-slate-800">Visualização de Tendências</h4>
+                                    <p className="text-[11px] text-slate-500 font-medium">Altere o período de comparação das métricas da dashboard em tempo real.</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-slate-500 uppercase">Período:</span>
+                                    <select
+                                        value={selectedPeriod}
+                                        onChange={(e) => setSelectedPeriod(e.target.value as any)}
+                                        className="text-xs font-bold px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 text-slate-700 cursor-pointer"
+                                    >
+                                        <option value="none">Sem Comparação</option>
+                                        <option value="week">Última Semana</option>
+                                        <option value="month">Último Mês</option>
+                                    </select>
+                                </div>
+                            </div>
+
                             {/* Cards de Métricas */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                                 <StatsCard
                                     title="Total de Usuários"
-                                    value="1.280"
-                                    change="+12%"
-                                    isPositive={true}
+                                    value={loadingDashboard ? '...' : dashboardData?.metrics?.users?.value || '0'}
+                                    change={loadingDashboard ? undefined : (dashboardData?.metrics?.users?.change || undefined)}
+                                    isPositive={loadingDashboard ? true : dashboardData?.metrics?.users?.isPositive}
                                     icon={Users}
                                     color="purple"
                                 />
                                 <StatsCard
                                     title="Conversas Ativas"
-                                    value="42"
-                                    change="+5 hoje"
-                                    isPositive={true}
+                                    value={loadingDashboard ? '...' : dashboardData?.metrics?.activeChats?.value || '0'}
+                                    change={loadingDashboard ? undefined : (dashboardData?.metrics?.activeChats?.change || undefined)}
+                                    isPositive={loadingDashboard ? true : dashboardData?.metrics?.activeChats?.isPositive}
                                     icon={MessageSquare}
                                     color="blue"
                                 />
                                 <StatsCard
                                     title="Mensagens Enviadas"
-                                    value="48.510"
-                                    change="+8.2%"
-                                    isPositive={true}
+                                    value={loadingDashboard ? '...' : dashboardData?.metrics?.messages?.value || '0'}
+                                    change={loadingDashboard ? undefined : (dashboardData?.metrics?.messages?.change || undefined)}
+                                    isPositive={loadingDashboard ? true : dashboardData?.metrics?.messages?.isPositive}
                                     icon={MessageCircle}
                                     color="green"
                                 />
                                 <StatsCard
                                     title="Total Recarregado"
-                                    value="R$ 15.420"
-                                    change="+23%"
-                                    isPositive={true}
+                                    value={loadingDashboard ? '...' : dashboardData?.metrics?.revenue?.value || 'R$ 0,00'}
+                                    change={loadingDashboard ? undefined : (dashboardData?.metrics?.revenue?.change || undefined)}
+                                    isPositive={loadingDashboard ? true : dashboardData?.metrics?.revenue?.isPositive}
                                     icon={Coins}
                                     color="amber"
                                 />
@@ -419,7 +468,14 @@ export default function AdminPage() {
                             {/* Gráficos e Outras Informações Rápidas */}
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                                 <div className="lg:col-span-2">
-                                    <ActivityChart />
+                                    {loadingDashboard ? (
+                                        <div className="bg-white border border-slate-200/80 p-6 rounded-2xl shadow-sm h-full flex flex-col items-center justify-center min-h-[220px]">
+                                            <div className="animate-spin h-8 w-8 text-purple-600 rounded-full border-4 border-slate-200 border-t-purple-600" />
+                                            <span className="text-sm font-semibold text-slate-500 mt-2">Buscando dados de atividade...</span>
+                                        </div>
+                                    ) : (
+                                        <ActivityChart data={dashboardData?.activityData} />
+                                    )}
                                 </div>
                                 <div className="bg-white border border-slate-200/80 p-6 rounded-2xl shadow-sm flex flex-col">
                                     <div className="mb-6">
@@ -433,30 +489,41 @@ export default function AdminPage() {
                                     </div>
                                     
                                     <div className="space-y-4 flex-1">
-                                        {transactionsMock.map((tx) => (
-                                            <div key={tx.id} className="flex items-center justify-between p-3.5 hover:bg-slate-50 rounded-xl transition-all border border-transparent hover:border-slate-100 group">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`p-2 rounded-lg ${
-                                                        tx.status === 'Aprovado' ? 'bg-emerald-50 text-emerald-600' :
-                                                        tx.status === 'Pendente' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'
-                                                    }`}>
-                                                        {tx.status === 'Aprovado' && <CheckCircle2 size={16} />}
-                                                        {tx.status === 'Pendente' && <Clock size={16} />}
-                                                        {tx.status === 'Falhou' && <AlertCircle size={16} />}
-                                                    </div>
-                                                    <div className="flex flex-col">
-                                                        <span className="text-xs font-bold text-slate-800">{tx.user}</span>
-                                                        <span className="text-[10px] text-slate-400 font-semibold">{tx.type} • {tx.time}</span>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <span className="text-xs font-bold text-slate-700 block">
-                                                        {tx.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                                    </span>
-                                                    <span className="text-[9px] text-slate-400 font-semibold uppercase">{tx.id}</span>
-                                                </div>
+                                        {loadingDashboard ? (
+                                            <div className="py-20 flex flex-col items-center justify-center gap-2">
+                                                <div className="animate-spin h-6 w-6 text-purple-600 rounded-full border-2 border-slate-200 border-t-purple-600" />
+                                                <span className="text-[10px] text-slate-400 font-semibold">Carregando logs...</span>
                                             </div>
-                                        ))}
+                                        ) : dashboardData?.recentTransactions?.length > 0 ? (
+                                            dashboardData.recentTransactions.map((tx: any) => (
+                                                <div key={tx.id} className="flex items-center justify-between p-3.5 hover:bg-slate-50 rounded-xl transition-all border border-transparent hover:border-slate-100 group">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`p-2 rounded-lg ${
+                                                            tx.status === 'Aprovado' || tx.status === 'Débito' ? 'bg-emerald-50 text-emerald-600' :
+                                                            tx.status === 'Pendente' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'
+                                                        }`}>
+                                                            {(tx.status === 'Aprovado' || tx.status === 'Débito') && <CheckCircle2 size={16} />}
+                                                            {tx.status === 'Pendente' && <Clock size={16} />}
+                                                            {tx.status === 'Cancelado' && <AlertCircle size={16} />}
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-xs font-bold text-slate-800">{tx.user}</span>
+                                                            <span className="text-[10px] text-slate-400 font-semibold">{tx.type} • {tx.time}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="text-xs font-bold text-slate-700 block">
+                                                            {tx.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                        </span>
+                                                        <span className="text-[9px] text-slate-400 font-semibold uppercase">{tx.id}</span>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="py-20 text-center text-xs font-semibold text-slate-400">
+                                                Nenhuma transação recente cadastrada.
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -500,60 +567,77 @@ export default function AdminPage() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {chatsMock.map((chat) => (
-                                            <tr key={chat.id} className="hover:bg-slate-50/40 transition-colors group">
-                                                {/* Participantes */}
-                                                <td className="py-4 px-6">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="flex -space-x-3">
-                                                            <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 border-2 border-white flex items-center justify-center font-bold text-xs">
-                                                                {getInitials(chat.userA.name)}
-                                                            </div>
-                                                            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 border-2 border-white flex items-center justify-center font-bold text-xs">
-                                                                {getInitials(chat.userB.name)}
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex flex-col">
-                                                            <span className="text-xs font-bold text-slate-800 leading-tight">
-                                                                {chat.userA.name}
-                                                            </span>
-                                                            <span className="text-[10px] text-slate-400 font-semibold mt-0.5">
-                                                                ↔ {chat.userB.name}
-                                                            </span>
-                                                        </div>
+                                        {loadingChats ? (
+                                            <tr>
+                                                <td colSpan={6} className="py-20 text-center text-sm font-semibold text-slate-400">
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        <div className="animate-spin h-6 w-6 text-purple-600 rounded-full border-2 border-slate-200 border-t-purple-600" />
+                                                        <span>Buscando conversas reais no banco...</span>
                                                     </div>
                                                 </td>
-                                                {/* Contagem de mensagens */}
-                                                <td className="py-4 px-6 text-sm text-slate-600 font-medium">
-                                                    {chat.messagesCount}
-                                                </td>
-                                                {/* Faturamento */}
-                                                <td className="py-4 px-6">
-                                                    <span className="text-sm font-semibold text-slate-700 flex items-center gap-1">
-                                                        <Coins size={13} className="text-amber-500" />
-                                                        {chat.totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                                    </span>
-                                                </td>
-                                                {/* Preview */}
-                                                <td className="py-4 px-6 text-xs text-slate-500 font-medium max-w-xs truncate">
-                                                    {chat.lastMessage}
-                                                </td>
-                                                {/* Tempo */}
-                                                <td className="py-4 px-6 text-xs text-slate-500 font-semibold">
-                                                    {chat.time}
-                                                </td>
-                                                {/* Ações */}
-                                                <td className="py-4 px-6 text-center">
-                                                    <button 
-                                                        onClick={() => setSelectedAuditChat(chat)}
-                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-600 text-xs font-bold rounded-lg transition-all border border-purple-100 cursor-pointer group-hover:scale-105"
-                                                    >
-                                                        <Eye size={12} />
-                                                        Auditar
-                                                    </button>
+                                            </tr>
+                                        ) : chats.length > 0 ? (
+                                            chats.map((chat) => (
+                                                <tr key={chat.id} className="hover:bg-slate-50/40 transition-colors group">
+                                                    {/* Participantes */}
+                                                    <td className="py-4 px-6">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="flex -space-x-3">
+                                                                <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 border-2 border-white flex items-center justify-center font-bold text-xs">
+                                                                    {getInitials(chat.userA.name)}
+                                                                </div>
+                                                                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 border-2 border-white flex items-center justify-center font-bold text-xs">
+                                                                    {getInitials(chat.userB.name)}
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex flex-col">
+                                                                <span className="text-xs font-bold text-slate-800 leading-tight">
+                                                                    {chat.userA.name}
+                                                                </span>
+                                                                <span className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                                                                    ↔ {chat.userB.name}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    {/* Contagem de mensagens */}
+                                                    <td className="py-4 px-6 text-sm text-slate-600 font-medium">
+                                                        {chat.messagesCount}
+                                                    </td>
+                                                    {/* Faturamento */}
+                                                    <td className="py-4 px-6">
+                                                        <span className="text-sm font-semibold text-slate-700 flex items-center gap-1">
+                                                            <Coins size={13} className="text-amber-500" />
+                                                            {chat.totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                        </span>
+                                                    </td>
+                                                    {/* Preview */}
+                                                    <td className="py-4 px-6 text-xs text-slate-500 font-medium max-w-xs truncate">
+                                                        {chat.lastMessage}
+                                                    </td>
+                                                    {/* Tempo */}
+                                                    <td className="py-4 px-6 text-xs text-slate-500 font-semibold">
+                                                        {chat.time}
+                                                    </td>
+                                                    {/* Ações */}
+                                                    <td className="py-4 px-6 text-center">
+                                                        <button 
+                                                            onClick={() => handleOpenAuditModal(chat)}
+                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-600 text-xs font-bold rounded-lg transition-all border border-purple-100 cursor-pointer group-hover:scale-105"
+                                                        >
+                                                            <Eye size={12} />
+                                                            Auditar
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={6} className="py-20 text-center text-sm font-semibold text-slate-400">
+                                                    Nenhuma conversa encontrada.
                                                 </td>
                                             </tr>
-                                        ))}
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
@@ -568,7 +652,7 @@ export default function AdminPage() {
                                     Histórico Financeiro Recente
                                 </h3>
                                 <p className="text-xs text-slate-500 font-medium">
-                                    Todas as transações financeiras de recarga de créditos efetuadas via API AbacatePay.
+                                    Todas as transações financeiras de recarga de créditos efetuadas via API AbacatePay e cobranças.
                                 </p>
                             </div>
 
@@ -585,30 +669,47 @@ export default function AdminPage() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {transactionsMock.map((tx) => (
-                                            <tr key={tx.id} className="hover:bg-slate-50/40 transition-colors">
-                                                <td className="py-4 px-6 text-xs font-bold text-slate-500 uppercase">{tx.id}</td>
-                                                <td className="py-4 px-6 text-sm font-bold text-slate-800">{tx.user}</td>
-                                                <td className="py-4 px-6 text-xs text-slate-500 font-semibold">{tx.type}</td>
-                                                <td className="py-4 px-6 text-sm font-bold text-slate-700">
-                                                    {tx.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                                </td>
-                                                <td className="py-4 px-6 text-xs text-slate-500 font-medium">{tx.time}</td>
-                                                <td className="py-4 px-6">
-                                                    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
-                                                        tx.status === 'Aprovado' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                                                        tx.status === 'Pendente' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                                                        'bg-rose-50 text-rose-700 border border-rose-100'
-                                                    }`}>
-                                                        <span className={`w-1.5 h-1.5 rounded-full ${
-                                                            tx.status === 'Aprovado' ? 'bg-emerald-500' :
-                                                            tx.status === 'Pendente' ? 'bg-amber-500' : 'bg-rose-500'
-                                                        }`} />
-                                                        {tx.status}
-                                                    </span>
+                                        {loadingDashboard ? (
+                                            <tr>
+                                                <td colSpan={6} className="py-20 text-center text-sm font-semibold text-slate-400">
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        <div className="animate-spin h-6 w-6 text-purple-600 rounded-full border-2 border-slate-200 border-t-purple-600" />
+                                                        <span>Buscando transações reais...</span>
+                                                    </div>
                                                 </td>
                                             </tr>
-                                        ))}
+                                        ) : dashboardData?.recentTransactions?.length > 0 ? (
+                                            dashboardData.recentTransactions.map((tx: any) => (
+                                                <tr key={tx.id} className="hover:bg-slate-50/40 transition-colors">
+                                                    <td className="py-4 px-6 text-xs font-bold text-slate-500 uppercase">{tx.id}</td>
+                                                    <td className="py-4 px-6 text-sm font-bold text-slate-800">{tx.user}</td>
+                                                    <td className="py-4 px-6 text-xs text-slate-500 font-semibold">{tx.type}</td>
+                                                    <td className="py-4 px-6 text-sm font-bold text-slate-700">
+                                                        {tx.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                    </td>
+                                                    <td className="py-4 px-6 text-xs text-slate-500 font-medium">{tx.time}</td>
+                                                    <td className="py-4 px-6">
+                                                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
+                                                            tx.status === 'Aprovado' || tx.status === 'Débito' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                                                            tx.status === 'Pendente' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                                                            'bg-rose-50 text-rose-700 border border-rose-100'
+                                                        }`}>
+                                                            <span className={`w-1.5 h-1.5 rounded-full ${
+                                                                tx.status === 'Aprovado' || tx.status === 'Débito' ? 'bg-emerald-500' :
+                                                                tx.status === 'Pendente' ? 'bg-amber-500' : 'bg-rose-500'
+                                                            }`} />
+                                                            {tx.status}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={6} className="py-20 text-center text-sm font-semibold text-slate-400">
+                                                    Nenhuma transação real registrada na base de dados.
+                                                </td>
+                                            </tr>
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
@@ -631,7 +732,7 @@ export default function AdminPage() {
                                 </div>
 
                                 <form onSubmit={saveSettings} className="space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <div className="space-y-2">
                                             <label className="text-xs font-bold text-slate-600 uppercase block">Taxa de Intermediação (%)</label>
                                             <input 
@@ -652,6 +753,18 @@ export default function AdminPage() {
                                                 min={1}
                                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700" 
                                             />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-600 uppercase block">Período Comparativo Padrão</label>
+                                            <select 
+                                                value={comparisonPeriod} 
+                                                onChange={(e) => setComparisonPeriod(e.target.value as any)}
+                                                className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700"
+                                            >
+                                                <option value="none">Sem Relação (Ocultar Variação)</option>
+                                                <option value="week">Uma Semana</option>
+                                                <option value="month">Um Mês</option>
+                                            </select>
                                         </div>
                                     </div>
 
