@@ -411,3 +411,24 @@ export function useRequestWithdraw() {
         },
     });
 }
+
+// ─── Histórico de Depósitos ─────────────────────────────────────────────────
+export function useDepositHistory() {
+    return useQuery({
+        queryKey: ['deposit', 'history'],
+        queryFn: async () => {
+            const response = await fetch('/api/users/me/balance/pix');
+            if (!response.ok) return { transactions: [] };
+            return response.json() as Promise<{
+                transactions: Array<{
+                    id: string;
+                    amount: number;
+                    status: string;
+                    createdAt: string;
+                }>;
+            }>;
+        },
+        staleTime: 60 * 1000,
+    });
+}
+

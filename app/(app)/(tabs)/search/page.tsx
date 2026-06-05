@@ -76,15 +76,15 @@ export default function SearchPage() {
             </div>
 
             {/* Modern Search Bar */}
-            <div className="bg-white px-4 pt-6 pb-2 shrink-0">
+            <div className="bg-white px-4 pt-5 pb-3 shrink-0">
                 <div className="relative group">
                     <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none transition-colors group-focus-within:text-purple-600 text-gray-400">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
                         </svg>
                     </div>
                     <input
-                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-gray-900 text-base placeholder-gray-400 focus:outline-none focus:bg-white focus:border-purple-400/50 shadow-[inset_0_2px_4px_rgba(0,0,0,0.06)] transition-all font-medium"
+                        className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-600/10 transition-all font-medium"
                         placeholder="Digite o @username..."
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
@@ -96,7 +96,7 @@ export default function SearchPage() {
                             onClick={() => setUsername('')}
                             className="absolute inset-y-0 right-4 flex items-center text-gray-400 hover:text-gray-600 appearance-none"
                         >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M18 6 6 18M6 6l12 12"/>
                             </svg>
                         </button>
@@ -115,9 +115,9 @@ export default function SearchPage() {
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-4 pb-16 md:pb-4">
                 {error && username.length > 2 && (
-                    <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-6 animate-in fade-in zoom-in">
-                        <p className="text-sm font-bold text-red-600 flex items-center gap-2">
-                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-5 animate-in fade-in zoom-in">
+                        <p className="text-sm font-semibold text-red-600 flex items-center gap-2">
+                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                              </svg>
                              {error}
@@ -125,56 +125,62 @@ export default function SearchPage() {
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 gap-6">
+                <div className="flex flex-col gap-3">
                     {foundUsers.map((user) => (
                         <div key={user.clerkId} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <div className="bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-xl shadow-gray-200/40 relative">
-                                <div className="h-24 bg-gradient-to-br from-purple-600 to-fuchsia-500 w-full" />
-                                
-                                <div className="px-6 pb-6 -mt-12 flex flex-col items-center">
-                                    <div className="p-1 bg-white rounded-full shadow-lg">
-                                        <Avatar uri={user.photoUrl} size={80} />
+                            <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm hover:shadow-md hover:border-purple-100/70 transition-all duration-300 flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-3.5 min-w-0">
+                                    <div className="shrink-0 relative">
+                                        <Avatar uri={user.photoUrl} size={56} />
                                     </div>
-
-                                    <div className="text-center mt-3 w-full">
-                                        <h2 className="text-lg font-black text-gray-900 tracking-tight leading-none mb-1">
-                                            {user.name || `@${user.username}`}
-                                        </h2>
-                                        <p className="text-purple-600 font-bold text-xs tracking-wide">
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <h2 className="text-base font-semibold text-gray-900 truncate tracking-tight leading-snug">
+                                                {user.name || `@${user.username}`}
+                                            </h2>
+                                            {user.isProfessional ? (
+                                                <span className="bg-purple-50 border border-purple-100 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider scale-95 origin-left">
+                                                    Profissional
+                                                </span>
+                                            ) : (
+                                                <span className="bg-gray-50 border border-gray-200 text-gray-500 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider scale-95 origin-left">
+                                                    Cliente
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-purple-600 font-semibold text-xs tracking-wide mt-0.5">
                                             @{user.username}
                                         </p>
                                         
-                                        <div className="mt-4 grid grid-cols-2 gap-3 w-full">
-                                            <div className="bg-gray-50 rounded-xl p-2.5 border border-gray-100 flex flex-col items-center justify-center gap-1">
-                                                <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none">Tipo</span>
-                                                <span className="text-[10px] font-bold text-gray-900">{user.isProfessional ? 'Profissional' : 'Cliente'}</span>
-                                            </div>
-                                            <div className="bg-gray-50 rounded-xl p-2.5 border border-gray-100 flex flex-col items-center justify-center gap-1 text-center">
-                                                <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none">Custo</span>
-                                                <span className="text-[10px] font-bold text-purple-600">
-                                                    {user.isProfessional ? `R$ ${(user.chargePerCharNonSubscribers ?? 0.005).toFixed(4)}` : 'Grátis'}
-                                                </span>
-                                            </div>
+                                        <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-500 font-medium flex-wrap">
+                                            <span>{user.isProfessional ? '💬 Pago' : '💬 Gratuito'}</span>
+                                            {user.isProfessional && (
+                                                <>
+                                                    <span className="w-1 h-1 rounded-full bg-gray-300" />
+                                                    <span className="text-purple-600 font-bold">
+                                                        R$ {(user.chargePerCharNonSubscribers ?? 0.005).toFixed(4)}/carac.
+                                                    </span>
+                                                </>
+                                            )}
                                         </div>
-                                        {user.isProfessional && (
-                                            <div className="mt-2 text-center">
-                                                <p className="text-[9px] font-black text-purple-500 uppercase tracking-tighter">
-                                                    💎 R$ {(user.chargePerCharSubscribers ?? 0.002).toFixed(4)} para assinantes
-                                                </p>
-                                            </div>
+                                        {user.isProfessional && user.chargePerCharSubscribers !== undefined && (
+                                            <p className="text-[10px] font-semibold text-purple-500 mt-0.5 flex items-center gap-1">
+                                                <span>💎</span>
+                                                <span>R$ {(user.chargePerCharSubscribers).toFixed(4)} para assinantes</span>
+                                            </p>
                                         )}
                                     </div>
-
-                                    <button 
-                                        onClick={() => handleStartChat(user.clerkId)}
-                                        className="mt-6 w-full h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-black tracking-wide text-sm shadow-lg shadow-purple-600/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-                                    >
-                                        Conversar
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                            <path d="M5 12h14M12 5l7 7-7 7"/>
-                                        </svg>
-                                    </button>
                                 </div>
+
+                                <button 
+                                    onClick={() => handleStartChat(user.clerkId)}
+                                    className="shrink-0 h-10 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold tracking-wide text-xs shadow-sm hover:shadow-md shadow-purple-600/10 transition-all active:scale-[0.98] flex items-center justify-center gap-1.5"
+                                >
+                                    Conversar
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                                    </svg>
+                                </button>
                             </div>
                         </div>
                     ))}
@@ -182,14 +188,14 @@ export default function SearchPage() {
 
                 {foundUsers.length === 0 && !loading && !error && (
                     <div className="flex flex-col items-center justify-center h-[40vh] text-center px-10 animate-in fade-in duration-700">
-                        <div className="w-24 h-24 bg-purple-100 rounded-full flex items-center justify-center mb-6 shadow-sm border border-purple-200">
-                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-purple-600">
+                        <div className="w-16 h-16 bg-gradient-to-tr from-purple-50 to-indigo-50 border border-purple-100/50 rounded-2xl flex items-center justify-center mb-5 shadow-sm">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-purple-600">
                                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
                             </svg>
                         </div>
-                        <h2 className="text-xl font-black text-gray-900 mb-2 tracking-tight">Buscar Pessoas</h2>
-                        <p className="text-gray-400 text-sm font-medium leading-relaxed">
-                            Digite o username para encontrar<br/>outros usuários na rede.
+                        <h2 className="text-lg font-semibold text-gray-800 mb-1.5 tracking-tight">Buscar Pessoas</h2>
+                        <p className="text-gray-400 text-xs font-normal leading-relaxed">
+                            Digite o @username acima para encontrar<br/>outros usuários na rede.
                         </p>
                     </div>
                 )}

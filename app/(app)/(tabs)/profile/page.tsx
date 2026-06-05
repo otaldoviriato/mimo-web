@@ -7,7 +7,7 @@ import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { BalanceDisplay } from '@/components/BalanceDisplay';
 import { Avatar } from '@/components/Avatar';
-import { useMyProfile, useUpdateProfile, useUploadPhoto, useUploadCover, useMyGallery, useUploadToGallery, usePendingWithdrawal, useRequestWithdraw, useDeleteFromGallery } from '@/hooks/useQueries';
+import { useMyProfile, useUpdateProfile, useUploadPhoto, useUploadCover, useMyGallery, useUploadToGallery, usePendingWithdrawal, useRequestWithdraw, useDeleteFromGallery, useDepositHistory, useChatRooms } from '@/hooks/useQueries';
 import { ImageCropper } from '@/components/ImageCropper';
 import { usePayment } from '@/context/PaymentContext';
 import { usePWA } from '@/context/PWAContext';
@@ -58,6 +58,8 @@ export default function ProfilePage() {
 
     const { data: pendingWithdrawal } = usePendingWithdrawal();
     const requestWithdrawMutation = useRequestWithdraw();
+    const { data: depositHistory } = useDepositHistory();
+    const { data: rooms = [] } = useChatRooms();
 
     const [saveError, setSaveError] = useState('');
     const [saveSuccess, setSaveSuccess] = useState(false);
@@ -300,195 +302,324 @@ export default function ProfilePage() {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 pb-20 md:pb-4 flex flex-col gap-4">
-                {/* Capa e Avatar */}
-                <div className="relative bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col items-center pb-5">
-                    {/* Capa */}
-                    <div className="relative h-32 w-full bg-purple-50 overflow-hidden shrink-0">
-                        {localCoverUrl ? (
-                            <img 
-                                src={localCoverUrl} 
-                                alt="Capa" 
-                                className="w-full h-full object-cover"
-                            />
-                        ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-purple-600 to-fuchsia-500" />
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-br from-purple-600/25 to-fuchsia-500/15 mix-blend-overlay" />
-                        
-                        {/* Editar Capa Botão */}
-                        <button
-                            onClick={() => coverInputRef.current?.click()}
-                            disabled={uploadCoverMutation.isPending}
-                            className="absolute bottom-2 right-2 px-3 py-1 bg-black/40 hover:bg-black/60 active:scale-95 text-white text-[10px] font-bold rounded-lg border border-white/20 backdrop-blur-sm transition-all flex items-center gap-1 shadow-sm"
-                            title="Editar capa"
-                        >
-                            <span>✏️ Capa</span>
-                        </button>
-                    </div>
-                    
-                    {/* Input de Capa */}
-                    <input
-                        ref={coverInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleCoverChange}
-                    />
+            <div className="flex-1 overflow-y-auto p-4 pb-24 md:pb-6 flex flex-col gap-3">
 
-                    {/* Avatar */}
-                    <div className="-mt-11 z-10 relative">
-                        <button
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={uploadPhotoMutation.isPending}
-                            className="relative group block p-1 bg-white rounded-full shadow-lg"
-                        >
-                            <Avatar uri={localPhotoUrl} size={80} />
-                            {uploadPhotoMutation.isPending && (
-                                <div className="absolute inset-1 rounded-full bg-black/50 flex items-center justify-center">
-                                    <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                    </svg>
+                {/* ── CARD DE PERFIL ─────────────────────────────────────── */}
+                <div className="relative bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    {isProfessional ? (
+                        /* Layout com capa — apenas para profissionais */
+                        <>
+                            <div className="relative h-28 w-full overflow-hidden shrink-0">
+                                {localCoverUrl ? (
+                                    <img src={localCoverUrl} alt="Capa" className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="w-full h-full bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600" />
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                                <button
+                                    onClick={() => coverInputRef.current?.click()}
+                                    disabled={uploadCoverMutation.isPending}
+                                    className="absolute bottom-2 right-2 px-2.5 py-1 bg-black/35 hover:bg-black/55 active:scale-95 text-white text-[10px] font-semibold rounded-lg border border-white/20 backdrop-blur-sm transition-all flex items-center gap-1"
+                                >
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                    Capa
+                                </button>
+                            </div>
+                            <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverChange} />
+
+                            <div className="px-4 pb-4">
+                                <div className="flex items-end justify-between -mt-8 mb-3">
+                                    <button
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={uploadPhotoMutation.isPending}
+                                        className="relative group block p-0.5 bg-white rounded-full shadow-md ring-2 ring-white"
+                                    >
+                                        <Avatar uri={localPhotoUrl} size={72} />
+                                        {uploadPhotoMutation.isPending ? (
+                                            <div className="absolute inset-0.5 rounded-full bg-black/50 flex items-center justify-center">
+                                                <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                                            </div>
+                                        ) : (
+                                            <div className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-white shadow border border-gray-100 flex items-center justify-center">
+                                                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                            </div>
+                                        )}
+                                    </button>
+                                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+                                    <span className="inline-flex items-center gap-1 bg-purple-50 border border-purple-200 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                        <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                                        Profissional
+                                    </span>
                                 </div>
-                            )}
-                            <div className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-white shadow-md flex items-center justify-center border border-gray-100">
-                                <span className="text-[11px]">✏️</span>
+                                <h1 className="text-base font-semibold text-gray-900 leading-tight">
+                                    {userData?.name || userData?.username || user?.username || ''}
+                                </h1>
+                                <p className="text-xs text-purple-600 font-medium mt-0.5">@{userData?.username || ''}</p>
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
+                                    {userData?.email && (
+                                        <span className="text-[11px] text-gray-400 flex items-center gap-1">
+                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                                            {userData.email.replace(/(.{2})(.*)(@.*)/, '$1•••$3')}
+                                        </span>
+                                    )}
+                                    {user?.createdAt && (
+                                        <span className="text-[11px] text-gray-400 flex items-center gap-1">
+                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                            Membro desde {new Date(user.createdAt).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
-                            <div className="absolute inset-1 rounded-full bg-black/0 group-hover:bg-black/10 transition-colors" />
-                        </button>
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handlePhotoChange}
-                        />
-                    </div>
+                        </>
+                    ) : (
+                        /* Layout horizontal compacto — clientes sem capa */
+                        <div className="p-4 flex items-center gap-4">
+                            <button
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={uploadPhotoMutation.isPending}
+                                className="relative shrink-0 group block p-0.5 bg-white rounded-full shadow-sm ring-1 ring-gray-100"
+                            >
+                                <Avatar uri={localPhotoUrl} size={64} />
+                                {uploadPhotoMutation.isPending ? (
+                                    <div className="absolute inset-0.5 rounded-full bg-black/50 flex items-center justify-center">
+                                        <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                                    </div>
+                                ) : (
+                                    <div className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-white shadow border border-gray-100 flex items-center justify-center">
+                                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                    </div>
+                                )}
+                            </button>
+                            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
 
-                    <p className="mt-3 text-base font-bold text-gray-900">
-                        {userData?.name || userData?.username || user?.username || ''}
-                    </p>
-                    <p className="text-sm text-gray-400">@{userData?.username || ''}</p>
-                    {isProfessional && (
-                        <span className="mt-2 inline-flex items-center gap-1 bg-purple-50 border border-purple-200 text-purple-700 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
-                            Profissional
-                        </span>
+                            <div className="flex-1 min-w-0">
+                                <h1 className="text-sm font-semibold text-gray-900 truncate">
+                                    {userData?.name || userData?.username || user?.username || ''}
+                                </h1>
+                                <p className="text-xs text-purple-600 font-medium mt-0.5">@{userData?.username || ''}</p>
+                                <div className="flex flex-col gap-0.5 mt-1.5">
+                                    {userData?.email && (
+                                        <span className="text-[11px] text-gray-400 flex items-center gap-1 truncate">
+                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                                            {userData.email.replace(/(.{2})(.*)(@.*)/, '$1•••$3')}
+                                        </span>
+                                    )}
+                                    {user?.createdAt && (
+                                        <span className="text-[11px] text-gray-400 flex items-center gap-1">
+                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                            Membro desde {new Date(user.createdAt).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
                     )}
                 </div>
 
-                {/* Balance Card - Discreet */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 shrink-0 flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 block mb-1">Saldo na Carteira</span>
-                            <div className="text-2xl font-black text-gray-900 tracking-tight">
-                                {((userData?.balance ?? 0) / 100).toLocaleString('pt-BR', { 
-                                    style: 'currency', 
-                                    currency: 'BRL',
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2
-                                })}
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={isProfessional 
-                                ? () => {
-                                    if (!pixKey) {
-                                        setPixModalOpen(true);
-                                    } else {
-                                        setWithdrawConfirmModalOpen(true);
-                                    }
-                                } 
-                                : openRechargeModal}
-                            disabled={isProfessional && pendingWithdrawal != null}
-                            className={`h-10 px-4 rounded-xl font-bold text-sm transition-colors active:scale-[0.98] flex items-center justify-center gap-2 ${
-                                isProfessional && pendingWithdrawal != null
-                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                    : 'bg-purple-50 hover:bg-purple-100 border border-purple-100 text-purple-700'
-                            }`}
-                        >
-                            {isProfessional ? (
-                                <>
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M12 5v14M5 12l7 7 7-7" />
-                                    </svg>
-                                    <span>Retirar</span>
-                                </>
-                            ) : (
-                                <>
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M12 19V5M5 12l7-7 7 7" />
-                                    </svg>
-                                    <span>Recarregar</span>
-                                </>
-                            )}
-                        </button>
+                {/* ── ESTATÍSTICAS DA CONTA ──────────────────────────────── */}
+                <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 flex flex-col items-center gap-0.5">
+                        <span className="text-lg font-bold text-gray-900">{(rooms as any[]).length}</span>
+                        <span className="text-[10px] text-gray-400 font-medium text-center leading-tight">Conversas</span>
                     </div>
-                    {pendingWithdrawal && (
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center gap-2 mt-1">
-                            <span className="text-amber-500">⏳</span>
+                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 flex flex-col items-center gap-0.5">
+                        <span className="text-lg font-bold text-gray-900">{(depositHistory?.transactions ?? []).length}</span>
+                        <span className="text-[10px] text-gray-400 font-medium text-center leading-tight">Depósitos</span>
+                    </div>
+                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 flex flex-col items-center justify-center gap-1">
+                        <div className="flex items-center gap-1">
+                            <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                            <span className="text-sm font-bold text-green-600">Ativa</span>
+                        </div>
+                        <span className="text-[10px] text-gray-400 font-medium text-center leading-tight">Conta</span>
+                    </div>
+                </div>
+
+                {/* ── CARTEIRA REDESENHADA ───────────────────────────────── */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+                    {/* Topo da carteira */}
+                    <div className="px-4 pt-4 pb-3 border-b border-gray-50">
+                        <div className="flex items-start justify-between">
                             <div>
-                                <p className="text-xs font-bold text-amber-800">Saque Pendente</p>
-                                <p className="text-[10px] text-amber-700">
-                                    Valor: {((pendingWithdrawal.amount ?? 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}. Pode levar até 24h.
-                                </p>
+                                <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Saldo Disponível</span>
+                                <div className="flex items-baseline gap-1 mt-0.5">
+                                    <span className="text-[11px] font-medium text-gray-400">R$</span>
+                                    <span className="text-2xl font-bold text-gray-900 tracking-tight">
+                                        {((userData?.balance ?? 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-1 mt-1">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                                    <span className="text-[10px] text-gray-400">Protegido · Atualizado agora</span>
+                                </div>
                             </div>
+                            <button
+                                onClick={isProfessional
+                                    ? () => { if (!pixKey) { setPixModalOpen(true); } else { setWithdrawConfirmModalOpen(true); } }
+                                    : openRechargeModal}
+                                disabled={isProfessional && pendingWithdrawal != null}
+                                className={`mt-1 h-9 px-4 rounded-xl font-semibold text-xs transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 ${
+                                    isProfessional && pendingWithdrawal != null
+                                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                        : isProfessional
+                                            ? 'bg-gray-900 hover:bg-gray-800 text-white shadow-sm'
+                                            : 'bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-600/20'
+                                }`}
+                            >
+                                {isProfessional ? (
+                                    <>
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12l7 7 7-7" /></svg>
+                                        Sacar
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                                        Recarregar
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+
+                    {pendingWithdrawal && (
+                        <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-500 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                            <div>
+                                <p className="text-[11px] font-semibold text-amber-800">Saque em processamento</p>
+                                <p className="text-[10px] text-amber-600">{((pendingWithdrawal.amount ?? 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} · Pode levar até 24h</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Mini-extrato de depósitos */}
+                    {(depositHistory?.transactions ?? []).length > 0 ? (
+                        <div className="px-4 pt-3 pb-4">
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2.5">Últimos depósitos</p>
+                            <div className="flex flex-col gap-3">
+                                {(depositHistory?.transactions ?? []).slice(0, 3).map((tx) => (
+                                    <div key={tx.id} className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-7 h-7 rounded-full bg-green-50 border border-green-100 flex items-center justify-center shrink-0">
+                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-green-600"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                                            </div>
+                                            <div>
+                                                <p className="text-[11px] font-medium text-gray-700">Depósito via Pix</p>
+                                                <p className="text-[10px] text-gray-400">{new Date(tx.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</p>
+                                            </div>
+                                        </div>
+                                        <span className="text-[11px] font-bold text-green-600">+{tx.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="px-4 py-3 flex items-center gap-2">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-300"><path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-8 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>
+                            <p className="text-[11px] text-gray-400">Nenhum depósito encontrado. Recarregue para começar.</p>
                         </div>
                     )}
                 </div>
 
-                {/* Gallery Section */}
+                {/* ── INTEGRIDADE DA CONTA ───────────────────────────────── */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg bg-green-50 border border-green-100 flex items-center justify-center">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-600"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            </div>
+                            <div>
+                                <p className="text-xs font-semibold text-gray-800">Integridade da Conta</p>
+                                <p className="text-[10px] text-gray-400">Complete seu perfil para maior segurança</p>
+                            </div>
+                        </div>
+                        {/* Barra de progresso */}
+                        {(() => {
+                            const checks = isProfessional
+                                ? [!!localPhotoUrl, !!userData?.taxId, !!userData?.pixKey, !!userData?.phone]
+                                : [!!localPhotoUrl, !!userData?.taxId, !!userData?.phone];
+                            const done = checks.filter(Boolean).length;
+                            const total = checks.length;
+                            return (
+                                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                                    done === total ? 'text-green-700 bg-green-50' : done >= Math.ceil(total / 2) ? 'text-amber-700 bg-amber-50' : 'text-red-600 bg-red-50'
+                                }`}>{done}/{total}</span>
+                            );
+                        })()}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                        {(isProfessional
+                            ? [
+                                { label: 'Foto de perfil', done: !!localPhotoUrl, action: () => fileInputRef.current?.click() },
+                                { label: 'CPF informado', done: !!userData?.taxId, action: () => setIsSettingsOpen(true) },
+                                { label: 'Chave Pix cadastrada', done: !!userData?.pixKey, action: () => setIsSettingsOpen(true) },
+                                { label: 'Telefone cadastrado', done: !!userData?.phone, action: () => setIsSettingsOpen(true) },
+                            ]
+                            : [
+                                { label: 'Foto de perfil', done: !!localPhotoUrl, action: () => fileInputRef.current?.click() },
+                                { label: 'CPF informado', done: !!userData?.taxId, action: () => setIsSettingsOpen(true) },
+                                { label: 'Telefone cadastrado', done: !!userData?.phone, action: () => setIsSettingsOpen(true) },
+                            ]
+                        ).map((item, i) => (
+                            <div key={i} className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
+                                        item.done ? 'bg-green-100' : 'bg-gray-100'
+                                    }`}>
+                                        {item.done ? (
+                                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-green-600"><polyline points="20 6 9 17 4 12"/></svg>
+                                        ) : (
+                                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-gray-400"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                        )}
+                                    </div>
+                                    <span className={`text-xs ${ item.done ? 'text-gray-700' : 'text-gray-400'}`}>{item.label}</span>
+                                </div>
+                                {!item.done && (
+                                    <button onClick={item.action} className="text-[10px] font-semibold text-purple-600 hover:text-purple-700">
+                                        Completar
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* ── GALERIA (Profissionais) ────────────────────────────── */}
                 {isProfessional && (
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-4">
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-3">
                         <div className="flex items-center justify-between">
-                            <h2 className="text-base font-bold text-gray-900">Minha Galeria</h2>
-                            <Button
-                                title="Fazer Upload"
-                                onPress={() => galleryInputRef.current?.click()}
-                                size="sm"
-                                variant="outline"
-                            />
-                            <input
-                                ref={galleryInputRef}
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={handleGalleryFileChange}
-                            />
+                            <div>
+                                <h2 className="text-sm font-semibold text-gray-800">Minha Galeria</h2>
+                                <p className="text-[10px] text-gray-400">{galleryData?.items?.length ?? 0} {(galleryData?.items?.length ?? 0) === 1 ? 'foto' : 'fotos'}</p>
+                            </div>
+                            <button
+                                onClick={() => galleryInputRef.current?.click()}
+                                className="h-7 px-3 rounded-lg border border-gray-200 text-[11px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-1"
+                            >
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                Adicionar
+                            </button>
+                            <input ref={galleryInputRef} type="file" accept="image/*" className="hidden" onChange={handleGalleryFileChange} />
                         </div>
 
                         {galleryData?.items?.length === 0 ? (
-                            <div className="py-8 flex flex-col items-center justify-center border-2 border-dashed border-gray-100 rounded-xl">
-                                <span className="text-2xl mb-2">📸</span>
-                                <p className="text-sm text-gray-400">Sua galeria está vazia</p>
+                            <div className="py-6 flex flex-col items-center justify-center border border-dashed border-gray-200 rounded-xl gap-1">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-300"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                <p className="text-xs text-gray-400">Nenhuma foto ainda</p>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-3 gap-1.5">
                                 {galleryData?.items?.map((item: any) => (
                                     <div key={item._id} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 group">
-                                        <img
-                                            src={item.imageUrl}
-                                            alt="Gallery item"
-                                            className="w-full h-full object-cover"
-                                        />
-                                        <div className="absolute top-1 right-1 px-1.5 py-0.5 rounded-md bg-black/50 text-[10px] text-white">
-                                            {item.visibility === 'public' ? 'Pública' : 'Assinantes'}
+                                        <img src={item.imageUrl} alt="Gallery" className="w-full h-full object-cover" />
+                                        <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-black/40 text-[9px] text-white backdrop-blur-sm">
+                                            {item.visibility === 'public' ? '🌐' : '💎'}
                                         </div>
                                         <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeleteGalleryItem(item._id);
-                                            }}
+                                            onClick={(e) => { e.stopPropagation(); handleDeleteGalleryItem(item._id); }}
                                             disabled={deleteGalleryMutation.isPending}
-                                            className="absolute bottom-1 right-1 p-1 rounded-md bg-red-600/80 hover:bg-red-600 text-white transition-colors"
-                                            title="Excluir foto"
+                                            className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100"
                                         >
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                <polyline points="3 6 5 6 21 6" />
-                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                            </svg>
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                                         </button>
                                     </div>
                                 ))}
@@ -498,241 +629,302 @@ export default function ProfilePage() {
                 )}
             </div>
 
-            {/* Configurações Overlay */}
+            {/* ── CONFIGURAÇÕES OVERLAY ───────────────────────────────────── */}
             {isSettingsOpen && (
-                <div className="fixed inset-0 z-50 bg-gray-50 flex flex-col overflow-y-auto pb-16 md:pb-4 animate-in slide-in-from-right duration-200">
-                    {/* Header Config */}
-                    <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center gap-3 z-10 sticky top-0 shadow-md">
+                <div className="fixed inset-0 z-50 bg-gray-50 flex flex-col overflow-y-auto animate-in slide-in-from-right duration-200">
+
+                    {/* Header — igual ao header principal do app */}
+                    <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[56px] shrink-0 flex items-center gap-3 sticky top-0 z-10 shadow-sm">
                         <button
-                            onClick={() => {
-                                setIsSettingsOpen(false);
-                                setSaveError('');
-                                setSaveSuccess(false);
-                            }}
-                            className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-colors text-white mr-1 flex items-center justify-center"
-                            title="Voltar"
+                            onClick={() => { setIsSettingsOpen(false); setSaveError(''); setSaveSuccess(false); }}
+                            className="p-1.5 hover:bg-white/10 active:bg-white/20 rounded-lg transition-colors text-white flex items-center justify-center"
                         >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="19" y1="12" x2="5" y2="12" />
-                                <polyline points="12 19 5 12 12 5" />
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" />
                             </svg>
                         </button>
-                        <h1 className="text-xl font-bold text-white">Configurações</h1>
+                        <h1 className="text-base font-bold text-white">Configurações</h1>
                     </div>
 
                     <div className="p-4 flex flex-col gap-4">
-                        {/* Dados Pessoais */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-4">
-                            <h2 className="text-base font-bold text-gray-900 border-b border-gray-100 pb-2">Dados Gerais</h2>
-                            
-                            <Input
-                                label="Nome de Exibição"
-                                placeholder="Seu nome real ou apelido"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                            />
 
-                            <Input
-                                label="Username"
-                                placeholder="@username"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                                autoCapitalize="none"
-                            />
-
-                            <Input
-                                label="CPF"
-                                placeholder="000.000.000-00"
-                                value={taxId}
-                                onChange={(e) => setTaxId(formatCPF(e.target.value))}
-                                maxLength={14}
-                                type="text"
-                            />
-
-                            <Input
-                                label="WhatsApp / Telefone"
-                                placeholder="(00) 00000-0000"
-                                value={phone}
-                                onChange={(e) => setPhone(formatPhone(e.target.value))}
-                                maxLength={15}
-                                type="tel"
-                            />
+                        {/* ── SEÇÃO: DADOS DO PERFIL ── */}
+                        <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Dados do Perfil</p>
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                                {/* Nome */}
+                                <div className="px-4 py-3.5 border-b border-gray-50">
+                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Nome de Exibição</label>
+                                    <input
+                                        className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
+                                        placeholder="Seu nome ou apelido"
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                    />
+                                </div>
+                                {/* Username */}
+                                <div className="px-4 py-3.5 border-b border-gray-50">
+                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Username</label>
+                                    <div className="flex items-center gap-1">
+                                        <span className="text-sm text-gray-300 select-none">@</span>
+                                        <input
+                                            className="flex-1 text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
+                                            placeholder="username"
+                                            value={username}
+                                            onChange={(e) => setUsername(e.target.value)}
+                                            autoCapitalize="none"
+                                            autoCorrect="off"
+                                        />
+                                    </div>
+                                </div>
+                                {/* CPF */}
+                                <div className="px-4 py-3.5 border-b border-gray-50">
+                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">CPF</label>
+                                    <input
+                                        className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
+                                        placeholder="000.000.000-00"
+                                        value={taxId}
+                                        onChange={(e) => setTaxId(formatCPF(e.target.value))}
+                                        maxLength={14}
+                                        inputMode="numeric"
+                                    />
+                                </div>
+                                {/* Telefone */}
+                                <div className="px-4 py-3.5">
+                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Telefone / WhatsApp</label>
+                                    <input
+                                        className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
+                                        placeholder="(00) 00000-0000"
+                                        value={phone}
+                                        onChange={(e) => setPhone(formatPhone(e.target.value))}
+                                        maxLength={15}
+                                        type="tel"
+                                    />
+                                </div>
+                            </div>
                         </div>
 
-                        {/* Configurações Profissionais */}
+                        {/* ── SEÇÃO: PREÇOS E GANHOS (Profissionais) ── */}
                         {isProfessional && (
-                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-4">
-                                <h2 className="text-base font-bold text-gray-900 border-b border-gray-100 pb-2">Preços e Ganhos</h2>
-
-                                <Input
-                                    label="Preço da Assinatura Mensal (R$)"
-                                    placeholder="0.00"
-                                    value={subscriptionPrice}
-                                    onChange={(e) => setSubscriptionPrice(e.target.value)}
-                                    type="number"
-                                    step="0.01"
-                                />
-
-                                <div className="flex flex-col gap-1">
-                                    <Input
-                                        label="Valor por caractere (Assinantes) em R$"
-                                        placeholder="0.002"
-                                        value={chargePerCharSubscribers}
-                                        onChange={(e) => setChargePerCharSubscribers(e.target.value)}
-                                        type="number"
-                                        step="0.0001"
-                                    />
-                                    {chargePerCharSubscribers && !isNaN(Number(chargePerCharSubscribers)) && (
-                                        <span className="text-[11px] text-gray-500 italic px-1">
-                                            💡 Uma mensagem de 100 caracteres custará <strong>
-                                                {(Number(chargePerCharSubscribers) * 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })}
-                                            </strong> para seus assinantes.
-                                        </span>
-                                    )}
-                                </div>
-
-                                <div className="flex flex-col gap-1">
-                                    <Input
-                                        label="Valor por caractere (Não Assinantes) em R$"
-                                        placeholder="0.005"
-                                        value={chargePerCharNonSubscribers}
-                                        onChange={(e) => setChargePerCharNonSubscribers(e.target.value)}
-                                        type="number"
-                                        step="0.0001"
-                                    />
-                                    {chargePerCharNonSubscribers && !isNaN(Number(chargePerCharNonSubscribers)) && (
-                                        <span className="text-[11px] text-gray-500 italic px-1">
-                                            💡 Uma mensagem de 100 caracteres custará <strong>
-                                                {(Number(chargePerCharNonSubscribers) * 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })}
-                                            </strong> para não assinantes.
-                                        </span>
-                                    )}
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Preços e Ganhos</p>
+                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                                    <div className="px-4 py-3.5 border-b border-gray-50">
+                                        <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Assinatura Mensal (R$)</label>
+                                        <input
+                                            className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
+                                            placeholder="0.00"
+                                            value={subscriptionPrice}
+                                            onChange={(e) => setSubscriptionPrice(e.target.value)}
+                                            type="number"
+                                            step="0.01"
+                                            inputMode="decimal"
+                                        />
+                                    </div>
+                                    <div className="px-4 py-3.5 border-b border-gray-50">
+                                        <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Por Caractere — Assinantes (R$)</label>
+                                        <input
+                                            className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
+                                            placeholder="0.002"
+                                            value={chargePerCharSubscribers}
+                                            onChange={(e) => setChargePerCharSubscribers(e.target.value)}
+                                            type="number"
+                                            step="0.0001"
+                                            inputMode="decimal"
+                                        />
+                                        {chargePerCharSubscribers && !isNaN(Number(chargePerCharSubscribers)) && (
+                                            <p className="text-[10px] text-gray-400 mt-1.5">
+                                                100 chars = <span className="font-semibold text-purple-600">{(Number(chargePerCharSubscribers) * 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })}</span> para assinantes
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="px-4 py-3.5">
+                                        <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Por Caractere — Não Assinantes (R$)</label>
+                                        <input
+                                            className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
+                                            placeholder="0.005"
+                                            value={chargePerCharNonSubscribers}
+                                            onChange={(e) => setChargePerCharNonSubscribers(e.target.value)}
+                                            type="number"
+                                            step="0.0001"
+                                            inputMode="decimal"
+                                        />
+                                        {chargePerCharNonSubscribers && !isNaN(Number(chargePerCharNonSubscribers)) && (
+                                            <p className="text-[10px] text-gray-400 mt-1.5">
+                                                100 chars = <span className="font-semibold text-purple-600">{(Number(chargePerCharNonSubscribers) * 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })}</span> para não assinantes
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* Push Notifications Card */}
-                        {mounted && (
-                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-xl text-purple-700 font-bold shrink-0">
-                                        🔔
-                                    </div>
-                                    <div>
-                                        <h2 className="text-base font-bold text-gray-900">Notificações no Celular</h2>
-                                        <p className="text-xs text-gray-500 leading-snug">
-                                            {notificationPermission === 'granted'
-                                                ? 'Ativadas para este dispositivo.'
-                                                : notificationPermission === 'denied'
-                                                    ? 'Bloqueadas nas configurações do seu navegador.'
-                                                    : 'Receba alertas de novas mensagens em tempo real.'}
-                                        </p>
-                                    </div>
-                                </div>
-                                {notificationPermission !== 'granted' && (
-                                    <Button
-                                        title={notificationPermission === 'denied' ? "Como Desbloquear" : "Ativar Notificações"}
-                                        onPress={notificationPermission === 'denied'
-                                            ? () => alert('Acesse as configurações do seu navegador ou celular, procure as permissões de notificação deste site e marque como "Permitir".')
-                                            : handleRequestPermission}
-                                        size="md"
-                                        className="w-full bg-purple-600 hover:bg-purple-700 shadow-md !text-white"
-                                    />
-                                )}
-                            </div>
-                        )}
-
-                        {/* PWA Install Button */}
-                        {mounted && isInstallable && !isStandalone && (
-                            <div className="bg-gradient-to-br from-purple-50 to-white border border-purple-100 rounded-2xl p-5 flex flex-col gap-3 shadow-sm">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center text-xl shadow-sm text-white">
-                                        📲
-                                    </div>
-                                    <div>
-                                        <h2 className="text-base font-bold text-gray-900">Aplicativo Mimo</h2>
-                                        <p className="text-xs text-gray-500">Instale para ter acesso rápido e notificações</p>
-                                    </div>
-                                </div>
-                                <Button
-                                    title="Instalar Agora"
-                                    onPress={promptInstall}
-                                    size="md"
-                                    className="w-full bg-purple-600 hover:bg-purple-700 shadow-md !text-white"
-                                />
-                            </div>
-                        )}
-
-                        {/* Accordion Sobre o Mimo */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3">
-                            <button
-                                onClick={() => setIsAboutExpanded(!isAboutExpanded)}
-                                className="flex items-center justify-between w-full text-left font-bold text-gray-900 focus:outline-none"
-                            >
-                                <span>Sobre o Mimo</span>
-                                <span className="text-gray-400 transition-transform duration-200" style={{ transform: isAboutExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>
-                                    ▼
-                                </span>
-                            </button>
-                            {isAboutExpanded && (
-                                <div className="flex flex-col gap-3 mt-2 border-t border-gray-100 pt-3 text-sm animate-in fade-in slide-in-from-top-2 duration-200">
-                                    <div className="flex items-center justify-between py-1">
-                                        <span className="text-gray-500">Versão</span>
-                                        <span className="font-medium text-gray-800">1.0.0</span>
-                                    </div>
-                                    <div className="flex items-center justify-between py-1">
-                                        <span className="text-gray-500">ID do Usuário</span>
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-medium text-gray-800 font-mono text-[11px] truncate max-w-[150px]">{user?.id}</span>
-                                            <button
-                                                onClick={() => {
-                                                    if (user?.id) {
-                                                        navigator.clipboard.writeText(user.id);
-                                                        alert('ID copiado para a área de transferência!');
-                                                    }
-                                                }}
-                                                className="text-xs text-purple-600 hover:text-purple-700 font-semibold"
-                                            >
-                                                Copiar
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Botão de Salvar Alterações e Logs */}
-                        <div className="mt-2 flex flex-col gap-2">
+                        {/* ── BOTÃO SALVAR — imediatamente após os campos ── */}
+                        <div className="flex flex-col gap-2">
                             {saveError && (
-                                <p className="text-sm text-red-500">{saveError}</p>
+                                <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-100 rounded-xl">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                    <p className="text-xs text-red-600 font-medium">{saveError}</p>
+                                </div>
                             )}
                             {saveSuccess && (
-                                <p className="text-sm text-green-600 font-medium">✓ Perfil atualizado com sucesso!</p>
+                                <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-100 rounded-xl">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-600 shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
+                                    <p className="text-xs text-green-700 font-medium">Perfil atualizado com sucesso</p>
+                                </div>
                             )}
-
-                            <Button
-                                title="Salvar Alterações"
-                                onPress={handleSaveAll}
-                                loading={loading}
-                                size="md"
-                                className="w-full bg-purple-600 hover:bg-purple-700 shadow-md !text-white"
-                            />
+                            <button
+                                onClick={handleSaveAll}
+                                disabled={loading}
+                                className="w-full h-10 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white text-sm font-semibold transition-colors active:scale-[0.98] flex items-center justify-center gap-2"
+                            >
+                                {loading ? (
+                                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                ) : (
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                )}
+                                Salvar Alterações
+                            </button>
                         </div>
 
-                        {/* Logout no fim */}
-                        <div className="mt-4">
-                            <Button
-                                title="Sair da Conta"
-                                onPress={handleLogout}
-                                variant="outline"
-                                size="md"
-                                className="w-full !border-red-400 !text-red-500 hover:!bg-red-50"
-                            />
+                        {/* ── SEÇÃO: PREFERÊNCIAS DO DISPOSITIVO ── */}
+                        {mounted && (notificationPermission !== 'granted' || (isInstallable && !isStandalone)) && (
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Este Dispositivo</p>
+                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                                    {/* Notificações */}
+                                    <div className={`px-4 py-3.5 flex items-center justify-between ${isInstallable && !isStandalone ? 'border-b border-gray-50' : ''}`}>
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-500">
+                                                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                                                </svg>
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium text-gray-800">Notificações</p>
+                                                <p className="text-[10px] text-gray-400 leading-snug">
+                                                    {notificationPermission === 'granted'
+                                                        ? 'Ativas para este dispositivo'
+                                                        : notificationPermission === 'denied'
+                                                            ? 'Bloqueadas pelo navegador'
+                                                            : 'Alertas de novas mensagens'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        {notificationPermission === 'granted' ? (
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                                                <span className="text-[10px] font-semibold text-green-600">Ativo</span>
+                                            </div>
+                                        ) : notificationPermission === 'denied' ? (
+                                            <span className="shrink-0 text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-100 px-2 py-1 rounded-lg">Bloqueado</span>
+                                        ) : (
+                                            <button
+                                                onClick={handleRequestPermission}
+                                                className="shrink-0 h-7 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-semibold transition-colors"
+                                            >
+                                                Ativar
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Instalar app (PWA) */}
+                                    {isInstallable && !isStandalone && (
+                                        <div className="px-4 py-3.5 flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-500">
+                                                        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>
+                                                    </svg>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-800">Instalar Aplicativo</p>
+                                                    <p className="text-[10px] text-gray-400">Acesso rápido na tela inicial</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={promptInstall}
+                                                className="shrink-0 h-7 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-semibold transition-colors"
+                                            >
+                                                Instalar
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── SEÇÃO: SOBRE O APP ── */}
+                        <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Mais Informações</p>
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                                <button
+                                    onClick={() => setIsAboutExpanded(!isAboutExpanded)}
+                                    className="w-full px-4 py-3.5 flex items-center justify-between"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-500">
+                                                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                                            </svg>
+                                        </div>
+                                        <span className="text-sm font-medium text-gray-800">Sobre o MimoChat</span>
+                                    </div>
+                                    <svg
+                                        width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                                        className={`text-gray-400 transition-transform duration-200 ${isAboutExpanded ? 'rotate-180' : ''}`}
+                                    >
+                                        <polyline points="6 9 12 15 18 9"/>
+                                    </svg>
+                                </button>
+                                {isAboutExpanded && (
+                                    <div className="border-t border-gray-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                                        <div className="px-4 py-2.5 flex items-center justify-between border-b border-gray-50">
+                                            <span className="text-xs text-gray-400">Versão</span>
+                                            <span className="text-xs font-semibold text-gray-700 tabular-nums">1.0.0</span>
+                                        </div>
+                                        <div className="px-4 py-2.5 flex items-center justify-between">
+                                            <span className="text-xs text-gray-400">ID do Usuário</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[11px] font-mono text-gray-600 truncate max-w-[130px]">{user?.id}</span>
+                                                <button
+                                                    onClick={() => { if (user?.id) { navigator.clipboard.writeText(user.id); alert('ID copiado!'); } }}
+                                                    className="text-[10px] font-semibold text-purple-600 hover:text-purple-700"
+                                                >
+                                                    Copiar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
+
+                        {/* ── SEÇÃO: CONTA (sair) ── */}
+                        <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Conta</p>
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                                <button
+                                    onClick={handleLogout}
+                                    className="w-full px-4 py-3.5 flex items-center gap-3 hover:bg-red-50 active:bg-red-100 transition-colors"
+                                >
+                                    <div className="w-8 h-8 rounded-lg bg-red-50 border border-red-100 flex items-center justify-center shrink-0">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500">
+                                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                                        </svg>
+                                    </div>
+                                    <span className="text-sm font-medium text-red-500">Sair da conta</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="pb-2" />
+
                     </div>
                 </div>
             )}
 
+            {/* Visibility Selection Modal */}
             {/* Visibility Selection Modal */}
             {visibilityModal.open && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">

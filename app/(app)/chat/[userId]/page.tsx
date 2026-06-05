@@ -9,6 +9,7 @@ import { BalanceDisplay } from '@/components/BalanceDisplay';
 import { useSocket } from '@/hooks/useSocket';
 import { useUserById, useMyProfile, QueryKeys, useRecentEarnings } from '@/hooks/useQueries';
 import { usePayment } from '@/context/PaymentContext';
+import { Drawer } from 'vaul';
 
 interface Message {
     _id: string;
@@ -66,7 +67,9 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
     const [mediaPriceStr, setMediaPriceStr] = useState('');
     const [showFreeMediaConfirm, setShowFreeMediaConfirm] = useState(false);
     const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
-    const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+    const [galleryVisible, setGalleryVisible] = useState(false);
+    const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
+    const swipeTouchStartX = useRef<number | null>(null);
     const [detailsModalVisible, setDetailsModalVisible] = useState(false);
     const [unlockModalVisible, setUnlockModalVisible] = useState(false);
     const [unlockData, setUnlockData] = useState<{ id: string; price: number; isVideo: boolean } | null>(null);
@@ -133,6 +136,20 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
     const { data: earningsData } = useRecentEarnings(otherUserId);
     const { data: receiver } = useUserById(otherUserId);
     const balance = userData?.balance ?? 0;
+
+    // Lista derivada das mensagens com mídia desbloqueada (imagens e vídeos)
+    const mediaItems = React.useMemo(() => {
+        return messages
+            .filter(m => {
+                if (m.isLockedImage) return false; // locked não entra
+                return m.originalImageUrl || (m.isVideo && m.videoUrl);
+            })
+            .map(m => ({
+                url: m.isVideo ? m.videoUrl! : m.originalImageUrl!,
+                thumbnailUrl: m.isVideo ? m.thumbnailUrl : m.originalImageUrl,
+                isVideo: !!m.isVideo,
+            }));
+    }, [messages]);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -909,13 +926,30 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                 </svg>
                             )}
-                            <BalanceDisplay 
-                                balance={balance} 
-                                earnings={userData?.isProfessional ? earningsData?.lastSessionEarnings : 0}
-                                size="sm" 
-                                variant="glass" 
-                                clickable={true} 
-                            />
+                            {!userData?.isProfessional && receiver?.isProfessional ? (
+                                <button
+                                    id="gallery-btn"
+                                    onClick={() => setGalleryVisible(true)}
+                                    className="text-white/80 hover:text-white p-1 transition-colors"
+                                    title="Ver mídias compartilhadas"
+                                >
+                                    {/* Ícone grade 2x2 */}
+                                    <svg width="20" height="20" viewBox="0 0 18 18" fill="none">
+                                        <rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor"/>
+                                        <rect x="11" y="1" width="6" height="6" rx="1.5" fill="currentColor"/>
+                                        <rect x="1" y="11" width="6" height="6" rx="1.5" fill="currentColor"/>
+                                        <rect x="11" y="11" width="6" height="6" rx="1.5" fill="currentColor"/>
+                                    </svg>
+                                </button>
+                            ) : (
+                                <BalanceDisplay 
+                                    balance={balance} 
+                                    earnings={userData?.isProfessional ? earningsData?.lastSessionEarnings : 0}
+                                    size="sm" 
+                                    variant="glass" 
+                                    clickable={true} 
+                                />
+                            )}
 
                             <div className="relative">
                                 <button
@@ -1084,7 +1118,10 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                                         handleUnlockImage(item._id, price || 0, item.isVideo);
                                                     } else {
                                                         const url = item.isVideo ? item.videoUrl : item.originalImageUrl;
-                                                        if (url) setFullscreenImage(url);
+                                                        if (url) {
+                                                            const idx = mediaItems.findIndex(m => m.url === url);
+                                                            setFullscreenIndex(idx >= 0 ? idx : 0);
+                                                        }
                                                     }
                                                 }}>
                                                     <img 
@@ -1118,11 +1155,10 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                                 <div 
                                                     className="relative w-60 h-60 rounded-2xl overflow-hidden bg-gray-100 shadow-sm cursor-pointer group flex items-center justify-center"
                                                     onClick={() => {
-                                                        if (item.isVideo && item.videoUrl) {
-                                                            setFullscreenImage(item.videoUrl);
-                                                        } else {
-                                                            const url = item.isVideo ? item.videoUrl : item.originalImageUrl;
-                                                            if (url) setFullscreenImage(url);
+                                                        const url = item.isVideo ? item.videoUrl : item.originalImageUrl;
+                                                        if (url) {
+                                                            const idx = mediaItems.findIndex(m => m.url === url);
+                                                            setFullscreenIndex(idx >= 0 ? idx : 0);
                                                         }
                                                     }}
                                                 >
@@ -1582,36 +1618,191 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                 </div>
             )}
 
-            {fullscreenImage && (
-                <div 
-                    className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300"
-                    onClick={() => setFullscreenImage(null)}
-                >
-                    <button 
-                        className="absolute top-6 right-6 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
-                        onClick={() => setFullscreenImage(null)}
+            {/* ===== VIEWER FULLSCREEN COM SWIPE ===== */}
+            {fullscreenIndex !== null && mediaItems.length > 0 && (() => {
+                const current = mediaItems[fullscreenIndex];
+                const goPrev = () => setFullscreenIndex(i => (i !== null && i > 0 ? i - 1 : i));
+                const goNext = () => setFullscreenIndex(i => (i !== null && i < mediaItems.length - 1 ? i + 1 : i));
+                const canPrev = fullscreenIndex > 0;
+                const canNext = fullscreenIndex < mediaItems.length - 1;
+
+                return (
+                    <div
+                        className="fixed inset-0 z-[100] bg-black flex flex-col select-none"
+                        onTouchStart={e => { swipeTouchStartX.current = e.touches[0].clientX; }}
+                        onTouchEnd={e => {
+                            if (swipeTouchStartX.current === null) return;
+                            const delta = e.changedTouches[0].clientX - swipeTouchStartX.current;
+                            swipeTouchStartX.current = null;
+                            if (delta < -50) goNext();
+                            else if (delta > 50) goPrev();
+                        }}
                     >
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                    </button>
-                    <img 
-                        src={fullscreenImage} 
-                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-300" 
-                        alt="Fullscreen" 
-                    />
-                    {fullscreenImage.includes('_video') && (
-                         <video 
-                            src={fullscreenImage} 
-                            controls 
-                            autoPlay 
-                            className="max-w-full max-h-full rounded-lg shadow-2xl animate-in zoom-in-95 duration-300" 
-                            onClick={e => e.stopPropagation()}
-                        />
-                    )}
-                </div>
-            )}
+                        {/* Topo */}
+                        <div className="flex items-center justify-between px-4 pt-6 pb-2 shrink-0" style={{ paddingTop: 'max(24px, env(safe-area-inset-top))' }}>
+                            <button
+                                className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 active:scale-95 transition-all"
+                                onClick={() => setFullscreenIndex(null)}
+                            >
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18"/>
+                                    <line x1="6" y1="6" x2="18" y2="18"/>
+                                </svg>
+                            </button>
+                            <span className="text-white/70 text-sm font-semibold tracking-wide">
+                                {fullscreenIndex + 1} / {mediaItems.length}
+                            </span>
+                            <div className="w-10" />{/* spacer */}
+                        </div>
+
+                        {/* Área central: conteúdo + setas */}
+                        <div className="flex-1 flex items-center justify-center relative min-h-0 px-2">
+                            {/* Seta esquerda */}
+                            {canPrev && (
+                                <button
+                                    className="absolute left-2 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition-all flex items-center justify-center text-white"
+                                    onClick={e => { e.stopPropagation(); goPrev(); }}
+                                >
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M15 18l-6-6 6-6"/>
+                                    </svg>
+                                </button>
+                            )}
+
+                            {/* Mídia */}
+                            <div className="flex items-center justify-center w-full h-full" onClick={() => setFullscreenIndex(null)}>
+                                {current.isVideo ? (
+                                    <video
+                                        key={current.url}
+                                        src={current.url}
+                                        controls
+                                        autoPlay
+                                        playsInline
+                                        className="max-w-full max-h-full rounded-xl shadow-2xl"
+                                        onClick={e => e.stopPropagation()}
+                                    />
+                                ) : (
+                                    <img
+                                        key={current.url}
+                                        src={current.url}
+                                        className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+                                        alt={`Mídia ${fullscreenIndex + 1}`}
+                                        onClick={e => e.stopPropagation()}
+                                    />
+                                )}
+                            </div>
+
+                            {/* Seta direita */}
+                            {canNext && (
+                                <button
+                                    className="absolute right-2 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition-all flex items-center justify-center text-white"
+                                    onClick={e => { e.stopPropagation(); goNext(); }}
+                                >
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M9 18l6-6-6-6"/>
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Dots de paginação */}
+                        {mediaItems.length > 1 && mediaItems.length <= 20 && (
+                            <div className="flex items-center justify-center gap-1.5 py-4 shrink-0">
+                                {mediaItems.map((_, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => setFullscreenIndex(i)}
+                                        className={`rounded-full transition-all ${
+                                            i === fullscreenIndex
+                                                ? 'w-5 h-2 bg-white'
+                                                : 'w-2 h-2 bg-white/30 hover:bg-white/50'
+                                        }`}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                );
+            })()}
+
+            {/* ===== GALERIA DE MÍDIA (Vaul Drawer) ===== */}
+            <Drawer.Root open={galleryVisible} onOpenChange={setGalleryVisible}>
+                <Drawer.Portal>
+                    <Drawer.Overlay className="fixed inset-0 z-[100] bg-black/60" />
+                    <Drawer.Content className="fixed inset-x-0 bottom-0 z-[101] flex flex-col bg-white rounded-t-[32px] max-h-[78vh] w-full max-w-lg mx-auto outline-none shadow-2xl">
+                        <div className="w-full flex-1 overflow-y-auto flex flex-col p-6 pb-8">
+                            {/* Handle */}
+                            <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-200 mb-6" />
+
+                            {/* Header */}
+                            <div className="flex items-center justify-between mb-5">
+                                <Drawer.Title className="text-xl font-bold text-gray-900">Mídia Compartilhada</Drawer.Title>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm text-gray-400 font-medium">
+                                        {mediaItems.length === 0
+                                            ? 'Nenhum item'
+                                            : `${mediaItems.length} ${mediaItems.length === 1 ? 'item' : 'itens'}`
+                                        }
+                                    </span>
+                                    <button
+                                        onClick={() => setGalleryVisible(false)}
+                                        className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                                    >
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                            <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Grid de thumbnails */}
+                            {mediaItems.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-16 gap-4">
+                                    <div className="w-16 h-16 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-300">
+                                        <svg width="28" height="28" viewBox="0 0 18 18" fill="none">
+                                            <rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor"/>
+                                            <rect x="11" y="1" width="6" height="6" rx="1.5" fill="currentColor"/>
+                                            <rect x="1" y="11" width="6" height="6" rx="1.5" fill="currentColor"/>
+                                            <rect x="11" y="11" width="6" height="6" rx="1.5" fill="currentColor"/>
+                                        </svg>
+                                    </div>
+                                    <p className="text-gray-400 text-sm font-medium text-center">
+                                        Nenhuma imagem ou vídeo enviado ainda
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-3 gap-1">
+                                    {mediaItems.map((item, idx) => (
+                                        <button
+                                            key={idx}
+                                            className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 active:opacity-70 transition-opacity"
+                                            onClick={() => {
+                                                setGalleryVisible(false);
+                                                setFullscreenIndex(idx);
+                                            }}
+                                        >
+                                            <img
+                                                src={item.thumbnailUrl || item.url}
+                                                alt={`Mídia ${idx + 1}`}
+                                                className="w-full h-full object-cover"
+                                            />
+                                            {item.isVideo && (
+                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                    <div className="w-8 h-8 rounded-full bg-black/45 backdrop-blur-sm flex items-center justify-center">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
+                                                            <path d="M8 5v14l11-7z"/>
+                                                        </svg>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </Drawer.Content>
+                </Drawer.Portal>
+            </Drawer.Root>
         </div>
     );
 }

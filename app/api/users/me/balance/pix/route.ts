@@ -2,11 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { Transaction } from '@/models/Transaction';
-import AbacatePay from 'abacatepay-nodejs-sdk';
 
-const apiKey = process.env.ABACATEPAY_API_KEY || '';
-const abacatepay = AbacatePay(apiKey);
-
+// POST /api/users/me/balance/pix — Cria novo PIX de recarga
 export async function POST(req: NextRequest) {
   try {
     const { userId } = await auth();
@@ -25,13 +22,16 @@ export async function POST(req: NextRequest) {
     const externalId = `recharge_${userId}_${Date.now()}`;
 
     try {
+      const AbacatePay = (await import('abacatepay-nodejs-sdk')).default;
+      const apiKey = process.env.ABACATEPAY_API_KEY || '';
+      const abacatepay = AbacatePay(apiKey);
+
       console.log('Criando PIX QR Code AbacatePay para userId:', userId, 'valor:', amount);
 
-      // pixQrCode.create gera o brCode diretamente e aparece no dashboard em dev e prod
       const pixResponse = await abacatepay.pixQrCode.create({
-        amount: Math.round(amount * 100), // cents
+        amount: Math.round(amount * 100),
         description: `Recarga de Saldo - MimoChat`,
-        expiresIn: 3600, // 1 hora
+        expiresIn: 3600,
       }) as any;
 
       if (!pixResponse.data) {
@@ -80,6 +80,39 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('Error generating PIX:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+// GET /api/users/me/balance/pix — Lista histórico de depósitos/recargas
+export async function GET() {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    await connectToDatabase();
+
+    const transactions = await Transaction.find({
+      userId,
+      source: 'recharge',
+      status: 'PAID',
+    })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+
+    return NextResponse.json({
+      transactions: transactions.map((t) => ({
+        id: t._id?.toString(),
+        amount: t.amount,
+        status: t.status,
+        createdAt: t.createdAt,
+      })),
+    });
+  } catch (error) {
+    console.error('Error fetching deposit history:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
