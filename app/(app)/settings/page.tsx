@@ -39,6 +39,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const [phone, setPhone] = useState('');
     const [pixKey, setPixKey] = useState('');
     const [subscriptionPrice, setSubscriptionPrice] = useState('');
+    const [bio, setBio] = useState('');
 
     const [loading, setLoading] = useState(false);
     const [saveError, setSaveError] = useState('');
@@ -63,6 +64,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             setPhone(userData.phone ? formatPhone(userData.phone) : '');
             setPixKey(userData.pixKey || '');
             setSubscriptionPrice(userData.subscriptionPrice?.toString() ?? '0');
+            setBio(userData.bio || '');
             hasPopulated.current = true;
         }
     }, [userData]);
@@ -90,6 +92,9 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                     return;
                 }
                 updateData.subscriptionPrice = price;
+                updateData.bio = bio;
+            } else {
+                updateData.bio = '';
             }
 
             await updateProfileMutation.mutateAsync(updateData);
@@ -210,7 +215,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                     />
                                 </div>
                                 {/* Chave Pix (Nova adição ou alteração, igual ao que estava no modal ou de forma direta) */}
-                                <div className="px-4 py-3.5">
+                                <div className="px-4 py-3.5 border-b border-gray-50">
                                     <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Chave Pix</label>
                                     <input
                                         className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
@@ -219,6 +224,28 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                         onChange={(e) => setPixKey(e.target.value)}
                                     />
                                 </div>
+                                {/* Biografia (apenas profissionais) */}
+                                {profileIsProfessional && (
+                                    <div className="px-4 py-3.5">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Biografia</label>
+                                            <span className={`text-[9px] font-medium ${bio.length > 300 ? 'text-red-500' : 'text-gray-400'}`}>
+                                                {bio.length}/300
+                                            </span>
+                                        </div>
+                                        <textarea
+                                            className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none resize-none h-20"
+                                            placeholder="Fale um pouco sobre você..."
+                                            value={bio}
+                                            onChange={(e) => {
+                                                if (e.target.value.length <= 300) {
+                                                    setBio(e.target.value);
+                                                }
+                                            }}
+                                            maxLength={300}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         </div>
 

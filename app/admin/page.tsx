@@ -45,6 +45,10 @@ interface SettingsData {
     maxPricePerChar: number;
     maxSubscriptionPrice: number;
     subscriberDiscountPercentage: number;
+    minPublicPhotos: number;
+    maxPublicPhotos: number;
+    minExclusivePhotos: number;
+    maxExclusivePhotos: number;
 }
 
 interface ChatMessage {
@@ -115,6 +119,10 @@ export default function AdminPage() {
     const [maxPricePerChar, setMaxPricePerChar] = useState(0.2);
     const [maxSubscriptionPrice, setMaxSubscriptionPrice] = useState(200);
     const [subscriberDiscountPercentage, setSubscriberDiscountPercentage] = useState(20);
+    const [minPublicPhotos, setMinPublicPhotos] = useState(6);
+    const [maxPublicPhotos, setMaxPublicPhotos] = useState(12);
+    const [minExclusivePhotos, setMinExclusivePhotos] = useState(2);
+    const [maxExclusivePhotos, setMaxExclusivePhotos] = useState(4);
     const [saving, setSaving] = useState(false);
 
     // Estados de Gerenciamento de Administradores Ricos
@@ -182,6 +190,10 @@ export default function AdminPage() {
                     setMaxPricePerChar(s.maxPricePerChar !== undefined ? s.maxPricePerChar : 0.2);
                     setMaxSubscriptionPrice(s.maxSubscriptionPrice !== undefined ? s.maxSubscriptionPrice : 200);
                     setSubscriberDiscountPercentage(s.subscriberDiscountPercentage !== undefined ? s.subscriberDiscountPercentage : 20);
+                    setMinPublicPhotos(s.minPublicPhotos !== undefined ? s.minPublicPhotos : 6);
+                    setMaxPublicPhotos(s.maxPublicPhotos !== undefined ? s.maxPublicPhotos : 12);
+                    setMinExclusivePhotos(s.minExclusivePhotos !== undefined ? s.minExclusivePhotos : 2);
+                    setMaxExclusivePhotos(s.maxExclusivePhotos !== undefined ? s.maxExclusivePhotos : 4);
                     setIsAuthorized(true);
                 } else if (response.status === 403) {
                     setIsAuthorized(false);
@@ -403,6 +415,10 @@ export default function AdminPage() {
                     maxPricePerChar,
                     maxSubscriptionPrice,
                     subscriberDiscountPercentage,
+                    minPublicPhotos,
+                    maxPublicPhotos,
+                    minExclusivePhotos,
+                    maxExclusivePhotos,
                 }),
             });
 
@@ -421,6 +437,10 @@ export default function AdminPage() {
                 setMaxPricePerChar(data.settings.maxPricePerChar);
                 setMaxSubscriptionPrice(data.settings.maxSubscriptionPrice);
                 setSubscriberDiscountPercentage(data.settings.subscriberDiscountPercentage);
+                setMinPublicPhotos(data.settings.minPublicPhotos);
+                setMaxPublicPhotos(data.settings.maxPublicPhotos);
+                setMinExclusivePhotos(data.settings.minExclusivePhotos);
+                setMaxExclusivePhotos(data.settings.maxExclusivePhotos);
             } else {
                 const errData = await response.json();
                 toast.error(errData.error || 'Erro ao salvar configurações.');
@@ -1081,6 +1101,52 @@ export default function AdminPage() {
                                                 max={100}
                                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700" 
                                             />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4 pt-4 border-t border-slate-100">
+                                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Regras de Perfil e Galeria Pública</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-slate-600 uppercase block">Mínimo de Fotos</label>
+                                                <input 
+                                                    type="number" 
+                                                    value={minPublicPhotos} 
+                                                    onChange={(e) => setMinPublicPhotos(Number(e.target.value))}
+                                                    min={0}
+                                                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700" 
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-slate-600 uppercase block">Máximo de Fotos</label>
+                                                <input 
+                                                    type="number" 
+                                                    value={maxPublicPhotos} 
+                                                    onChange={(e) => setMaxPublicPhotos(Number(e.target.value))}
+                                                    min={0}
+                                                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700" 
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-slate-600 uppercase block">Mín. Exclusivas Assinante</label>
+                                                <input 
+                                                    type="number" 
+                                                    value={minExclusivePhotos} 
+                                                    onChange={(e) => setMinExclusivePhotos(Number(e.target.value))}
+                                                    min={0}
+                                                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700" 
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-slate-600 uppercase block">Máx. Exclusivas Assinante</label>
+                                                <input 
+                                                    type="number" 
+                                                    value={maxExclusivePhotos} 
+                                                    onChange={(e) => setMaxExclusivePhotos(Number(e.target.value))}
+                                                    min={0}
+                                                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700" 
+                                                />
+                                            </div>
                                         </div>
                                     </div>
 

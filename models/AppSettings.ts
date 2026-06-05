@@ -11,6 +11,10 @@ export interface IAppSettings extends Document {
     maxPricePerChar: number;
     maxSubscriptionPrice: number;
     subscriberDiscountPercentage: number;
+    minPublicPhotos: number;
+    maxPublicPhotos: number;
+    minExclusivePhotos: number;
+    maxExclusivePhotos: number;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -74,6 +78,30 @@ const AppSettingsSchema = new Schema<IAppSettings>({
         default: 20,
         min: 0,
         max: 100,
+    },
+    minPublicPhotos: {
+        type: Number,
+        required: true,
+        default: 6,
+        min: 0,
+    },
+    maxPublicPhotos: {
+        type: Number,
+        required: true,
+        default: 12,
+        min: 0,
+    },
+    minExclusivePhotos: {
+        type: Number,
+        required: true,
+        default: 2,
+        min: 0,
+    },
+    maxExclusivePhotos: {
+        type: Number,
+        required: true,
+        default: 4,
+        min: 0,
     },
 }, {
     timestamps: true,

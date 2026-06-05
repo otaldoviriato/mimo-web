@@ -28,6 +28,7 @@ export interface IUser extends Document {
     savedCards: ICard[];
     claimedGiftCodes: string[];
     isHighSpender: boolean;
+    bio?: string;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -116,6 +117,11 @@ const UserSchema = new Schema<IUser>({
     isHighSpender: {
         type: Boolean,
         default: false,
+    },
+    bio: {
+        type: String,
+        maxlength: 300,
+        default: '',
     },
 }, {
     timestamps: true,

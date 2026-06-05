@@ -21,7 +21,21 @@ async function getOrCreateSettings() {
             maxPricePerChar: 0.2,
             maxSubscriptionPrice: 200,
             subscriberDiscountPercentage: 20,
+            minPublicPhotos: 6,
+            maxPublicPhotos: 12,
+            minExclusivePhotos: 2,
+            maxExclusivePhotos: 4,
         });
+    } else {
+        // Garantir que novos campos sejam populados se não existirem
+        let updated = false;
+        if (settings.minPublicPhotos === undefined) { settings.minPublicPhotos = 6; updated = true; }
+        if (settings.maxPublicPhotos === undefined) { settings.maxPublicPhotos = 12; updated = true; }
+        if (settings.minExclusivePhotos === undefined) { settings.minExclusivePhotos = 2; updated = true; }
+        if (settings.maxExclusivePhotos === undefined) { settings.maxExclusivePhotos = 4; updated = true; }
+        if (updated) {
+            await settings.save();
+        }
     }
     return settings;
 }
@@ -107,7 +121,11 @@ export async function PUT(request: NextRequest) {
             comparisonPeriod,
             maxPricePerChar,
             maxSubscriptionPrice,
-            subscriberDiscountPercentage
+            subscriberDiscountPercentage,
+            minPublicPhotos,
+            maxPublicPhotos,
+            minExclusivePhotos,
+            maxExclusivePhotos
         } = body;
 
         // Validações básicas
@@ -164,6 +182,41 @@ export async function PUT(request: NextRequest) {
                 return NextResponse.json({ error: 'Desconto deve ser entre 0% e 100%' }, { status: 400 });
             }
             settings.subscriberDiscountPercentage = discount;
+        }
+
+        if (minPublicPhotos !== undefined) {
+            const val = Number(minPublicPhotos);
+            if (isNaN(val) || val < 0) return NextResponse.json({ error: 'Quantidade mínima de fotos inválida' }, { status: 400 });
+            settings.minPublicPhotos = val;
+        }
+
+        if (maxPublicPhotos !== undefined) {
+            const val = Number(maxPublicPhotos);
+            if (isNaN(val) || val < 0) return NextResponse.json({ error: 'Quantidade máxima de fotos inválida' }, { status: 400 });
+            settings.maxPublicPhotos = val;
+        }
+
+        if (minExclusivePhotos !== undefined) {
+            const val = Number(minExclusivePhotos);
+            if (isNaN(val) || val < 0) return NextResponse.json({ error: 'Quantidade mínima de fotos exclusivas inválida' }, { status: 400 });
+            settings.minExclusivePhotos = val;
+        }
+
+        if (maxExclusivePhotos !== undefined) {
+            const val = Number(maxExclusivePhotos);
+            if (isNaN(val) || val < 0) return NextResponse.json({ error: 'Quantidade máxima de fotos exclusivas inválida' }, { status: 400 });
+            settings.maxExclusivePhotos = val;
+        }
+
+        // Validação de consistência
+        if (settings.minPublicPhotos > settings.maxPublicPhotos) {
+            return NextResponse.json({ error: 'A quantidade mínima de fotos públicas não pode ser maior que a máxima' }, { status: 400 });
+        }
+        if (settings.minExclusivePhotos > settings.maxExclusivePhotos) {
+            return NextResponse.json({ error: 'A quantidade mínima de fotos exclusivas não pode ser maior que a máxima' }, { status: 400 });
+        }
+        if (settings.maxExclusivePhotos > settings.maxPublicPhotos) {
+            return NextResponse.json({ error: 'A quantidade máxima de fotos exclusivas não pode ser maior que o limite máximo de fotos públicas' }, { status: 400 });
         }
 
         if (adminClerkIds !== undefined) {

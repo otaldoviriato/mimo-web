@@ -85,9 +85,14 @@ export async function GET() {
                 chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? 0.005,
                 subscribers: user.subscribers || [],
                 pixKey: user.pixKey,
+                bio: user.bio || '',
                 maxPricePerChar,
                 maxSubscriptionPrice,
                 subscriberDiscountPercentage,
+                minPublicPhotos: settings?.minPublicPhotos ?? 6,
+                maxPublicPhotos: settings?.maxPublicPhotos ?? 12,
+                minExclusivePhotos: settings?.minExclusivePhotos ?? 2,
+                maxExclusivePhotos: settings?.maxExclusivePhotos ?? 4,
             },
         });
     } catch (error: any) {
@@ -106,7 +111,7 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { username, name, photoUrl, coverUrl, phone, taxId, pixKey, isProfessional, subscriptionPrice, chargePerCharSubscribers, chargePerCharNonSubscribers } = body;
+        const { username, name, photoUrl, coverUrl, phone, taxId, pixKey, isProfessional, subscriptionPrice, chargePerCharSubscribers, chargePerCharNonSubscribers, bio } = body;
 
         await connectToDatabase();
 
@@ -164,6 +169,21 @@ export async function PATCH(request: NextRequest) {
             updateData.chargePerCharNonSubscribers = chargePerCharNonSubscribers;
         }
 
+        const isProf = isProfessional !== undefined ? isProfessional : (currentUser?.isProfessional ?? false);
+        if (bio !== undefined) {
+            if (bio && !isProf) {
+                return NextResponse.json({ error: 'Apenas profissionais podem ter biografia.' }, { status: 400 });
+            }
+            if (bio.length > 300) {
+                return NextResponse.json({ error: 'A biografia deve ter no máximo 300 caracteres.' }, { status: 400 });
+            }
+            updateData.bio = bio;
+        }
+
+        if (isProfessional === false) {
+            updateData.bio = '';
+        }
+
         const user = await User.findOneAndUpdate(
             { clerkId: userId },
             {
@@ -206,9 +226,14 @@ export async function PATCH(request: NextRequest) {
                 chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? 0.005,
                 subscribers: user.subscribers || [],
                 pixKey: user.pixKey,
+                bio: user.bio || '',
                 maxPricePerChar,
                 maxSubscriptionPrice,
                 subscriberDiscountPercentage,
+                minPublicPhotos: settings?.minPublicPhotos ?? 6,
+                maxPublicPhotos: settings?.maxPublicPhotos ?? 12,
+                minExclusivePhotos: settings?.minExclusivePhotos ?? 2,
+                maxExclusivePhotos: settings?.maxExclusivePhotos ?? 4,
             },
         });
     } catch (error: any) {

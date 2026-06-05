@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
@@ -16,6 +16,7 @@ interface UserProfilePageProps {
 
 export default function UserProfilePage({ params, username: propUsername, onBack, isSubPage = false, isClosing = false }: UserProfilePageProps) {
     const router = useTransitionRouter();
+    const [activeGalleryTab, setActiveGalleryTab] = useState<'public' | 'private'>('public');
 
     let resolvedUsername = '';
     if (propUsername) {
@@ -156,72 +157,185 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                 <p className="text-purple-600 font-bold text-sm tracking-wide mt-0.5">
                     @{user.username}
                 </p>
+
+                {/* Galeria Privada - Contador minimalista e discreto no topo */}
+                {user.isProfessional && ((galleryData?.privatePhotosCount ?? 0) > 0 || (galleryData?.privateVideosCount ?? 0) > 0) && (
+                    <div className="mt-2.5 flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-full text-[10px] text-slate-500 font-medium border border-slate-200/50 shadow-sm z-10 animate-in fade-in duration-300">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-slate-400">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
+                        <span>Galeria Privada:</span>
+                        <span className="font-bold text-slate-700">
+                            {galleryData.privatePhotosCount > 0 && `${galleryData.privatePhotosCount} ${galleryData.privatePhotosCount === 1 ? 'foto' : 'fotos'}`}
+                            {galleryData.privatePhotosCount > 0 && galleryData.privateVideosCount > 0 && ' e '}
+                            {galleryData.privateVideosCount > 0 && `${galleryData.privateVideosCount} ${galleryData.privateVideosCount === 1 ? 'vídeo' : 'vídeos'}`}
+                        </span>
+                    </div>
+                )}
+
+                {/* Biografia do usuário */}
+                {user.isProfessional && user.bio && (
+                    <p className="mt-4 px-6 text-center text-xs text-slate-600 leading-relaxed max-w-sm italic font-medium z-10 animate-in fade-in duration-300">
+                        "{user.bio}"
+                    </p>
+                )}
+
+                {/* Painel Elegante de Estatísticas (Stats) para Credibilidade */}
+                {user.isProfessional && (
+                    <div className="w-full max-w-sm mt-5 grid grid-cols-3 gap-2 border-y border-slate-200/50 py-3.5 px-4 mb-4 z-10 bg-white/40 backdrop-blur-sm rounded-xl">
+                        <div className="flex flex-col items-center text-center">
+                            <span className="text-sm font-bold text-slate-800 tabular-nums">
+                                {user.subscribers?.length ?? 0}
+                            </span>
+                            <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
+                                Assinantes
+                            </span>
+                        </div>
+                        <div className="flex flex-col items-center text-center border-x border-slate-200/50">
+                            <span className="text-sm font-bold text-slate-800 tabular-nums">
+                                {galleryData?.items?.length ?? 0}
+                            </span>
+                            <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
+                                Mídias Públicas
+                            </span>
+                        </div>
+                        <div className="flex flex-col items-center text-center">
+                            <span className="text-sm font-bold text-slate-800 tabular-nums">
+                                {(galleryData?.privatePhotosCount ?? 0) + (galleryData?.privateVideosCount ?? 0)}
+                            </span>
+                            <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
+                                Mídias Privadas
+                            </span>
+                        </div>
+                    </div>
+                )}
             </div>
+
+            {/* Seletor de Abas da Galeria (apenas para assinantes ou dono) */}
+            {user?.isProfessional && (isSubscriber || isOwner) ? (
+                <div className="flex border-b border-purple-100/50 mb-2.5 px-6 shrink-0 z-10">
+                    <button
+                        onClick={() => setActiveGalleryTab('public')}
+                        className={`flex-1 pb-2 text-xs font-black uppercase tracking-wider transition-all border-b-2 text-center ${
+                            activeGalleryTab === 'public'
+                                ? 'border-purple-600 text-purple-600 font-bold'
+                                : 'border-transparent text-gray-400'
+                        }`}
+                    >
+                        Galeria Pública ({galleryData?.items?.length ?? 0})
+                    </button>
+                    <button
+                        onClick={() => setActiveGalleryTab('private')}
+                        className={`flex-1 pb-2 text-xs font-black uppercase tracking-wider transition-all border-b-2 text-center ${
+                            activeGalleryTab === 'private'
+                                ? 'border-purple-600 text-purple-600 font-bold'
+                                : 'border-transparent text-gray-400'
+                        }`}
+                    >
+                        Galeria Privada ({galleryData?.privateItems?.length ?? 0})
+                    </button>
+                </div>
+            ) : null}
 
             {/* Gallery section */}
             {user?.isProfessional && (
-                <div className="mt-6 w-full">
+                <div className="mt-2 w-full shrink-0 z-10">
                     {loadingGallery ? (
                         <div className="grid grid-cols-3 gap-0.5 animate-pulse px-0.5">
                             {[1, 2, 3, 4, 5, 6].map(i => (
                                 <div key={i} className="aspect-square bg-gray-100" />
                             ))}
                         </div>
-                    ) : galleryData?.items?.length === 0 ? (
-                        <div className="bg-gray-50 rounded-2xl p-8 border border-dashed border-gray-200 flex flex-col items-center justify-center text-center mx-6 mt-4">
-                            <span className="text-2xl mb-1">📸</span>
-                            <p className="text-sm text-gray-400 font-medium">Nenhuma foto na galeria ainda</p>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-3 gap-0.5 px-0.5">
-                            {galleryData?.items?.map((item: any) => {
-                                const isLocked = item.visibility === 'subscribers' && !isSubscriber && !isOwner;
-                                return (
-                                    <div key={item._id} className="relative aspect-square overflow-hidden bg-gray-100 group">
-                                        {isLocked ? (
-                                            <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-indigo-600 to-pink-500 flex flex-col items-center justify-center p-2.5 text-center select-none">
-                                                {/* Textura geométrica de bolinhas */}
-                                                <div 
-                                                    className="absolute inset-0 opacity-[0.15]" 
-                                                    style={{ 
-                                                        backgroundImage: 'radial-gradient(#fff 1.5px, transparent 1.5px)', 
-                                                        backgroundSize: '10px 10px' 
-                                                    }} 
-                                                />
-                                                {/* Textura geométrica de linhas diagonais */}
-                                                <div 
-                                                    className="absolute inset-0 opacity-[0.08] bg-[linear-gradient(45deg,_rgba(255,255,255,0.15)_25%,_transparent_25%,_transparent_50%,_rgba(255,255,255,0.15)_50%,_rgba(255,255,255,0.15)_75%,_transparent_75%,_transparent)] bg-[size:16px_16px]" 
-                                                />
-                                                
-                                                <div className="relative z-10 flex flex-col items-center gap-1">
-                                                    <div className="w-7 h-7 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-md">
-                                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                                                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                                                        </svg>
+                    ) : activeGalleryTab === 'public' ? (
+                        (galleryData?.items?.length ?? 0) === 0 ? (
+                            <div className="bg-gray-50 rounded-2xl p-8 border border-dashed border-gray-200 flex flex-col items-center justify-center text-center mx-6 mt-4">
+                                <span className="text-2xl mb-1">📸</span>
+                                <p className="text-sm text-gray-400 font-medium">Nenhuma foto na galeria ainda</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-3 gap-0.5 px-0.5">
+                                {galleryData?.items?.map((item: any) => {
+                                    const isLocked = item.visibility === 'subscribers' && !isSubscriber && !isOwner;
+                                    return (
+                                        <div key={item._id} className="relative aspect-square overflow-hidden bg-gray-100 group">
+                                            {isLocked ? (
+                                                <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-indigo-600 to-pink-500 flex flex-col items-center justify-center p-2.5 text-center select-none">
+                                                    {/* Textura geométrica de bolinhas */}
+                                                    <div 
+                                                        className="absolute inset-0 opacity-[0.15]" 
+                                                        style={{ 
+                                                            backgroundImage: 'radial-gradient(#fff 1.5px, transparent 1.5px)', 
+                                                            backgroundSize: '10px 10px' 
+                                                        }} 
+                                                    />
+                                                    {/* Textura geométrica de linhas diagonais */}
+                                                    <div 
+                                                        className="absolute inset-0 opacity-[0.08] bg-[linear-gradient(45deg,_rgba(255,255,255,0.15)_25%,_transparent_25%,_transparent_50%,_rgba(255,255,255,0.15)_50%,_rgba(255,255,255,0.15)_75%,_transparent_75%,_transparent)] bg-[size:16px_16px]" 
+                                                    />
+                                                    
+                                                    <div className="relative z-10 flex flex-col items-center gap-1">
+                                                        <div className="w-7 h-7 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-md">
+                                                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                                                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                                            </svg>
+                                                        </div>
+                                                        <span className="text-[9px] font-black text-white uppercase tracking-widest leading-none">
+                                                            Exclusivo
+                                                        </span>
+                                                        <span className="text-[7.5px] font-bold text-purple-100 uppercase tracking-wider leading-none block mt-0.5">
+                                                            para assinantes
+                                                        </span>
                                                     </div>
-                                                    <span className="text-[9px] font-black text-white uppercase tracking-widest leading-none">
-                                                        Exclusivo
-                                                    </span>
-                                                    <span className="text-[7.5px] font-bold text-purple-100 uppercase tracking-wider leading-none block mt-0.5">
-                                                        para assinantes
-                                                    </span>
+                                                </div>
+                                            ) : (
+                                                <img
+                                                    src={item.imageUrl}
+                                                    alt="Gallery item"
+                                                    className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
+                                                />
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )
+                    ) : (
+                        (galleryData?.privateItems?.length ?? 0) === 0 ? (
+                            <div className="bg-gray-50 rounded-2xl p-8 border border-dashed border-gray-200 flex flex-col items-center justify-center text-center mx-6 mt-4">
+                                <span className="text-2xl mb-1">🔒</span>
+                                <p className="text-sm text-gray-400 font-medium">Nenhuma mídia privada ainda</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-3 gap-0.5 px-0.5">
+                                {galleryData?.privateItems?.map((item: any) => (
+                                    <div key={item._id} className="relative aspect-square overflow-hidden bg-gray-100 group">
+                                        {item.mediaType === 'video' ? (
+                                            <div className="w-full h-full relative">
+                                                <video src={item.imageUrl} preload="metadata" className="w-full h-full object-cover" />
+                                                <div className="absolute inset-0 flex items-center justify-center bg-black/15">
+                                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="white" className="opacity-80 drop-shadow-md">
+                                                        <polygon points="5 3 19 12 5 21 5 3"/>
+                                                    </svg>
                                                 </div>
                                             </div>
                                         ) : (
                                             <img
                                                 src={item.imageUrl}
-                                                alt="Gallery item"
+                                                alt="Private Gallery item"
                                                 className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
                                             />
                                         )}
                                     </div>
-                                );
-                            })}
-                        </div>
+                                ))}
+                            </div>
+                        )
                     )}
                 </div>
             )}
+
+            {/* O banner discretizado antigo foi removido por ter sido integrado ao bloco superior */}
 
             {/* Barra de Ações Flutuante no Rodapé */}
             <div className="fixed bottom-6 left-4 right-4 z-30 flex justify-center pointer-events-none">

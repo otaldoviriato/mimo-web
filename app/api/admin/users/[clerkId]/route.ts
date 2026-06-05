@@ -94,7 +94,8 @@ export async function PATCH(
             chargePerCharSubscribers,
             chargePerCharNonSubscribers,
             photoUrl,
-            coverUrl
+            coverUrl,
+            bio
         } = body;
 
         const updateFields: any = {};
@@ -110,6 +111,17 @@ export async function PATCH(
         if (chargePerCharNonSubscribers !== undefined) updateFields.chargePerCharNonSubscribers = Number(chargePerCharNonSubscribers);
         if (photoUrl !== undefined) updateFields.photoUrl = photoUrl;
         if (coverUrl !== undefined) updateFields.coverUrl = coverUrl;
+
+        if (bio !== undefined) {
+            if (bio && bio.length > 300) {
+                return NextResponse.json({ error: 'A biografia deve ter no máximo 300 caracteres.' }, { status: 400 });
+            }
+            updateFields.bio = bio;
+        }
+
+        if (isProfessional === false) {
+            updateFields.bio = '';
+        }
 
         const updatedUser = await User.findOneAndUpdate(
             { clerkId },

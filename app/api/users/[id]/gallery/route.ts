@@ -16,20 +16,30 @@ export async function GET(
         // Buscar dono do perfil
         const owner = await User.findOne({ clerkId: ownerId });
         if (!owner) {
-            return NextResponse.json({ items: [] });
+            return NextResponse.json({ items: [], privateItems: [], privatePhotosCount: 0, privateVideosCount: 0 });
         }
 
         // Verificar se quem está pedindo é assinante (assinatura só faz sentido para profissionais)
         const isSubscriber = owner.isProfessional && requesterId && owner.subscribers?.includes(requesterId);
         const isOwner = requesterId === ownerId;
 
-        // Removemos o filtro de visibilidade para que todos vejam os itens (frontend aplicará o blur)
-        let query: any = { ownerId };
+        const allItems = await GalleryItem.find({ ownerId }).sort({ createdAt: -1 });
 
-        const items = await GalleryItem.find(query).sort({ createdAt: -1 });
+        const publicItems = allItems.filter(item => !item.galleryType || item.galleryType === 'public');
+        const privateItems = allItems.filter(item => item.galleryType === 'private');
+
+        const privatePhotosCount = privateItems.filter(item => !item.mediaType || item.mediaType === 'photo').length;
+        const privateVideosCount = privateItems.filter(item => item.mediaType === 'video').length;
+
+        // Se for assinante ou o dono, retornamos as fotos/vídeos privados, caso contrário retornamos vazio
+        const visiblePrivateItems = (isSubscriber || isOwner) ? privateItems : [];
 
         return NextResponse.json({ 
-            items,
+            items: publicItems,
+            publicItems,
+            privateItems: visiblePrivateItems,
+            privatePhotosCount,
+            privateVideosCount,
             isSubscriber: !!isSubscriber,
             isOwner: !!isOwner
         });

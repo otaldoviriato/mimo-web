@@ -42,6 +42,7 @@ export default function ProfilePage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const galleryInputRef = useRef<HTMLInputElement>(null);
     const coverInputRef = useRef<HTMLInputElement>(null);
+    const privateGalleryInputRef = useRef<HTMLInputElement>(null);
     const { data: galleryData } = useMyGallery();
     const uploadGalleryMutation = useUploadToGallery();
     const deleteGalleryMutation = useDeleteFromGallery();
@@ -80,6 +81,7 @@ export default function ProfilePage() {
     const [uploadingGallery, setUploadingGallery] = useState(false);
     const [visibilityModal, setVisibilityModal] = useState<{ open: boolean, file?: File }>({ open: false });
     const [cropperState, setCropperState] = useState<{ open: boolean; imageSrc: string; type: 'photo' | 'cover' } | null>(null);
+    const [activeGalleryTab, setActiveGalleryTab] = useState<'public' | 'private'>('public');
 
     const hasPopulatedFromCache = useRef(false);
 
@@ -303,6 +305,30 @@ export default function ProfilePage() {
         setVisibilityModal({ open: true, file });
     };
 
+    const handlePrivateGalleryFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (confirm(`Deseja adicionar este arquivo (${file.type.startsWith('video/') ? 'vídeo' : 'foto'}) à sua Galeria Privada?`)) {
+            setUploadingGallery(true);
+            const formData = new FormData();
+            formData.append('photo', file);
+            formData.append('galleryType', 'private');
+            formData.append('visibility', 'subscribers');
+
+            try {
+                await uploadGalleryMutation.mutateAsync(formData);
+                if (privateGalleryInputRef.current) privateGalleryInputRef.current.value = '';
+            } catch (error: any) {
+                alert(error.message || 'Erro ao subir arquivo para galeria privada');
+            } finally {
+                setUploadingGallery(false);
+            }
+        } else {
+            if (privateGalleryInputRef.current) privateGalleryInputRef.current.value = '';
+        }
+    };
+
     const confirmGalleryUpload = async (visibility: 'public' | 'subscribers') => {
         if (!visibilityModal.file) return;
         
@@ -310,6 +336,7 @@ export default function ProfilePage() {
         const formData = new FormData();
         formData.append('photo', visibilityModal.file);
         formData.append('visibility', visibility);
+        formData.append('galleryType', 'public');
 
         try {
             await uploadGalleryMutation.mutateAsync(formData);
@@ -758,8 +785,20 @@ export default function ProfilePage() {
                         </div>
                         {/* Barra de progresso */}
                         {(() => {
+                            const minPublicPhotos = userData?.minPublicPhotos ?? 6;
+                            const maxPublicPhotos = userData?.maxPublicPhotos ?? 12;
+                            const minExclusivePhotos = userData?.minExclusivePhotos ?? 2;
+                            const maxExclusivePhotos = userData?.maxExclusivePhotos ?? 4;
+                            const publicItemsCount = galleryData?.publicItems?.length ?? galleryData?.items?.length ?? 0;
+                            const publicExclusiveCount = (galleryData?.publicItems ?? galleryData?.items ?? []).filter((item: any) => item.visibility === 'subscribers').length;
+                            const publicGalleryIsComplete = 
+                                publicItemsCount >= minPublicPhotos && 
+                                publicItemsCount <= maxPublicPhotos && 
+                                publicExclusiveCount >= minExclusivePhotos && 
+                                publicExclusiveCount <= maxExclusivePhotos;
+
                             const checks = profileIsProfessional
-                                ? [!!localPhotoUrl, !!userData?.taxId, !!userData?.pixKey, !!userData?.phone]
+                                ? [!!localPhotoUrl, !!userData?.taxId, !!userData?.pixKey, !!userData?.phone, publicGalleryIsComplete]
                                 : [!!localPhotoUrl, !!userData?.taxId, !!userData?.phone];
                             const done = checks.filter(Boolean).length;
                             const total = checks.length;
@@ -771,86 +810,215 @@ export default function ProfilePage() {
                         })()}
                     </div>
                     <div className="flex flex-col gap-2">
-                        {(profileIsProfessional
-                            ? [
-                                { label: 'Foto de perfil', done: !!localPhotoUrl, action: () => fileInputRef.current?.click() },
-                                { label: 'CPF informado', done: !!userData?.taxId, action: () => router.push('/settings') },
-                                { label: 'Chave Pix cadastrada', done: !!userData?.pixKey, action: () => router.push('/settings') },
-                                { label: 'Telefone cadastrado', done: !!userData?.phone, action: () => router.push('/settings') },
-                            ]
-                            : [
-                                { label: 'Foto de perfil', done: !!localPhotoUrl, action: () => fileInputRef.current?.click() },
-                                { label: 'CPF informado', done: !!userData?.taxId, action: () => router.push('/settings') },
-                                { label: 'Telefone cadastrado', done: !!userData?.phone, action: () => router.push('/settings') },
-                            ]
-                        ).map((item, i) => (
-                            <div key={i} className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
-                                        item.done ? 'bg-green-100' : 'bg-gray-100'
-                                    }`}>
-                                        {item.done ? (
-                                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-green-600"><polyline points="20 6 9 17 4 12"/></svg>
-                                        ) : (
-                                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-gray-400"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                        )}
+                        {(() => {
+                            const minPublicPhotos = userData?.minPublicPhotos ?? 6;
+                            const maxPublicPhotos = userData?.maxPublicPhotos ?? 12;
+                            const minExclusivePhotos = userData?.minExclusivePhotos ?? 2;
+                            const maxExclusivePhotos = userData?.maxExclusivePhotos ?? 4;
+                            const publicItemsCount = galleryData?.publicItems?.length ?? galleryData?.items?.length ?? 0;
+                            const publicExclusiveCount = (galleryData?.publicItems ?? galleryData?.items ?? []).filter((item: any) => item.visibility === 'subscribers').length;
+                            const publicGalleryIsComplete = 
+                                publicItemsCount >= minPublicPhotos && 
+                                publicItemsCount <= maxPublicPhotos && 
+                                publicExclusiveCount >= minExclusivePhotos && 
+                                publicExclusiveCount <= maxExclusivePhotos;
+
+                            return (profileIsProfessional
+                                ? [
+                                    { label: 'Foto de perfil', done: !!localPhotoUrl, action: () => fileInputRef.current?.click() },
+                                    { label: 'CPF informado', done: !!userData?.taxId, action: () => router.push('/settings') },
+                                    { label: 'Chave Pix cadastrada', done: !!userData?.pixKey, action: () => router.push('/settings') },
+                                    { label: 'Telefone cadastrado', done: !!userData?.phone, action: () => router.push('/settings') },
+                                    { label: `Galeria pública completa (${publicItemsCount} fotos, ${publicExclusiveCount} exclusivas)`, done: publicGalleryIsComplete, action: () => { setActiveGalleryTab('public'); const el = document.getElementById('my-gallery-section'); el?.scrollIntoView({ behavior: 'smooth' }); } },
+                                ]
+                                : [
+                                    { label: 'Foto de perfil', done: !!localPhotoUrl, action: () => fileInputRef.current?.click() },
+                                    { label: 'CPF informado', done: !!userData?.taxId, action: () => router.push('/settings') },
+                                    { label: 'Telefone cadastrado', done: !!userData?.phone, action: () => router.push('/settings') },
+                                ]
+                            ).map((item, i) => (
+                                <div key={i} className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
+                                            item.done ? 'bg-green-100' : 'bg-gray-100'
+                                        }`}>
+                                            {item.done ? (
+                                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-green-600"><polyline points="20 6 9 17 4 12"/></svg>
+                                            ) : (
+                                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-gray-400"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                            )}
+                                        </div>
+                                        <span className={`text-xs ${ item.done ? 'text-gray-700' : 'text-gray-400'}`}>{item.label}</span>
                                     </div>
-                                    <span className={`text-xs ${ item.done ? 'text-gray-700' : 'text-gray-400'}`}>{item.label}</span>
+                                    {!item.done && (
+                                        <button onClick={item.action} className="text-[10px] font-semibold text-purple-600 hover:text-purple-700">
+                                            Completar
+                                        </button>
+                                    )}
                                 </div>
-                                {!item.done && (
-                                    <button onClick={item.action} className="text-[10px] font-semibold text-purple-600 hover:text-purple-700">
-                                        Completar
-                                    </button>
-                                )}
-                            </div>
-                        ))}
+                            ));
+                        })()}
                     </div>
                 </div>
 
                 {/* ── GALERIA (Profissionais) ────────────────────────────── */}
-                {profileIsProfessional && (
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-3">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h2 className="text-sm font-semibold text-gray-800">Minha Galeria</h2>
-                                <p className="text-[10px] text-gray-400">{galleryData?.items?.length ?? 0} {(galleryData?.items?.length ?? 0) === 1 ? 'foto' : 'fotos'}</p>
-                            </div>
-                            <button
-                                onClick={() => galleryInputRef.current?.click()}
-                                className="h-7 px-3 rounded-lg border border-gray-200 text-[11px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-1"
-                            >
-                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                Adicionar
-                            </button>
-                            <input ref={galleryInputRef} type="file" accept="image/*" className="hidden" onChange={handleGalleryFileChange} />
-                        </div>
+                {profileIsProfessional && (() => {
+                    const minPublicPhotos = userData?.minPublicPhotos ?? 6;
+                    const maxPublicPhotos = userData?.maxPublicPhotos ?? 12;
+                    const minExclusivePhotos = userData?.minExclusivePhotos ?? 2;
+                    const maxExclusivePhotos = userData?.maxExclusivePhotos ?? 4;
+                    const publicItemsCount = galleryData?.publicItems?.length ?? galleryData?.items?.length ?? 0;
+                    const publicExclusiveCount = (galleryData?.publicItems ?? galleryData?.items ?? []).filter((item: any) => item.visibility === 'subscribers').length;
+                    const publicGalleryIsComplete = 
+                        publicItemsCount >= minPublicPhotos && 
+                        publicItemsCount <= maxPublicPhotos && 
+                        publicExclusiveCount >= minExclusivePhotos && 
+                        publicExclusiveCount <= maxExclusivePhotos;
 
-                        {galleryData?.items?.length === 0 ? (
-                            <div className="py-6 flex flex-col items-center justify-center border border-dashed border-gray-200 rounded-xl gap-1">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-300"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                                <p className="text-xs text-gray-400">Nenhuma foto ainda</p>
+                    return (
+                        <div id="my-gallery-section" className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-3">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-sm font-semibold text-gray-800">Minha Galeria</h2>
+                                
+                                {activeGalleryTab === 'public' ? (
+                                    <button
+                                        onClick={() => galleryInputRef.current?.click()}
+                                        className="h-7 px-3 rounded-lg border border-gray-200 text-[11px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-1"
+                                    >
+                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                        Adicionar Foto
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => privateGalleryInputRef.current?.click()}
+                                        className="h-7 px-3 rounded-lg border border-gray-200 text-[11px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-1"
+                                    >
+                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                        Adicionar Mídia
+                                    </button>
+                                )}
+                                
+                                <input ref={galleryInputRef} type="file" accept="image/*" className="hidden" onChange={handleGalleryFileChange} />
+                                <input ref={privateGalleryInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={handlePrivateGalleryFileChange} />
                             </div>
-                        ) : (
-                            <div className="grid grid-cols-3 gap-1.5">
-                                {galleryData?.items?.map((item: any) => (
-                                    <div key={item._id} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 group">
-                                        <img src={item.imageUrl} alt="Gallery" className="w-full h-full object-cover" />
-                                        <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-black/40 text-[9px] text-white backdrop-blur-sm">
-                                            {item.visibility === 'public' ? '🌐' : '💎'}
-                                        </div>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleDeleteGalleryItem(item._id); }}
-                                            disabled={deleteGalleryMutation.isPending}
-                                            className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100"
-                                        >
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                                        </button>
+
+                            {/* Seletor de Abas */}
+                            <div className="flex border-b border-gray-100 mt-1">
+                                <button
+                                    onClick={() => setActiveGalleryTab('public')}
+                                    className={`flex-1 pb-2 text-xs font-bold transition-all border-b-2 text-center ${
+                                        activeGalleryTab === 'public'
+                                            ? 'border-purple-600 text-purple-600'
+                                            : 'border-transparent text-gray-400'
+                                    }`}
+                                >
+                                    Pública ({publicItemsCount})
+                                </button>
+                                <button
+                                    onClick={() => setActiveGalleryTab('private')}
+                                    className={`flex-1 pb-2 text-xs font-bold transition-all border-b-2 text-center ${
+                                        activeGalleryTab === 'private'
+                                            ? 'border-purple-600 text-purple-600'
+                                            : 'border-transparent text-gray-400'
+                                    }`}
+                                >
+                                    Privada ({galleryData?.privateItems?.length ?? 0})
+                                </button>
+                            </div>
+
+                            {/* Avisos/Alertas de Validação */}
+                            {activeGalleryTab === 'public' && !publicGalleryIsComplete && (
+                                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 flex items-start gap-2.5">
+                                    <span className="text-base mt-0.5">⚠️</span>
+                                    <div className="text-xs text-amber-800 font-medium">
+                                        <p className="font-bold">Galeria Pública Incompleta</p>
+                                        <p className="mt-0.5">
+                                            Insira de {minPublicPhotos} a {maxPublicPhotos} fotos. No mínimo {minExclusivePhotos} e no máximo {maxExclusivePhotos} delas devem ser exclusivas para assinantes.
+                                        </p>
+                                        <p className="mt-1 font-semibold text-amber-900">
+                                            Atual: {publicItemsCount} fotos ({publicExclusiveCount} exclusivas).
+                                        </p>
                                     </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
+                                </div>
+                            )}
+                            {activeGalleryTab === 'private' && (
+                                <div className="bg-purple-50/50 border border-purple-100/60 rounded-xl p-3 flex items-start gap-2.5">
+                                    <span className="text-base mt-0.5">🔒</span>
+                                    <div className="text-xs text-purple-800 font-medium">
+                                        <p className="font-bold">Galeria Privada Exclusiva</p>
+                                        <p className="mt-0.5">
+                                            Todos os itens adicionados aqui são exclusivos para assinantes por definição. Aceita fotos e vídeos.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Grid de Itens */}
+                            {activeGalleryTab === 'public' ? (
+                                publicItemsCount === 0 ? (
+                                    <div className="py-6 flex flex-col items-center justify-center border border-dashed border-gray-200 rounded-xl gap-1">
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-300"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                        <p className="text-xs text-gray-400">Nenhuma foto pública ainda</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-3 gap-1.5">
+                                        {(galleryData?.publicItems ?? galleryData?.items ?? []).map((item: any) => (
+                                            <div key={item._id} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 group">
+                                                <img src={item.imageUrl} alt="Gallery" className="w-full h-full object-cover" />
+                                                <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-black/40 text-[9px] text-white backdrop-blur-sm">
+                                                    {item.visibility === 'public' ? '🌐' : '💎'}
+                                                </div>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleDeleteGalleryItem(item._id); }}
+                                                    disabled={deleteGalleryMutation.isPending}
+                                                    className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100"
+                                                >
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )
+                            ) : (
+                                (galleryData?.privateItems?.length ?? 0) === 0 ? (
+                                    <div className="py-6 flex flex-col items-center justify-center border border-dashed border-gray-200 rounded-xl gap-1">
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-300"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                        <p className="text-xs text-gray-400">Nenhuma mídia privada ainda</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-3 gap-1.5">
+                                        {galleryData?.privateItems?.map((item: any) => (
+                                            <div key={item._id} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 group">
+                                                {item.mediaType === 'video' ? (
+                                                    <div className="w-full h-full relative">
+                                                        <video src={item.imageUrl} preload="metadata" className="w-full h-full object-cover" />
+                                                        <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="white" className="opacity-80">
+                                                                <polygon points="5 3 19 12 5 21 5 3"/>
+                                                            </svg>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <img src={item.imageUrl} alt="Private Gallery" className="w-full h-full object-cover" />
+                                                )}
+                                                <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-black/40 text-[9px] text-white backdrop-blur-sm">
+                                                    🔒
+                                                </div>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleDeleteGalleryItem(item._id); }}
+                                                    disabled={deleteGalleryMutation.isPending}
+                                                    className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100"
+                                                >
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )
+                            )}
+                        </div>
+                    );
+                })()}
             </div>
 
             {/* Visibility Selection Modal */}

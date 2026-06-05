@@ -219,6 +219,10 @@ export default function ChatsPage() {
                 setGiftAmount(typeof data?.amount === 'number' ? data.amount : null);
                 setGiftModal(true);
                 queryClient.invalidateQueries({ queryKey: QueryKeys.me });
+                queryClient.invalidateQueries({ queryKey: ['deposit', 'history'] });
+                if (user?.id) {
+                    queryClient.invalidateQueries({ queryKey: QueryKeys.balance(user.id) });
+                }
             }
         }).catch(() => {});
     }, [user?.id, queryClient]);

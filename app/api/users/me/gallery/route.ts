@@ -17,9 +17,15 @@ export async function GET() {
 
         await connectToDatabase();
 
-        const items = await GalleryItem.find({ ownerId: userId }).sort({ createdAt: -1 });
+        const allItems = await GalleryItem.find({ ownerId: userId }).sort({ createdAt: -1 });
+        const publicItems = allItems.filter(item => !item.galleryType || item.galleryType === 'public');
+        const privateItems = allItems.filter(item => item.galleryType === 'private');
 
-        return NextResponse.json({ items });
+        return NextResponse.json({ 
+            items: publicItems, 
+            publicItems, 
+            privateItems 
+        });
     } catch (error: any) {
         console.error('Error fetching gallery:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -38,10 +44,28 @@ export async function POST(request: NextRequest) {
 
         const formData = await request.formData();
         const file = formData.get('photo') as File;
+        const galleryType = formData.get('galleryType') as 'public' | 'private' || 'public';
         let visibility = formData.get('visibility') as 'public' | 'subscribers' || 'public';
 
         if (!file) {
-            return NextResponse.json({ error: 'Nenhuma foto enviada' }, { status: 400 });
+            return NextResponse.json({ error: 'Nenhum arquivo enviado' }, { status: 400 });
+        }
+
+        const isVideo = file.type.startsWith('video/');
+        const isImage = file.type.startsWith('image/');
+
+        if (!isImage && !isVideo) {
+            return NextResponse.json({ error: 'O arquivo deve ser uma imagem ou vídeo' }, { status: 400 });
+        }
+
+        // Galeria pública aceita apenas fotos
+        if (galleryType === 'public' && isVideo) {
+            return NextResponse.json({ error: 'A galeria pública suporta apenas fotos' }, { status: 400 });
+        }
+
+        // Forçar visibilidade para assinantes se for galeria privada
+        if (galleryType === 'private') {
+            visibility = 'subscribers';
         }
 
         // Verificar se o usuário quer 'subscribers' mas não é profissional
@@ -53,12 +77,8 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        if (!file.type.startsWith('image/')) {
-            return NextResponse.json({ error: 'O arquivo deve ser uma imagem' }, { status: 400 });
-        }
-
         // Gerar um nome de arquivo único
-        const fileExtension = file.name.split('.').pop();
+        const fileExtension = file.name.split('.').pop() || (isVideo ? 'mp4' : 'jpg');
         const fileName = `galleries/${userId}/${uuidv4()}.${fileExtension}`;
 
         // Fazer upload para GCS
@@ -69,6 +89,8 @@ export async function POST(request: NextRequest) {
             ownerId: userId,
             imageUrl,
             visibility,
+            galleryType,
+            mediaType: isVideo ? 'video' : 'photo',
         });
 
         return NextResponse.json({ item: newItem });

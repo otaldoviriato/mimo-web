@@ -124,4 +124,9 @@ export const userApi = {
         const response = await api.get('/api/withdraw');
         return response.data;
     },
+
+    claimGiftCode: async (code: string) => {
+        const response = await api.post('/api/gift/claim', { code });
+        return response.data;
+    },
 };
