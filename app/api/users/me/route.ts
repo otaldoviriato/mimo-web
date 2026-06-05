@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
-import { User } from '@/models/User';
+import { User, type ICard } from '@/models/User';
 import { Room } from '@/models/Room';
 import { Message } from '@/models/Message';
 import { AppSettings } from '@/models/AppSettings';
@@ -85,6 +85,13 @@ export async function GET() {
                 chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? 0.005,
                 subscribers: user.subscribers || [],
                 pixKey: user.pixKey,
+                savedCards: (user.savedCards || []).map((card: ICard) => ({
+                    id: card.id,
+                    label: card.label,
+                    lastFour: card.lastFour,
+                    brand: card.brand,
+                    createdAt: card.createdAt,
+                })),
                 bio: user.bio || '',
                 maxPricePerChar,
                 maxSubscriptionPrice,
@@ -226,6 +233,13 @@ export async function PATCH(request: NextRequest) {
                 chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? 0.005,
                 subscribers: user.subscribers || [],
                 pixKey: user.pixKey,
+                savedCards: (user.savedCards || []).map((card: ICard) => ({
+                    id: card.id,
+                    label: card.label,
+                    lastFour: card.lastFour,
+                    brand: card.brand,
+                    createdAt: card.createdAt,
+                })),
                 bio: user.bio || '',
                 maxPricePerChar,
                 maxSubscriptionPrice,

@@ -80,6 +80,8 @@ const INITIAL_METHODS = [
     { id: 'new_card', type: 'new_card', label: 'Adicionar novo cartão', icon: 'plus' },
 ];
 
+const CARD_PAYMENTS_ENABLED = false;
+
 function detectCardBrand(number: string): string {
     const clean = number.replace(/\s/g, '');
     if (/^4/.test(clean)) return 'Visa';
@@ -152,7 +154,6 @@ export function RechargeModal({
     const [giftAmount, setGiftAmount] = useState<number | null>(null);
 
     const cardBrand = detectCardBrand(cardNumber);
-    const isNewCardSelected = selectedMethod === 'new_card';
     const isPixSelected = selectedMethod === 'pix';
 
     useEffect(() => {
@@ -263,9 +264,10 @@ export function RechargeModal({
             } else {
                 setCouponError('Não foi possível resgatar o cupom.');
             }
-        } catch (error: any) {
-            const status = error?.response?.status;
-            const errCode = error?.response?.data?.error;
+        } catch (error: unknown) {
+            const apiError = error as { response?: { status?: number; data?: { error?: string } } };
+            const status = apiError.response?.status;
+            const errCode = apiError.response?.data?.error;
             if (status === 404 || errCode === 'invalid_code') {
                 setCouponError('Cupom inválido.');
             } else if (status === 410 || errCode === 'expired_code') {
@@ -356,7 +358,9 @@ export function RechargeModal({
         }
     };
 
-    const allMethods = [...savedCards, ...INITIAL_METHODS];
+    const allMethods = CARD_PAYMENTS_ENABLED
+        ? [...savedCards, ...INITIAL_METHODS]
+        : INITIAL_METHODS.filter((method) => method.id !== 'new_card');
     const finalAmount = getFinalAmount();
     const hasCpf = userCpf.replace(/\D/g, '').length === 11;
     const hasPhone = userPhone.replace(/\D/g, '').length >= 10;
