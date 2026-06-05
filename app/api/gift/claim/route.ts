@@ -5,6 +5,7 @@ import { User } from '@/models/User';
 import { GiftCode } from '@/models/GiftCode';
 import { MicroTransaction } from '@/models/MicroTransaction';
 import { Transaction } from '@/models/Transaction';
+import { AppSettings } from '@/models/AppSettings';
 
 export async function POST(req: NextRequest) {
     try {
@@ -16,6 +17,11 @@ export async function POST(req: NextRequest) {
         if (!rawCode) return NextResponse.json({ error: 'Invalid code' }, { status: 400 });
 
         await connectToDatabase();
+
+        const settings = await AppSettings.findOne({ key: 'global' }).select('couponsEnabled').lean();
+        if (settings && settings.couponsEnabled === false) {
+            return NextResponse.json({ error: 'payment_method_unavailable' }, { status: 503 });
+        }
 
         // Busca o cupom no banco
         const giftCode = await GiftCode.findOne({ code: rawCode, isActive: true });

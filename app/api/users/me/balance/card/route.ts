@@ -5,6 +5,7 @@ import { connectToDatabase } from '@/lib/db';
 import { createAsaasCardPayment, createAsaasSavedCardPayment, getAsaasEnvironment, mapAsaasPaymentStatus } from '@/lib/asaas';
 import { Transaction } from '@/models/Transaction';
 import { User } from '@/models/User';
+import { AppSettings } from '@/models/AppSettings';
 
 export const dynamic = 'force-dynamic';
 
@@ -88,6 +89,11 @@ export async function POST(request: NextRequest) {
         }
 
         await connectToDatabase();
+
+        const settings = await AppSettings.findOne({ key: 'global' }).select('creditCardEnabled').lean();
+        if (settings && settings.creditCardEnabled === false) {
+            return NextResponse.json({ error: 'payment_method_unavailable' }, { status: 503 });
+        }
 
         const user = await User.findOne({ clerkId: userId });
 

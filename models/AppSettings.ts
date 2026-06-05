@@ -15,6 +15,9 @@ export interface IAppSettings extends Document {
     maxPublicPhotos: number;
     minExclusivePhotos: number;
     maxExclusivePhotos: number;
+    pixEnabled: boolean;
+    creditCardEnabled: boolean;
+    couponsEnabled: boolean;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -102,6 +105,21 @@ const AppSettingsSchema = new Schema<IAppSettings>({
         required: true,
         default: 4,
         min: 0,
+    },
+    pixEnabled: {
+        type: Boolean,
+        required: true,
+        default: true,
+    },
+    creditCardEnabled: {
+        type: Boolean,
+        required: true,
+        default: true,
+    },
+    couponsEnabled: {
+        type: Boolean,
+        required: true,
+        default: true,
     },
 }, {
     timestamps: true,

@@ -33,6 +33,9 @@ async function getOrCreateSettings() {
         if (settings.maxPublicPhotos === undefined) { settings.maxPublicPhotos = 12; updated = true; }
         if (settings.minExclusivePhotos === undefined) { settings.minExclusivePhotos = 2; updated = true; }
         if (settings.maxExclusivePhotos === undefined) { settings.maxExclusivePhotos = 4; updated = true; }
+        if (settings.pixEnabled === undefined) { settings.pixEnabled = true; updated = true; }
+        if (settings.creditCardEnabled === undefined) { settings.creditCardEnabled = true; updated = true; }
+        if (settings.couponsEnabled === undefined) { settings.couponsEnabled = true; updated = true; }
         if (updated) {
             await settings.save();
         }
@@ -112,11 +115,11 @@ export async function PUT(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { 
-            platformFeePercentage, 
-            uploadLimitMB, 
-            autoModeration, 
-            professionalsOnlyCreateRooms, 
+        const {
+            platformFeePercentage,
+            uploadLimitMB,
+            autoModeration,
+            professionalsOnlyCreateRooms,
             adminClerkIds,
             comparisonPeriod,
             maxPricePerChar,
@@ -125,7 +128,10 @@ export async function PUT(request: NextRequest) {
             minPublicPhotos,
             maxPublicPhotos,
             minExclusivePhotos,
-            maxExclusivePhotos
+            maxExclusivePhotos,
+            pixEnabled,
+            creditCardEnabled,
+            couponsEnabled,
         } = body;
 
         // Validações básicas
@@ -206,6 +212,18 @@ export async function PUT(request: NextRequest) {
             const val = Number(maxExclusivePhotos);
             if (isNaN(val) || val < 0) return NextResponse.json({ error: 'Quantidade máxima de fotos exclusivas inválida' }, { status: 400 });
             settings.maxExclusivePhotos = val;
+        }
+
+        if (pixEnabled !== undefined) {
+            settings.pixEnabled = Boolean(pixEnabled);
+        }
+
+        if (creditCardEnabled !== undefined) {
+            settings.creditCardEnabled = Boolean(creditCardEnabled);
+        }
+
+        if (couponsEnabled !== undefined) {
+            settings.couponsEnabled = Boolean(couponsEnabled);
         }
 
         // Validação de consistência

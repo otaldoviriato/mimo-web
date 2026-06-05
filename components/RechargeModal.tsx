@@ -20,6 +20,12 @@ import {
     X,
 } from 'lucide-react';
 
+interface PaymentAvailability {
+    pixEnabled: boolean;
+    creditCardEnabled: boolean;
+    couponsEnabled: boolean;
+}
+
 interface RechargeModalProps {
     visible: boolean;
     onClose: () => void;
@@ -175,6 +181,11 @@ export function RechargeModal({
     const [couponSuccess, setCouponSuccess] = useState('');
     const [giftModalOpen, setGiftModalOpen] = useState(false);
     const [giftAmount, setGiftAmount] = useState<number | null>(null);
+    const [paymentAvailability, setPaymentAvailability] = useState<PaymentAvailability>({
+        pixEnabled: true,
+        creditCardEnabled: true,
+        couponsEnabled: true,
+    });
 
     const cardBrand = detectCardBrand(cardNumber);
     const isPixSelected = selectedMethod === 'pix';
@@ -193,6 +204,11 @@ export function RechargeModal({
                     setSelectedSavedCardId((current) => current || cards[0].id);
                 }
             })
+            .catch(() => undefined);
+
+        fetch('/api/settings/payments')
+            .then((r) => r.json())
+            .then((data) => setPaymentAvailability(data))
             .catch(() => undefined);
 
     }, [visible]);
@@ -398,7 +414,10 @@ export function RechargeModal({
         }
     };
 
-    const allMethods = INITIAL_METHODS;
+    const allMethods = INITIAL_METHODS.filter((m) => {
+        if (m.id === 'coupon') return paymentAvailability.couponsEnabled;
+        return true;
+    });
     const finalAmount = getFinalAmount();
     const hasCpf = userCpf.replace(/\D/g, '').length === 11;
     const hasPhone = userPhone.replace(/\D/g, '').length >= 10;
@@ -482,39 +501,54 @@ export function RechargeModal({
                                                         ? Ticket
                                                     : CreditCard;
 
+                                                const isDisabled =
+                                                    (method.id === 'pix' && !paymentAvailability.pixEnabled) ||
+                                                    (method.id === 'card' && !paymentAvailability.creditCardEnabled);
+
                                                 return (
                                                     <React.Fragment key={method.id}>
                                                         <button
                                                             type="button"
-                                                            onClick={() => setSelectedMethod(method.id)}
-                                                            className={`flex min-h-12 items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all active:scale-[0.99] ${
-                                                                isSelected
-                                                                    ? 'border-purple-600 bg-purple-50 shadow-sm shadow-purple-600/10'
-                                                                    : 'border-gray-100 bg-gray-50 hover:border-purple-200 hover:bg-white'
+                                                            onClick={() => !isDisabled && setSelectedMethod(method.id)}
+                                                            disabled={isDisabled}
+                                                            className={`flex min-h-12 items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all ${
+                                                                isDisabled
+                                                                    ? 'cursor-not-allowed border-gray-100 bg-gray-50 opacity-60'
+                                                                    : isSelected
+                                                                        ? 'border-purple-600 bg-purple-50 shadow-sm shadow-purple-600/10 active:scale-[0.99]'
+                                                                        : 'border-gray-100 bg-gray-50 hover:border-purple-200 hover:bg-white active:scale-[0.99]'
                                                             }`}
                                                         >
                                                             <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${
-                                                                isSelected
-                                                                    ? 'border-purple-100 bg-white text-purple-600'
-                                                                    : 'border-gray-100 bg-white text-gray-400'
+                                                                isDisabled
+                                                                    ? 'border-gray-100 bg-white text-gray-300'
+                                                                    : isSelected
+                                                                        ? 'border-purple-100 bg-white text-purple-600'
+                                                                        : 'border-gray-100 bg-white text-gray-400'
                                                             }`}>
                                                                 <Icon size={15} strokeWidth={2.2} />
                                                             </div>
                                                             <div className="min-w-0 flex-1">
-                                                                <span className={`block truncate text-sm font-semibold ${isSelected ? 'text-purple-700' : 'text-gray-800'}`}>
+                                                                <span className={`block truncate text-sm font-semibold ${isDisabled ? 'text-gray-400' : isSelected ? 'text-purple-700' : 'text-gray-800'}`}>
                                                                     {method.label}
                                                                 </span>
-                                                                {method.id === 'pix' && (
-                                                                    <span className="mt-0.5 block text-xs text-gray-400">Confirmação rápida e segura</span>
-                                                                )}
-                                                                {method.id === 'coupon' && (
-                                                                    <span className="mt-0.5 block text-xs text-gray-400">Resgate créditos com seu código</span>
+                                                                {isDisabled ? (
+                                                                    <span className="mt-0.5 block text-xs text-amber-500">Indisponível temporariamente</span>
+                                                                ) : (
+                                                                    <>
+                                                                        {method.id === 'pix' && (
+                                                                            <span className="mt-0.5 block text-xs text-gray-400">Confirmação rápida e segura</span>
+                                                                        )}
+                                                                        {method.id === 'coupon' && (
+                                                                            <span className="mt-0.5 block text-xs text-gray-400">Resgate créditos com seu código</span>
+                                                                        )}
+                                                                    </>
                                                                 )}
                                                             </div>
                                                             <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
-                                                                isSelected ? 'border-purple-600 bg-purple-600 text-white' : 'border-gray-200 bg-white'
+                                                                isDisabled ? 'border-gray-200 bg-white' : isSelected ? 'border-purple-600 bg-purple-600 text-white' : 'border-gray-200 bg-white'
                                                             }`}>
-                                                                {isSelected && <CheckCircle2 size={12} strokeWidth={3} />}
+                                                                {isSelected && !isDisabled && <CheckCircle2 size={12} strokeWidth={3} />}
                                                             </div>
                                                         </button>
                                                         

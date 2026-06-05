@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { Transaction } from '@/models/Transaction';
+import { AppSettings } from '@/models/AppSettings';
 
 // POST /api/users/me/balance/pix — Cria novo PIX de recarga
 export async function POST(req: NextRequest) {
@@ -18,6 +19,11 @@ export async function POST(req: NextRequest) {
     }
 
     await connectToDatabase();
+
+    const settings = await AppSettings.findOne({ key: 'global' }).select('pixEnabled').lean();
+    if (settings && settings.pixEnabled === false) {
+      return NextResponse.json({ error: 'payment_method_unavailable' }, { status: 503 });
+    }
 
     const externalId = `recharge_${userId}_${Date.now()}`;
 

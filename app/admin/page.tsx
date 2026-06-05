@@ -50,6 +50,9 @@ interface SettingsData {
     maxPublicPhotos: number;
     minExclusivePhotos: number;
     maxExclusivePhotos: number;
+    pixEnabled: boolean;
+    creditCardEnabled: boolean;
+    couponsEnabled: boolean;
 }
 
 interface ChatMessage {
@@ -125,6 +128,9 @@ export default function AdminPage() {
     const [maxPublicPhotos, setMaxPublicPhotos] = useState(12);
     const [minExclusivePhotos, setMinExclusivePhotos] = useState(2);
     const [maxExclusivePhotos, setMaxExclusivePhotos] = useState(4);
+    const [pixEnabled, setPixEnabled] = useState(true);
+    const [creditCardEnabled, setCreditCardEnabled] = useState(true);
+    const [couponsEnabled, setCouponsEnabled] = useState(true);
     const [saving, setSaving] = useState(false);
 
     // Estados de Gerenciamento de Administradores Ricos
@@ -217,6 +223,9 @@ export default function AdminPage() {
                     setMaxPublicPhotos(s.maxPublicPhotos !== undefined ? s.maxPublicPhotos : 12);
                     setMinExclusivePhotos(s.minExclusivePhotos !== undefined ? s.minExclusivePhotos : 2);
                     setMaxExclusivePhotos(s.maxExclusivePhotos !== undefined ? s.maxExclusivePhotos : 4);
+                    setPixEnabled(s.pixEnabled !== undefined ? s.pixEnabled : true);
+                    setCreditCardEnabled(s.creditCardEnabled !== undefined ? s.creditCardEnabled : true);
+                    setCouponsEnabled(s.couponsEnabled !== undefined ? s.couponsEnabled : true);
                     setIsAuthorized(true);
                 } else if (response.status === 403) {
                     setIsAuthorized(false);
@@ -598,6 +607,9 @@ export default function AdminPage() {
                     maxPublicPhotos,
                     minExclusivePhotos,
                     maxExclusivePhotos,
+                    pixEnabled,
+                    creditCardEnabled,
+                    couponsEnabled,
                 }),
             });
 
@@ -1350,11 +1362,11 @@ export default function AdminPage() {
                                         </label>
 
                                         <label className="flex items-start gap-3 cursor-pointer group">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={professionalsOnly} 
+                                            <input
+                                                type="checkbox"
+                                                checked={professionalsOnly}
                                                 onChange={(e) => setProfessionalsOnly(e.target.checked)}
-                                                className="mt-1 accent-purple-600 rounded cursor-pointer w-4 h-4" 
+                                                className="mt-1 accent-purple-600 rounded cursor-pointer w-4 h-4"
                                             />
                                             <div>
                                                 <span className="text-sm font-bold text-slate-700 group-hover:text-purple-600 transition-colors block">
@@ -1362,6 +1374,64 @@ export default function AdminPage() {
                                                 </span>
                                                 <span className="text-xs text-slate-400 font-medium">
                                                     Restringe a criação de novas salas de chat a contas validadas.
+                                                </span>
+                                            </div>
+                                        </label>
+                                    </div>
+
+                                    <div className="space-y-4 pt-4 border-t border-slate-100">
+                                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Meios de Pagamento</h4>
+                                        <p className="text-xs text-slate-500 font-medium -mt-2">
+                                            Desabilite temporariamente um meio de pagamento. Usuários verão uma mensagem de indisponibilidade.
+                                        </p>
+
+                                        <label className="flex items-start gap-3 cursor-pointer group">
+                                            <input
+                                                type="checkbox"
+                                                checked={pixEnabled}
+                                                onChange={(e) => setPixEnabled(e.target.checked)}
+                                                className="mt-1 accent-purple-600 rounded cursor-pointer w-4 h-4"
+                                            />
+                                            <div>
+                                                <span className="text-sm font-bold text-slate-700 group-hover:text-purple-600 transition-colors block">
+                                                    Pagamento via Pix habilitado
+                                                </span>
+                                                <span className="text-xs text-slate-400 font-medium">
+                                                    Quando desmarcado, o Pix aparecerá como &quot;Indisponível temporariamente&quot; para os usuários.
+                                                </span>
+                                            </div>
+                                        </label>
+
+                                        <label className="flex items-start gap-3 cursor-pointer group">
+                                            <input
+                                                type="checkbox"
+                                                checked={creditCardEnabled}
+                                                onChange={(e) => setCreditCardEnabled(e.target.checked)}
+                                                className="mt-1 accent-purple-600 rounded cursor-pointer w-4 h-4"
+                                            />
+                                            <div>
+                                                <span className="text-sm font-bold text-slate-700 group-hover:text-purple-600 transition-colors block">
+                                                    Pagamento via Cartão de Crédito habilitado
+                                                </span>
+                                                <span className="text-xs text-slate-400 font-medium">
+                                                    Quando desmarcado, o cartão de crédito aparecerá como &quot;Indisponível temporariamente&quot; para os usuários.
+                                                </span>
+                                            </div>
+                                        </label>
+
+                                        <label className="flex items-start gap-3 cursor-pointer group">
+                                            <input
+                                                type="checkbox"
+                                                checked={couponsEnabled}
+                                                onChange={(e) => setCouponsEnabled(e.target.checked)}
+                                                className="mt-1 accent-purple-600 rounded cursor-pointer w-4 h-4"
+                                            />
+                                            <div>
+                                                <span className="text-sm font-bold text-slate-700 group-hover:text-purple-600 transition-colors block">
+                                                    Resgate de Cupons habilitado
+                                                </span>
+                                                <span className="text-xs text-slate-400 font-medium">
+                                                    Quando desmarcado, a opção de resgatar cupom fica oculta no modal de recarga.
                                                 </span>
                                             </div>
                                         </label>
