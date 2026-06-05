@@ -1,11 +1,49 @@
 'use client';
 
 import { useRouter as useNextRouter } from 'next/navigation';
+import { useStackNavigation } from '@/context/StackNavigationContext';
+
+const reservedRoutes = ['chats', 'search', 'profile', 'settings', 'login', 'sso-callback', 'api', 'admin'];
+
+const isReservedRoute = (path: string) => {
+    const cleaned = path.replace(/^\//, ''); // Remove leading slash
+    const parts = cleaned.split('/');
+    const base = parts[0];
+    return reservedRoutes.includes(base) || base === '';
+};
 
 export function useTransitionRouter() {
     const router = useNextRouter();
+    
+    let stackNav: any = null;
+    try {
+        // Envolve em try/catch para evitar erros se for usado fora do StackNavigationProvider
+        stackNav = useStackNavigation();
+    } catch {
+        stackNav = null;
+    }
 
     const push = (href: string) => {
+        if (stackNav) {
+            // 1. Verifica se é rota de chat (/chat/userId)
+            const chatMatch = href.match(/^\/chat\/([^\/]+)$/);
+            if (chatMatch) {
+                const userId = chatMatch[1];
+                stackNav.pushVirtual('chat', { userId });
+                return;
+            }
+
+            // 2. Verifica se é rota de perfil público (/[username])
+            // Remove o prefixo / e @ se houver
+            const cleanedPath = href.replace(/^\//, '');
+            if (!isReservedRoute(href) && cleanedPath.length > 0) {
+                const username = cleanedPath.replace(/^@/, '');
+                stackNav.pushVirtual('profile', { username });
+                return;
+            }
+        }
+
+        // Fallback para View Transitions nativas
         if (typeof document !== 'undefined' && 'startViewTransition' in document) {
             document.documentElement.classList.add('transition-forward');
             document.documentElement.classList.remove('transition-backward');
@@ -46,6 +84,13 @@ export function useTransitionRouter() {
     };
 
     const back = () => {
+        if (stackNav && stackNav.isVirtualActive) {
+            // Se a pilha virtual está ativa, voltar retrocede o histórico do navegador.
+            // O event listener de popstate no StackNavigationContext vai capturar e fechar a tela virtual.
+            router.back();
+            return;
+        }
+
         if (typeof document !== 'undefined' && 'startViewTransition' in document) {
             if (typeof window !== 'undefined') {
                 (window as any).__navigatingWithTransition = true;
@@ -94,3 +139,4 @@ export function useTransitionRouter() {
         back,
     };
 }
+

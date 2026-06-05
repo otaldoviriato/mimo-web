@@ -6,9 +6,24 @@ import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { useUserByUsername, usePublicGallery, useSubscribe, useMyProfile } from '@/hooks/useQueries';
 
-export default function UserProfilePage({ params }: { params: Promise<{ username: string }> }) {
-    const { username } = React.use(params);
+interface UserProfilePageProps {
+    params?: Promise<{ username: string }>;
+    username?: string;
+    onBack?: () => void;
+    isSubPage?: boolean;
+    isClosing?: boolean;
+}
+
+export default function UserProfilePage({ params, username: propUsername, onBack, isSubPage = false, isClosing = false }: UserProfilePageProps) {
     const router = useTransitionRouter();
+
+    let resolvedUsername = '';
+    if (propUsername) {
+        resolvedUsername = propUsername;
+    } else if (params) {
+        const resolvedParams = React.use(params);
+        resolvedUsername = resolvedParams.username;
+    }
 
     React.useEffect(() => {
         if (typeof window !== 'undefined' && (window as any).__resolveTransition) {
@@ -18,7 +33,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ username
     }, []);
 
     // Decodifica e remove o @ caso o usuário tenha digitado com ele na URL
-    const decodedUsername = decodeURIComponent(username).replace('@', '');
+    const decodedUsername = decodeURIComponent(resolvedUsername).replace('@', '');
 
     const { data: user, isLoading, isError } = useUserByUsername(decodedUsername);
     const { data: me } = useMyProfile();
@@ -28,6 +43,14 @@ export default function UserProfilePage({ params }: { params: Promise<{ username
     const isSubscriber = galleryData?.isSubscriber;
     const isOwner = galleryData?.isOwner;
     const showSubscribeButton = user?.isProfessional && !isSubscriber && !isOwner;
+
+    const handleBack = () => {
+        if (onBack) {
+            onBack();
+        } else {
+            router.back();
+        }
+    };
 
     const handleSubscribe = async () => {
         if (!user) return;
@@ -41,9 +64,17 @@ export default function UserProfilePage({ params }: { params: Promise<{ username
         }
     };
 
+    const layoutClass = isSubPage
+        ? 'fixed inset-0 z-50 w-full h-full'
+        : 'w-full h-full';
+
+    const animationClass = isSubPage
+        ? (isClosing ? 'animate-android-slide-out' : 'animate-android-slide-in')
+        : '';
+
     if (isLoading) {
         return (
-            <div className="flex flex-col h-full bg-white animate-pulse">
+            <div className={`flex flex-col bg-white animate-pulse ${layoutClass} ${animationClass}`}>
                 <div className="h-48 bg-gray-200" />
                 <div className="px-6 -mt-12 flex flex-col items-center">
                     <div className="w-24 h-24 rounded-full bg-gray-300 border-4 border-white shadow-lg" />
@@ -56,14 +87,14 @@ export default function UserProfilePage({ params }: { params: Promise<{ username
 
     if (isError || !user) {
         return (
-            <div className="flex flex-col items-center justify-center p-8 h-[100dvh] text-center bg-white">
+            <div className={`flex flex-col items-center justify-center p-8 text-center bg-white ${layoutClass} ${animationClass}`}>
                 <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mb-6">
                     <span className="text-4xl text-gray-300">👻</span>
                 </div>
                 <h1 className="text-2xl font-black text-gray-900 mb-2">Pessoa não encontrada</h1>
                 <p className="text-gray-400 text-sm mb-8 leading-relaxed px-4">O perfil que você está tentando acessar não existe,<br/>é do mesmo modo que o seu ou foi removido.</p>
                 <button 
-                    onClick={() => router.back()}
+                    onClick={handleBack}
                     className="px-8 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-colors shadow-lg shadow-purple-200"
                 >
                     Voltar para Conversa
@@ -73,7 +104,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ username
     }
 
     return (
-        <div className="flex flex-col h-full bg-white overflow-y-auto pb-28 no-scrollbar relative">
+        <div className={`flex flex-col bg-white overflow-y-auto pb-28 no-scrollbar relative ${layoutClass} ${animationClass}`}>
             {/* Cover and Header */}
             <div className="relative shrink-0">
                 <div className="relative h-44 w-full overflow-hidden bg-purple-50 shadow-inner">
@@ -90,7 +121,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ username
                     <div className="absolute inset-0 bg-gradient-to-br from-purple-600/25 to-fuchsia-500/15 mix-blend-overlay" />
                 </div>
                 <button 
-                    onClick={() => router.back()}
+                    onClick={handleBack}
                     className="absolute top-4 left-4 w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/30 transition-all active:scale-90 z-20"
                     title="Voltar"
                 >

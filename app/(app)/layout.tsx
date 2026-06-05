@@ -6,13 +6,17 @@ import { useRouter, usePathname } from 'next/navigation';
 import { setupAxiosInterceptors } from '@/services/api';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { NotificationPromptModal } from '@/components';
+import { StackNavigationProvider, useStackNavigation } from '@/context/StackNavigationContext';
+import ChatPage from './chat/[userId]/page';
+import UserProfilePage from './[username]/page';
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const { isLoaded, isSignedIn, getToken } = useAuth();
     const { user } = useUser();
     const router = useRouter();
     const pathname = usePathname();
     const { handleRequestPermission } = usePushNotifications();
+    const { screens, popVirtual } = useStackNavigation();
 
     useEffect(() => {
         // Se a rota for o chat, deixamos a própria página de chat gerenciar a resolução
@@ -123,7 +127,46 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return (
         <>
             {children}
+            
+            {/* Pilha de Telas Virtuais */}
+            {screens.map((screen) => {
+                const isClosing = screen.isClosing;
+                const animationClass = isClosing ? 'animate-android-slide-out' : 'animate-android-slide-in';
+                return (
+                    <div
+                        key={screen.key}
+                        className={`fixed inset-0 z-50 w-full h-full bg-white select-none no-select ${animationClass}`}
+                    >
+                        {screen.type === 'chat' && (
+                            <ChatPage
+                                userId={screen.params.userId}
+                                isSubPage={true}
+                                isClosing={isClosing}
+                                onBack={popVirtual}
+                            />
+                        )}
+                        {screen.type === 'profile' && (
+                            <UserProfilePage
+                                username={screen.params.username}
+                                isSubPage={true}
+                                isClosing={isClosing}
+                                onBack={popVirtual}
+                            />
+                        )}
+                    </div>
+                );
+            })}
+
             <NotificationPromptModal />
         </>
     );
 }
+
+export default function AppLayout({ children }: { children: React.ReactNode }) {
+    return (
+        <StackNavigationProvider>
+            <AppLayoutContent>{children}</AppLayoutContent>
+        </StackNavigationProvider>
+    );
+}
+

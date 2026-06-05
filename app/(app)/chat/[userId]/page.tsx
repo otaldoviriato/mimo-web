@@ -196,15 +196,13 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
         }
     }, [messages, user?.id, otherUserId, loadingMessages]);
 
-    // Notifica que o DOM está pronto e pré-populado com dados para iniciar a animação nativa
+    // Notifica que o DOM está pronto imediatamente na montagem para iniciar a transição sem delay (estilo nativo)
     useEffect(() => {
-        if (receiver && !loadingMessages) {
-            if (typeof window !== 'undefined' && (window as any).__resolveTransition) {
-                (window as any).__resolveTransition();
-                (window as any).__resolveTransition = null;
-            }
+        if (typeof window !== 'undefined' && (window as any).__resolveTransition) {
+            (window as any).__resolveTransition();
+            (window as any).__resolveTransition = null;
         }
-    }, [receiver, loadingMessages]);
+    }, []);
 
     // Prefetch da tela de perfil público para navegação instantânea (resposta tátil imediata)
     useEffect(() => {
@@ -913,7 +911,7 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                             onClick={() => receiver?.username && router.push(`/${receiver.username}`)}
                             className="flex-1 flex items-center gap-2 min-w-0 text-left py-0.5"
                         >
-                            <div className="relative shrink-0">
+                            <div className={`relative shrink-0 ${!receiver ? 'animate-pulse' : ''}`}>
                                 <Avatar uri={receiver?.photoUrl} size={46} />
                                 {userData?.isProfessional && (
                                     <div className="absolute -bottom-1 -right-1 bg-white text-purple-700 rounded-full px-1.5 py-0.5 border border-purple-200 flex items-center justify-center shadow-sm">
@@ -924,7 +922,7 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                 )}
                                 {connected && <div className="absolute -right-0.5 top-0 w-2.5 h-2.5 bg-green-500 border-2 border-purple-600 rounded-full" />}
                             </div>
-                            <div className="flex-1 min-w-0">
+                            <div className={`flex-1 min-w-0 ${!receiver ? 'animate-pulse' : ''}`}>
                                 <p className="text-base font-black text-white truncate tracking-tight">
                                     {receiver?.name || receiver?.username || (otherUserId ? `Usuário ${otherUserId.substring(0, 8)}` : 'Conversa')}
                                 </p>
