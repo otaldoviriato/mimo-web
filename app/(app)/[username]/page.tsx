@@ -102,9 +102,18 @@ export default function UserProfilePage({ params, username: propUsername, onBack
     }
 
     return (
-        <div className={`flex flex-col bg-white overflow-y-auto pb-28 no-scrollbar relative ${layoutClass} ${animationClass}`}>
+        <div className={`flex flex-col bg-gradient-to-b from-purple-50/60 via-white to-pink-50/50 overflow-y-auto pb-28 no-scrollbar relative ${layoutClass} ${animationClass}`}>
+            {/* Textura sutil no fundo da página */}
+            <div 
+                className="absolute inset-0 opacity-[0.03] pointer-events-none select-none z-0" 
+                style={{ 
+                    backgroundImage: 'radial-gradient(#6D28D9 1.2px, transparent 1.2px)', 
+                    backgroundSize: '24px 24px' 
+                }} 
+            />
+
             {/* Cover and Header */}
-            <div className="relative shrink-0">
+            <div className="relative shrink-0 z-10">
                 <div className="relative h-44 w-full overflow-hidden bg-purple-50 shadow-inner">
                     {user.coverUrl ? (
                         <img 
@@ -115,8 +124,6 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                     ) : (
                         <div className="w-full h-full bg-gradient-to-br from-purple-600 to-fuchsia-500" />
                     )}
-                    {/* Overlay degradê sutil */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-purple-600/25 to-fuchsia-500/15 mix-blend-overlay" />
                 </div>
                 <button 
                     onClick={handleBack}
@@ -165,18 +172,42 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                                 const isLocked = item.visibility === 'subscribers' && !isSubscriber && !isOwner;
                                 return (
                                     <div key={item._id} className="relative aspect-square overflow-hidden bg-gray-100 group">
-                                        <img
-                                            src={item.imageUrl}
-                                            alt="Gallery item"
-                                            className={`w-full h-full object-cover transition-all duration-500 ${isLocked ? 'blur-[3.5px] scale-105 brightness-[90%]' : 'group-hover:scale-105'}`}
-                                        />
-                                        {isLocked && (
-                                            <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center border border-white/10 shadow-lg">
-                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-                                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                                                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                                                </svg>
+                                        {isLocked ? (
+                                            <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-indigo-600 to-pink-500 flex flex-col items-center justify-center p-2.5 text-center select-none">
+                                                {/* Textura geométrica de bolinhas */}
+                                                <div 
+                                                    className="absolute inset-0 opacity-[0.15]" 
+                                                    style={{ 
+                                                        backgroundImage: 'radial-gradient(#fff 1.5px, transparent 1.5px)', 
+                                                        backgroundSize: '10px 10px' 
+                                                    }} 
+                                                />
+                                                {/* Textura geométrica de linhas diagonais */}
+                                                <div 
+                                                    className="absolute inset-0 opacity-[0.08] bg-[linear-gradient(45deg,_rgba(255,255,255,0.15)_25%,_transparent_25%,_transparent_50%,_rgba(255,255,255,0.15)_50%,_rgba(255,255,255,0.15)_75%,_transparent_75%,_transparent)] bg-[size:16px_16px]" 
+                                                />
+                                                
+                                                <div className="relative z-10 flex flex-col items-center gap-1">
+                                                    <div className="w-7 h-7 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-md">
+                                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                                        </svg>
+                                                    </div>
+                                                    <span className="text-[9px] font-black text-white uppercase tracking-widest leading-none">
+                                                        Exclusivo
+                                                    </span>
+                                                    <span className="text-[7.5px] font-bold text-purple-100 uppercase tracking-wider leading-none block mt-0.5">
+                                                        para assinantes
+                                                    </span>
+                                                </div>
                                             </div>
+                                        ) : (
+                                            <img
+                                                src={item.imageUrl}
+                                                alt="Gallery item"
+                                                className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
+                                            />
                                         )}
                                     </div>
                                 );
@@ -186,21 +217,21 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                 </div>
             )}
 
-            {/* Barra de Ações Fixa no Rodapé */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-100 px-4 py-4 flex gap-3 z-30 justify-center">
-                <div className="w-full max-w-md flex gap-3">
+            {/* Barra de Ações Flutuante no Rodapé */}
+            <div className="fixed bottom-6 left-4 right-4 z-30 flex justify-center pointer-events-none">
+                <div className="w-full max-w-md flex gap-3 px-2 pointer-events-auto">
                     {showSubscribeButton ? (
                         <>
                             <button 
                                 onClick={handleSubscribe} 
                                 disabled={subscribeMutation.isPending}
-                                className="flex-[3] py-3.5 px-4 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 active:scale-[0.98] text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-200/50"
+                                className="flex-[3] py-3.5 px-4 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 active:scale-[0.98] text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-xl shadow-purple-600/30"
                             >
                                 <span>Assinar por R$ {user.subscriptionPrice?.toFixed(2)}</span>
                             </button>
                             <button 
                                 onClick={() => router.push(`/chat/${user.clerkId}`)}
-                                className="flex-[2] py-3.5 px-4 bg-gray-50 hover:bg-gray-100 active:scale-[0.98] text-gray-800 border border-gray-200/60 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+                                className="flex-[2] py-3.5 px-4 bg-white/95 hover:bg-gray-50 active:scale-[0.98] text-gray-800 border border-gray-200/80 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-black/5"
                             >
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
@@ -211,7 +242,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                     ) : (
                         <button 
                             onClick={() => router.push(`/chat/${user.clerkId}`)}
-                            className="w-full py-3.5 px-4 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 active:scale-[0.98] text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-200/50"
+                            className="w-full py-3.5 px-4 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 active:scale-[0.98] text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-xl shadow-purple-600/30"
                         >
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
