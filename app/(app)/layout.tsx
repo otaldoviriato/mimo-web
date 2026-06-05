@@ -125,7 +125,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     if (!isSignedIn) return null;
 
     return (
-        <>
+        <div className="bg-black min-h-screen w-full relative overflow-hidden">
             {children}
             
             {/* Pilha de Telas Virtuais */}
@@ -158,7 +158,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             })}
 
             <NotificationPromptModal />
-        </>
+        </div>
     );
 }
 

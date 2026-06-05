@@ -20,6 +20,8 @@ html, body {
   height: 100%;
   margin: 0;
   padding: 0;
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: contain;
 }
 
 body {
@@ -86,10 +88,10 @@ button, a, [role="button"] {
   }
 }
 
-/* Keyframes de transições deslizantes */
+/* Keyframes de transições deslizantes (reduzido paralaxe de debaixo para -20% para evitar fendas brancas) */
 @keyframes slideToLeft {
   from { transform: translate3d(0, 0, 0); }
-  to { transform: translate3d(-30%, 0, 0); }
+  to { transform: translate3d(-20%, 0, 0); }
 }
 
 @keyframes slideFromRight {
@@ -98,7 +100,7 @@ button, a, [role="button"] {
 }
 
 @keyframes slideFromLeft {
-  from { transform: translate3d(-30%, 0, 0); }
+  from { transform: translate3d(-20%, 0, 0); }
   to { transform: translate3d(0, 0, 0); }
 }
 
@@ -107,9 +109,15 @@ button, a, [role="button"] {
   to { transform: translate3d(100%, 0, 0); }
 }
 
-/* Configuração de animações do View Transition (API Nativa) */
+/* Garante fundo preto durante a transição para que eventuais fendas pareçam sombras de profundidade */
+html.transition-forward, html.transition-backward {
+  background-color: #000000 !important;
+}
+
+/* Configuração de animações do View Transition (API Nativa) - Mantém a tela de baixo estática para evitar faixas brancas */
 .transition-forward::view-transition-old(root) {
-  animation: slideToLeft 320ms cubic-bezier(0.1, 0.76, 0.55, 0.94) both;
+  animation: none;
+  opacity: 1;
 }
 
 .transition-forward::view-transition-new(root) {
@@ -118,10 +126,13 @@ button, a, [role="button"] {
 
 .transition-backward::view-transition-old(root) {
   animation: slideToRight 300ms cubic-bezier(0.1, 0.76, 0.55, 0.94) both;
+  z-index: 10;
 }
 
 .transition-backward::view-transition-new(root) {
-  animation: slideFromLeft 300ms cubic-bezier(0.1, 0.76, 0.55, 0.94) both;
+  animation: none;
+  opacity: 1;
+  z-index: 1;
 }
 
 /* Garante o ordenamento z-index correto das camadas para simular o comportamento nativo */
@@ -132,20 +143,15 @@ button, a, [role="button"] {
   z-index: 1;
 }
 
-.transition-backward::view-transition-new(root) {
-  z-index: 1;
-}
-.transition-backward::view-transition-old(root) {
-  z-index: 10;
-}
-
 /* Classes de animações utilitárias para transições controladas por JS */
 .animate-android-slide-in {
   animation: slideFromRight 320ms cubic-bezier(0.1, 0.76, 0.55, 0.94) both;
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.22); /* Sombra física na borda esquerda */
 }
 
 .animate-android-slide-out {
   animation: slideToRight 300ms cubic-bezier(0.1, 0.76, 0.55, 0.94) both;
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.22); /* Sombra física na borda esquerda */
 }
 
 /* Header compartilhado para transição persistente e suave (estilo nativo) */

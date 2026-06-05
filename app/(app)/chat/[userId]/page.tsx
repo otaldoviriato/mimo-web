@@ -850,9 +850,9 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
         ? 'fixed inset-0 z-50 w-full h-full'
         : 'w-full h-full';
 
-    const animationClass = (useNativeTransition && !isSubPage)
-        ? ''
-        : (isClosingOrLeaving ? 'animate-android-slide-out' : 'animate-android-slide-in');
+    const animationClass = isSubPage
+        ? '' // A div externa do layout já gerencia as animações de slide-in/out da subpágina
+        : (useNativeTransition ? '' : (isClosingOrLeaving ? 'animate-android-slide-out' : 'animate-android-slide-in'));
 
     return (
         <div 

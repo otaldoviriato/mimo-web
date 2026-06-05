@@ -68,9 +68,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
         ? 'fixed inset-0 z-50 w-full h-full'
         : 'w-full h-full';
 
-    const animationClass = isSubPage
-        ? (isClosing ? 'animate-android-slide-out' : 'animate-android-slide-in')
-        : '';
+    const animationClass = ''; // A div externa do layout já gerencia as animações de slide-in/out da subpágina
 
     if (isLoading) {
         return (
