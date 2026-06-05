@@ -4,10 +4,11 @@ import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useUser } from '@clerk/nextjs';
 import { useQueryClient } from '@tanstack/react-query';
-import { Avatar, BalanceDisplay, TouchableRipple } from '@/components';
+import { Avatar, TouchableRipple } from '@/components';
 import { useChatRooms, useMyProfile, QueryKeys } from '@/hooks/useQueries';
 import { useSocket } from '@/hooks/useSocket';
 import ChatPage from '@/app/(app)/chat/[userId]/page';
+import { CheckCircle2, X, WalletCards } from 'lucide-react';
 
 interface Room {
     _id: string;
@@ -72,8 +73,9 @@ export default function ChatsPage() {
     // Estado de "digitando" por sala: { [roomId]: boolean }
     const [typingRooms, setTypingRooms] = useState<Record<string, boolean>>({});
 
-    // Modal de presente (gift code)
+    // Modal de crédito promocional (gift code)
     const [giftModal, setGiftModal] = useState(false);
+    const [giftAmount, setGiftAmount] = useState<number | null>(null);
     const giftClaimedRef = useRef(false);
 
     // Controle da SPA para o chat individual
@@ -218,6 +220,8 @@ export default function ChatsPage() {
             body: JSON.stringify({ code }),
         }).then(async (res) => {
             if (res.ok) {
+                const data = await res.json();
+                setGiftAmount(typeof data?.amount === 'number' ? data.amount : null);
                 setGiftModal(true);
                 queryClient.invalidateQueries({ queryKey: QueryKeys.me });
             }
@@ -276,80 +280,70 @@ export default function ChatsPage() {
                     <h1 className="text-2xl font-black text-white tracking-tighter">Mimo</h1>
                     <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">Conversas</span>
                 </div>
-                <BalanceDisplay 
-                    balance={myProfile?.balance ?? 0} 
-                    size="sm" 
-                    variant="glass" 
-                />
             </div>
 
-            {/* Modal de presente */}
+            {/* Modal de crédito promocional */}
             {giftModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-5">
                     <div
-                        className="absolute inset-0 bg-black/65 backdrop-blur-sm animate-in fade-in duration-300"
+                        className="absolute inset-0 bg-purple-950/35 backdrop-blur-[2px] animate-in fade-in duration-200"
                         onClick={() => setGiftModal(false)}
                     />
-                    <div className="relative w-full max-w-sm animate-in fade-in slide-in-from-bottom-10 zoom-in-95 duration-500">
-                        <div className="relative bg-gradient-to-b from-purple-700 via-purple-600 to-purple-800 rounded-3xl overflow-hidden shadow-2xl border border-purple-400/30">
+                    <div className="relative w-full max-w-[360px] animate-in fade-in slide-in-from-bottom-6 zoom-in-95 duration-300">
+                        <div className="relative overflow-hidden rounded-[28px] border border-purple-100 bg-white text-gray-900 shadow-2xl">
+                            <button
+                                type="button"
+                                aria-label="Fechar"
+                                onClick={() => setGiftModal(false)}
+                                className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-800"
+                            >
+                                <X size={18} strokeWidth={2.2} />
+                            </button>
 
-                            {/* Estrelas decorativas */}
-                            <span className="absolute top-5 left-7 text-yellow-300 text-xl animate-spin pointer-events-none" style={{ animationDuration: '4s' }}>✦</span>
-                            <span className="absolute top-8 left-16 text-white/30 text-sm animate-pulse pointer-events-none">★</span>
-                            <span className="absolute top-4 right-8 text-yellow-200 text-lg animate-spin pointer-events-none" style={{ animationDuration: '6s', animationDirection: 'reverse' }}>✦</span>
-                            <span className="absolute top-10 right-20 text-white/40 text-xs animate-pulse pointer-events-none" style={{ animationDelay: '500ms' }}>✦</span>
-                            <span className="absolute bottom-24 left-5 text-yellow-300/50 text-sm animate-ping pointer-events-none" style={{ animationDuration: '2s' }}>★</span>
-                            <span className="absolute bottom-28 right-6 text-white/30 text-xs animate-ping pointer-events-none" style={{ animationDuration: '2.5s', animationDelay: '700ms' }}>✦</span>
+                            <div className="h-1.5 bg-gradient-to-r from-purple-600 via-fuchsia-500 to-purple-500" />
 
-                            <div className="px-8 pt-10 pb-8 text-center">
-                                {/* Ícone de presente com bounce */}
-                                <div className="mb-1">
-                                    <span
-                                        className="text-[72px] inline-block animate-bounce"
-                                        style={{ animationDuration: '1.2s', filter: 'drop-shadow(0 0 20px rgba(250,204,21,0.6))' }}
-                                    >
-                                        🎁
-                                    </span>
+                            <div className="px-6 pb-6 pt-7">
+                                <div className="mb-5 flex items-start gap-4">
+                                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 ring-1 ring-purple-100">
+                                        <WalletCards size={24} strokeWidth={1.9} />
+                                    </div>
+                                    <div className="min-w-0 pr-7">
+                                        <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-purple-500">Saldo promocional</p>
+                                        <h2 className="text-[22px] font-semibold leading-tight tracking-normal text-gray-900">Crédito liberado para você</h2>
+                                    </div>
                                 </div>
 
-                                {/* Linha de estrelas animadas */}
-                                <div className="flex justify-center items-center gap-3 mb-5 text-yellow-300">
-                                    <span className="animate-ping text-xs" style={{ animationDuration: '1.5s' }}>✦</span>
-                                    <span className="animate-bounce text-base" style={{ animationDuration: '1s', animationDelay: '200ms' }}>★</span>
-                                    <span className="animate-ping text-xs" style={{ animationDuration: '1.5s', animationDelay: '400ms' }}>✦</span>
-                                </div>
-
-                                {/* Título */}
-                                <h2 className="text-white text-[26px] font-black leading-tight mb-1">Você ganhou!</h2>
-                                <p className="text-purple-200 text-sm mb-6 leading-relaxed">Um presente especial está esperando por você 🎉</p>
-
-                                {/* Card de valor */}
-                                <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-6 py-5 mb-6 border border-white/20 shadow-inner">
-                                    <p className="text-purple-300 text-[10px] font-bold uppercase tracking-widest mb-1.5">Crédito adicionado ao seu saldo</p>
-                                    <p className="text-yellow-300 font-black tracking-tight leading-none" style={{ fontSize: '56px', textShadow: '0 0 30px rgba(250,204,21,0.5)' }}>
-                                        R$50
+                                <div className="mb-5 rounded-2xl border border-purple-100 bg-purple-50/60 px-5 py-4">
+                                    <div className="flex items-end justify-between gap-4">
+                                        <div>
+                                            <p className="mb-1 text-sm text-gray-500">Valor adicionado</p>
+                                            <p className="text-[42px] font-semibold leading-none tracking-normal text-purple-700">
+                                                {((giftAmount ?? 5000) / 100).toLocaleString('pt-BR', {
+                                                    style: 'currency',
+                                                    currency: 'BRL',
+                                                    maximumFractionDigits: 0,
+                                                })}
+                                            </p>
+                                        </div>
+                                        <CheckCircle2 className="mb-1 shrink-0 text-emerald-500" size={26} strokeWidth={1.9} />
+                                    </div>
+                                    <div className="mt-4 h-px bg-purple-100" />
+                                    <p className="mt-4 text-sm leading-relaxed text-gray-600">
+                                        O valor já entrou no seu saldo e pode ser usado nas conversas e conteúdos do app.
                                     </p>
-                                    <p className="text-white/60 text-xs mt-1.5">para gastar como quiser no MimoChat</p>
                                 </div>
 
-                                {/* Descrição */}
-                                <p className="text-purple-200 text-sm mb-7 leading-relaxed px-2">
-                                    Seu saldo já foi creditado e está disponível para você usar agora mesmo!
-                                </p>
-
-                                {/* Botão CTA */}
                                 <button
                                     onClick={() => setGiftModal(false)}
-                                    className="w-full bg-gradient-to-r from-yellow-400 to-amber-400 hover:from-yellow-300 hover:to-amber-300 text-gray-900 font-black text-base py-4 rounded-2xl shadow-lg hover:shadow-yellow-400/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+                                    className="w-full rounded-2xl bg-purple-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-purple-600/20 transition-colors hover:bg-purple-700 active:scale-[0.99]"
                                 >
-                                    Aproveitar agora! 🎉
+                                    Continuar no chat
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
-
             {/* List */}
             <div className="flex-1 overflow-y-auto pb-16 md:pb-0">
                 {isLoading ? (

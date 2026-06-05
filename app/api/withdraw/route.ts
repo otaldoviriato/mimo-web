@@ -88,6 +88,22 @@ export async function GET(request: NextRequest) {
 
         await connectToDatabase();
 
+        if (request.nextUrl.searchParams.get('history') === 'true') {
+            const withdrawals = await WithdrawRequest.find({ userId })
+                .sort({ createdAt: -1 })
+                .limit(10)
+                .lean();
+
+            return NextResponse.json({
+                withdrawals: withdrawals.map((withdrawal) => ({
+                    id: withdrawal._id?.toString(),
+                    amount: withdrawal.amount,
+                    status: withdrawal.status,
+                    createdAt: withdrawal.createdAt,
+                })),
+            });
+        }
+
         const pendingWithdrawal = await WithdrawRequest.findOne({ 
             userId: userId,
             status: 'pendente'

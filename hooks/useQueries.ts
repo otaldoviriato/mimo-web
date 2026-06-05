@@ -407,8 +407,29 @@ export function useRequestWithdraw() {
         mutationFn: () => userApi.requestWithdraw(),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['withdraw', 'pending'] });
+            queryClient.invalidateQueries({ queryKey: ['withdraw', 'history'] });
             queryClient.invalidateQueries({ queryKey: QueryKeys.me }); // Atualiza saldo para 0
         },
+    });
+}
+
+// ─── Histórico de Saques ────────────────────────────────────────────────────
+export function useWithdrawalHistory() {
+    return useQuery({
+        queryKey: ['withdraw', 'history'],
+        queryFn: async () => {
+            const response = await fetch('/api/withdraw?history=true');
+            if (!response.ok) return { withdrawals: [] };
+            return response.json() as Promise<{
+                withdrawals: Array<{
+                    id: string;
+                    amount: number;
+                    status: 'pendente' | 'concluido' | 'rejeitado';
+                    createdAt: string;
+                }>;
+            }>;
+        },
+        staleTime: 60 * 1000,
     });
 }
 
@@ -424,6 +445,9 @@ export function useDepositHistory() {
                     id: string;
                     amount: number;
                     status: string;
+                    source: 'recharge' | 'gift';
+                    type: string;
+                    metadata?: Record<string, unknown>;
                     createdAt: string;
                 }>;
             }>;
@@ -431,4 +455,3 @@ export function useDepositHistory() {
         staleTime: 60 * 1000,
     });
 }
-

@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { GiftCode } from '@/models/GiftCode';
 import { MicroTransaction } from '@/models/MicroTransaction';
+import { Transaction } from '@/models/Transaction';
 
 export async function POST(req: NextRequest) {
     try {
@@ -67,6 +68,16 @@ export async function POST(req: NextRequest) {
         await MicroTransaction.create({
             userId,
             amount,
+            type: 'credit',
+            source: 'gift',
+            metadata: { giftCode: rawCode },
+            timestamp: new Date(),
+        });
+
+        await Transaction.create({
+            userId,
+            amount,
+            status: 'PAID',
             type: 'credit',
             source: 'gift',
             metadata: { giftCode: rawCode },

@@ -5,9 +5,8 @@ import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useUser } from '@clerk/nextjs';
 import { useQueryClient } from '@tanstack/react-query';
 import { Avatar } from '@/components/Avatar';
-import { BalanceDisplay } from '@/components/BalanceDisplay';
 import { useSocket } from '@/hooks/useSocket';
-import { useUserById, useMyProfile, QueryKeys, useRecentEarnings } from '@/hooks/useQueries';
+import { useUserById, useMyProfile, QueryKeys } from '@/hooks/useQueries';
 import { usePayment } from '@/context/PaymentContext';
 import { Drawer } from 'vaul';
 
@@ -39,6 +38,13 @@ interface ChatPageProps {
     onBack?: () => void;
     isSubPage?: boolean;
     isClosing?: boolean;
+}
+
+interface CachedRoom {
+    participants: string[];
+    otherUser?: {
+        balance?: number;
+    };
 }
 
 export default function ChatPage({ params, userId: propUserId, onBack, isSubPage = false, isClosing = false }: ChatPageProps) {
@@ -133,9 +139,12 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
     const pendingMediaRef = useRef<{ file: File; isVideoFile: boolean } | null>(null);
 
     const { data: userData } = useMyProfile();
-    const { data: earningsData } = useRecentEarnings(otherUserId);
     const { data: receiver } = useUserById(otherUserId);
     const balance = userData?.balance ?? 0;
+    const cachedRoom = user?.id
+        ? queryClient.getQueryData<CachedRoom[]>(QueryKeys.rooms(user.id))?.find((room) => room.participants.includes(otherUserId))
+        : undefined;
+    const receiverBalance = receiver?.balance ?? cachedRoom?.otherUser?.balance ?? 0;
 
     // Lista derivada das mensagens com mídia desbloqueada (imagens e vídeos)
     const mediaItems = React.useMemo(() => {
@@ -898,8 +907,15 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                             className="flex-1 flex items-center gap-2 min-w-0 text-left py-0.5"
                         >
                             <div className="relative shrink-0">
-                                <Avatar uri={receiver?.photoUrl} size={34} />
-                                {connected && <div className="absolute -right-0.5 -bottom-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-purple-600 rounded-full" />}
+                                <Avatar uri={receiver?.photoUrl} size={46} />
+                                {userData?.isProfessional && (
+                                    <div className="absolute -bottom-1 -right-1 bg-white text-purple-700 rounded-full px-1.5 py-0.5 border border-purple-200 flex items-center justify-center shadow-sm">
+                                        <span className="text-[9px] font-bold leading-none whitespace-nowrap">
+                                            R$ {(receiverBalance / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                )}
+                                {connected && <div className="absolute -right-0.5 top-0 w-2.5 h-2.5 bg-green-500 border-2 border-purple-600 rounded-full" />}
                             </div>
                             <div className="flex-1 min-w-0">
                                 <p className="text-base font-black text-white truncate tracking-tight">
@@ -926,7 +942,7 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                 </svg>
                             )}
-                            {!userData?.isProfessional && receiver?.isProfessional ? (
+                            {!userData?.isProfessional && receiver?.isProfessional && (
                                 <button
                                     id="gallery-btn"
                                     onClick={() => setGalleryVisible(true)}
@@ -941,14 +957,6 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                         <rect x="11" y="11" width="6" height="6" rx="1.5" fill="currentColor"/>
                                     </svg>
                                 </button>
-                            ) : (
-                                <BalanceDisplay 
-                                    balance={balance} 
-                                    earnings={userData?.isProfessional ? earningsData?.lastSessionEarnings : 0}
-                                    size="sm" 
-                                    variant="glass" 
-                                    clickable={true} 
-                                />
                             )}
 
                             <div className="relative">

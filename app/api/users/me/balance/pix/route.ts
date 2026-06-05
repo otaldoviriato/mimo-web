@@ -96,7 +96,7 @@ export async function GET() {
 
     const transactions = await Transaction.find({
       userId,
-      source: 'recharge',
+      source: { $in: ['recharge', 'gift'] },
       status: 'PAID',
     })
       .sort({ createdAt: -1 })
@@ -108,6 +108,9 @@ export async function GET() {
         id: t._id?.toString(),
         amount: t.amount,
         status: t.status,
+        source: t.source,
+        type: t.type,
+        metadata: t.metadata ?? {},
         createdAt: t.createdAt,
       })),
     });

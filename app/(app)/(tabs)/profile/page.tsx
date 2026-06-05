@@ -7,7 +7,7 @@ import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { BalanceDisplay } from '@/components/BalanceDisplay';
 import { Avatar } from '@/components/Avatar';
-import { useMyProfile, useUpdateProfile, useUploadPhoto, useUploadCover, useMyGallery, useUploadToGallery, usePendingWithdrawal, useRequestWithdraw, useDeleteFromGallery, useDepositHistory, useChatRooms } from '@/hooks/useQueries';
+import { useMyProfile, useUpdateProfile, useUploadPhoto, useUploadCover, useMyGallery, useUploadToGallery, usePendingWithdrawal, useRequestWithdraw, useDeleteFromGallery, useDepositHistory, useWithdrawalHistory, useChatRooms } from '@/hooks/useQueries';
 import { ImageCropper } from '@/components/ImageCropper';
 import { usePayment } from '@/context/PaymentContext';
 import { usePWA } from '@/context/PWAContext';
@@ -46,7 +46,7 @@ export default function ProfilePage() {
     const [localPhotoUrl, setLocalPhotoUrl] = useState<string | undefined>(undefined);
     const [localCoverUrl, setLocalCoverUrl] = useState<string | undefined>(undefined);
     const [loading, setLoading] = useState(false);
-    const [isProfessional, setIsProfessional] = useState(false);
+    const [isProfessional, setIsProfessional] = useState(() => !!userData?.isProfessional);
     const [pixKey, setPixKey] = useState('');
     const [pixModalOpen, setPixModalOpen] = useState(false);
     const [withdrawConfirmModalOpen, setWithdrawConfirmModalOpen] = useState(false);
@@ -59,6 +59,7 @@ export default function ProfilePage() {
     const { data: pendingWithdrawal } = usePendingWithdrawal();
     const requestWithdrawMutation = useRequestWithdraw();
     const { data: depositHistory } = useDepositHistory();
+    const { data: withdrawalHistory } = useWithdrawalHistory();
     const { data: rooms = [] } = useChatRooms();
 
     const [saveError, setSaveError] = useState('');
@@ -75,7 +76,6 @@ export default function ProfilePage() {
             setName(userData.name || '');
             setTaxId(userData.taxId ? formatCPF(userData.taxId) : '');
             setPhone(userData.phone ? formatPhone(userData.phone) : '');
-            setIsProfessional(!!userData.isProfessional);
             setPixKey(userData.pixKey || '');
             setSubscriptionPrice(userData.subscriptionPrice?.toString() ?? '0');
             setChargePerCharSubscribers(userData.chargePerCharSubscribers?.toString() ?? '0.002');
@@ -98,6 +98,12 @@ export default function ProfilePage() {
             if (userData.chargePerCharNonSubscribers !== undefined && !chargePerCharNonSubscribers) setChargePerCharNonSubscribers(userData.chargePerCharNonSubscribers.toString());
         }
     }, [userData]);
+
+    useEffect(() => {
+        if (userData?.isProfessional !== undefined) {
+            setIsProfessional(!!userData.isProfessional);
+        }
+    }, [userData?.isProfessional]);
 
     const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -238,6 +244,35 @@ export default function ProfilePage() {
     };
 
     const onRefresh = useCallback(() => refetchProfile(), [refetchProfile]);
+    const profileIsProfessional = userData?.isProfessional !== undefined ? !!userData.isProfessional : isProfessional;
+    const walletHistoryItems = profileIsProfessional
+        ? (withdrawalHistory?.withdrawals ?? []).map((withdrawal) => ({
+            id: withdrawal.id,
+            amount: withdrawal.amount / 100,
+            createdAt: withdrawal.createdAt,
+            label: withdrawal.status === 'pendente' ? 'Saque pendente' : withdrawal.status === 'concluido' ? 'Saque concluído' : 'Saque rejeitado',
+            valuePrefix: '-',
+            amountClassName: withdrawal.status === 'rejeitado' ? 'text-gray-400' : 'text-gray-900',
+            iconClassName: withdrawal.status === 'rejeitado' ? 'text-gray-400' : 'text-gray-700',
+            iconBgClassName: withdrawal.status === 'rejeitado' ? 'bg-gray-50 border-gray-100' : 'bg-gray-50 border-gray-200',
+        }))
+        : (depositHistory?.transactions ?? []).map((tx) => ({
+            id: tx.id,
+            amount: tx.source === 'gift' ? tx.amount / 100 : tx.amount,
+            createdAt: tx.createdAt,
+            label: tx.source === 'gift'
+                ? `Crédito via cupom${typeof tx.metadata?.giftCode === 'string' ? ` ${tx.metadata.giftCode}` : ''}`
+                : 'Depósito via Pix',
+            valuePrefix: '+',
+            amountClassName: 'text-green-600',
+            iconClassName: 'text-green-600',
+            iconBgClassName: tx.source === 'gift' ? 'bg-purple-50 border-purple-100' : 'bg-green-50 border-green-100',
+        }));
+    const walletHistoryTitle = profileIsProfessional ? 'Últimos saques' : 'Histórico';
+    const walletHistoryEmpty = profileIsProfessional
+        ? 'Nenhum saque encontrado. Solicite um saque para começar.'
+        : 'Nenhum histórico encontrado. Recarregue ou use um cupom para começar.';
+    const walletStatLabel = profileIsProfessional ? 'Saques' : 'Histórico';
 
     if (loadingProfile && !userData) {
         return (
@@ -305,11 +340,14 @@ export default function ProfilePage() {
             <div className="flex-1 overflow-y-auto p-4 pb-24 md:pb-6 flex flex-col gap-3">
 
                 {/* ── CARD DE PERFIL ─────────────────────────────────────── */}
-                <div className="relative bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    {isProfessional ? (
+                <div
+                    className={`relative bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden ${profileIsProfessional ? 'min-h-[190px]' : 'min-h-[96px]'}`}
+                    style={{ minHeight: profileIsProfessional ? 190 : 96 }}
+                >
+                    {profileIsProfessional ? (
                         /* Layout com capa — apenas para profissionais */
-                        <>
-                            <div className="relative h-28 w-full overflow-hidden shrink-0">
+                        <div className="block min-h-[190px]" style={{ display: 'block', minHeight: 190 }}>
+                            <div className="relative w-full overflow-hidden shrink-0" style={{ height: 112 }}>
                                 {localCoverUrl ? (
                                     <img src={localCoverUrl} alt="Capa" className="w-full h-full object-cover" />
                                 ) : (
@@ -327,7 +365,7 @@ export default function ProfilePage() {
                             </div>
                             <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverChange} />
 
-                            <div className="px-4 pb-4">
+                            <div className="px-4 pb-6">
                                 <div className="flex items-end justify-between -mt-8 mb-3">
                                     <button
                                         onClick={() => fileInputRef.current?.click()}
@@ -351,29 +389,29 @@ export default function ProfilePage() {
                                         Profissional
                                     </span>
                                 </div>
-                                <h1 className="text-base font-semibold text-gray-900 leading-tight">
+                                <h1 className="text-base font-semibold text-gray-900 leading-tight truncate">
                                     {userData?.name || userData?.username || user?.username || ''}
                                 </h1>
                                 <p className="text-xs text-purple-600 font-medium mt-0.5">@{userData?.username || ''}</p>
-                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
+                                <div className="flex flex-col gap-0.5 mt-1.5 pb-1">
                                     {userData?.email && (
-                                        <span className="text-[11px] text-gray-400 flex items-center gap-1">
-                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                                        <span className="text-[11px] text-gray-400 flex items-center gap-1 truncate">
+                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                                             {userData.email.replace(/(.{2})(.*)(@.*)/, '$1•••$3')}
                                         </span>
                                     )}
                                     {user?.createdAt && (
                                         <span className="text-[11px] text-gray-400 flex items-center gap-1">
-                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                                             Membro desde {new Date(user.createdAt).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}
                                         </span>
                                     )}
                                 </div>
                             </div>
-                        </>
+                        </div>
                     ) : (
                         /* Layout horizontal compacto — clientes sem capa */
-                        <div className="p-4 flex items-center gap-4">
+                        <div className="p-4 pb-5 flex items-center gap-4">
                             <button
                                 onClick={() => fileInputRef.current?.click()}
                                 disabled={uploadPhotoMutation.isPending}
@@ -423,8 +461,8 @@ export default function ProfilePage() {
                         <span className="text-[10px] text-gray-400 font-medium text-center leading-tight">Conversas</span>
                     </div>
                     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 flex flex-col items-center gap-0.5">
-                        <span className="text-lg font-bold text-gray-900">{(depositHistory?.transactions ?? []).length}</span>
-                        <span className="text-[10px] text-gray-400 font-medium text-center leading-tight">Depósitos</span>
+                        <span className="text-lg font-bold text-gray-900">{walletHistoryItems.length}</span>
+                        <span className="text-[10px] text-gray-400 font-medium text-center leading-tight">{walletStatLabel}</span>
                     </div>
                     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 flex flex-col items-center justify-center gap-1">
                         <div className="flex items-center gap-1">
@@ -454,19 +492,19 @@ export default function ProfilePage() {
                                 </div>
                             </div>
                             <button
-                                onClick={isProfessional
+                                onClick={profileIsProfessional
                                     ? () => { if (!pixKey) { setPixModalOpen(true); } else { setWithdrawConfirmModalOpen(true); } }
                                     : openRechargeModal}
-                                disabled={isProfessional && pendingWithdrawal != null}
+                                disabled={profileIsProfessional && pendingWithdrawal != null}
                                 className={`mt-1 h-9 px-4 rounded-xl font-semibold text-xs transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 ${
-                                    isProfessional && pendingWithdrawal != null
+                                    profileIsProfessional && pendingWithdrawal != null
                                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                        : isProfessional
+                                        : profileIsProfessional
                                             ? 'bg-gray-900 hover:bg-gray-800 text-white shadow-sm'
                                             : 'bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-600/20'
                                 }`}
                             >
-                                {isProfessional ? (
+                                {profileIsProfessional ? (
                                     <>
                                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12l7 7 7-7" /></svg>
                                         Sacar
@@ -491,23 +529,27 @@ export default function ProfilePage() {
                         </div>
                     )}
 
-                    {/* Mini-extrato de depósitos */}
-                    {(depositHistory?.transactions ?? []).length > 0 ? (
+                    {/* Mini-extrato */}
+                    {walletHistoryItems.length > 0 ? (
                         <div className="px-4 pt-3 pb-4">
-                            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2.5">Últimos depósitos</p>
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2.5">{walletHistoryTitle}</p>
                             <div className="flex flex-col gap-3">
-                                {(depositHistory?.transactions ?? []).slice(0, 3).map((tx) => (
+                                {walletHistoryItems.slice(0, 3).map((tx) => (
                                     <div key={tx.id} className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
-                                            <div className="w-7 h-7 rounded-full bg-green-50 border border-green-100 flex items-center justify-center shrink-0">
-                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-green-600"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                                            <div className={`w-7 h-7 rounded-full border flex items-center justify-center shrink-0 ${tx.iconBgClassName}`}>
+                                                {profileIsProfessional ? (
+                                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className={tx.iconClassName}><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+                                                ) : (
+                                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className={tx.iconClassName}><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                                                )}
                                             </div>
                                             <div>
-                                                <p className="text-[11px] font-medium text-gray-700">Depósito via Pix</p>
+                                                <p className="text-[11px] font-medium text-gray-700">{tx.label}</p>
                                                 <p className="text-[10px] text-gray-400">{new Date(tx.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</p>
                                             </div>
                                         </div>
-                                        <span className="text-[11px] font-bold text-green-600">+{tx.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                        <span className={`text-[11px] font-bold ${tx.amountClassName}`}>{tx.valuePrefix}{tx.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                                     </div>
                                 ))}
                             </div>
@@ -515,7 +557,7 @@ export default function ProfilePage() {
                     ) : (
                         <div className="px-4 py-3 flex items-center gap-2">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-300"><path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-8 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>
-                            <p className="text-[11px] text-gray-400">Nenhum depósito encontrado. Recarregue para começar.</p>
+                            <p className="text-[11px] text-gray-400">{walletHistoryEmpty}</p>
                         </div>
                     )}
                 </div>
@@ -534,7 +576,7 @@ export default function ProfilePage() {
                         </div>
                         {/* Barra de progresso */}
                         {(() => {
-                            const checks = isProfessional
+                            const checks = profileIsProfessional
                                 ? [!!localPhotoUrl, !!userData?.taxId, !!userData?.pixKey, !!userData?.phone]
                                 : [!!localPhotoUrl, !!userData?.taxId, !!userData?.phone];
                             const done = checks.filter(Boolean).length;
@@ -547,7 +589,7 @@ export default function ProfilePage() {
                         })()}
                     </div>
                     <div className="flex flex-col gap-2">
-                        {(isProfessional
+                        {(profileIsProfessional
                             ? [
                                 { label: 'Foto de perfil', done: !!localPhotoUrl, action: () => fileInputRef.current?.click() },
                                 { label: 'CPF informado', done: !!userData?.taxId, action: () => setIsSettingsOpen(true) },
@@ -584,7 +626,7 @@ export default function ProfilePage() {
                 </div>
 
                 {/* ── GALERIA (Profissionais) ────────────────────────────── */}
-                {isProfessional && (
+                {profileIsProfessional && (
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-3">
                         <div className="flex items-center justify-between">
                             <div>
@@ -705,7 +747,7 @@ export default function ProfilePage() {
                         </div>
 
                         {/* ── SEÇÃO: PREÇOS E GANHOS (Profissionais) ── */}
-                        {isProfessional && (
+                        {profileIsProfessional && (
                             <div>
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Preços e Ganhos</p>
                                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -973,7 +1015,7 @@ export default function ProfilePage() {
                                 </div>
                             </button>
 
-                            {isProfessional && (
+                            {profileIsProfessional && (
                                 <button
                                     onClick={() => confirmGalleryUpload('subscribers')}
                                     disabled={uploadingGallery}
