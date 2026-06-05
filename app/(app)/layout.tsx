@@ -5,6 +5,7 @@ import { useAuth, useUser } from '@clerk/nextjs';
 import { useRouter, usePathname } from 'next/navigation';
 import { setupAxiosInterceptors } from '@/services/api';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { NotificationPromptModal } from '@/components';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     const { isLoaded, isSignedIn, getToken } = useAuth();
@@ -25,7 +26,48 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         }
     }, [pathname]);
 
+    useEffect(() => {
+        if (typeof window === 'undefined' || !('startViewTransition' in document)) return;
 
+        const handlePopState = () => {
+            if ((window as any).__navigatingWithTransition) {
+                return;
+            }
+
+            document.documentElement.classList.add('transition-backward');
+            document.documentElement.classList.remove('transition-forward');
+
+            const transition = (document as any).startViewTransition(() => {
+                return new Promise<void>((resolve) => {
+                    (window as any).__resolveTransition = () => {
+                        setTimeout(resolve, 50);
+                    };
+
+                    setTimeout(() => {
+                        if ((window as any).__resolveTransition) {
+                            resolve();
+                            (window as any).__resolveTransition = null;
+                        }
+                    }, 1000);
+                });
+            });
+
+            if (transition.ready) {
+                transition.ready.catch(() => {});
+            }
+
+            transition.finished
+                .catch(() => {})
+                .finally(() => {
+                    document.documentElement.classList.remove('transition-backward');
+                });
+        };
+
+        window.addEventListener('popstate', handlePopState, true);
+        return () => {
+            window.removeEventListener('popstate', handlePopState, true);
+        };
+    }, []);
 
     useEffect(() => {
         if (isLoaded && !isSignedIn) {
@@ -78,5 +120,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     if (!isSignedIn) return null;
 
-    return <>{children}</>;
+    return (
+        <>
+            {children}
+            <NotificationPromptModal />
+        </>
+    );
 }

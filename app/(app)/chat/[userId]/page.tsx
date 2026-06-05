@@ -206,6 +206,13 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
         }
     }, [receiver, loadingMessages]);
 
+    // Prefetch da tela de perfil público para navegação instantânea (resposta tátil imediata)
+    useEffect(() => {
+        if (receiver?.username) {
+            router.prefetch(`/${receiver.username}`);
+        }
+    }, [receiver?.username, router]);
+
     const scrollToBottom = (behavior: 'auto' | 'smooth' = 'smooth') => {
         setTimeout(() => {
             const container = messagesContainerRef.current;

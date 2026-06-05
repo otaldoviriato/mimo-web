@@ -7,4 +7,5 @@ export { PixCheckoutView } from './PixCheckoutView';
 export { ProcessingPaymentView } from './ProcessingPaymentView';
 export { TouchableOpacity } from './TouchableOpacity';
 export { TouchableRipple } from './TouchableRipple';
+export { NotificationPromptModal } from './NotificationPromptModal';
 

@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useUser, useClerk } from '@clerk/nextjs';
-import { useRouter } from 'next/navigation';
+import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { BalanceDisplay } from '@/components/BalanceDisplay';
@@ -23,7 +23,11 @@ function SkeletonBox({ className = '' }: { className?: string }) {
 export default function ProfilePage() {
     const { user } = useUser();
     const { signOut } = useClerk();
-    const router = useRouter();
+    const router = useTransitionRouter();
+
+    useEffect(() => {
+        router.prefetch('/settings');
+    }, [router]);
     const { openRechargeModal } = usePayment();
     const { isInstallable, promptInstall, mounted, isStandalone } = usePWA();
     const { permission: notificationPermission, handleRequestPermission } = usePushNotifications();
@@ -50,11 +54,12 @@ export default function ProfilePage() {
     const [pixKey, setPixKey] = useState('');
     const [pixModalOpen, setPixModalOpen] = useState(false);
     const [withdrawConfirmModalOpen, setWithdrawConfirmModalOpen] = useState(false);
-    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isAboutExpanded, setIsAboutExpanded] = useState(false);
     const [subscriptionPrice, setSubscriptionPrice] = useState('');
     const [chargePerCharSubscribers, setChargePerCharSubscribers] = useState('');
     const [chargePerCharNonSubscribers, setChargePerCharNonSubscribers] = useState('');
+    const [isSavingPrice, setIsSavingPrice] = useState(false);
+    const [priceSavedFeedback, setPriceSavedFeedback] = useState(false);
 
     const { data: pendingWithdrawal } = usePendingWithdrawal();
     const requestWithdrawMutation = useRequestWithdraw();
@@ -200,6 +205,54 @@ export default function ProfilePage() {
         }
     };
 
+    const savePriceSettings = async (nonSubscribersPrice: number, subscribersPrice: number) => {
+        setIsSavingPrice(true);
+        setPriceSavedFeedback(false);
+        try {
+            await updateProfileMutation.mutateAsync({
+                chargePerCharNonSubscribers: nonSubscribersPrice,
+                chargePerCharSubscribers: subscribersPrice,
+            });
+            setPriceSavedFeedback(true);
+            setTimeout(() => setPriceSavedFeedback(false), 2000);
+        } catch {
+            alert('Erro ao salvar o preço por caractere.');
+        } finally {
+            setIsSavingPrice(false);
+        }
+    };
+
+    const handleAdjustPrice = async (delta: number) => {
+        const currentPrice = Number(chargePerCharNonSubscribers) || 0;
+        const newPrice = Math.max(0, currentPrice + delta);
+        const newPriceStr = parseFloat(newPrice.toFixed(4)).toString();
+        const subscriberPriceStr = parseFloat((newPrice * 0.8).toFixed(4)).toString();
+
+        setChargePerCharNonSubscribers(newPriceStr);
+        setChargePerCharSubscribers(subscriberPriceStr);
+
+        await savePriceSettings(newPrice, newPrice * 0.8);
+    };
+
+    const handleInputBlur = async () => {
+        const parsed = parseFloat(Number(chargePerCharNonSubscribers).toFixed(4));
+        if (isNaN(parsed) || parsed < 0) {
+            if (userData) {
+                setChargePerCharNonSubscribers(userData.chargePerCharNonSubscribers?.toString() ?? '0.005');
+                setChargePerCharSubscribers(userData.chargePerCharSubscribers?.toString() ?? '0.002');
+            }
+            return;
+        }
+
+        const nonSubPrice = parsed;
+        const subPrice = parseFloat((parsed * 0.8).toFixed(4));
+
+        setChargePerCharNonSubscribers(nonSubPrice.toString());
+        setChargePerCharSubscribers(subPrice.toString());
+
+        await savePriceSettings(nonSubPrice, subPrice);
+    };
+
     const handleDeleteGalleryItem = async (itemId: string) => {
         if (!confirm('Tem certeza que deseja remover esta foto da sua galeria?')) return;
         try {
@@ -325,7 +378,7 @@ export default function ProfilePage() {
                         </div>
                     )}
                     <button
-                        onClick={() => setIsSettingsOpen(true)}
+                        onClick={() => router.push('/settings')}
                         className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center"
                         title="Configurações"
                     >
@@ -341,12 +394,13 @@ export default function ProfilePage() {
 
                 {/* ── CARD DE PERFIL ─────────────────────────────────────── */}
                 <div
-                    className={`relative bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden ${profileIsProfessional ? 'min-h-[190px]' : 'min-h-[96px]'}`}
-                    style={{ minHeight: profileIsProfessional ? 190 : 96 }}
+                    className={`relative bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden shrink-0 h-auto ${
+                        profileIsProfessional ? 'min-h-[220px]' : 'min-h-[96px]'
+                    }`}
                 >
                     {profileIsProfessional ? (
                         /* Layout com capa — apenas para profissionais */
-                        <div className="block min-h-[190px]" style={{ display: 'block', minHeight: 190 }}>
+                        <div className="block h-auto" style={{ display: 'block' }}>
                             <div className="relative w-full overflow-hidden shrink-0" style={{ height: 112 }}>
                                 {localCoverUrl ? (
                                     <img src={localCoverUrl} alt="Capa" className="w-full h-full object-cover" />
@@ -365,7 +419,7 @@ export default function ProfilePage() {
                             </div>
                             <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverChange} />
 
-                            <div className="px-4 pb-6">
+                            <div className="p-5 pt-0">
                                 <div className="flex items-end justify-between -mt-8 mb-3">
                                     <button
                                         onClick={() => fileInputRef.current?.click()}
@@ -411,7 +465,7 @@ export default function ProfilePage() {
                         </div>
                     ) : (
                         /* Layout horizontal compacto — clientes sem capa */
-                        <div className="p-4 pb-5 flex items-center gap-4">
+                        <div className="p-5 flex items-center gap-4">
                             <button
                                 onClick={() => fileInputRef.current?.click()}
                                 disabled={uploadPhotoMutation.isPending}
@@ -499,9 +553,7 @@ export default function ProfilePage() {
                                 className={`mt-1 h-9 px-4 rounded-xl font-semibold text-xs transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 ${
                                     profileIsProfessional && pendingWithdrawal != null
                                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                        : profileIsProfessional
-                                            ? 'bg-gray-900 hover:bg-gray-800 text-white shadow-sm'
-                                            : 'bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-600/20'
+                                        : 'bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-600/20'
                                 }`}
                             >
                                 {profileIsProfessional ? (
@@ -562,6 +614,110 @@ export default function ProfilePage() {
                     )}
                 </div>
 
+                {/* ── PREÇO POR CARACTERE (Apenas Profissionais) ───────────────── */}
+                {profileIsProfessional && (
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-3">
+                        <div>
+                            <h2 className="text-sm font-semibold text-gray-800">Preço por Caractere</h2>
+                            <p className="text-[10px] text-gray-400">
+                                Defina o preço base. Assinantes têm 20% de desconto automaticamente.
+                            </p>
+                        </div>
+
+                        <div className="flex items-center justify-between bg-gray-50 rounded-xl p-3 border border-gray-100">
+                            <span className="text-xs font-medium text-gray-500">Valor Base</span>
+                            
+                            <div className="flex items-center gap-2">
+                                {/* Botão Decrementar */}
+                                <button
+                                    onClick={() => handleAdjustPrice(-0.001)}
+                                    disabled={isSavingPrice || Number(chargePerCharNonSubscribers) <= 0}
+                                    className="w-8 h-8 rounded-lg bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-600 hover:bg-gray-50 active:scale-95 transition-all disabled:opacity-50"
+                                    title="Diminuir preço"
+                                >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="5" y1="12" x2="19" y2="12" />
+                                    </svg>
+                                </button>
+
+                                {/* Input de Valor */}
+                                <div className="relative flex items-center">
+                                    <span className="absolute left-2.5 text-xs font-semibold text-gray-400">R$</span>
+                                    <input
+                                        type="number"
+                                        step="0.0001"
+                                        min="0"
+                                        className="w-24 h-8 pl-8 pr-2 text-center text-sm font-bold text-gray-800 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-600 focus:border-purple-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        value={chargePerCharNonSubscribers}
+                                        onChange={(e) => setChargePerCharNonSubscribers(e.target.value)}
+                                        onBlur={handleInputBlur}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                handleInputBlur();
+                                            }
+                                        }}
+                                    />
+                                </div>
+
+                                {/* Botão Incrementar */}
+                                <button
+                                    onClick={() => handleAdjustPrice(0.001)}
+                                    disabled={isSavingPrice}
+                                    className="w-8 h-8 rounded-lg bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-600 hover:bg-gray-50 active:scale-95 transition-all disabled:opacity-50"
+                                    title="Aumentar preço"
+                                >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Detalhes de cálculo dinâmico */}
+                        <div className="grid grid-cols-2 gap-2 bg-purple-50/40 rounded-xl p-3 border border-purple-50 text-xs">
+                            <div className="flex flex-col gap-0.5">
+                                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Não Assinantes</span>
+                                <span className="font-bold text-gray-800">
+                                    {Number(chargePerCharNonSubscribers).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4 })}
+                                </span>
+                                <span className="text-[9px] text-gray-500 font-medium">
+                                    100 chars = {((Number(chargePerCharNonSubscribers) || 0) * 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                            
+                            <div className="flex flex-col gap-0.5 border-l border-purple-100/50 pl-3">
+                                <span className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider flex items-center gap-1">
+                                    Assinantes
+                                    <span className="bg-purple-100 text-purple-700 text-[8px] font-bold px-1.5 py-0.5 rounded-md">-20%</span>
+                                </span>
+                                <span className="font-bold text-purple-700">
+                                    {(Number(chargePerCharNonSubscribers) * 0.8).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4 })}
+                                </span>
+                                <span className="text-[9px] text-purple-500 font-medium">
+                                    100 chars = {((Number(chargePerCharNonSubscribers) || 0) * 0.8 * 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Feedback visual de salvamento */}
+                        {isSavingPrice && (
+                            <div className="flex items-center gap-1.5 justify-center text-[10px] text-gray-400 animate-pulse">
+                                <svg className="animate-spin h-3 w-3 text-purple-600" viewBox="0 0 24 24" fill="none">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                                Salvando preço...
+                            </div>
+                        )}
+                        {!isSavingPrice && priceSavedFeedback && (
+                            <div className="flex items-center gap-1 justify-center text-[10px] text-green-600 font-medium animate-in fade-in duration-200">
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-green-600"><polyline points="20 6 9 17 4 12"/></svg>
+                                Valor atualizado!
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* ── INTEGRIDADE DA CONTA ───────────────────────────────── */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
                     <div className="flex items-center justify-between mb-3">
@@ -592,14 +748,14 @@ export default function ProfilePage() {
                         {(profileIsProfessional
                             ? [
                                 { label: 'Foto de perfil', done: !!localPhotoUrl, action: () => fileInputRef.current?.click() },
-                                { label: 'CPF informado', done: !!userData?.taxId, action: () => setIsSettingsOpen(true) },
-                                { label: 'Chave Pix cadastrada', done: !!userData?.pixKey, action: () => setIsSettingsOpen(true) },
-                                { label: 'Telefone cadastrado', done: !!userData?.phone, action: () => setIsSettingsOpen(true) },
+                                { label: 'CPF informado', done: !!userData?.taxId, action: () => router.push('/settings') },
+                                { label: 'Chave Pix cadastrada', done: !!userData?.pixKey, action: () => router.push('/settings') },
+                                { label: 'Telefone cadastrado', done: !!userData?.phone, action: () => router.push('/settings') },
                             ]
                             : [
                                 { label: 'Foto de perfil', done: !!localPhotoUrl, action: () => fileInputRef.current?.click() },
-                                { label: 'CPF informado', done: !!userData?.taxId, action: () => setIsSettingsOpen(true) },
-                                { label: 'Telefone cadastrado', done: !!userData?.phone, action: () => setIsSettingsOpen(true) },
+                                { label: 'CPF informado', done: !!userData?.taxId, action: () => router.push('/settings') },
+                                { label: 'Telefone cadastrado', done: !!userData?.phone, action: () => router.push('/settings') },
                             ]
                         ).map((item, i) => (
                             <div key={i} className="flex items-center justify-between">
@@ -670,301 +826,6 @@ export default function ProfilePage() {
                     </div>
                 )}
             </div>
-
-            {/* ── CONFIGURAÇÕES OVERLAY ───────────────────────────────────── */}
-            {isSettingsOpen && (
-                <div className="fixed inset-0 z-50 bg-gray-50 flex flex-col overflow-y-auto animate-in slide-in-from-right duration-200">
-
-                    {/* Header — igual ao header principal do app */}
-                    <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[56px] shrink-0 flex items-center gap-3 sticky top-0 z-10 shadow-sm">
-                        <button
-                            onClick={() => { setIsSettingsOpen(false); setSaveError(''); setSaveSuccess(false); }}
-                            className="p-1.5 hover:bg-white/10 active:bg-white/20 rounded-lg transition-colors text-white flex items-center justify-center"
-                        >
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" />
-                            </svg>
-                        </button>
-                        <h1 className="text-base font-bold text-white">Configurações</h1>
-                    </div>
-
-                    <div className="p-4 flex flex-col gap-4">
-
-                        {/* ── SEÇÃO: DADOS DO PERFIL ── */}
-                        <div>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Dados do Perfil</p>
-                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                                {/* Nome */}
-                                <div className="px-4 py-3.5 border-b border-gray-50">
-                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Nome de Exibição</label>
-                                    <input
-                                        className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
-                                        placeholder="Seu nome ou apelido"
-                                        value={name}
-                                        onChange={(e) => setName(e.target.value)}
-                                    />
-                                </div>
-                                {/* Username */}
-                                <div className="px-4 py-3.5 border-b border-gray-50">
-                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Username</label>
-                                    <div className="flex items-center gap-1">
-                                        <span className="text-sm text-gray-300 select-none">@</span>
-                                        <input
-                                            className="flex-1 text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
-                                            placeholder="username"
-                                            value={username}
-                                            onChange={(e) => setUsername(e.target.value)}
-                                            autoCapitalize="none"
-                                            autoCorrect="off"
-                                        />
-                                    </div>
-                                </div>
-                                {/* CPF */}
-                                <div className="px-4 py-3.5 border-b border-gray-50">
-                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">CPF</label>
-                                    <input
-                                        className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
-                                        placeholder="000.000.000-00"
-                                        value={taxId}
-                                        onChange={(e) => setTaxId(formatCPF(e.target.value))}
-                                        maxLength={14}
-                                        inputMode="numeric"
-                                    />
-                                </div>
-                                {/* Telefone */}
-                                <div className="px-4 py-3.5">
-                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Telefone / WhatsApp</label>
-                                    <input
-                                        className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
-                                        placeholder="(00) 00000-0000"
-                                        value={phone}
-                                        onChange={(e) => setPhone(formatPhone(e.target.value))}
-                                        maxLength={15}
-                                        type="tel"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* ── SEÇÃO: PREÇOS E GANHOS (Profissionais) ── */}
-                        {profileIsProfessional && (
-                            <div>
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Preços e Ganhos</p>
-                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                                    <div className="px-4 py-3.5 border-b border-gray-50">
-                                        <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Assinatura Mensal (R$)</label>
-                                        <input
-                                            className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
-                                            placeholder="0.00"
-                                            value={subscriptionPrice}
-                                            onChange={(e) => setSubscriptionPrice(e.target.value)}
-                                            type="number"
-                                            step="0.01"
-                                            inputMode="decimal"
-                                        />
-                                    </div>
-                                    <div className="px-4 py-3.5 border-b border-gray-50">
-                                        <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Por Caractere — Assinantes (R$)</label>
-                                        <input
-                                            className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
-                                            placeholder="0.002"
-                                            value={chargePerCharSubscribers}
-                                            onChange={(e) => setChargePerCharSubscribers(e.target.value)}
-                                            type="number"
-                                            step="0.0001"
-                                            inputMode="decimal"
-                                        />
-                                        {chargePerCharSubscribers && !isNaN(Number(chargePerCharSubscribers)) && (
-                                            <p className="text-[10px] text-gray-400 mt-1.5">
-                                                100 chars = <span className="font-semibold text-purple-600">{(Number(chargePerCharSubscribers) * 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })}</span> para assinantes
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="px-4 py-3.5">
-                                        <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Por Caractere — Não Assinantes (R$)</label>
-                                        <input
-                                            className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
-                                            placeholder="0.005"
-                                            value={chargePerCharNonSubscribers}
-                                            onChange={(e) => setChargePerCharNonSubscribers(e.target.value)}
-                                            type="number"
-                                            step="0.0001"
-                                            inputMode="decimal"
-                                        />
-                                        {chargePerCharNonSubscribers && !isNaN(Number(chargePerCharNonSubscribers)) && (
-                                            <p className="text-[10px] text-gray-400 mt-1.5">
-                                                100 chars = <span className="font-semibold text-purple-600">{(Number(chargePerCharNonSubscribers) * 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })}</span> para não assinantes
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* ── BOTÃO SALVAR — imediatamente após os campos ── */}
-                        <div className="flex flex-col gap-2">
-                            {saveError && (
-                                <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-100 rounded-xl">
-                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                                    <p className="text-xs text-red-600 font-medium">{saveError}</p>
-                                </div>
-                            )}
-                            {saveSuccess && (
-                                <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-100 rounded-xl">
-                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-600 shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
-                                    <p className="text-xs text-green-700 font-medium">Perfil atualizado com sucesso</p>
-                                </div>
-                            )}
-                            <button
-                                onClick={handleSaveAll}
-                                disabled={loading}
-                                className="w-full h-10 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white text-sm font-semibold transition-colors active:scale-[0.98] flex items-center justify-center gap-2"
-                            >
-                                {loading ? (
-                                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                                ) : (
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                                )}
-                                Salvar Alterações
-                            </button>
-                        </div>
-
-                        {/* ── SEÇÃO: PREFERÊNCIAS DO DISPOSITIVO ── */}
-                        {mounted && (notificationPermission !== 'granted' || (isInstallable && !isStandalone)) && (
-                            <div>
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Este Dispositivo</p>
-                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                                    {/* Notificações */}
-                                    <div className={`px-4 py-3.5 flex items-center justify-between ${isInstallable && !isStandalone ? 'border-b border-gray-50' : ''}`}>
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-500">
-                                                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                                                </svg>
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="text-sm font-medium text-gray-800">Notificações</p>
-                                                <p className="text-[10px] text-gray-400 leading-snug">
-                                                    {notificationPermission === 'granted'
-                                                        ? 'Ativas para este dispositivo'
-                                                        : notificationPermission === 'denied'
-                                                            ? 'Bloqueadas pelo navegador'
-                                                            : 'Alertas de novas mensagens'}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        {notificationPermission === 'granted' ? (
-                                            <div className="flex items-center gap-1 shrink-0">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                                                <span className="text-[10px] font-semibold text-green-600">Ativo</span>
-                                            </div>
-                                        ) : notificationPermission === 'denied' ? (
-                                            <span className="shrink-0 text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-100 px-2 py-1 rounded-lg">Bloqueado</span>
-                                        ) : (
-                                            <button
-                                                onClick={handleRequestPermission}
-                                                className="shrink-0 h-7 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-semibold transition-colors"
-                                            >
-                                                Ativar
-                                            </button>
-                                        )}
-                                    </div>
-
-                                    {/* Instalar app (PWA) */}
-                                    {isInstallable && !isStandalone && (
-                                        <div className="px-4 py-3.5 flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-500">
-                                                        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>
-                                                    </svg>
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-medium text-gray-800">Instalar Aplicativo</p>
-                                                    <p className="text-[10px] text-gray-400">Acesso rápido na tela inicial</p>
-                                                </div>
-                                            </div>
-                                            <button
-                                                onClick={promptInstall}
-                                                className="shrink-0 h-7 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-semibold transition-colors"
-                                            >
-                                                Instalar
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* ── SEÇÃO: SOBRE O APP ── */}
-                        <div>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Mais Informações</p>
-                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                                <button
-                                    onClick={() => setIsAboutExpanded(!isAboutExpanded)}
-                                    className="w-full px-4 py-3.5 flex items-center justify-between"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-500">
-                                                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                                            </svg>
-                                        </div>
-                                        <span className="text-sm font-medium text-gray-800">Sobre o MimoChat</span>
-                                    </div>
-                                    <svg
-                                        width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                                        className={`text-gray-400 transition-transform duration-200 ${isAboutExpanded ? 'rotate-180' : ''}`}
-                                    >
-                                        <polyline points="6 9 12 15 18 9"/>
-                                    </svg>
-                                </button>
-                                {isAboutExpanded && (
-                                    <div className="border-t border-gray-50 animate-in fade-in slide-in-from-top-1 duration-150">
-                                        <div className="px-4 py-2.5 flex items-center justify-between border-b border-gray-50">
-                                            <span className="text-xs text-gray-400">Versão</span>
-                                            <span className="text-xs font-semibold text-gray-700 tabular-nums">1.0.0</span>
-                                        </div>
-                                        <div className="px-4 py-2.5 flex items-center justify-between">
-                                            <span className="text-xs text-gray-400">ID do Usuário</span>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[11px] font-mono text-gray-600 truncate max-w-[130px]">{user?.id}</span>
-                                                <button
-                                                    onClick={() => { if (user?.id) { navigator.clipboard.writeText(user.id); alert('ID copiado!'); } }}
-                                                    className="text-[10px] font-semibold text-purple-600 hover:text-purple-700"
-                                                >
-                                                    Copiar
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* ── SEÇÃO: CONTA (sair) ── */}
-                        <div>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Conta</p>
-                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                                <button
-                                    onClick={handleLogout}
-                                    className="w-full px-4 py-3.5 flex items-center gap-3 hover:bg-red-50 active:bg-red-100 transition-colors"
-                                >
-                                    <div className="w-8 h-8 rounded-lg bg-red-50 border border-red-100 flex items-center justify-center shrink-0">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500">
-                                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-                                        </svg>
-                                    </div>
-                                    <span className="text-sm font-medium text-red-500">Sair da conta</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="pb-2" />
-
-                    </div>
-                </div>
-            )}
 
             {/* Visibility Selection Modal */}
             {/* Visibility Selection Modal */}

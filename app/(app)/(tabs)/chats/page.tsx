@@ -7,7 +7,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Avatar, TouchableRipple } from '@/components';
 import { useChatRooms, useMyProfile, QueryKeys } from '@/hooks/useQueries';
 import { useSocket } from '@/hooks/useSocket';
-import ChatPage from '@/app/(app)/chat/[userId]/page';
 import { CheckCircle2, X, WalletCards } from 'lucide-react';
 
 interface Room {
@@ -77,10 +76,6 @@ export default function ChatsPage() {
     const [giftModal, setGiftModal] = useState(false);
     const [giftAmount, setGiftAmount] = useState<number | null>(null);
     const giftClaimedRef = useRef(false);
-
-    // Controle da SPA para o chat individual
-    const [activeChatUserId, setActiveChatUserId] = useState<string | null>(null);
-    const [isClosingChat, setIsClosingChat] = useState<boolean>(false);
 
     // Resolve a transição pendente assim que a lista de chats é montada
     useEffect(() => {
@@ -228,39 +223,10 @@ export default function ChatsPage() {
         }).catch(() => {});
     }, [user?.id, queryClient]);
 
-    // Histórico e navegação SPA para o chat individual
+    // Abre a tela de conversa física usando o roteador de transição
     const handleOpenChat = (userId: string) => {
-        window.history.pushState({ chatUserId: userId }, '', `/chat/${userId}`);
-        setActiveChatUserId(userId);
-        setIsClosingChat(false);
+        router.push(`/chat/${userId}`);
     };
-
-    const handleCloseChat = () => {
-        window.history.back();
-    };
-
-    useEffect(() => {
-        const handlePopState = (event: PopStateEvent) => {
-            const state = event.state;
-            if (activeChatUserId && (!state || state.chatUserId !== activeChatUserId)) {
-                // Inicia animação de fechar
-                setIsClosingChat(true);
-                setTimeout(() => {
-                    setActiveChatUserId(null);
-                    setIsClosingChat(false);
-                }, 300);
-            } else if (!activeChatUserId && state && state.chatUserId) {
-                // Se o usuário navegou para a frente no histórico
-                setActiveChatUserId(state.chatUserId);
-                setIsClosingChat(false);
-            }
-        };
-
-        window.addEventListener('popstate', handlePopState);
-        return () => {
-            window.removeEventListener('popstate', handlePopState);
-        };
-    }, [activeChatUserId]);
 
     const onRefresh = useCallback(() => {
         refetchRooms();
@@ -429,14 +395,6 @@ export default function ChatsPage() {
                 )}
             </div>
 
-            {activeChatUserId && (
-                <ChatPage
-                    userId={activeChatUserId}
-                    onBack={handleCloseChat}
-                    isSubPage={true}
-                    isClosing={isClosingChat}
-                />
-            )}
         </div>
     );
 }

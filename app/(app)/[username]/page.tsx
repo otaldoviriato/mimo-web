@@ -1,14 +1,21 @@
 'use client';
 
 import React from 'react';
-import { useRouter } from 'next/navigation';
+import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { useUserByUsername, usePublicGallery, useSubscribe, useMyProfile } from '@/hooks/useQueries';
 
 export default function UserProfilePage({ params }: { params: Promise<{ username: string }> }) {
     const { username } = React.use(params);
-    const router = useRouter();
+    const router = useTransitionRouter();
+
+    React.useEffect(() => {
+        if (typeof window !== 'undefined' && (window as any).__resolveTransition) {
+            (window as any).__resolveTransition();
+            (window as any).__resolveTransition = null;
+        }
+    }, []);
 
     // Decodifica e remove o @ caso o usuário tenha digitado com ele na URL
     const decodedUsername = decodeURIComponent(username).replace('@', '');
