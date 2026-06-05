@@ -76,7 +76,14 @@ export default function SettingsPage() {
             };
 
             if (userData?.isProfessional) {
-                updateData.subscriptionPrice = Number(subscriptionPrice) || 0;
+                const limitMax = userData?.maxSubscriptionPrice ?? 200;
+                const price = Number(subscriptionPrice) || 0;
+                if (price > limitMax) {
+                    setSaveError(`O preço da assinatura não pode ser maior que R$ ${limitMax.toFixed(2)}`);
+                    setLoading(false);
+                    return;
+                }
+                updateData.subscriptionPrice = price;
             }
 
             await updateProfileMutation.mutateAsync(updateData);
@@ -211,7 +218,11 @@ export default function SettingsPage() {
                                             type="number"
                                             step="0.01"
                                             inputMode="decimal"
+                                            max={userData?.maxSubscriptionPrice ?? 200}
                                         />
+                                        <span className="text-[9px] text-gray-400 block mt-1">
+                                            Valor máximo permitido: R$ {(userData?.maxSubscriptionPrice ?? 200).toFixed(2)}
+                                        </span>
                                     </div>
                                 </div>
                             </div>

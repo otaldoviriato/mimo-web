@@ -223,19 +223,32 @@ export default function ProfilePage() {
     };
 
     const handleAdjustPrice = async (delta: number) => {
+        const limitMax = userData?.maxPricePerChar ?? 0.2;
+        const discountFactor = 1 - (userData?.subscriberDiscountPercentage ?? 20) / 100;
         const currentPrice = Number(chargePerCharNonSubscribers) || 0;
-        const newPrice = Math.max(0, currentPrice + delta);
+        let newPrice = currentPrice + delta;
+
+        if (newPrice > limitMax) {
+            alert(`O valor máximo por caractere é R$ ${limitMax.toFixed(2)}`);
+            newPrice = limitMax;
+        } else if (newPrice < 0) {
+            newPrice = 0;
+        }
+
         const newPriceStr = parseFloat(newPrice.toFixed(4)).toString();
-        const subscriberPriceStr = parseFloat((newPrice * 0.8).toFixed(4)).toString();
+        const subscriberPriceStr = parseFloat((newPrice * discountFactor).toFixed(4)).toString();
 
         setChargePerCharNonSubscribers(newPriceStr);
         setChargePerCharSubscribers(subscriberPriceStr);
 
-        await savePriceSettings(newPrice, newPrice * 0.8);
+        await savePriceSettings(newPrice, newPrice * discountFactor);
     };
 
     const handleInputBlur = async () => {
         const parsed = parseFloat(Number(chargePerCharNonSubscribers).toFixed(4));
+        const limitMax = userData?.maxPricePerChar ?? 0.2;
+        const discountFactor = 1 - (userData?.subscriberDiscountPercentage ?? 20) / 100;
+
         if (isNaN(parsed) || parsed < 0) {
             if (userData) {
                 setChargePerCharNonSubscribers(userData.chargePerCharNonSubscribers?.toString() ?? '0.005');
@@ -244,8 +257,13 @@ export default function ProfilePage() {
             return;
         }
 
-        const nonSubPrice = parsed;
-        const subPrice = parseFloat((parsed * 0.8).toFixed(4));
+        let nonSubPrice = parsed;
+        if (nonSubPrice > limitMax) {
+            alert(`O valor máximo por caractere é R$ ${limitMax.toFixed(2)}`);
+            nonSubPrice = limitMax;
+        }
+
+        const subPrice = parseFloat((nonSubPrice * discountFactor).toFixed(4));
 
         setChargePerCharNonSubscribers(nonSubPrice.toString());
         setChargePerCharSubscribers(subPrice.toString());
@@ -620,7 +638,7 @@ export default function ProfilePage() {
                         <div>
                             <h2 className="text-sm font-semibold text-gray-800">Preço por Caractere</h2>
                             <p className="text-[10px] text-gray-400">
-                                Defina o preço base. Assinantes têm 20% de desconto automaticamente.
+                                Defina o preço base. Assinantes têm {userData?.subscriberDiscountPercentage ?? 20}% de desconto automaticamente.
                             </p>
                         </div>
 
@@ -688,13 +706,13 @@ export default function ProfilePage() {
                             <div className="flex flex-col gap-0.5 border-l border-purple-100/50 pl-3">
                                 <span className="text-[10px] font-semibold text-purple-600 uppercase tracking-wider flex items-center gap-1">
                                     Assinantes
-                                    <span className="bg-purple-100 text-purple-700 text-[8px] font-bold px-1.5 py-0.5 rounded-md">-20%</span>
+                                    <span className="bg-purple-100 text-purple-700 text-[8px] font-bold px-1.5 py-0.5 rounded-md">-{userData?.subscriberDiscountPercentage ?? 20}%</span>
                                 </span>
                                 <span className="font-bold text-purple-700">
-                                    {(Number(chargePerCharNonSubscribers) * 0.8).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4 })}
+                                    {(Number(chargePerCharNonSubscribers) * (1 - (userData?.subscriberDiscountPercentage ?? 20) / 100)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4 })}
                                 </span>
                                 <span className="text-[9px] text-purple-500 font-medium">
-                                    100 chars = {((Number(chargePerCharNonSubscribers) || 0) * 0.8 * 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })}
+                                    100 chars = {((Number(chargePerCharNonSubscribers) || 0) * (1 - (userData?.subscriberDiscountPercentage ?? 20) / 100) * 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })}
                                 </span>
                             </div>
                         </div>

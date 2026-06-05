@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { Room } from '@/models/Room';
 import { Message } from '@/models/Message';
+import { AppSettings } from '@/models/AppSettings';
 
 // GET /api/users/me - Get current user
 export async function GET() {
@@ -15,6 +16,11 @@ export async function GET() {
         }
 
         await connectToDatabase();
+
+        const settings = await AppSettings.findOne({ key: 'global' });
+        const maxPricePerChar = settings?.maxPricePerChar ?? 0.2;
+        const maxSubscriptionPrice = settings?.maxSubscriptionPrice ?? 200;
+        const subscriberDiscountPercentage = settings?.subscriberDiscountPercentage ?? 20;
 
         let user = await User.findOne({ clerkId: userId });
 
@@ -79,6 +85,9 @@ export async function GET() {
                 chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? 0.005,
                 subscribers: user.subscribers || [],
                 pixKey: user.pixKey,
+                maxPricePerChar,
+                maxSubscriptionPrice,
+                subscriberDiscountPercentage,
             },
         });
     } catch (error: any) {
@@ -100,6 +109,11 @@ export async function PATCH(request: NextRequest) {
         const { username, name, photoUrl, coverUrl, phone, taxId, pixKey, isProfessional, subscriptionPrice, chargePerCharSubscribers, chargePerCharNonSubscribers } = body;
 
         await connectToDatabase();
+
+        const settings = await AppSettings.findOne({ key: 'global' });
+        const maxPricePerChar = settings?.maxPricePerChar ?? 0.2;
+        const maxSubscriptionPrice = settings?.maxSubscriptionPrice ?? 200;
+        const subscriberDiscountPercentage = settings?.subscriberDiscountPercentage ?? 20;
 
         const currentUser = await User.findOne({ clerkId: userId });
 
@@ -131,6 +145,9 @@ export async function PATCH(request: NextRequest) {
         
         if (subscriptionPrice !== undefined) {
             if (subscriptionPrice < 0) return NextResponse.json({ error: 'Subscription price cannot be negative' }, { status: 400 });
+            if (subscriptionPrice > maxSubscriptionPrice) {
+                return NextResponse.json({ error: `O preço da assinatura não pode ser maior que R$ ${maxSubscriptionPrice}` }, { status: 400 });
+            }
             updateData.subscriptionPrice = subscriptionPrice;
         }
 
@@ -141,6 +158,9 @@ export async function PATCH(request: NextRequest) {
 
         if (chargePerCharNonSubscribers !== undefined) {
             if (chargePerCharNonSubscribers < 0) return NextResponse.json({ error: 'Charge per char cannot be negative' }, { status: 400 });
+            if (chargePerCharNonSubscribers > maxPricePerChar) {
+                return NextResponse.json({ error: `O preço por caractere não pode ser maior que R$ ${maxPricePerChar}` }, { status: 400 });
+            }
             updateData.chargePerCharNonSubscribers = chargePerCharNonSubscribers;
         }
 
@@ -186,6 +206,9 @@ export async function PATCH(request: NextRequest) {
                 chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? 0.005,
                 subscribers: user.subscribers || [],
                 pixKey: user.pixKey,
+                maxPricePerChar,
+                maxSubscriptionPrice,
+                subscriberDiscountPercentage,
             },
         });
     } catch (error: any) {

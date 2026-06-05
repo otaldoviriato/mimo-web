@@ -41,6 +41,9 @@ interface SettingsData {
     professionalsOnlyCreateRooms: boolean;
     adminClerkIds: string[];
     comparisonPeriod: 'none' | 'week' | 'month';
+    maxPricePerChar: number;
+    maxSubscriptionPrice: number;
+    subscriberDiscountPercentage: number;
 }
 
 interface ChatMessage {
@@ -97,6 +100,9 @@ export default function AdminPage() {
     const [autoModeration, setAutoModeration] = useState(true);
     const [professionalsOnly, setProfessionalsOnly] = useState(false);
     const [comparisonPeriod, setComparisonPeriod] = useState<'none' | 'week' | 'month'>('none');
+    const [maxPricePerChar, setMaxPricePerChar] = useState(0.2);
+    const [maxSubscriptionPrice, setMaxSubscriptionPrice] = useState(200);
+    const [subscriberDiscountPercentage, setSubscriberDiscountPercentage] = useState(20);
     const [saving, setSaving] = useState(false);
 
     // Estados de Gerenciamento de Administradores Ricos
@@ -160,6 +166,9 @@ export default function AdminPage() {
                     setComparisonPeriod(s.comparisonPeriod || 'none');
                     setSelectedPeriod(s.comparisonPeriod || 'none');
                     setAdminListRich(data.richAdmins || []);
+                    setMaxPricePerChar(s.maxPricePerChar !== undefined ? s.maxPricePerChar : 0.2);
+                    setMaxSubscriptionPrice(s.maxSubscriptionPrice !== undefined ? s.maxSubscriptionPrice : 200);
+                    setSubscriberDiscountPercentage(s.subscriberDiscountPercentage !== undefined ? s.subscriberDiscountPercentage : 20);
                     setIsAuthorized(true);
                 } else if (response.status === 403) {
                     setIsAuthorized(false);
@@ -378,6 +387,9 @@ export default function AdminPage() {
                     professionalsOnlyCreateRooms: professionalsOnly,
                     adminClerkIds: adminListRich.map(a => a.clerkId),
                     comparisonPeriod,
+                    maxPricePerChar,
+                    maxSubscriptionPrice,
+                    subscriberDiscountPercentage,
                 }),
             });
 
@@ -393,6 +405,9 @@ export default function AdminPage() {
                 });
                 setSettings(data.settings);
                 setAdminListRich(data.richAdmins || []);
+                setMaxPricePerChar(data.settings.maxPricePerChar);
+                setMaxSubscriptionPrice(data.settings.maxSubscriptionPrice);
+                setSubscriberDiscountPercentage(data.settings.subscriberDiscountPercentage);
             } else {
                 const errData = await response.json();
                 toast.error(errData.error || 'Erro ao salvar configurações.');
@@ -1010,6 +1025,42 @@ export default function AdminPage() {
                                                 <option value="week">Uma Semana</option>
                                                 <option value="month">Um Mês</option>
                                             </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-slate-100">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-600 uppercase block">Preço Máximo por Caractere (R$)</label>
+                                            <input 
+                                                type="number" 
+                                                step="0.001"
+                                                value={maxPricePerChar} 
+                                                onChange={(e) => setMaxPricePerChar(Number(e.target.value))}
+                                                min={0}
+                                                className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700" 
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-600 uppercase block">Preço Máximo da Assinatura (R$)</label>
+                                            <input 
+                                                type="number" 
+                                                step="0.01"
+                                                value={maxSubscriptionPrice} 
+                                                onChange={(e) => setMaxSubscriptionPrice(Number(e.target.value))}
+                                                min={0}
+                                                className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700" 
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-600 uppercase block">Desconto p/ Assinantes (%)</label>
+                                            <input 
+                                                type="number" 
+                                                value={subscriberDiscountPercentage} 
+                                                onChange={(e) => setSubscriberDiscountPercentage(Number(e.target.value))}
+                                                min={0}
+                                                max={100}
+                                                className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700" 
+                                            />
                                         </div>
                                     </div>
 

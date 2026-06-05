@@ -8,6 +8,9 @@ export interface IAppSettings extends Document {
     professionalsOnlyCreateRooms: boolean;
     adminClerkIds: string[];
     comparisonPeriod: 'none' | 'week' | 'month';
+    maxPricePerChar: number;
+    maxSubscriptionPrice: number;
+    subscriberDiscountPercentage: number;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -52,6 +55,25 @@ const AppSettingsSchema = new Schema<IAppSettings>({
         type: String,
         enum: ['none', 'week', 'month'],
         default: 'none',
+    },
+    maxPricePerChar: {
+        type: Number,
+        required: true,
+        default: 0.2,
+        min: 0,
+    },
+    maxSubscriptionPrice: {
+        type: Number,
+        required: true,
+        default: 200,
+        min: 0,
+    },
+    subscriberDiscountPercentage: {
+        type: Number,
+        required: true,
+        default: 20,
+        min: 0,
+        max: 100,
     },
 }, {
     timestamps: true,

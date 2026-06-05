@@ -18,6 +18,9 @@ async function getOrCreateSettings() {
             professionalsOnlyCreateRooms: false,
             adminClerkIds: [FALLBACK_ADMIN],
             comparisonPeriod: 'none',
+            maxPricePerChar: 0.2,
+            maxSubscriptionPrice: 200,
+            subscriberDiscountPercentage: 20,
         });
     }
     return settings;
@@ -101,7 +104,10 @@ export async function PUT(request: NextRequest) {
             autoModeration, 
             professionalsOnlyCreateRooms, 
             adminClerkIds,
-            comparisonPeriod
+            comparisonPeriod,
+            maxPricePerChar,
+            maxSubscriptionPrice,
+            subscriberDiscountPercentage
         } = body;
 
         // Validações básicas
@@ -134,6 +140,30 @@ export async function PUT(request: NextRequest) {
                 return NextResponse.json({ error: 'Período comparativo inválido' }, { status: 400 });
             }
             settings.comparisonPeriod = comparisonPeriod;
+        }
+
+        if (maxPricePerChar !== undefined) {
+            const price = Number(maxPricePerChar);
+            if (isNaN(price) || price < 0) {
+                return NextResponse.json({ error: 'Preço máximo por caractere inválido' }, { status: 400 });
+            }
+            settings.maxPricePerChar = price;
+        }
+
+        if (maxSubscriptionPrice !== undefined) {
+            const price = Number(maxSubscriptionPrice);
+            if (isNaN(price) || price < 0) {
+                return NextResponse.json({ error: 'Preço máximo de assinatura inválido' }, { status: 400 });
+            }
+            settings.maxSubscriptionPrice = price;
+        }
+
+        if (subscriberDiscountPercentage !== undefined) {
+            const discount = Number(subscriberDiscountPercentage);
+            if (isNaN(discount) || discount < 0 || discount > 100) {
+                return NextResponse.json({ error: 'Desconto deve ser entre 0% e 100%' }, { status: 400 });
+            }
+            settings.subscriberDiscountPercentage = discount;
         }
 
         if (adminClerkIds !== undefined) {
