@@ -24,7 +24,7 @@ export async function GET(
         await connectToDatabase();
 
         let user = await User.findOne({ username: cleanUsername }).select(
-            'clerkId username name email photoUrl isProfessional subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers subscribers'
+            'clerkId username name email photoUrl coverUrl isProfessional subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers subscribers'
         );
 
         if (!user) {
@@ -59,6 +59,7 @@ export async function GET(
                 name: user.name,
                 email: user.email,
                 photoUrl: user.photoUrl,
+                coverUrl: user.coverUrl,
                 isProfessional: user.isProfessional,
                 subscriptionPrice: user.subscriptionPrice || 0,
                 chargePerCharSubscribers: user.chargePerCharSubscribers ?? 0.002,

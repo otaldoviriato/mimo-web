@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
             ],
             clerkId: { $ne: userId },
             isProfessional: true, // Busca retorna apenas perfis profissionais
-        }).select('clerkId username name email photoUrl isProfessional subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers').limit(20).lean() as any[];
+        }).select('clerkId username name email photoUrl coverUrl isProfessional subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers').limit(20).lean() as any[];
 
         if (!foundUsers || foundUsers.length === 0) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
                 name: u.name,
                 email: u.email,
                 photoUrl: u.photoUrl,
+                coverUrl: u.coverUrl,
                 isProfessional: u.isProfessional,
                 subscriptionPrice: u.subscriptionPrice || 0,
                 chargePerCharSubscribers: u.chargePerCharSubscribers ?? 0.002,

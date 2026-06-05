@@ -131,6 +131,7 @@ export function useUpdateProfile() {
             username?: string;
             name?: string;
             photoUrl?: string;
+            coverUrl?: string;
             gallery?: string[];
             isProfessional?: boolean;
             subscriptionPrice?: number;
@@ -158,6 +159,21 @@ export function useUploadPhoto() {
             if (response?.photoUrl) {
                 queryClient.setQueryData(QueryKeys.me, (old: Record<string, unknown> | null) =>
                     old ? { ...old, photoUrl: response.photoUrl } : old
+                );
+            }
+        },
+    });
+}
+
+export function useUploadCover() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (formData: FormData) => userApi.uploadCover(formData),
+        onSuccess: (response) => {
+            if (response?.coverUrl) {
+                queryClient.setQueryData(QueryKeys.me, (old: Record<string, unknown> | null) =>
+                    old ? { ...old, coverUrl: response.coverUrl } : old
                 );
             }
         },

@@ -1071,14 +1071,14 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                 <div
                                     className={`max-w-[75%] ${isLocked || item.originalImageUrl || item.isVideo ? 'p-1 bg-transparent' : 'px-3 py-1.5'} rounded-2xl ${
                                         (!isLocked && !item.originalImageUrl && !item.isVideo) 
-                                            ? (isMine ? 'bg-purple-600 text-white rounded-br-sm' : 'bg-white text-gray-900 shadow-sm rounded-bl-sm')
+                                    ? (isMine ? 'bg-purple-600 text-white rounded-br-sm' : 'bg-white text-gray-900 shadow-sm rounded-bl-sm')
                                             : (isMine ? 'rounded-br-sm' : 'rounded-bl-sm')
                                         }`}
                                 >
                                     {isLocked || item.originalImageUrl || item.isVideo ? (
                                         <>
                                             {isLocked ? (
-                                                <div className="relative rounded-2xl overflow-hidden cursor-pointer bg-gray-200 shadow-sm" onClick={() => {
+                                                <div className="relative w-60 h-60 rounded-2xl overflow-hidden cursor-pointer bg-gray-200 shadow-sm flex items-center justify-center" onClick={() => {
                                                     if (!isMine) {
                                                         const price = 'lockedImagePrice' in item ? item.lockedImagePrice : (item as any).lockedPrice;
                                                         handleUnlockImage(item._id, price || 0, item.isVideo);
@@ -1089,27 +1089,34 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                                 }}>
                                                     <img 
                                                         src={(isMine ? (item.isVideo ? item.thumbnailUrl : item.originalImageUrl) : item.blurredImageUrl) || ''} 
-                                                        className="w-full h-auto object-cover max-h-[300px]" 
+                                                        className="w-full h-full object-cover" 
                                                         alt="Locked Media" 
                                                     />
                                                     {!isMine ? (
-                                                        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center flex-col">
-                                                            <div className="bg-white/20 backdrop-blur-md rounded-2xl px-5 py-3 border border-white/30 shadow-xl text-center font-semibold text-white transition-transform hover:scale-105 active:scale-95">
-                                                                🔓 Desbloquear<br/><span className="text-xl">R$ {((item.lockedImagePrice || 0) / 100).toFixed(2)}</span>
-                                                            </div>
+                                                        <div className="absolute inset-0 bg-black/40 backdrop-blur-[1.5px] flex flex-col items-center justify-center gap-2">
+                                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="opacity-90 drop-shadow">
+                                                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                                                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                                            </svg>
+                                                            <span className="text-[10px] font-medium uppercase tracking-widest text-white/90 drop-shadow">
+                                                                Desbloquear
+                                                            </span>
+                                                            <span className="text-xs font-semibold text-purple-200 drop-shadow">
+                                                                R$ {((item.lockedImagePrice || 0) / 100).toFixed(2)}
+                                                            </span>
                                                         </div>
                                                     ) : (
-                                                        <div className="absolute top-3 right-3">
-                                                            <div className="bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 flex items-center gap-1.5 shadow-lg">
-                                                                <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                                                                <span className="text-[10px] font-bold text-white uppercase tracking-wider">Aguardando compra</span>
+                                                        <div className="absolute top-2 right-2">
+                                                            <div className="bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 flex items-center gap-1.5 shadow-md">
+                                                                <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                                                                <span className="text-[8px] font-bold text-white uppercase tracking-wider">Aguardando</span>
                                                             </div>
                                                         </div>
                                                     )}
                                                 </div>
                                             ) : (
                                                 <div 
-                                                    className="relative rounded-2xl overflow-hidden bg-gray-100 shadow-sm cursor-pointer group"
+                                                    className="relative w-60 h-60 rounded-2xl overflow-hidden bg-gray-100 shadow-sm cursor-pointer group flex items-center justify-center"
                                                     onClick={() => {
                                                         if (item.isVideo && item.videoUrl) {
                                                             setFullscreenImage(item.videoUrl);
@@ -1121,12 +1128,12 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                                 >
                                                     <img 
                                                         src={(item.isVideo ? item.thumbnailUrl : item.originalImageUrl) || ''} 
-                                                        className="w-full h-auto object-cover max-h-[300px]" 
+                                                        className="w-full h-full object-cover animate-in fade-in duration-300" 
                                                         alt="Media" 
                                                     />
                                                     {item.isVideo && (
                                                         <div className="absolute inset-0 flex items-center justify-center">
-                                                            <div className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white border border-white/20 group-hover:scale-110 transition-transform">
+                                                            <div className="w-12 h-12 rounded-full bg-black/45 backdrop-blur-sm flex items-center justify-center text-white border border-white/10 group-hover:scale-110 transition-transform">
                                                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                                                                     <path d="M8 5v14l11-7z" />
                                                                 </svg>
@@ -1134,12 +1141,12 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                                         </div>
                                                     )}
                                                     {isMine && item.lockedImagePrice! > 0 && (
-                                                        <div className="absolute top-3 right-3">
-                                                            <div className="bg-green-500/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 flex items-center gap-1.5 shadow-lg animate-in fade-in zoom-in duration-300">
-                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="text-white">
+                                                        <div className="absolute top-2 right-2">
+                                                            <div className="bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 flex items-center gap-1 shadow-md">
+                                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" className="text-white">
                                                                     <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                                                                 </svg>
-                                                                <span className="text-[10px] font-bold text-white uppercase tracking-wider">
+                                                                <span className="text-[8px] font-bold text-white uppercase tracking-wider">
                                                                     {item.isVideo ? 'Vídeo aberto' : 'Foto aberta'} • R$ {((item.lockedImagePrice || 0) / 100).toFixed(2)}
                                                                 </span>
                                                             </div>

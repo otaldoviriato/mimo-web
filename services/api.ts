@@ -44,6 +44,7 @@ export const userApi = {
         taxId?: string;
         phone?: string;
         photoUrl?: string;
+        coverUrl?: string;
         isProfessional?: boolean;
         subscriptionPrice?: number;
         chargePerCharSubscribers?: number;
@@ -87,6 +88,13 @@ export const userApi = {
 
     uploadPhoto: async (formData: FormData) => {
         const response = await api.post('/api/users/me/photo', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return response.data;
+    },
+
+    uploadCover: async (formData: FormData) => {
+        const response = await api.post('/api/users/me/cover', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
         });
         return response.data;

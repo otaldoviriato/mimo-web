@@ -16,6 +16,7 @@ export interface IUser extends Document {
     taxId?: string;
     phone?: string;
     photoUrl?: string;
+    coverUrl?: string;
     balance: number;
     isProfessional: boolean;
     subscriptionPrice: number;
@@ -59,6 +60,9 @@ const UserSchema = new Schema<IUser>({
         type: String,
     },
     photoUrl: {
+        type: String,
+    },
+    coverUrl: {
         type: String,
     },
     balance: {

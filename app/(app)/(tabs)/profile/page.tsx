@@ -7,7 +7,8 @@ import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { BalanceDisplay } from '@/components/BalanceDisplay';
 import { Avatar } from '@/components/Avatar';
-import { useMyProfile, useUpdateProfile, useUploadPhoto, useMyGallery, useUploadToGallery, usePendingWithdrawal, useRequestWithdraw, useDeleteFromGallery } from '@/hooks/useQueries';
+import { useMyProfile, useUpdateProfile, useUploadPhoto, useUploadCover, useMyGallery, useUploadToGallery, usePendingWithdrawal, useRequestWithdraw, useDeleteFromGallery } from '@/hooks/useQueries';
+import { ImageCropper } from '@/components/ImageCropper';
 import { usePayment } from '@/context/PaymentContext';
 import { usePWA } from '@/context/PWAContext';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -28,6 +29,7 @@ export default function ProfilePage() {
     const { permission: notificationPermission, handleRequestPermission } = usePushNotifications();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const galleryInputRef = useRef<HTMLInputElement>(null);
+    const coverInputRef = useRef<HTMLInputElement>(null);
     const { data: galleryData } = useMyGallery();
     const uploadGalleryMutation = useUploadToGallery();
     const deleteGalleryMutation = useDeleteFromGallery();
@@ -35,12 +37,14 @@ export default function ProfilePage() {
     const { data: userData, isLoading: loadingProfile, isFetching, refetch: refetchProfile } = useMyProfile();
     const updateProfileMutation = useUpdateProfile();
     const uploadPhotoMutation = useUploadPhoto();
+    const uploadCoverMutation = useUploadCover();
 
     const [username, setUsername] = useState('');
     const [name, setName] = useState('');
     const [taxId, setTaxId] = useState('');
     const [phone, setPhone] = useState('');
     const [localPhotoUrl, setLocalPhotoUrl] = useState<string | undefined>(undefined);
+    const [localCoverUrl, setLocalCoverUrl] = useState<string | undefined>(undefined);
     const [loading, setLoading] = useState(false);
     const [isProfessional, setIsProfessional] = useState(false);
     const [pixKey, setPixKey] = useState('');
@@ -59,6 +63,7 @@ export default function ProfilePage() {
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [uploadingGallery, setUploadingGallery] = useState(false);
     const [visibilityModal, setVisibilityModal] = useState<{ open: boolean, file?: File }>({ open: false });
+    const [cropperState, setCropperState] = useState<{ open: boolean; imageSrc: string; type: 'photo' | 'cover' } | null>(null);
 
     const hasPopulatedFromCache = useRef(false);
 
@@ -74,10 +79,14 @@ export default function ProfilePage() {
             setChargePerCharSubscribers(userData.chargePerCharSubscribers?.toString() ?? '0.002');
             setChargePerCharNonSubscribers(userData.chargePerCharNonSubscribers?.toString() ?? '0.005');
             if (userData.photoUrl) setLocalPhotoUrl(userData.photoUrl);
+            if (userData.coverUrl) setLocalCoverUrl(userData.coverUrl);
             hasPopulatedFromCache.current = true;
         } else if (userData) {
             if (userData.photoUrl && !uploadPhotoMutation.isPending) {
                 setLocalPhotoUrl(userData.photoUrl);
+            }
+            if (userData.coverUrl && !uploadCoverMutation.isPending) {
+                setLocalCoverUrl(userData.coverUrl);
             }
             if (userData.taxId && !taxId) setTaxId(formatCPF(userData.taxId));
             if (userData.phone && !phone) setPhone(formatPhone(userData.phone));
@@ -88,21 +97,64 @@ export default function ProfilePage() {
         }
     }, [userData]);
 
-    const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
         const previewUrl = URL.createObjectURL(file);
-        setLocalPhotoUrl(previewUrl);
+        setCropperState({
+            open: true,
+            imageSrc: previewUrl,
+            type: 'photo'
+        });
+        
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const previewUrl = URL.createObjectURL(file);
+        setCropperState({
+            open: true,
+            imageSrc: previewUrl,
+            type: 'cover'
+        });
+        
+        if (coverInputRef.current) coverInputRef.current.value = '';
+    };
+
+    const handleCropConfirm = async (croppedFile: File) => {
+        if (!cropperState) return;
+        
+        const type = cropperState.type;
+        setCropperState(null);
 
         const formData = new FormData();
-        formData.append('photo', file);
 
-        try {
-            const uploadResponse = await uploadPhotoMutation.mutateAsync(formData);
-            if (uploadResponse.photoUrl) setLocalPhotoUrl(uploadResponse.photoUrl);
-        } catch {
-            if (userData?.photoUrl) setLocalPhotoUrl(userData.photoUrl);
+        if (type === 'photo') {
+            const previewUrl = URL.createObjectURL(croppedFile);
+            setLocalPhotoUrl(previewUrl);
+            formData.append('photo', croppedFile);
+
+            try {
+                const uploadResponse = await uploadPhotoMutation.mutateAsync(formData);
+                if (uploadResponse.photoUrl) setLocalPhotoUrl(uploadResponse.photoUrl);
+            } catch {
+                if (userData?.photoUrl) setLocalPhotoUrl(userData.photoUrl);
+            }
+        } else if (type === 'cover') {
+            const previewUrl = URL.createObjectURL(croppedFile);
+            setLocalCoverUrl(previewUrl);
+            formData.append('cover', croppedFile);
+
+            try {
+                const uploadResponse = await uploadCoverMutation.mutateAsync(formData);
+                if (uploadResponse.coverUrl) setLocalCoverUrl(uploadResponse.coverUrl);
+            } catch {
+                if (userData?.coverUrl) setLocalCoverUrl(userData.coverUrl);
+            }
         }
     };
 
@@ -249,41 +301,78 @@ export default function ProfilePage() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 pb-20 md:pb-4 flex flex-col gap-4">
-                {/* Avatar card */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col items-center">
-                    <button
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={uploadPhotoMutation.isPending}
-                        className="relative group"
-                    >
-                        <Avatar uri={localPhotoUrl} size={96} />
-                        {uploadPhotoMutation.isPending && (
-                            <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center">
-                                <svg className="animate-spin h-6 w-6 text-white" viewBox="0 0 24 24" fill="none">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                </svg>
-                            </div>
+                {/* Capa e Avatar */}
+                <div className="relative bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col items-center pb-5">
+                    {/* Capa */}
+                    <div className="relative h-32 w-full bg-purple-50 overflow-hidden shrink-0">
+                        {localCoverUrl ? (
+                            <img 
+                                src={localCoverUrl} 
+                                alt="Capa" 
+                                className="w-full h-full object-cover"
+                            />
+                        ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-purple-600 to-fuchsia-500" />
                         )}
-                        <div className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center">
-                            <span className="text-sm">✏️</span>
-                        </div>
-                        <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/10 transition-colors" />
-                    </button>
+                        <div className="absolute inset-0 bg-gradient-to-br from-purple-600/25 to-fuchsia-500/15 mix-blend-overlay" />
+                        
+                        {/* Editar Capa Botão */}
+                        <button
+                            onClick={() => coverInputRef.current?.click()}
+                            disabled={uploadCoverMutation.isPending}
+                            className="absolute bottom-2 right-2 px-3 py-1 bg-black/40 hover:bg-black/60 active:scale-95 text-white text-[10px] font-bold rounded-lg border border-white/20 backdrop-blur-sm transition-all flex items-center gap-1 shadow-sm"
+                            title="Editar capa"
+                        >
+                            <span>✏️ Capa</span>
+                        </button>
+                    </div>
+                    
+                    {/* Input de Capa */}
                     <input
-                        ref={fileInputRef}
+                        ref={coverInputRef}
                         type="file"
                         accept="image/*"
                         className="hidden"
-                        onChange={handlePhotoChange}
+                        onChange={handleCoverChange}
                     />
+
+                    {/* Avatar */}
+                    <div className="-mt-11 z-10 relative">
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={uploadPhotoMutation.isPending}
+                            className="relative group block p-1 bg-white rounded-full shadow-lg"
+                        >
+                            <Avatar uri={localPhotoUrl} size={80} />
+                            {uploadPhotoMutation.isPending && (
+                                <div className="absolute inset-1 rounded-full bg-black/50 flex items-center justify-center">
+                                    <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                    </svg>
+                                </div>
+                            )}
+                            <div className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-white shadow-md flex items-center justify-center border border-gray-100">
+                                <span className="text-[11px]">✏️</span>
+                            </div>
+                            <div className="absolute inset-1 rounded-full bg-black/0 group-hover:bg-black/10 transition-colors" />
+                        </button>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handlePhotoChange}
+                        />
+                    </div>
+
                     <p className="mt-3 text-base font-bold text-gray-900">
                         {userData?.name || userData?.username || user?.username || ''}
                     </p>
                     <p className="text-sm text-gray-400">@{userData?.username || ''}</p>
                     {isProfessional && (
-                        <span className="mt-2 inline-flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
-                            ⭐ Profissional
+                        <span className="mt-2 inline-flex items-center gap-1 bg-purple-50 border border-purple-200 text-purple-700 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
+                            Profissional
                         </span>
                     )}
                 </div>
@@ -649,8 +738,11 @@ export default function ProfilePage() {
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
                     <div className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-sm flex flex-col gap-5 animate-in fade-in zoom-in duration-300">
                         <div className="flex flex-col items-center text-center gap-3">
-                            <div className="w-16 h-16 rounded-2xl bg-purple-100 flex items-center justify-center text-3xl shadow-inner">
-                                🔒
+                            <div className="w-16 h-16 rounded-2xl bg-purple-100 flex items-center justify-center shadow-inner">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-purple-600">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                </svg>
                             </div>
                             <div>
                                 <h2 className="text-lg font-bold text-gray-900">Quem pode ver?</h2>
@@ -674,9 +766,15 @@ export default function ProfilePage() {
                             <button
                                 onClick={() => confirmGalleryUpload('public')}
                                 disabled={uploadingGallery}
-                                className="w-full p-4 rounded-2xl border-2 border-gray-100 hover:border-purple-600 hover:bg-purple-50 transition-all flex items-center gap-3 group text-left"
+                                className="w-full p-4 rounded-2xl border-2 border-gray-100 hover:border-purple-600 hover:bg-purple-50 transition-all flex items-center gap-4 group text-left"
                             >
-                                <span className="text-2xl group-hover:scale-110 transition-transform">🌍</span>
+                                <div className="w-10 h-10 rounded-xl bg-gray-50 group-hover:bg-purple-100/50 flex items-center justify-center transition-colors">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500 group-hover:text-purple-600 transition-colors">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <line x1="2" y1="12" x2="22" y2="12" />
+                                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                                    </svg>
+                                </div>
                                 <div className="flex-1">
                                     <p className="font-bold text-gray-900 leading-tight">Público</p>
                                     <p className="text-xs text-gray-500">Qualquer pessoa pode ver</p>
@@ -687,9 +785,16 @@ export default function ProfilePage() {
                                 <button
                                     onClick={() => confirmGalleryUpload('subscribers')}
                                     disabled={uploadingGallery}
-                                    className="w-full p-4 rounded-2xl border-2 border-gray-100 hover:border-purple-600 hover:bg-purple-50 transition-all flex items-center gap-3 group text-left"
+                                    className="w-full p-4 rounded-2xl border-2 border-gray-100 hover:border-purple-600 hover:bg-purple-50 transition-all flex items-center gap-4 group text-left"
                                 >
-                                    <span className="text-2xl group-hover:scale-110 transition-transform">💎</span>
+                                    <div className="w-10 h-10 rounded-xl bg-gray-50 group-hover:bg-purple-100/50 flex items-center justify-center transition-colors">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500 group-hover:text-purple-600 transition-colors">
+                                            <polygon points="12 2 22 8.5 12 15 2 8.5 12 2" />
+                                            <line x1="2" y1="8.5" x2="12" y2="15" />
+                                            <line x1="22" y1="8.5" x2="12" y2="15" />
+                                            <polyline points="2 8.5 12 22 22 8.5" />
+                                        </svg>
+                                    </div>
                                     <div className="flex-1">
                                         <p className="font-bold text-gray-900 leading-tight">Somente Assinantes</p>
                                         <p className="text-xs text-gray-500">Apenas quem assina seu perfil</p>
@@ -818,6 +923,16 @@ export default function ProfilePage() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {cropperState && cropperState.open && (
+                <ImageCropper
+                    imageSrc={cropperState.imageSrc}
+                    circular={cropperState.type === 'photo'}
+                    aspectRatio={cropperState.type === 'photo' ? 1 : 2.75}
+                    onCrop={handleCropConfirm}
+                    onCancel={() => setCropperState(null)}
+                />
             )}
         </div>
     );

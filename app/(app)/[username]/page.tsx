@@ -66,21 +66,34 @@ export default function UserProfilePage({ params }: { params: Promise<{ username
     }
 
     return (
-        <div className="flex flex-col h-full bg-white overflow-y-auto pb-10 no-scrollbar">
+        <div className="flex flex-col h-full bg-white overflow-y-auto pb-28 no-scrollbar relative">
             {/* Cover and Header */}
             <div className="relative shrink-0">
-                <div className="h-40 bg-gradient-to-br from-purple-600 to-fuchsia-500 shadow-inner" />
+                <div className="relative h-44 w-full overflow-hidden bg-purple-50 shadow-inner">
+                    {user.coverUrl ? (
+                        <img 
+                            src={user.coverUrl} 
+                            alt="Foto de capa" 
+                            className="w-full h-full object-cover"
+                        />
+                    ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-purple-600 to-fuchsia-500" />
+                    )}
+                    {/* Overlay degradê sutil */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-600/25 to-fuchsia-500/15 mix-blend-overlay" />
+                </div>
                 <button 
                     onClick={() => router.back()}
-                    className="absolute top-4 left-4 w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/30 transition-colors"
+                    className="absolute top-4 left-4 w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/30 transition-all active:scale-90 z-20"
+                    title="Voltar"
                 >
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M19 12H5M12 19l-7-7 7-7"/>
                     </svg>
                 </button>
                 
-                <div className="px-6 -mt-12 flex flex-col items-center">
-                    <div className="p-1 bg-white rounded-full shadow-2xl">
+                <div className="px-6 -mt-14 flex flex-col items-center relative z-10">
+                    <div className="p-1.5 bg-white rounded-full shadow-2xl">
                         <Avatar uri={user.photoUrl} size={110} />
                     </div>
                 </div>
@@ -88,142 +101,88 @@ export default function UserProfilePage({ params }: { params: Promise<{ username
 
             {/* Content */}
             <div className="px-6 mt-4 flex flex-col items-center">
-                <h1 className="text-3xl font-black text-gray-900 tracking-tight text-center">
+                <h1 className="text-2xl font-black text-gray-900 tracking-tight text-center">
                     {user.name || `@${user.username}`}
                 </h1>
-                <p className="text-purple-600 font-bold text-lg tracking-wide mt-1">
+                <p className="text-purple-600 font-bold text-sm tracking-wide mt-0.5">
                     @{user.username}
                 </p>
+            </div>
 
-                {/* Stats / Info Badges */}
-                <div className="mt-8 grid grid-cols-2 gap-4 w-full max-w-sm">
-                    <div className="bg-gray-50 rounded-3xl p-5 border border-gray-100 flex flex-col items-center justify-center gap-1.5 shadow-sm">
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">Tipo de Conta</span>
-                        <span className="text-sm font-bold text-gray-900 uppercase">{user.isProfessional ? 'Profissional' : 'Cliente'}</span>
-                    </div>
-                    <div className="bg-gray-50 rounded-3xl p-5 border border-gray-100 flex flex-col items-center justify-center gap-1.5 shadow-sm">
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">Custo da Mensagem</span>
-                        <span className="text-sm font-bold text-purple-600 uppercase">
-                            {user.isProfessional 
-                                ? (isSubscriber ? `R$ ${(user.chargePerCharSubscribers ?? 0.002).toFixed(3)}` : `R$ ${(user.chargePerCharNonSubscribers ?? 0.005).toFixed(3)}`) 
-                                : 'Grátis'}
-                        </span>
-                    </div>
-                </div>
-
-                {user.isProfessional && (
-                    <div className="mt-6 w-full max-w-sm space-y-3">
-                        <div className="bg-purple-600 rounded-[2rem] p-5 text-white shadow-xl shadow-purple-200 relative overflow-hidden group">
-                           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-125 transition-transform">
-                               <svg width="60" height="60" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                           </div>
-                           <div className="relative z-10">
-                                theme/color options
-                                <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Preço p/ Assinantes</span>
-                                <div className="flex items-baseline gap-1 mt-1">
-                                    <span className="text-2xl font-black">R$ {(user.chargePerCharSubscribers ?? 0.002).toFixed(3)}</span>
-                                    <span className="text-[10px] font-bold opacity-70">/ caractere</span>
-                                </div>
-                                <div className="mt-3 flex items-center gap-2 text-[10px] font-black bg-white/20 w-fit px-3 py-1 rounded-full">
-                                    <span>ECONOMIA DE {((( (user.chargePerCharNonSubscribers ?? 0.005) - (user.chargePerCharSubscribers ?? 0.002)) / (user.chargePerCharNonSubscribers ?? 0.005)) * 100).toFixed(0)}%</span>
-                                </div>
-                           </div>
+            {/* Gallery section */}
+            {user?.isProfessional && (
+                <div className="mt-6 w-full">
+                    {loadingGallery ? (
+                        <div className="grid grid-cols-3 gap-0.5 animate-pulse px-0.5">
+                            {[1, 2, 3, 4, 5, 6].map(i => (
+                                <div key={i} className="aspect-square bg-gray-100" />
+                            ))}
                         </div>
-
-                        <div className="bg-gray-50 rounded-[2rem] p-5 border border-gray-100 flex justify-between items-center shadow-sm">
-                            <div>
-                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Não Assinantes</span>
-                                <div className="flex items-baseline gap-1 mt-0.5">
-                                    <span className="text-xl font-black text-gray-900">R$ {(user.chargePerCharNonSubscribers ?? 0.005).toFixed(3)}</span>
-                                    <span className="text-[10px] font-bold text-gray-400">/ caractere</span>
-                                </div>
-                            </div>
-                            <div className="w-10 h-10 rounded-full bg-white border border-gray-100 flex items-center justify-center text-lg shadow-sm">
-                                👤
-                            </div>
+                    ) : galleryData?.items?.length === 0 ? (
+                        <div className="bg-gray-50 rounded-2xl p-8 border border-dashed border-gray-200 flex flex-col items-center justify-center text-center mx-6 mt-4">
+                            <span className="text-2xl mb-1">📸</span>
+                            <p className="text-sm text-gray-400 font-medium">Nenhuma foto na galeria ainda</p>
                         </div>
-                    </div>
-                )}
-
-                <div className="mt-10 w-full max-w-md bg-gray-50/50 rounded-[2.5rem] p-8 border border-gray-100 flex flex-col gap-6">
-                    {user.isProfessional && (
-                        <div className="bg-white/80 p-5 rounded-3xl border border-purple-100 flex items-start gap-4">
-                            <span className="text-xl">💰</span>
-                            <p className="text-xs text-purple-800 font-medium leading-relaxed">
-                                Este usuário possui o modo profissional ativado. Cada mensagem enviada será debitada do seu saldo conforme o tamanho do texto.
-                            </p>
+                    ) : (
+                        <div className="grid grid-cols-3 gap-0.5 px-0.5">
+                            {galleryData?.items?.map((item: any) => {
+                                const isLocked = item.visibility === 'subscribers' && !isSubscriber && !isOwner;
+                                return (
+                                    <div key={item._id} className="relative aspect-square overflow-hidden bg-gray-100 group">
+                                        <img
+                                            src={item.imageUrl}
+                                            alt="Gallery item"
+                                            className={`w-full h-full object-cover transition-all duration-500 ${isLocked ? 'blur-[3.5px] scale-105 brightness-[90%]' : 'group-hover:scale-105'}`}
+                                        />
+                                        {isLocked && (
+                                            <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center border border-white/10 shadow-lg">
+                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                                </svg>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
+            )}
 
-                {/* Subscription Button */}
-                {showSubscribeButton && (
-                    <div className="mt-6 w-full max-w-sm px-6">
-                        <Button 
-                            title={`Assinar Perfil (R$ ${user.subscriptionPrice?.toFixed(2)})`}
-                            onPress={handleSubscribe} 
-                            size="lg" 
-                            variant="outline"
-                            loading={subscribeMutation.isPending}
-                            className="w-full border-purple-600 text-purple-600 hover:bg-purple-50"
-                        />
-                    </div>
-                )}
-
-                {/* Gallery section */}
-                {user?.isProfessional && (
-                    <div className="mt-10 w-full max-w-md px-6">
-                        <h2 className="text-xl font-black text-gray-900 mb-4 flex items-center gap-2">
-                            📸 Galeria
-                        </h2>
-                        {loadingGallery ? (
-                            <div className="grid grid-cols-3 gap-2 animate-pulse">
-                                {[1, 2, 3].map(i => (
-                                    <div key={i} className="aspect-square bg-gray-100 rounded-2xl" />
-                                ))}
-                            </div>
-                        ) : galleryData?.items?.length === 0 ? (
-                            <div className="bg-gray-50 rounded-3xl p-8 border border-dashed border-gray-200 flex flex-col items-center justify-center text-center">
-                                <span className="text-2xl mb-2">📸</span>
-                                <p className="text-sm text-gray-400 font-medium">Nenhuma foto na galeria ainda</p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-3 gap-2">
-                                {galleryData?.items?.map((item: any) => {
-                                    const isLocked = item.visibility === 'subscribers' && !isSubscriber && !isOwner;
-                                    return (
-                                        <div key={item._id} className="relative aspect-square rounded-2xl overflow-hidden bg-gray-100 group">
-                                            <img
-                                                src={item.imageUrl}
-                                                alt="Gallery item"
-                                                className={`w-full h-full object-cover transition-all duration-500 ${isLocked ? 'blur-xl scale-110 grayscale brightness-75' : 'group-hover:scale-105'}`}
-                                            />
-                                            {isLocked && (
-                                                <div className="absolute inset-0 flex flex-col items-center justify-center p-3 text-center bg-black/40 backdrop-blur-[3px]">
-                                                    <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center mb-2 shadow-xl border border-white/30">
-                                                        <span className="text-xl drop-shadow-lg">💎</span>
-                                                    </div>
-                                                    <span className="text-[9px] text-white font-black uppercase tracking-wider leading-tight drop-shadow-md">
-                                                        exclusiva para<br/>assinantes
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* CTA */}
-                <div className="mt-6 w-full max-w-sm px-6">
-                    <Button 
-                        title="Enviar Mensagem" 
-                        onPress={() => router.back()} 
-                        size="lg" 
-                        className="w-full shadow-xl shadow-purple-600/20"
-                    />
+            {/* Barra de Ações Fixa no Rodapé */}
+            <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-100 px-4 py-4 flex gap-3 z-30 justify-center">
+                <div className="w-full max-w-md flex gap-3">
+                    {showSubscribeButton ? (
+                        <>
+                            <button 
+                                onClick={handleSubscribe} 
+                                disabled={subscribeMutation.isPending}
+                                className="flex-[3] py-3.5 px-4 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 active:scale-[0.98] text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-200/50"
+                            >
+                                <span>Assinar por R$ {user.subscriptionPrice?.toFixed(2)}</span>
+                            </button>
+                            <button 
+                                onClick={() => router.push(`/chat/${user.clerkId}`)}
+                                className="flex-[2] py-3.5 px-4 bg-gray-50 hover:bg-gray-100 active:scale-[0.98] text-gray-800 border border-gray-200/60 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                </svg>
+                                <span>Mensagem</span>
+                            </button>
+                        </>
+                    ) : (
+                        <button 
+                            onClick={() => router.push(`/chat/${user.clerkId}`)}
+                            className="w-full py-3.5 px-4 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 active:scale-[0.98] text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-200/50"
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                            </svg>
+                            <span>Enviar Mensagem</span>
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

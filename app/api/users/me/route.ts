@@ -71,6 +71,7 @@ export async function GET() {
                 phone: user.phone,
                 taxId: user.taxId,
                 photoUrl: user.photoUrl,
+                coverUrl: user.coverUrl,
                 balance: user.balance,
                 isProfessional: user.isProfessional,
                 subscriptionPrice: user.subscriptionPrice || 0,
@@ -96,7 +97,7 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { username, name, photoUrl, phone, taxId, pixKey, isProfessional, subscriptionPrice, chargePerCharSubscribers, chargePerCharNonSubscribers } = body;
+        const { username, name, photoUrl, coverUrl, phone, taxId, pixKey, isProfessional, subscriptionPrice, chargePerCharSubscribers, chargePerCharNonSubscribers } = body;
 
         await connectToDatabase();
 
@@ -121,6 +122,7 @@ export async function PATCH(request: NextRequest) {
         if (username !== undefined) updateData.username = username;
         if (name !== undefined) updateData.name = name.trim();
         if (photoUrl !== undefined) updateData.photoUrl = photoUrl;
+        if (coverUrl !== undefined) updateData.coverUrl = coverUrl;
         if (phone !== undefined) updateData.phone = phone;
         if (taxId !== undefined) updateData.taxId = taxId;
         if (pixKey !== undefined) updateData.pixKey = pixKey;
@@ -176,6 +178,7 @@ export async function PATCH(request: NextRequest) {
                 phone: user.phone,
                 taxId: user.taxId,
                 photoUrl: user.photoUrl,
+                coverUrl: user.coverUrl,
                 balance: user.balance,
                 isProfessional: user.isProfessional,
                 subscriptionPrice: user.subscriptionPrice || 0,
