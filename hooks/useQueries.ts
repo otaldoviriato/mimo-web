@@ -41,7 +41,7 @@ export function useMyProfile() {
                 if (cached) {
                     try {
                         return JSON.parse(cached);
-                    } catch (e) {
+                    } catch {
                         return undefined;
                     }
                 }
@@ -86,7 +86,7 @@ export function useChatRooms() {
                 if (cached) {
                     try {
                         return JSON.parse(cached);
-                    } catch (e) {
+                    } catch {
                         return undefined;
                     }
                 }
@@ -203,6 +203,22 @@ export function useGeneratePix() {
     });
 }
 
+export function useGenerateCardPayment() {
+    return useMutation({
+        mutationFn: (data: {
+            amount: number;
+            holderName: string;
+            holderDocument: string;
+            cardNumber: string;
+            expiryMonth: string;
+            expiryYear: string;
+            cvv: string;
+            installments: number;
+            phone?: string;
+        }) => userApi.generateCardPayment(data),
+    });
+}
+
 // ─── Hook: buscar usuário por ID ────────────────────────────────────────────
 export function useUserById(userId: string | undefined) {
     const queryClient = useQueryClient();
@@ -235,14 +251,16 @@ export function useUserById(userId: string | undefined) {
                 if (cached) {
                     try {
                         return JSON.parse(cached);
-                    } catch (e) {
+                    } catch {
                         // ignore
                     }
                 }
             }
             // Tenta obter das salas salvas no cache do react-query
             if (currentUser?.id && userId) {
-                const rooms = queryClient.getQueryData<any[]>(QueryKeys.rooms(currentUser.id));
+                const rooms = queryClient.getQueryData<Array<{ participants: string[]; otherUser?: unknown }>>(
+                    QueryKeys.rooms(currentUser.id)
+                );
                 if (rooms) {
                     const room = rooms.find((r) => r.participants.includes(userId));
                     if (room?.otherUser) {

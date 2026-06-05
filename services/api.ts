@@ -65,6 +65,21 @@ export const userApi = {
         return response.data;
     },
 
+    generateCardPayment: async (data: {
+        amount: number;
+        holderName: string;
+        holderDocument: string;
+        cardNumber: string;
+        expiryMonth: string;
+        expiryYear: string;
+        cvv: string;
+        installments: number;
+        phone?: string;
+    }) => {
+        const response = await api.post('/api/users/me/balance/card', data);
+        return response.data;
+    },
+
     checkPixStatus: async (transactionId: string) => {
         const response = await api.get(`/api/users/me/balance/pix/${transactionId}?t=${Date.now()}`);
         return response.data;

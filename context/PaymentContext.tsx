@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState } from 'react';
 import { RechargeModal } from '@/components/RechargeModal';
-import { useAddBalance, useGeneratePix } from '@/hooks/useQueries';
+import { useAddBalance, useGenerateCardPayment, useGeneratePix } from '@/hooks/useQueries';
 
 interface PaymentContextType {
     openRechargeModal: (errorMessage?: string | unknown) => void;
@@ -24,6 +24,7 @@ export function PaymentProvider({ children }: { children: React.ReactNode }) {
 
     const addBalanceMutation = useAddBalance();
     const generatePixMutation = useGeneratePix();
+    const generateCardPaymentMutation = useGenerateCardPayment();
 
     const openRechargeModal = (errorMessage?: string | unknown) => {
         if (typeof errorMessage === 'string') {
@@ -40,21 +41,27 @@ export function PaymentProvider({ children }: { children: React.ReactNode }) {
     };
 
     const handleRecharge = async (amount: number) => {
-        try {
-            const response = await addBalanceMutation.mutateAsync(amount);
-            if (response.status === 'PENDING') return response;
-            return response;
-        } catch (error: any) {
-            throw error;
-        }
+        const response = await addBalanceMutation.mutateAsync(amount);
+        if (response.status === 'PENDING') return response;
+        return response;
     };
 
     const handleGeneratePix = async (amount: number) => {
-        try {
-            return await generatePixMutation.mutateAsync(amount);
-        } catch (error: any) {
-            throw error;
-        }
+        return generatePixMutation.mutateAsync(amount);
+    };
+
+    const handleGenerateCardPayment = async (data: {
+        amount: number;
+        holderName: string;
+        holderDocument: string;
+        cardNumber: string;
+        expiryMonth: string;
+        expiryYear: string;
+        cvv: string;
+        installments: number;
+        phone?: string;
+    }) => {
+        return generateCardPaymentMutation.mutateAsync(data);
     };
 
     return (
@@ -65,6 +72,7 @@ export function PaymentProvider({ children }: { children: React.ReactNode }) {
                 onClose={closeRechargeModal}
                 onRecharge={handleRecharge}
                 onGeneratePix={handleGeneratePix}
+                onGenerateCardPayment={handleGenerateCardPayment}
                 insufficientBalanceMessage={insufficientBalanceMessage}
             />
         </PaymentContext.Provider>

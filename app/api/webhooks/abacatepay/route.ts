@@ -10,7 +10,9 @@ export async function POST(req: NextRequest) {
         console.log('=== Webhook AbacatePay RECEBIDO ===');
         
         let abacateId = '';
-        if (body?.data?.pixQrCode?.id) {
+        if (body?.data?.transparent?.id) {
+            abacateId = body.data.transparent.id;
+        } else if (body?.data?.pixQrCode?.id) {
             abacateId = body.data.pixQrCode.id;
         } else if (body?.data?.billing?.id) {
             abacateId = body.data.billing.id;
@@ -20,7 +22,13 @@ export async function POST(req: NextRequest) {
             abacateId = body.id;
         }
 
-        let eventStatus = body?.data?.pixQrCode?.status || body?.data?.billing?.status || body?.data?.status || body?.status || body?.event;
+        const eventStatus =
+            body?.data?.transparent?.status ||
+            body?.data?.pixQrCode?.status ||
+            body?.data?.billing?.status ||
+            body?.data?.status ||
+            body?.status ||
+            body?.event;
 
         if (!abacateId) {
             console.error('Webhook payload sem id:', body);
@@ -30,7 +38,9 @@ export async function POST(req: NextRequest) {
         // Se o status indicar que foi pago ('PAID' / 'payment.paid')
         const isPaid =
             typeof eventStatus === 'string' &&
-            (eventStatus.toUpperCase() === 'PAID' || eventStatus.includes('paid'));
+            (eventStatus.toUpperCase() === 'PAID' ||
+                eventStatus.toLowerCase().includes('paid') ||
+                eventStatus.toLowerCase().includes('completed'));
 
         if (!isPaid) {
             console.log('Webhook evento ignorado (não é pago):', eventStatus);
@@ -42,7 +52,13 @@ export async function POST(req: NextRequest) {
         // Operação atômica: só atualiza se ainda estiver PENDING, evitando duplicatas
         const transaction = await Transaction.findOneAndUpdate(
             { abacatePayId: abacateId, status: { $ne: 'PAID' } },
-            { $set: { status: 'PAID' } },
+            {
+                $set: {
+                    status: 'PAID',
+                    'metadata.providerStatus': eventStatus,
+                    'metadata.receiptUrl': body?.data?.transparent?.receiptUrl || body?.data?.billing?.receiptUrl,
+                }
+            },
             { new: true }
         );
 
