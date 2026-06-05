@@ -1016,7 +1016,7 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                 ) : (
                     <>
                         <div ref={messagesEndRef} />
-                        <div className="px-4 py-3 flex flex-col-reverse gap-1">
+                        <div className="px-4 py-3 flex flex-col-reverse gap-0.5">
                 {isTyping && (
                     <div className="flex justify-start">
                         <div className="bg-white text-gray-900 shadow-sm rounded-2xl rounded-bl-sm px-3 py-1.5">
@@ -1031,10 +1031,11 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                 {[...messages].reverse().map((item) => {
                     const isMine = item.senderId === user?.id;
                     const isLocked = item.isLockedImage;
+                    const isText = !item.isGift && !isLocked && !item.originalImageUrl && !item.isVideo;
                     return (
                         <div
                             key={item._id}
-                            className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-1 transition-colors duration-300 ${selectedMessageIds.has(item._id) ? 'bg-purple-100/50 -mx-4 px-4 py-0.5' : ''} select-none no-select`}
+                            className={`flex ${isMine ? 'justify-end' : 'justify-start'} ${isText ? 'mb-0.5' : 'mb-2'} -mx-4 px-4 py-0.5 transition-colors duration-300 ${selectedMessageIds.has(item._id) ? 'bg-purple-100/50' : ''} select-none no-select`}
                             onMouseDown={(e) => handleStartPress(item._id, e)}
                             onMouseMove={handleMovePress}
                             onMouseUp={handleEndPress}

@@ -5,9 +5,10 @@ import { Bell, Search, User } from 'lucide-react';
 
 interface DashboardHeaderProps {
     title: string;
+    children?: React.ReactNode;
 }
 
-export function DashboardHeader({ title }: DashboardHeaderProps) {
+export function DashboardHeader({ title, children }: DashboardHeaderProps) {
     const formattedDate = new Date().toLocaleDateString('pt-BR', {
         weekday: 'long',
         year: 'numeric',
@@ -21,13 +22,16 @@ export function DashboardHeader({ title }: DashboardHeaderProps) {
     return (
         <header className="bg-white border-b border-slate-200 px-8 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 sticky top-0 z-10 shadow-sm shadow-slate-100/40">
             {/* Boas-vindas e Data */}
-            <div>
-                <h1 className="text-2xl font-bold text-slate-800 tracking-tight capitalize">
-                    {title}
-                </h1>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    {capitalize(formattedDate)}
-                </p>
+            <div className="flex items-center gap-4 flex-wrap md:flex-nowrap">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-800 tracking-tight capitalize">
+                        {title}
+                    </h1>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                        {capitalize(formattedDate)}
+                    </p>
+                </div>
+                {children}
             </div>
 
             {/* Ações e Info do Usuário */}

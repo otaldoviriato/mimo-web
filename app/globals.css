@@ -87,8 +87,9 @@ body {
   }
 }
 
-/* Reseta o destaque de clique cinza/azul padrão do mobile nos elementos clicáveis */
-button, a, [role="button"] {
+/* Reseta o destaque de clique cinza/azul padrão do mobile e garante cursor pointer em todos os elementos clicáveis por padrão */
+button, a, select, label, input[type="button"], input[type="submit"], input[type="checkbox"], input[type="radio"], [role="button"] {
+  cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 

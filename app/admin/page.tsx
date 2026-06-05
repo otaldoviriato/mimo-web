@@ -732,7 +732,22 @@ export default function AdminPage() {
             {/* Conteúdo Principal à Direita */}
             <div className="flex-1 flex flex-col min-w-0">
                 {/* Header Dinâmico */}
-                <DashboardHeader title={tabTitles[activeTab]} />
+                <DashboardHeader title={tabTitles[activeTab]}>
+                    {(activeTab === 'dashboard' || activeTab === 'financial') && (
+                        <div className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 px-3 py-1.5 rounded-xl transition-all h-fit shrink-0 ml-2 md:ml-4 select-none">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Período:</span>
+                            <select
+                                value={selectedPeriod}
+                                onChange={(e) => setSelectedPeriod(e.target.value as any)}
+                                className="text-xs font-bold bg-transparent focus:outline-none text-slate-700 cursor-pointer pr-1"
+                            >
+                                <option value="none">Sem Comparação</option>
+                                <option value="week">Última Semana</option>
+                                <option value="month">Último Mês</option>
+                            </select>
+                        </div>
+                    )}
+                </DashboardHeader>
 
                 {/* Área de Visualização Principal */}
                 <main className="flex-1 p-8 overflow-y-auto space-y-8 max-w-7xl w-full mx-auto">
@@ -740,26 +755,6 @@ export default function AdminPage() {
                     {/* TAB: DASHBOARD */}
                     {activeTab === 'dashboard' && (
                         <>
-                            {/* Filtro Rápido de Período da Dashboard */}
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white border border-slate-200/80 px-6 py-4 rounded-2xl shadow-sm gap-4">
-                                <div>
-                                    <h4 className="text-sm font-bold text-slate-800">Visualização de Tendências</h4>
-                                    <p className="text-[11px] text-slate-500 font-medium">Altere o período de comparação das métricas da dashboard em tempo real.</p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs font-bold text-slate-500 uppercase">Período:</span>
-                                    <select
-                                        value={selectedPeriod}
-                                        onChange={(e) => setSelectedPeriod(e.target.value as any)}
-                                        className="text-xs font-bold px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 text-slate-700 cursor-pointer"
-                                    >
-                                        <option value="none">Sem Comparação</option>
-                                        <option value="week">Última Semana</option>
-                                        <option value="month">Último Mês</option>
-                                    </select>
-                                </div>
-                            </div>
-
                             {/* Cards de Métricas */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                                 <StatsCard
