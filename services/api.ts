@@ -67,16 +67,17 @@ export const userApi = {
 
     generateCardPayment: async (data: {
         amount: number;
-        holderName: string;
-        holderDocument: string;
-        cardNumber: string;
-        expiryMonth: string;
-        expiryYear: string;
-        cvv: string;
-        installments: number;
+        holderName?: string;
+        holderDocument?: string;
+        cardNumber?: string;
+        expiryMonth?: string;
+        expiryYear?: string;
+        cvv?: string;
         phone?: string;
+        saveCard?: boolean;
+        savedCardId?: string;
     }) => {
-        const response = await api.post('/api/users/me/balance/card', data);
+        const response = await api.post('/api/users/me/balance/card', data, { timeout: 60000 });
         return response.data;
     },
 

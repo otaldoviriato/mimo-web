@@ -96,6 +96,7 @@ export default function AdminPage() {
     const router = useRouter();
 
     const [activeTab, setActiveTab] = useState('dashboard');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     // Carrega a aba ativa a partir do parâmetro "tab" na URL
     useEffect(() => {
@@ -726,13 +727,18 @@ export default function AdminPage() {
     return (
         <div className="flex bg-slate-50 min-h-screen font-sans selection:bg-purple-100 selection:text-purple-900 relative">
             
-            {/* Sidebar Fixa à Esquerda */}
-            <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+            {/* Sidebar */}
+            <Sidebar
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                isOpen={isSidebarOpen}
+                onClose={() => setIsSidebarOpen(false)}
+            />
 
             {/* Conteúdo Principal à Direita */}
             <div className="flex-1 flex flex-col min-w-0">
                 {/* Header Dinâmico */}
-                <DashboardHeader title={tabTitles[activeTab]}>
+                <DashboardHeader title={tabTitles[activeTab]} onMenuToggle={() => setIsSidebarOpen(true)}>
                     {(activeTab === 'dashboard' || activeTab === 'financial') && (
                         <div className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 px-3 py-1.5 rounded-xl transition-all h-fit shrink-0 ml-2 md:ml-4 select-none">
                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Período:</span>
@@ -750,7 +756,7 @@ export default function AdminPage() {
                 </DashboardHeader>
 
                 {/* Área de Visualização Principal */}
-                <main className="flex-1 p-8 overflow-y-auto space-y-8 max-w-7xl w-full mx-auto">
+                <main className="flex-1 p-4 md:p-8 overflow-y-auto space-y-4 md:space-y-8 max-w-7xl w-full mx-auto">
                     
                     {/* TAB: DASHBOARD */}
                     {activeTab === 'dashboard' && (

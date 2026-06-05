@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
-import { checkTransparentCharge } from '@/lib/abacatepay';
+import { checkAsaasPayment, mapAsaasPaymentStatus } from '@/lib/asaas';
 import { Transaction } from '@/models/Transaction';
 import { User } from '@/models/User';
 
@@ -28,15 +28,15 @@ export async function GET(
             return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
         }
 
-        if (transaction.status === 'PENDING') {
+        if (transaction.status === 'PENDING' && transaction.metadata?.provider === 'asaas') {
             try {
-                const providerStatus = await checkTransparentCharge(id);
-                const status = providerStatus.status?.toUpperCase();
+                const providerStatus = await checkAsaasPayment(id);
+                const status = mapAsaasPaymentStatus(providerStatus.status);
 
                 if (status === 'PAID') {
                     const paidTransaction = await Transaction.findOneAndUpdate(
                         { abacatePayId: id, userId, status: { $ne: 'PAID' } },
-                        { $set: { status: 'PAID', 'metadata.providerStatus': status } },
+                        { $set: { status: 'PAID', 'metadata.providerStatus': providerStatus.status } },
                         { new: true }
                     );
 
@@ -49,15 +49,15 @@ export async function GET(
                     } else {
                         transaction = await Transaction.findOne({ abacatePayId: id, userId }) || transaction;
                     }
-                } else if (status === 'CANCELLED' || status === 'EXPIRED' || status === 'FAILED') {
+                } else if (status === 'CANCELLED') {
                     transaction = await Transaction.findOneAndUpdate(
                         { abacatePayId: id, userId, status: 'PENDING' },
-                        { $set: { status: 'CANCELLED', 'metadata.providerStatus': status } },
+                        { $set: { status: 'CANCELLED', 'metadata.providerStatus': providerStatus.status } },
                         { new: true }
                     ) || transaction;
                 }
             } catch {
-                // If AbacatePay status lookup is unavailable, return local state.
+                // If Asaas status lookup is unavailable, return local state.
             }
         }
 

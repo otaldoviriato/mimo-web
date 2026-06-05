@@ -45,20 +45,31 @@ interface PixPaymentData {
 
 interface CardPaymentRequest {
     amount: number;
-    holderName: string;
-    holderDocument: string;
-    cardNumber: string;
-    expiryMonth: string;
-    expiryYear: string;
-    cvv: string;
-    installments: number;
+    holderName?: string;
+    holderDocument?: string;
+    cardNumber?: string;
+    expiryMonth?: string;
+    expiryYear?: string;
+    cvv?: string;
     phone?: string;
+    saveCard?: boolean;
+    savedCardId?: string;
+}
+
+interface SavedCard {
+    id: string;
+    label: string;
+    lastFour: string;
+    brand: string;
+    canUseForPayments?: boolean;
+    createdAt?: string;
 }
 
 interface UserProfileResponse {
     user?: {
         taxId?: string;
         phone?: string;
+        savedCards?: SavedCard[];
     };
 }
 
@@ -93,6 +104,21 @@ function formatExpiry(text: string): string {
     const clean = text.replace(/\D/g, '').slice(0, 4);
     if (clean.length >= 3) return `${clean.slice(0, 2)}/${clean.slice(2)}`;
     return clean;
+}
+
+function isFutureCardExpiry(month: string, year: string): boolean {
+    const parsedMonth = Number(month);
+    const parsedYear = Number(year.length === 2 ? `20${year}` : year);
+
+    if (!Number.isInteger(parsedMonth) || parsedMonth < 1 || parsedMonth > 12 || !Number.isInteger(parsedYear)) {
+        return false;
+    }
+
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const cardExpiryMonthStart = new Date(parsedYear, parsedMonth - 1, 1);
+
+    return cardExpiryMonthStart >= currentMonthStart;
 }
 
 export function formatCPF(val: string) {
@@ -135,11 +161,13 @@ export function RechargeModal({
     const [pixData, setPixData] = useState<PixPaymentData | null>(null);
     const [ccTransactionId, setCcTransactionId] = useState('');
     const [cardHolderName, setCardHolderName] = useState('');
-    const [cardInstallments, setCardInstallments] = useState(1);
     const [paymentError, setPaymentError] = useState('');
     const [cardNumber, setCardNumber] = useState('');
     const [cardExpiry, setCardExpiry] = useState('');
     const [cardCvv, setCardCvv] = useState('');
+    const [saveCard, setSaveCard] = useState(true);
+    const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
+    const [selectedSavedCardId, setSelectedSavedCardId] = useState('');
     const [userCpf, setUserCpf] = useState('');
     const [userPhone, setUserPhone] = useState('');
     const [couponCode, setCouponCode] = useState('');
@@ -159,6 +187,11 @@ export function RechargeModal({
             .then((res: UserProfileResponse) => {
                 if (res?.user?.taxId) setUserCpf(formatCPF(res.user.taxId));
                 if (res?.user?.phone) setUserPhone(formatPhone(res.user.phone));
+                const cards = (res?.user?.savedCards || []).filter((card) => card.canUseForPayments);
+                setSavedCards(cards);
+                if (cards.length > 0) {
+                    setSelectedSavedCardId((current) => current || cards[0].id);
+                }
             })
             .catch(() => undefined);
 
@@ -178,7 +211,8 @@ export function RechargeModal({
         setCardNumber('');
         setCardExpiry('');
         setCardCvv('');
-        setCardInstallments(1);
+        setSaveCard(true);
+        setSelectedSavedCardId('');
         setCouponCode('');
         setCouponError('');
         setCouponSuccess('');
@@ -278,22 +312,25 @@ export function RechargeModal({
     const processCardPayment = async (amount: number) => {
         if (!onGenerateCardPayment) return;
 
-        const [expiryMonth = '', expiryYear = ''] = cardExpiry.split('/');
-
         setLoading(true);
         setPaymentError('');
         try {
-            const response = await onGenerateCardPayment({
-                amount,
-                holderName: cardHolderName,
-                holderDocument: userCpf,
-                phone: userPhone,
-                cardNumber,
-                expiryMonth,
-                expiryYear,
-                cvv: cardCvv,
-                installments: cardInstallments,
-            });
+            const response = selectedSavedCardId
+                ? await onGenerateCardPayment({
+                    amount,
+                    savedCardId: selectedSavedCardId,
+                })
+                : await onGenerateCardPayment({
+                    amount,
+                    holderName: cardHolderName,
+                    holderDocument: userCpf,
+                    phone: userPhone,
+                    cardNumber,
+                    expiryMonth,
+                    expiryYear,
+                    cvv: cardCvv,
+                    saveCard,
+                });
 
             if (response?.status === 'PAID') {
                 handleClose(true);
@@ -306,7 +343,17 @@ export function RechargeModal({
             }
         } catch (error: unknown) {
             const apiError = error as { response?: { data?: { error?: string; details?: unknown } } };
-            const message = apiError.response?.data?.error || 'Não foi possível processar o cartão.';
+            const details = apiError.response?.data?.details;
+            const providerMessage =
+                typeof details === 'string'
+                    ? details
+                    : Array.isArray((details as { errors?: Array<{ description?: string }> })?.errors)
+                      ? (details as { errors: Array<{ description?: string }> }).errors
+                            .map((item) => item.description)
+                            .filter(Boolean)
+                            .join(' ')
+                      : '';
+            const message = providerMessage || apiError.response?.data?.error || 'Não foi possível processar o cartão.';
             setPaymentError(message);
         } finally {
             setLoading(false);
@@ -358,19 +405,23 @@ export function RechargeModal({
     const hasCompletePixData = hasCpf && hasPhone;
     const cleanCardNumber = cardNumber.replace(/\s/g, '');
     const [expiryMonth = '', expiryYear = ''] = cardExpiry.split('/');
+    const hasSavedCardSelected = Boolean(selectedSavedCardId);
     const hasValidCardData =
-        cardHolderName.trim().length >= 3 &&
-        cleanCardNumber.length >= 13 &&
-        expiryMonth.length === 2 &&
-        expiryYear.length === 2 &&
-        cardCvv.length >= 3 &&
-        hasCpf &&
-        hasPhone;
+        hasSavedCardSelected ||
+        (
+            cardHolderName.trim().length >= 3 &&
+            cleanCardNumber.length >= 13 &&
+            expiryMonth.length === 2 &&
+            expiryYear.length === 2 &&
+            isFutureCardExpiry(expiryMonth, expiryYear) &&
+            cardCvv.length >= 3 &&
+            hasCpf &&
+            hasPhone
+        );
     const isPixValid = isPixSelected
         ? hasCompletePixData
         : true;
     const isCardValid = isCardSelected ? hasValidCardData : true;
-    const maxInstallments = Math.max(1, Math.min(12, Math.floor((finalAmount * 100) / 1000)));
     const canConfirm = finalAmount > 0 && selectedMethod !== '' && isPixValid && isCardValid;
     const formattedFinalAmount = finalAmount > 0 ? finalAmount.toFixed(2).replace('.', ',') : '0,00';
 
@@ -473,6 +524,41 @@ export function RechargeModal({
                                                                     <ShieldCheck size={13} className="text-green-600" strokeWidth={2.2} />
                                                                     Os dados do cartão são enviados somente para processar esta cobrança.
                                                                 </div>
+                                                                {savedCards.length > 0 && (
+                                                                    <div className="flex flex-col gap-2">
+                                                                        {savedCards.map((card) => {
+                                                                            const isCardActive = selectedSavedCardId === card.id;
+
+                                                                            return (
+                                                                                <button
+                                                                                    key={card.id}
+                                                                                    type="button"
+                                                                                    onClick={() => setSelectedSavedCardId(card.id)}
+                                                                                    className={`flex min-h-11 items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${
+                                                                                        isCardActive
+                                                                                            ? 'border-purple-500 bg-white text-purple-700'
+                                                                                            : 'border-gray-100 bg-white text-gray-700 hover:border-purple-200'
+                                                                                    }`}
+                                                                                >
+                                                                                    <CreditCard size={15} strokeWidth={2.2} />
+                                                                                    <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                                                                                        {card.brand} final {card.lastFour}
+                                                                                    </span>
+                                                                                    <span className={`h-4 w-4 rounded-full border ${isCardActive ? 'border-purple-600 bg-purple-600' : 'border-gray-200'}`} />
+                                                                                </button>
+                                                                            );
+                                                                        })}
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setSelectedSavedCardId('')}
+                                                                            className="self-start text-sm font-semibold text-purple-600 transition-colors hover:text-purple-700"
+                                                                        >
+                                                                            Usar outro cartão
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                                {!selectedSavedCardId && (
+                                                                    <>
                                                                 <div className="flex flex-col gap-1">
                                                                     <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">Nome impresso no cartão</label>
                                                                     <input
@@ -532,6 +618,17 @@ export function RechargeModal({
                                                                         />
                                                                     </div>
                                                                 </div>
+                                                                <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={saveCard}
+                                                                        onChange={(e) => setSaveCard(e.target.checked)}
+                                                                        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-200"
+                                                                    />
+                                                                    <span className="min-w-0 text-sm font-medium text-gray-700">
+                                                                        Salvar cartão para compras futuras
+                                                                    </span>
+                                                                </label>
                                                                 {!hasCpf && (
                                                                     <div className="flex flex-col gap-1">
                                                                         <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">CPF do titular</label>
@@ -560,20 +657,8 @@ export function RechargeModal({
                                                                         />
                                                                     </div>
                                                                 )}
-                                                                <div className="flex flex-col gap-1">
-                                                                    <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">Parcelas</label>
-                                                                    <select
-                                                                        value={cardInstallments}
-                                                                        onChange={(e) => setCardInstallments(Number(e.target.value))}
-                                                                        className="rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
-                                                                    >
-                                                                        {Array.from({ length: maxInstallments }, (_, index) => index + 1).map((installment) => (
-                                                                            <option key={installment} value={installment}>
-                                                                                {installment}x de R$ {(finalAmount / installment).toFixed(2).replace('.', ',')}
-                                                                            </option>
-                                                                        ))}
-                                                                    </select>
-                                                                </div>
+                                                                    </>
+                                                                )}
                                                                 {paymentError && (
                                                                     <p className="text-xs font-medium text-red-600 animate-in fade-in duration-200">
                                                                         {paymentError}

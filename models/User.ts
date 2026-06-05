@@ -5,6 +5,11 @@ export interface ICard {
     label: string;
     lastFour: string;
     brand: string;
+    token?: string;
+    asaasCustomerId?: string;
+    asaasEnvironment?: 'sandbox' | 'production';
+    expiryMonth?: string;
+    expiryYear?: string;
     createdAt: Date;
 }
 
@@ -106,6 +111,11 @@ const UserSchema = new Schema<IUser>({
             label: { type: String, required: true },
             lastFour: { type: String, required: true },
             brand: { type: String, required: true },
+            token: { type: String },
+            asaasCustomerId: { type: String },
+            asaasEnvironment: { type: String, enum: ['sandbox', 'production'] },
+            expiryMonth: { type: String },
+            expiryYear: { type: String },
             createdAt: { type: Date, default: Date.now },
         }],
         default: [],

@@ -368,7 +368,9 @@ export default function ProfilePage() {
             createdAt: tx.createdAt,
             label: tx.source === 'gift'
                 ? `Crédito via cupom${typeof tx.metadata?.giftCode === 'string' ? ` ${tx.metadata.giftCode}` : ''}`
-                : 'Depósito via Pix',
+                : tx.type === 'CC'
+                    ? 'Depósito via cartão'
+                    : 'Depósito via Pix',
             valuePrefix: '+',
             amountClassName: 'text-green-600',
             iconClassName: 'text-green-600',

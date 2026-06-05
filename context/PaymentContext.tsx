@@ -52,14 +52,15 @@ export function PaymentProvider({ children }: { children: React.ReactNode }) {
 
     const handleGenerateCardPayment = async (data: {
         amount: number;
-        holderName: string;
-        holderDocument: string;
-        cardNumber: string;
-        expiryMonth: string;
-        expiryYear: string;
-        cvv: string;
-        installments: number;
+        holderName?: string;
+        holderDocument?: string;
+        cardNumber?: string;
+        expiryMonth?: string;
+        expiryYear?: string;
+        cvv?: string;
         phone?: string;
+        saveCard?: boolean;
+        savedCardId?: string;
     }) => {
         return generateCardPaymentMutation.mutateAsync(data);
     };

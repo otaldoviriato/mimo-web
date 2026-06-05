@@ -207,14 +207,15 @@ export function useGenerateCardPayment() {
     return useMutation({
         mutationFn: (data: {
             amount: number;
-            holderName: string;
-            holderDocument: string;
-            cardNumber: string;
-            expiryMonth: string;
-            expiryYear: string;
-            cvv: string;
-            installments: number;
+            holderName?: string;
+            holderDocument?: string;
+            cardNumber?: string;
+            expiryMonth?: string;
+            expiryYear?: string;
+            cvv?: string;
             phone?: string;
+            saveCard?: boolean;
+            savedCardId?: string;
         }) => userApi.generateCardPayment(data),
     });
 }
