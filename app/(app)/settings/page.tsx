@@ -17,7 +17,13 @@ function SkeletonField() {
     );
 }
 
-export default function SettingsPage() {
+interface SettingsPageProps {
+    isSubPage?: boolean;
+    onBack?: () => void;
+    isClosing?: boolean;
+}
+
+export default function SettingsPage({ isSubPage = false, onBack, isClosing = false }: SettingsPageProps) {
     const { user } = useUser();
     const { signOut } = useClerk();
     const router = useTransitionRouter();
@@ -108,20 +114,33 @@ export default function SettingsPage() {
 
     const profileIsProfessional = !!userData?.isProfessional;
 
+    const layoutClass = isSubPage
+        ? 'w-full h-full'
+        : 'min-h-screen w-full';
+
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col overflow-y-auto">
+        <div className={`bg-gray-50 flex flex-col overflow-y-auto ${layoutClass}`}>
             {/* Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[56px] shrink-0 flex items-center gap-3 sticky top-0 z-10 shadow-sm">
-                <button
-                    onClick={() => router.back()}
-                    className="p-1.5 hover:bg-white/10 active:bg-white/20 rounded-lg transition-colors text-white flex items-center justify-center"
-                    title="Voltar"
-                >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" />
-                    </svg>
-                </button>
-                <h1 className="text-base font-bold text-white">Configurações</h1>
+            <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between sticky top-0 z-20 shadow-md">
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => {
+                            if (isSubPage && onBack) {
+                                onBack();
+                            } else {
+                                router.back();
+                            }
+                        }}
+                        className="text-white hover:bg-white/10 transition-colors p-2 -ml-2 rounded-full flex items-center justify-center"
+                        title="Voltar"
+                    >
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                    </button>
+                    <h1 className="text-2xl font-black text-white tracking-tighter">Mimo</h1>
+                    <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">Configurações</span>
+                </div>
             </div>
 
             <div className="p-4 flex flex-col gap-4 max-w-md w-full mx-auto pb-24">

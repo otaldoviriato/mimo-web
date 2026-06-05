@@ -41,6 +41,12 @@ export function useTransitionRouter() {
                 stackNav.pushVirtual('profile', { username });
                 return;
             }
+
+            // 3. Verifica se é rota de configurações (/settings)
+            if (href === '/settings') {
+                stackNav.pushVirtual('settings', {});
+                return;
+            }
         }
 
         // Fallback para View Transitions nativas

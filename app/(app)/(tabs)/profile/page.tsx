@@ -25,6 +25,14 @@ export default function ProfilePage() {
     const { signOut } = useClerk();
     const router = useTransitionRouter();
 
+    // Resolve a transição de visualização imediatamente para não travar a animação de volta
+    useEffect(() => {
+        if (typeof window !== 'undefined' && (window as any).__resolveTransition) {
+            (window as any).__resolveTransition();
+            (window as any).__resolveTransition = null;
+        }
+    }, []);
+
     useEffect(() => {
         router.prefetch('/settings');
     }, [router]);

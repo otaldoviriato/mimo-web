@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useAuth, useUser } from '@clerk/nextjs';
 import { useRouter, usePathname } from 'next/navigation';
 import { setupAxiosInterceptors } from '@/services/api';
@@ -9,6 +9,11 @@ import { NotificationPromptModal } from '@/components';
 import { StackNavigationProvider, useStackNavigation } from '@/context/StackNavigationContext';
 import ChatPage from './chat/[userId]/page';
 import UserProfilePage from './[username]/page';
+import SettingsPage from './settings/page';
+
+const isTabRoute = (path: string) => {
+    return ['/chats', '/search', '/profile', '/'].includes(path);
+};
 
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const { isLoaded, isSignedIn, getToken } = useAuth();
@@ -17,6 +22,11 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const { handleRequestPermission } = usePushNotifications();
     const { screens, popVirtual } = useStackNavigation();
+    const screensRef = useRef(screens);
+
+    useEffect(() => {
+        screensRef.current = screens;
+    }, [screens]);
 
     useEffect(() => {
         // Se a rota for o chat, deixamos a própria página de chat gerenciar a resolução
@@ -34,6 +44,16 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         if (typeof window === 'undefined' || !('startViewTransition' in document)) return;
 
         const handlePopState = () => {
+            if (screensRef.current.length > 0) {
+                return;
+            }
+
+            // Ignora a animação View Transition de slide se estivermos navegando (voltando) entre abas principais do rodapé
+            const destination = window.location.pathname;
+            if (isTabRoute(pathname) && isTabRoute(destination)) {
+                return;
+            }
+
             if ((window as any).__navigatingWithTransition) {
                 return;
             }
@@ -148,6 +168,13 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                         {screen.type === 'profile' && (
                             <UserProfilePage
                                 username={screen.params.username}
+                                isSubPage={true}
+                                isClosing={isClosing}
+                                onBack={popVirtual}
+                            />
+                        )}
+                        {screen.type === 'settings' && (
+                            <SettingsPage
                                 isSubPage={true}
                                 isClosing={isClosing}
                                 onBack={popVirtual}

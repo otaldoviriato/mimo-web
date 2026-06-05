@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 
 export interface StackScreen {
-    type: 'chat' | 'profile';
+    type: 'chat' | 'profile' | 'settings';
     key: string;
     params: any;
     isClosing?: boolean;
@@ -11,7 +11,7 @@ export interface StackScreen {
 
 interface StackNavigationContextType {
     screens: StackScreen[];
-    pushVirtual: (type: 'chat' | 'profile', params: any) => void;
+    pushVirtual: (type: 'chat' | 'profile' | 'settings', params: any) => void;
     popVirtual: () => void;
     isVirtualActive: boolean;
 }
@@ -27,7 +27,7 @@ export function StackNavigationProvider({ children }: { children: React.ReactNod
         screensRef.current = screens;
     }, [screens]);
 
-    const pushVirtual = (type: 'chat' | 'profile', params: any) => {
+    const pushVirtual = (type: 'chat' | 'profile' | 'settings', params: any) => {
         const key = `${type}-${Date.now()}`;
         const newScreen: StackScreen = { type, key, params };
 
@@ -37,6 +37,8 @@ export function StackNavigationProvider({ children }: { children: React.ReactNod
             url = `/chat/${params.userId}`;
         } else if (type === 'profile') {
             url = `/${params.username}`;
+        } else if (type === 'settings') {
+            url = `/settings`;
         }
 
         if (url) {

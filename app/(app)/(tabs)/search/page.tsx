@@ -14,6 +14,14 @@ export default function SearchPage() {
     const [foundUsers, setFoundUsers] = useState<any[]>([]);
     const [error, setError] = useState('');
 
+    // Resolve a transição de visualização imediatamente para não travar a animação de volta
+    useEffect(() => {
+        if (typeof window !== 'undefined' && (window as any).__resolveTransition) {
+            (window as any).__resolveTransition();
+            (window as any).__resolveTransition = null;
+        }
+    }, []);
+
     const handleSearch = async () => {
         if (!username.trim()) {
             setError('Digite um username para buscar');
