@@ -102,13 +102,19 @@ export default function UserProfilePage({ params, username: propUsername, onBack
     }
 
     return (
-        <div className={`flex flex-col bg-gradient-to-b from-purple-50/60 via-white to-pink-50/50 overflow-y-auto pb-28 no-scrollbar relative ${layoutClass} ${animationClass}`}>
-            {/* Textura sutil no fundo da página */}
+        <div className={`flex flex-col bg-slate-50 overflow-y-auto pb-28 no-scrollbar relative ${layoutClass} ${animationClass}`}>
+            {/* Efeito de Fundo Aurora (Esferas Desfocadas Modernas) */}
+            <div className="absolute top-[-10%] left-[-20%] w-[350px] h-[350px] rounded-full bg-purple-400/15 blur-[100px] pointer-events-none select-none z-0" />
+            <div className="absolute top-[35%] right-[-15%] w-[300px] h-[300px] rounded-full bg-pink-400/12 blur-[90px] pointer-events-none select-none z-0" />
+            <div className="absolute bottom-[15%] left-[-15%] w-[280px] h-[280px] rounded-full bg-indigo-400/10 blur-[100px] pointer-events-none select-none z-0" />
+            
+            {/* Textura Geométrica Discreta (Bolinhas Lavanda) */}
             <div 
-                className="absolute inset-0 opacity-[0.03] pointer-events-none select-none z-0" 
+                className="absolute inset-0 pointer-events-none select-none z-0" 
                 style={{ 
-                    backgroundImage: 'radial-gradient(#6D28D9 1.2px, transparent 1.2px)', 
-                    backgroundSize: '24px 24px' 
+                    backgroundImage: 'radial-gradient(#E9D5FF 1.5px, transparent 1.5px)', 
+                    backgroundSize: '20px 20px',
+                    opacity: 0.4
                 }} 
             />
 
