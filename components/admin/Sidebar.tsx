@@ -4,6 +4,7 @@ import React from 'react';
 import { 
     LayoutDashboard, 
     Users, 
+    UserCheck,
     MessageSquare, 
     DollarSign, 
     Settings, 
@@ -21,7 +22,8 @@ interface SidebarProps {
 export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     const menuItems = [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { id: 'users', label: 'Usuários', icon: Users },
+        { id: 'clients', label: 'Clientes', icon: Users },
+        { id: 'professionals', label: 'Profissionais', icon: UserCheck },
         { id: 'rooms', label: 'Conversas', icon: MessageSquare },
         { id: 'financial', label: 'Financeiro', icon: DollarSign },
         { id: 'withdrawals', label: 'Solicitações de Saque', icon: Wallet },

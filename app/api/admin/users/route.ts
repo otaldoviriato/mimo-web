@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
         }
 
         const usersList = await User.find(filter)
-            .select('clerkId username name email photoUrl balance isProfessional createdAt taxId phone pixKey')
+            .select('clerkId username name email photoUrl balance isProfessional createdAt taxId phone pixKey subscriptionPrice')
             .sort({ createdAt: -1 })
             .limit(100)
             .lean() as any[];
@@ -62,6 +62,7 @@ export async function GET(request: NextRequest) {
                 taxId: u.taxId || '',
                 phone: u.phone || '',
                 pixKey: u.pixKey || '',
+                subscriptionPrice: u.subscriptionPrice || 0,
             }))
         });
 

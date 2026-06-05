@@ -7,7 +7,8 @@ import { Sidebar } from '@/components/admin/Sidebar';
 import { DashboardHeader } from '@/components/admin/DashboardHeader';
 import { StatsCard } from '@/components/admin/StatsCard';
 import { ActivityChart } from '@/components/admin/ActivityChart';
-import { UserTable } from '@/components/admin/UserTable';
+import { ClientsTable } from '@/components/admin/ClientsTable';
+import { ProfessionalsTable } from '@/components/admin/ProfessionalsTable';
 import { 
     Users, 
     MessageSquare, 
@@ -90,6 +91,17 @@ export default function AdminPage() {
     const router = useRouter();
 
     const [activeTab, setActiveTab] = useState('dashboard');
+
+    // Carrega a aba ativa a partir do parâmetro "tab" na URL
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            const tabParam = params.get('tab');
+            if (tabParam && ['dashboard', 'clients', 'professionals', 'rooms', 'financial', 'withdrawals', 'settings'].includes(tabParam)) {
+                setActiveTab(tabParam);
+            }
+        }
+    }, []);
     const [settings, setSettings] = useState<SettingsData | null>(null);
     const [loadingSettings, setLoadingSettings] = useState(true);
     const [isAuthorized, setIsAuthorized] = useState(false);
@@ -124,7 +136,8 @@ export default function AdminPage() {
     // Mapeamento de títulos para o Header
     const tabTitles: { [key: string]: string } = {
         dashboard: 'Painel Geral',
-        users: 'Gerenciamento de Usuários',
+        clients: 'Gerenciamento de Clientes',
+        professionals: 'Gerenciamento de Profissionais',
         rooms: 'Auditoria de Conversas',
         financial: 'Movimentações Financeiras',
         withdrawals: 'Solicitações de Saque',
@@ -648,17 +661,24 @@ export default function AdminPage() {
                                 </div>
                             </div>
 
-                            {/* Tabela de Usuários Rápida */}
+                            {/* Tabela de Clientes Rápida */}
                             <div className="w-full">
-                                <UserTable />
+                                <ClientsTable />
                             </div>
                         </>
                     )}
 
-                    {/* TAB: USERS */}
-                    {activeTab === 'users' && (
+                    {/* TAB: CLIENTS */}
+                    {activeTab === 'clients' && (
                         <div className="w-full">
-                            <UserTable />
+                            <ClientsTable />
+                        </div>
+                    )}
+
+                    {/* TAB: PROFESSIONALS */}
+                    {activeTab === 'professionals' && (
+                        <div className="w-full">
+                            <ProfessionalsTable />
                         </div>
                     )}
 
