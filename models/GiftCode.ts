@@ -8,9 +8,9 @@ export interface IGiftCode extends Document {
     description?: string;
     isActive: boolean;
     targetAudience: GiftCodeAudience; // 'all' | 'client' | 'professional'
-    maxUses?: number; // null = usos ilimitados
+    maxUses?: number | null; // null = usos ilimitados
     totalUses: number;
-    expiresAt?: Date;
+    expiresAt?: Date | null;
     createdAt: Date;
     updatedAt: Date;
 }

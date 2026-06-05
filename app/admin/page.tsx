@@ -31,7 +31,8 @@ import {
     Search,
     Loader2,
     Wallet,
-    Check
+    Check,
+    Ticket
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -101,7 +102,7 @@ export default function AdminPage() {
         if (typeof window !== 'undefined') {
             const params = new URLSearchParams(window.location.search);
             const tabParam = params.get('tab');
-            if (tabParam && ['dashboard', 'clients', 'professionals', 'rooms', 'financial', 'withdrawals', 'settings'].includes(tabParam)) {
+            if (tabParam && ['dashboard', 'clients', 'professionals', 'rooms', 'financial', 'withdrawals', 'settings', 'coupons'].includes(tabParam)) {
                 setActiveTab(tabParam);
             }
         }
@@ -141,6 +142,26 @@ export default function AdminPage() {
     // Estado do Modal de Auditoria de Conversa
     const [selectedAuditChat, setSelectedAuditChat] = useState<ChatRoom | null>(null);
 
+    // Estados do Gerenciamento de Cupons de Desconto
+    const [coupons, setCoupons] = useState<any[]>([]);
+    const [loadingCoupons, setLoadingCoupons] = useState(true);
+    const [couponModalOpen, setCouponModalOpen] = useState(false);
+    const [selectedCoupon, setSelectedCoupon] = useState<any | null>(null);
+    const [couponUsersModalOpen, setCouponUsersModalOpen] = useState(false);
+    const [auditedCoupon, setAuditedCoupon] = useState<any | null>(null);
+    const [couponUsers, setCouponUsers] = useState<any[]>([]);
+    const [loadingCouponUsers, setLoadingCouponUsers] = useState(false);
+    const [couponUsersSearch, setCouponUsersSearch] = useState('');
+
+    // Estados do Formulário de Cupom
+    const [cpCode, setCpCode] = useState('');
+    const [cpAmount, setCpAmount] = useState('');
+    const [cpDescription, setCpDescription] = useState('');
+    const [cpTargetAudience, setCpTargetAudience] = useState<'all' | 'client' | 'professional'>('all');
+    const [cpMaxUses, setCpMaxUses] = useState('');
+    const [cpExpiresAt, setCpExpiresAt] = useState('');
+    const [cpIsActive, setCpIsActive] = useState(true);
+
     // Mapeamento de títulos para o Header
     const tabTitles: { [key: string]: string } = {
         dashboard: 'Painel Geral',
@@ -150,6 +171,7 @@ export default function AdminPage() {
         financial: 'Movimentações Financeiras',
         withdrawals: 'Solicitações de Saque',
         settings: 'Configurações do Sistema',
+        coupons: 'Gerenciamento de Cupons de Desconto',
     };
 
     // Período comparativo selecionado na Dashboard
@@ -332,6 +354,160 @@ export default function AdminPage() {
         }
     };
 
+    // Busca cupons de desconto
+    const fetchCoupons = async () => {
+        setLoadingCoupons(true);
+        try {
+            const response = await fetch('/api/admin/coupons');
+            if (response.ok) {
+                const data = await response.json();
+                setCoupons(data.coupons || []);
+            } else {
+                toast.error('Erro ao carregar cupons do servidor.');
+            }
+        } catch (error) {
+            console.error('Erro de conexão ao buscar cupons:', error);
+            toast.error('Erro de conexão ao buscar cupons.');
+        } finally {
+            setLoadingCoupons(false);
+        }
+    };
+
+    // Abre o modal para criar ou editar cupom
+    const handleOpenCouponModal = (coupon: any | null = null) => {
+        setSelectedCoupon(coupon);
+        if (coupon) {
+            setCpCode(coupon.code);
+            setCpAmount((coupon.amount / 100).toString()); // Converte centavos para reais
+            setCpDescription(coupon.description || '');
+            setCpTargetAudience(coupon.targetAudience || 'all');
+            setCpMaxUses(coupon.maxUses !== null && coupon.maxUses !== undefined ? coupon.maxUses.toString() : '');
+            setCpExpiresAt(coupon.expiresAt ? new Date(coupon.expiresAt).toISOString().split('T')[0] : '');
+            setCpIsActive(coupon.isActive);
+        } else {
+            setCpCode('');
+            setCpAmount('');
+            setCpDescription('');
+            setCpTargetAudience('all');
+            setCpMaxUses('');
+            setCpExpiresAt('');
+            setCpIsActive(true);
+        }
+        setCouponModalOpen(true);
+    };
+
+    // Salva o cupom (Cria ou Edita)
+    const handleSaveCoupon = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!cpCode.trim()) {
+            toast.error('O código do cupom é obrigatório.');
+            return;
+        }
+
+        const parsedAmount = parseFloat(cpAmount);
+        if (isNaN(parsedAmount) || parsedAmount <= 0) {
+            toast.error('Digite um valor válido em reais maior que zero.');
+            return;
+        }
+
+        // Converte de reais para centavos
+        const amountCents = Math.round(parsedAmount * 100);
+
+        const payload = {
+            code: cpCode.trim().toUpperCase(),
+            amount: amountCents,
+            description: cpDescription.trim(),
+            targetAudience: cpTargetAudience,
+            maxUses: cpMaxUses.trim() !== '' ? parseInt(cpMaxUses) : null,
+            expiresAt: cpExpiresAt ? new Date(cpExpiresAt).toISOString() : null,
+            isActive: cpIsActive,
+        };
+
+        try {
+            const url = selectedCoupon ? `/api/admin/coupons/${selectedCoupon._id}` : '/api/admin/coupons';
+            const method = selectedCoupon ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+
+            if (response.ok) {
+                toast.success(selectedCoupon ? 'Cupom atualizado com sucesso!' : 'Cupom criado com sucesso!', {
+                    style: {
+                        borderRadius: '12px',
+                        background: '#1E293B',
+                        color: '#FFF',
+                        fontWeight: 600,
+                    }
+                });
+                setCouponModalOpen(false);
+                fetchCoupons();
+            } else {
+                const data = await response.json();
+                toast.error(data.error || 'Erro ao salvar o cupom.');
+            }
+        } catch (error) {
+            console.error('Erro ao salvar cupom:', error);
+            toast.error('Erro de conexão ao salvar.');
+        }
+    };
+
+    // Exclui o cupom do banco de dados
+    const handleDeleteCoupon = async (id: string, code: string) => {
+        const confirmDelete = window.confirm(`Tem certeza que deseja excluir permanentemente o cupom ${code}?`);
+        if (!confirmDelete) return;
+
+        try {
+            const response = await fetch(`/api/admin/coupons/${id}`, {
+                method: 'DELETE',
+            });
+
+            if (response.ok) {
+                toast.success(`Cupom ${code} excluído com sucesso!`, {
+                    style: {
+                        borderRadius: '12px',
+                        background: '#1E293B',
+                        color: '#FFF',
+                        fontWeight: 600,
+                    }
+                });
+                fetchCoupons();
+            } else {
+                const data = await response.json();
+                toast.error(data.error || 'Erro ao excluir o cupom.');
+            }
+        } catch (error) {
+            console.error('Erro ao excluir cupom:', error);
+            toast.error('Erro de conexão ao excluir.');
+        }
+    };
+
+    // Abre o modal de usuários que usaram o cupom
+    const handleOpenCouponUsers = async (coupon: any) => {
+        setAuditedCoupon(coupon);
+        setCouponUsers([]);
+        setCouponUsersSearch('');
+        setLoadingCouponUsers(true);
+        setCouponUsersModalOpen(true);
+
+        try {
+            const response = await fetch(`/api/admin/coupons/${coupon._id}/users`);
+            if (response.ok) {
+                const data = await response.json();
+                setCouponUsers(data.users || []);
+            } else {
+                toast.error('Erro ao carregar os usuários que usaram o cupom.');
+            }
+        } catch (error) {
+            console.error('Erro ao buscar usuários do cupom:', error);
+            toast.error('Erro de conexão com o servidor.');
+        } finally {
+            setLoadingCouponUsers(false);
+        }
+    };
+
     // Efeito para carregar dados conforme aba e período ativo
     useEffect(() => {
         if (!isAuthorized) return;
@@ -341,6 +517,8 @@ export default function AdminPage() {
             fetchRooms();
         } else if (activeTab === 'withdrawals') {
             fetchWithdrawals();
+        } else if (activeTab === 'coupons') {
+            fetchCoupons();
         }
     }, [activeTab, selectedPeriod, isAuthorized]);
 
@@ -1318,6 +1496,148 @@ export default function AdminPage() {
                         </div>
                     )}
 
+                    {/* TAB: COUPONS */}
+                    {activeTab === 'coupons' && (
+                        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden p-6 space-y-6 animate-fade-in-up">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-800 tracking-tight">
+                                        Gerenciamento de Cupons de Desconto
+                                    </h3>
+                                    <p className="text-xs text-slate-500 font-medium">
+                                        Crie, edite e gerencie os cupons promocionais que concedem saldo de recarga para os usuários.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => handleOpenCouponModal(null)}
+                                    className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-purple-600/10 cursor-pointer flex items-center gap-1.5"
+                                >
+                                    <Plus size={14} />
+                                    Criar Novo Cupom
+                                </button>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+                                            <th className="py-4 px-6">Código</th>
+                                            <th className="py-4 px-6">Valor</th>
+                                            <th className="py-4 px-6">Descrição</th>
+                                            <th className="py-4 px-6">Público-Alvo</th>
+                                            <th className="py-4 px-6">Usos / Limite</th>
+                                            <th className="py-4 px-6">Expira Em</th>
+                                            <th className="py-4 px-6">Status</th>
+                                            <th className="py-4 px-6 text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {loadingCoupons ? (
+                                            <tr>
+                                                <td colSpan={8} className="py-20 text-center text-sm font-semibold text-slate-400">
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        <div className="animate-spin h-6 w-6 text-purple-600 rounded-full border-2 border-slate-200 border-t-purple-600" />
+                                                        <span>Buscando cupons no banco...</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ) : coupons.length > 0 ? (
+                                            coupons.map((coupon) => (
+                                                <tr key={coupon._id} className="hover:bg-slate-50/40 transition-colors group">
+                                                    {/* Código */}
+                                                    <td className="py-4 px-6">
+                                                        <span className="text-xs font-mono font-bold text-purple-700 bg-purple-50 border border-purple-100/80 px-2.5 py-1 rounded-lg">
+                                                            {coupon.code}
+                                                        </span>
+                                                    </td>
+                                                    {/* Valor */}
+                                                    <td className="py-4 px-6">
+                                                        <span className="text-sm font-extrabold text-slate-800">
+                                                            {(coupon.amount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                        </span>
+                                                    </td>
+                                                    {/* Descrição */}
+                                                    <td className="py-4 px-6 text-xs text-slate-500 font-medium max-w-[180px] truncate" title={coupon.description}>
+                                                        {coupon.description || '-'}
+                                                    </td>
+                                                    {/* Público-Alvo */}
+                                                    <td className="py-4 px-6">
+                                                        <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                                            coupon.targetAudience === 'client' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                                            coupon.targetAudience === 'professional' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' :
+                                                            'bg-slate-50 text-slate-700 border-slate-100'
+                                                        }`}>
+                                                            {coupon.targetAudience === 'client' ? 'Clientes' :
+                                                             coupon.targetAudience === 'professional' ? 'Profissionais' : 'Todos'}
+                                                        </span>
+                                                    </td>
+                                                    {/* Usos / Limite */}
+                                                    <td className="py-4 px-6">
+                                                        <button
+                                                            onClick={() => handleOpenCouponUsers(coupon)}
+                                                            className="text-xs font-semibold text-slate-650 hover:text-purple-600 transition-colors flex items-center gap-1 group/use cursor-pointer"
+                                                            title="Ver detalhes de quem usou"
+                                                        >
+                                                            <span>
+                                                                {coupon.totalUses} {coupon.maxUses !== null && coupon.maxUses !== undefined ? `/ ${coupon.maxUses}` : ''}
+                                                            </span>
+                                                            <Eye size={12} className="text-slate-400 group-hover/use:text-purple-600 transition-colors" />
+                                                        </button>
+                                                    </td>
+                                                    {/* Expira Em */}
+                                                    <td className="py-4 px-6 text-xs text-slate-500 font-semibold">
+                                                        {coupon.expiresAt ? new Date(coupon.expiresAt).toLocaleDateString('pt-BR') : 'Sem expiração'}
+                                                    </td>
+                                                    {/* Status */}
+                                                    <td className="py-4 px-6">
+                                                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                                            coupon.isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-200'
+                                                        }`}>
+                                                            <span className={`w-1 h-1 rounded-full ${coupon.isActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                                                            {coupon.isActive ? 'Ativo' : 'Inativo'}
+                                                        </span>
+                                                    </td>
+                                                    {/* Ações */}
+                                                    <td className="py-4 px-6 text-center">
+                                                        <div className="flex gap-2 justify-center">
+                                                            <button
+                                                                onClick={() => handleOpenCouponUsers(coupon)}
+                                                                className="p-1.5 bg-slate-50 border border-slate-200 text-slate-500 hover:text-purple-600 hover:bg-purple-50 hover:border-purple-100 rounded-lg cursor-pointer transition-all shadow-sm active:scale-95"
+                                                                title="Visualizar resgastes"
+                                                            >
+                                                                <Eye size={13} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleOpenCouponModal(coupon)}
+                                                                className="p-1.5 bg-slate-50 border border-slate-200 text-slate-500 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-100 rounded-lg cursor-pointer transition-all shadow-sm active:scale-95"
+                                                                title="Editar cupom"
+                                                            >
+                                                                <Sliders size={13} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteCoupon(coupon._id, coupon.code)}
+                                                                className="p-1.5 bg-slate-50 border border-slate-200 text-slate-500 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100 rounded-lg cursor-pointer transition-all shadow-sm active:scale-95"
+                                                                title="Excluir cupom"
+                                                            >
+                                                                <Trash2 size={13} />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={8} className="py-20 text-center text-sm font-semibold text-slate-400">
+                                                    Nenhum cupom de desconto cadastrado no sistema.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
                 </main>
             </div>
 
@@ -1414,6 +1734,264 @@ export default function AdminPage() {
                 </div>
             )}
 
+            {/* MODAL DE CRIAÇÃO / EDIÇÃO DE CUPOM */}
+            {couponModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-lg flex flex-col shadow-2xl overflow-hidden animate-fade-in-up">
+                        {/* Header */}
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-purple-50 text-purple-600 rounded-xl border border-purple-100">
+                                    <Ticket size={20} />
+                                </div>
+                                <div>
+                                    <h3 className="text-slate-800 text-base font-bold tracking-tight">
+                                        {selectedCoupon ? 'Editar Cupom de Desconto' : 'Criar Novo Cupom'}
+                                    </h3>
+                                    <p className="text-slate-500 text-xs mt-0.5">
+                                        {selectedCoupon ? 'Altere as configurações do cupom existente.' : 'Preencha os campos para cadastrar um cupom no banco.'}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setCouponModalOpen(false)}
+                                className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-lg transition-all cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Form Body */}
+                        <form onSubmit={handleSaveCoupon} className="flex-1 flex flex-col overflow-hidden">
+                            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Código do Cupom</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            value={cpCode}
+                                            onChange={(e) => setCpCode(e.target.value.toUpperCase().replace(/\s/g, ''))}
+                                            placeholder="EX: PROMO100"
+                                            className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-semibold text-slate-800 uppercase"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Valor do Crédito (R$)</label>
+                                        <input
+                                            type="number"
+                                            required
+                                            step="0.01"
+                                            min="0.01"
+                                            value={cpAmount}
+                                            onChange={(e) => setCpAmount(e.target.value)}
+                                            placeholder="50,00"
+                                            className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-semibold text-slate-850"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Descrição</label>
+                                    <input
+                                        type="text"
+                                        value={cpDescription}
+                                        onChange={(e) => setCpDescription(e.target.value)}
+                                        placeholder="EX: Cupom promocional de R$ 50 para novos clientes"
+                                        className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Público-Alvo</label>
+                                        <select
+                                            value={cpTargetAudience}
+                                            onChange={(e) => setCpTargetAudience(e.target.value as any)}
+                                            className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-semibold text-slate-700 cursor-pointer"
+                                        >
+                                            <option value="all">Todos os usuários</option>
+                                            <option value="client">Apenas Clientes (compradores)</option>
+                                            <option value="professional">Apenas Profissionais</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Limite de Usos (Max)</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={cpMaxUses}
+                                            onChange={(e) => setCpMaxUses(e.target.value)}
+                                            placeholder="Ilimitado"
+                                            className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4 items-center">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Data de Expiração</label>
+                                        <input
+                                            type="date"
+                                            value={cpExpiresAt}
+                                            onChange={(e) => setCpExpiresAt(e.target.value)}
+                                            className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700 cursor-pointer"
+                                        />
+                                    </div>
+                                    <div className="pt-5 pl-2">
+                                        <label className="flex items-center gap-2 cursor-pointer group">
+                                            <input
+                                                type="checkbox"
+                                                checked={cpIsActive}
+                                                onChange={(e) => setCpIsActive(e.target.checked)}
+                                                className="accent-purple-600 rounded cursor-pointer w-4 h-4"
+                                            />
+                                            <span className="text-xs font-bold text-slate-700 group-hover:text-purple-600 transition-colors select-none">
+                                                Cupom Ativo
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Footer buttons */}
+                            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setCouponModalOpen(false)}
+                                    className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-bold rounded-xl transition-all cursor-pointer bg-white"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-xs font-bold rounded-xl shadow-md shadow-purple-600/10 cursor-pointer transition-all"
+                                >
+                                    {selectedCoupon ? 'Salvar Alterações' : 'Criar Cupom'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL DE AUDITORIA DE RESGATES DO CUPOM */}
+            {couponUsersModalOpen && auditedCoupon && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-xl h-[70vh] flex flex-col shadow-2xl overflow-hidden animate-fade-in-up">
+                        {/* Header */}
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-purple-50 text-purple-600 rounded-xl border border-purple-100">
+                                    <Users size={20} />
+                                </div>
+                                <div>
+                                    <h3 className="text-slate-800 text-base font-bold tracking-tight">
+                                        Histórico de Resgates - Cupom <strong className="font-mono text-purple-700">{auditedCoupon.code}</strong>
+                                    </h3>
+                                    <p className="text-slate-500 text-xs mt-0.5">
+                                        Resgatado {couponUsers.length} {couponUsers.length === 1 ? 'vez' : 'vezes'} · Valor individual: R$ {(auditedCoupon.amount / 100).toFixed(2)}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setCouponUsersModalOpen(false)}
+                                className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-lg transition-all cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Search and List */}
+                        <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
+                                <input
+                                    type="text"
+                                    placeholder="Pesquisar por nome ou e-mail na lista de resgates..."
+                                    value={couponUsersSearch}
+                                    onChange={(e) => setCouponUsersSearch(e.target.value)}
+                                    className="w-full pl-9 pr-4 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-medium text-slate-700 placeholder-slate-400"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                            {loadingCouponUsers ? (
+                                <div className="py-20 flex flex-col items-center justify-center gap-2">
+                                    <Loader2 className="h-7 w-7 text-purple-600 animate-spin" />
+                                    <span className="text-xs font-semibold text-slate-400">Buscando transações de resgate...</span>
+                                </div>
+                            ) : couponUsers.length > 0 ? (
+                                (() => {
+                                    const filtered = couponUsers.filter(u => 
+                                        u.name.toLowerCase().includes(couponUsersSearch.toLowerCase()) ||
+                                        u.username.toLowerCase().includes(couponUsersSearch.toLowerCase()) ||
+                                        u.email.toLowerCase().includes(couponUsersSearch.toLowerCase())
+                                    );
+
+                                    if (filtered.length === 0) {
+                                        return (
+                                            <div className="py-20 text-center text-xs font-bold text-slate-400">
+                                                Nenhum usuário correspondente à pesquisa.
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <div className="divide-y divide-slate-100">
+                                            {filtered.map((u, index) => (
+                                                <div key={index} className="flex items-center justify-between py-3.5 first:pt-0">
+                                                    <div className="flex items-center gap-3 min-w-0 pr-3">
+                                                        <div className="w-9 h-9 rounded-full bg-purple-50 text-purple-600 border border-purple-100 flex items-center justify-center font-bold text-xs overflow-hidden shrink-0 shadow-sm">
+                                                            {u.photoUrl ? (
+                                                                <img src={u.photoUrl} alt={u.name} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                getInitials(u.name)
+                                                            )}
+                                                        </div>
+                                                        <div className="flex flex-col min-w-0">
+                                                            <span className="text-xs font-bold text-slate-800 truncate leading-tight">
+                                                                {u.name}
+                                                            </span>
+                                                            <span className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">
+                                                                {u.email}
+                                                            </span>
+                                                            <code className="text-[8px] font-mono text-slate-400 mt-1 truncate">
+                                                                @{u.username || 'sem_username'} · {u.clerkId}
+                                                            </code>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right shrink-0">
+                                                        <span className="text-[10px] font-bold text-slate-500 uppercase block">Resgatado em</span>
+                                                        <span className="text-xs text-slate-600 font-bold mt-0.5 block">
+                                                            {new Date(u.claimedAt).toLocaleString('pt-BR')}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    );
+                                })()
+                            ) : (
+                                <div className="py-20 text-center text-xs font-semibold text-slate-400">
+                                    Nenhum resgate registrado para este cupom ainda.
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer buttons */}
+                        <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end">
+                            <button
+                                onClick={() => setCouponUsersModalOpen(false)}
+                                className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-white text-xs font-bold rounded-xl cursor-pointer transition-all shadow-md shadow-slate-800/10"
+                            >
+                                Fechar Auditoria
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

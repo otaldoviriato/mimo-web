@@ -199,7 +199,8 @@ export async function GET(request: NextRequest) {
                 : `Usuário (${tx.userId.substring(0, 8)}...)`;
 
             // Agora todos os valores na coleção Transaction estão salvos em Reais!
-            const valInReais = tx.amount || 0;
+            // Exceção: As transações do tipo 'gift' (resgate de cupom) salvam em centavos.
+            const valInReais = tx.source === 'gift' ? ((tx.amount || 0) / 100) : (tx.amount || 0);
 
             // Mapeia o tipo amigável
             let typeLabel = 'Movimentação';
@@ -207,6 +208,8 @@ export async function GET(request: NextRequest) {
                 typeLabel = tx.type === 'PIX' ? 'Recarga Pix' : 'Recarga Cartão';
             } else if (tx.source === 'withdrawal') {
                 typeLabel = 'Saque';
+            } else if (tx.source === 'gift') {
+                typeLabel = 'Resgate de Cupom';
             }
 
             // Mapeia o status amigável
