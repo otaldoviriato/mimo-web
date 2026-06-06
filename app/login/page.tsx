@@ -38,7 +38,13 @@ export default function LoginPage() {
 
     useEffect(() => {
         if (isSignedIn) {
-            router.replace('/chats');
+            const redirectPath = sessionStorage.getItem('mimo_redirect_after_login');
+            if (redirectPath) {
+                sessionStorage.removeItem('mimo_redirect_after_login');
+                router.replace(redirectPath);
+            } else {
+                router.replace('/chats');
+            }
         }
     }, [isSignedIn, router]);
 
@@ -110,13 +116,25 @@ export default function LoginPage() {
                 await signUp!.attemptEmailAddressVerification({ code });
                 if (signUp!.status === 'complete') {
                     await setSignUpActive!({ session: signUp!.createdSessionId });
-                    router.replace('/chats');
+                    const redirectPath = sessionStorage.getItem('mimo_redirect_after_login');
+                    if (redirectPath) {
+                        sessionStorage.removeItem('mimo_redirect_after_login');
+                        router.replace(redirectPath);
+                    } else {
+                        router.replace('/chats');
+                    }
                 }
             } else {
                 await signIn!.attemptFirstFactor({ strategy: 'email_code', code });
                 if (signIn!.status === 'complete') {
                     await setSignInActive!({ session: signIn!.createdSessionId });
-                    router.replace('/chats');
+                    const redirectPath = sessionStorage.getItem('mimo_redirect_after_login');
+                    if (redirectPath) {
+                        sessionStorage.removeItem('mimo_redirect_after_login');
+                        router.replace(redirectPath);
+                    } else {
+                        router.replace('/chats');
+                    }
                 }
             }
         } catch (err: unknown) {

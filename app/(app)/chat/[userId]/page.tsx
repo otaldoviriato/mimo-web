@@ -57,7 +57,7 @@ interface CachedRoom {
 }
 
 function formatLastSeen(isOnline?: boolean, lastSeenDateStr?: string | Date) {
-    if (isOnline) return 'Online';
+    if (isOnline) return 'online';
     if (!lastSeenDateStr) return '';
     
     try {
@@ -212,6 +212,47 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const typingTimeoutRef = useRef<any>(null);
+
+    const [couponClaimModal, setCouponClaimModal] = useState(false);
+    const [couponClaimAmount, setCouponClaimAmount] = useState<number | null>(null);
+    const couponClaimedRef = useRef(false);
+
+    // Efeito para resgatar cupom na tela de chat
+    useEffect(() => {
+        if (!user?.id || couponClaimedRef.current) return;
+
+        const stored = sessionStorage.getItem('mimo_pending_gift');
+        const fromUrl = new URLSearchParams(window.location.search).get('gift');
+        const code = stored || fromUrl;
+        if (!code) return;
+
+        couponClaimedRef.current = true;
+        sessionStorage.removeItem('mimo_pending_gift');
+
+        // Limpa a URL para remover o query param 'gift'
+        if (fromUrl && typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('gift');
+            window.history.replaceState({}, '', url.pathname + url.search);
+        }
+
+        fetch('/api/gift/claim', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code }),
+        }).then(async (res) => {
+            if (res.ok) {
+                const data = await res.json();
+                setCouponClaimAmount(typeof data?.amount === 'number' ? data.amount : null);
+                setCouponClaimModal(true);
+                // Invalida os caches do perfil e do saldo
+                queryClient.invalidateQueries({ queryKey: QueryKeys.me });
+                queryClient.invalidateQueries({ queryKey: QueryKeys.balance(user.id) });
+            }
+        }).catch((err) => {
+            console.error('Error claiming coupon in chat screen:', err);
+        });
+    }, [user?.id, queryClient]);
 
     const roomId = [user?.id, otherUserId].sort().join('_');
 
@@ -1126,10 +1167,13 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                         </button>
                         <button 
                             onClick={() => receiver?.username && router.push(`/${receiver.username}`)}
-                            className="flex-1 flex items-center gap-3 min-w-0 text-left py-0.5"
+                            className="flex-1 flex items-center gap-3.5 min-w-0 text-left py-0.5"
                         >
                             <div className={`relative shrink-0 ${!receiver ? 'animate-pulse' : ''}`}>
-                                <Avatar uri={receiver?.photoUrl} size={40} />
+                                <Avatar uri={receiver?.photoUrl} size={44} />
+                                {receiver?.isOnline && (
+                                    <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-purple-600 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
+                                )}
                             </div>
                             <div className={`flex-1 min-w-0 ${!receiver ? 'animate-pulse' : ''}`}>
                                 <p className="text-base font-bold text-white truncate tracking-tight">
@@ -1139,7 +1183,11 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                     {!connected ? (
                                         <span className="text-[10px] text-white/50 font-bold uppercase tracking-widest">Conectando...</span>
                                     ) : isTyping ? (
-                                        <span className="text-[10px] text-white font-black animate-pulse uppercase tracking-widest">Digitando...</span>
+                                        <span className="text-[11px] text-emerald-300 font-bold animate-pulse tracking-wide lowercase">digitando...</span>
+                                    ) : receiver?.isOnline ? (
+                                        <span className="text-[11px] text-emerald-300 font-semibold tracking-wide lowercase">
+                                            online
+                                        </span>
                                     ) : (
                                         <span className="text-[10px] text-white/65 font-medium truncate tracking-tight normal-case">
                                             {receiver ? formatLastSeen(receiver.isOnline, receiver.lastSeen) : (receiver?.username ? `@${receiver.username}` : 'Ver perfil')}
@@ -1160,7 +1208,7 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                 <button
                                     id="gallery-btn"
                                     onClick={() => setGalleryVisible(true)}
-                                    className="text-white/80 hover:text-white p-1 transition-colors"
+                                    className="text-white/80 hover:text-white p-2 hover:bg-white/10 rounded-full active:scale-95 transition-all"
                                     title="Ver mídias compartilhadas"
                                 >
                                     {/* Ícone grade 2x2 */}
@@ -1176,7 +1224,7 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                             <div className="relative">
                                 <button
                                     onClick={() => setMenuVisible(!menuVisible)}
-                                    className="text-white/80 hover:text-white p-1 transition-colors"
+                                    className="text-white/80 hover:text-white p-2 hover:bg-white/10 rounded-full active:scale-95 transition-all"
                                 >
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                                         <circle cx="12" cy="5" r="1.5" />
@@ -2191,6 +2239,78 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                     </Drawer.Content>
                 </Drawer.Portal>
             </Drawer.Root>
+
+            {/* Modal de crédito promocional (cupom) resgatado */}
+            {couponClaimModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-5 select-none no-select">
+                    <div
+                        className="absolute inset-0 bg-purple-950/35 backdrop-blur-[2px] animate-in fade-in duration-200"
+                        onClick={() => setCouponClaimModal(false)}
+                    />
+                    <div className="relative w-full max-w-[360px] animate-in fade-in slide-in-from-bottom-6 zoom-in-95 duration-300">
+                        <div className="relative overflow-hidden rounded-[28px] border border-purple-100 bg-white text-gray-900 shadow-2xl">
+                            <button
+                                type="button"
+                                aria-label="Fechar"
+                                onClick={() => setCouponClaimModal(false)}
+                                className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-800"
+                            >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+
+                            <div className="h-1.5 bg-gradient-to-r from-purple-600 via-fuchsia-500 to-purple-500" />
+
+                            <div className="px-6 pb-6 pt-7">
+                                <div className="mb-5 flex items-start gap-4">
+                                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 ring-1 ring-purple-100">
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                                            <rect x="2" y="5" width="20" height="14" rx="2" ry="2"></rect>
+                                            <line x1="2" y1="10" x2="22" y2="10"></line>
+                                        </svg>
+                                    </div>
+                                    <div className="min-w-0 pr-7">
+                                        <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-purple-500">Saldo promocional</p>
+                                        <h2 className="text-[22px] font-semibold leading-tight tracking-normal text-gray-900">Crédito liberado para você</h2>
+                                    </div>
+                                </div>
+
+                                <div className="mb-5 rounded-2xl border border-purple-100 bg-purple-50/60 px-5 py-4">
+                                    <div className="flex items-end justify-between gap-4">
+                                        <div>
+                                            <p className="mb-1 text-sm text-gray-500">Valor adicionado</p>
+                                            <p className="text-[42px] font-semibold leading-none tracking-normal text-purple-700">
+                                                {((couponClaimAmount ?? 5000) / 100).toLocaleString('pt-BR', {
+                                                    style: 'currency',
+                                                    currency: 'BRL',
+                                                    maximumFractionDigits: 0,
+                                                })}
+                                            </p>
+                                        </div>
+                                        <svg className="mb-1 shrink-0 text-emerald-500" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                        </svg>
+                                    </div>
+                                    <div className="mt-4 h-px bg-purple-100" />
+                                    <p className="mt-4 text-sm leading-relaxed text-gray-600">
+                                        O valor já entrou no seu saldo e pode ser usado nas conversas e conteúdos do app.
+                                    </p>
+                                </div>
+
+                                <button
+                                    onClick={() => setCouponClaimModal(false)}
+                                    className="w-full rounded-2xl bg-purple-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-purple-600/20 transition-colors hover:bg-purple-700 active:scale-[0.99]"
+                                >
+                                    Continuar no chat
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

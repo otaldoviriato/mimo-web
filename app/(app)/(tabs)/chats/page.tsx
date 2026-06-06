@@ -387,8 +387,14 @@ export default function ChatsPage() {
                                                         </span>
                                                     </span>
                                                 ) : (
-                                                    <span className={`text-sm truncate flex-1 pr-3 ${hasUnread ? 'font-semibold text-gray-800' : 'text-gray-500'}`}>
-                                                        {room.lastMessage || 'Nenhuma mensagem ainda'}
+                                                    <span className={`text-sm truncate flex-1 pr-3 ${
+                                                        hasUnread 
+                                                            ? 'font-semibold text-gray-950' 
+                                                            : room.lastMessage 
+                                                                ? 'text-gray-500' 
+                                                                : 'text-purple-500 italic font-medium'
+                                                    }`}>
+                                                        {room.lastMessage || 'Toque para iniciar a conversa! ✨'}
                                                     </span>
                                                 )}
                                                 {hasUnread && (
