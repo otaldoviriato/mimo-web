@@ -450,27 +450,19 @@ export function RechargeModal({
             <Drawer.Portal>
                 <Drawer.Overlay className="fixed inset-0 z-[100] bg-gray-950/55 backdrop-blur-[2px]" />
                 <Drawer.Content className="fixed inset-x-0 bottom-0 z-[101] mx-auto flex max-h-[84vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[24px] bg-white shadow-[0_-20px_60px_rgba(15,23,42,0.18)] outline-none">
-                    <div className="flex w-full flex-1 flex-col overflow-y-auto">
-                        <div className="border-b border-gray-100 px-5 pb-4 pt-3">
-                            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-gray-200" />
-                            <div className="flex items-start justify-between gap-4">
-                                <div>
-                                    <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Carteira Mimo</p>
-                                    <Drawer.Title className="mt-1 text-xl font-bold tracking-tight text-gray-900">Recarregar saldo</Drawer.Title>
-                                    <p className="mt-0.5 text-sm text-gray-500">
-                                        Adicione créditos de forma rápida e segura.
-                                    </p>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => handleClose()}
-                                    aria-label="Fechar recarga"
-                                    className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-100 bg-white text-gray-400 shadow-sm transition-colors hover:bg-gray-50 hover:text-gray-700"
-                                >
-                                    <X size={16} strokeWidth={2.2} />
-                                </button>
+                    <div className="border-b border-gray-100 px-5 pb-4 pt-3 shrink-0 bg-white">
+                        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-gray-200" />
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Carteira Mimo</p>
+                                <Drawer.Title className="mt-1 text-xl font-bold tracking-tight text-gray-900">Recarregar saldo</Drawer.Title>
+                                <p className="mt-0.5 text-sm text-gray-500">
+                                    Adicione créditos de forma rápida e segura.
+                                </p>
                             </div>
                         </div>
+                    </div>
+                    <div className="flex w-full flex-1 flex-col overflow-y-auto min-h-0">
 
                         {step === 'amount_and_method' ? (
                             <>
