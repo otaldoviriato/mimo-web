@@ -46,6 +46,8 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const [saveError, setSaveError] = useState('');
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [isAboutExpanded, setIsAboutExpanded] = useState(false);
+    const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(false);
+    const [savingEmailPref, setSavingEmailPref] = useState(false);
 
     const hasPopulated = useRef(false);
 
@@ -66,6 +68,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             setPixKey(userData.pixKey || '');
             setSubscriptionPrice(userData.subscriptionPrice?.toString() ?? '0');
             setBio(userData.bio || '');
+            setEmailNotificationsEnabled(userData.emailNotificationsEnabled ?? false);
             hasPopulated.current = true;
         }
     }, [userData]);
@@ -273,6 +276,65 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                             Valor máximo permitido: R$ {(userData?.maxSubscriptionPrice ?? 200).toFixed(2)}
                                         </span>
                                     </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── SEÇÃO: NOTIFICAÇÕES POR E-MAIL (Profissionais) ── */}
+                        {profileIsProfessional && (
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Notificações por E-mail</p>
+                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                                    <div className="px-4 py-3.5 flex items-center justify-between">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-8 h-8 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-500">
+                                                    <rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,4 12,13 2,4"/>
+                                                </svg>
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium text-gray-800">Alertas de nova conversa</p>
+                                                <p className="text-[10px] text-gray-400 leading-snug">
+                                                    Receba um e-mail quando um cliente iniciar uma nova sessão de chat com você
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            id="email-notifications-toggle"
+                                            onClick={async () => {
+                                                const newValue = !emailNotificationsEnabled;
+                                                setEmailNotificationsEnabled(newValue);
+                                                setSavingEmailPref(true);
+                                                try {
+                                                    await updateProfileMutation.mutateAsync({ emailNotificationsEnabled: newValue });
+                                                } catch {
+                                                    // Reverter em caso de erro
+                                                    setEmailNotificationsEnabled(!newValue);
+                                                } finally {
+                                                    setSavingEmailPref(false);
+                                                }
+                                            }}
+                                            disabled={savingEmailPref}
+                                            className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-60 ${
+                                                emailNotificationsEnabled ? 'bg-purple-600' : 'bg-gray-200'
+                                            }`}
+                                            aria-label="Ativar notificações por e-mail"
+                                            role="switch"
+                                            aria-checked={emailNotificationsEnabled}
+                                        >
+                                            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                                                emailNotificationsEnabled ? 'translate-x-5' : 'translate-x-0'
+                                            }`} />
+                                        </button>
+                                    </div>
+                                    {emailNotificationsEnabled && (
+                                        <div className="px-4 pb-3 -mt-1">
+                                            <p className="text-[10px] text-purple-600 font-medium flex items-center gap-1">
+                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                                E-mails serão enviados para {userData?.email}
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}

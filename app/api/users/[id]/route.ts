@@ -62,7 +62,7 @@ export async function GET(
                 subscribers: user.subscribers || [],
                 bio: user.bio || '',
                 isOnline: user.isOnline ?? false,
-                lastSeen: user.lastSeen || new Date(),
+                lastSeen: user.lastSeen ?? null,
             },
         });
     } catch (error: any) {

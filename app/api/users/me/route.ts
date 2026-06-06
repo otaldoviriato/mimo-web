@@ -101,6 +101,7 @@ export async function GET() {
                 maxPublicPhotos: settings?.maxPublicPhotos ?? 12,
                 minExclusivePhotos: settings?.minExclusivePhotos ?? 2,
                 maxExclusivePhotos: settings?.maxExclusivePhotos ?? 4,
+                emailNotificationsEnabled: user.emailNotificationsEnabled ?? false,
             },
         });
     } catch (error: any) {
@@ -119,7 +120,7 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { username, name, photoUrl, coverUrl, phone, taxId, pixKey, isProfessional, subscriptionPrice, chargePerCharSubscribers, chargePerCharNonSubscribers, bio } = body;
+        const { username, name, photoUrl, coverUrl, phone, taxId, pixKey, isProfessional, subscriptionPrice, chargePerCharSubscribers, chargePerCharNonSubscribers, bio, emailNotificationsEnabled } = body;
 
         await connectToDatabase();
 
@@ -192,6 +193,10 @@ export async function PATCH(request: NextRequest) {
             updateData.bio = '';
         }
 
+        if (emailNotificationsEnabled !== undefined) {
+            updateData.emailNotificationsEnabled = Boolean(emailNotificationsEnabled);
+        }
+
         const user = await User.findOneAndUpdate(
             { clerkId: userId },
             {
@@ -250,6 +255,7 @@ export async function PATCH(request: NextRequest) {
                 maxPublicPhotos: settings?.maxPublicPhotos ?? 12,
                 minExclusivePhotos: settings?.minExclusivePhotos ?? 2,
                 maxExclusivePhotos: settings?.maxExclusivePhotos ?? 4,
+                emailNotificationsEnabled: user.emailNotificationsEnabled ?? false,
             },
         });
     } catch (error: any) {

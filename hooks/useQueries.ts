@@ -138,6 +138,10 @@ export function useUpdateProfile() {
             chargePerCharSubscribers?: number;
             chargePerCharNonSubscribers?: number;
             pixKey?: string;
+            bio?: string;
+            taxId?: string;
+            phone?: string;
+            emailNotificationsEnabled?: boolean;
         }) => userApi.updateMe(data),
         onSuccess: (response) => {
             if (response?.user) {

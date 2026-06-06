@@ -36,6 +36,7 @@ async function getOrCreateSettings() {
         if (settings.pixEnabled === undefined) { settings.pixEnabled = true; updated = true; }
         if (settings.creditCardEnabled === undefined) { settings.creditCardEnabled = true; updated = true; }
         if (settings.couponsEnabled === undefined) { settings.couponsEnabled = true; updated = true; }
+        if (settings.chatSessionTimeoutMinutes === undefined) { settings.chatSessionTimeoutMinutes = 30; updated = true; }
         if (updated) {
             await settings.save();
         }
@@ -132,6 +133,7 @@ export async function PUT(request: NextRequest) {
             pixEnabled,
             creditCardEnabled,
             couponsEnabled,
+            chatSessionTimeoutMinutes,
         } = body;
 
         // Validações básicas
@@ -224,6 +226,14 @@ export async function PUT(request: NextRequest) {
 
         if (couponsEnabled !== undefined) {
             settings.couponsEnabled = Boolean(couponsEnabled);
+        }
+
+        if (chatSessionTimeoutMinutes !== undefined) {
+            const timeout = Number(chatSessionTimeoutMinutes);
+            if (isNaN(timeout) || timeout < 1) {
+                return NextResponse.json({ error: 'Tempo de sessão deve ser de pelo menos 1 minuto' }, { status: 400 });
+            }
+            settings.chatSessionTimeoutMinutes = timeout;
         }
 
         // Validação de consistência

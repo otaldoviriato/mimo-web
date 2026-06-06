@@ -18,6 +18,7 @@ export interface IAppSettings extends Document {
     pixEnabled: boolean;
     creditCardEnabled: boolean;
     couponsEnabled: boolean;
+    chatSessionTimeoutMinutes: number;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -120,6 +121,12 @@ const AppSettingsSchema = new Schema<IAppSettings>({
         type: Boolean,
         required: true,
         default: true,
+    },
+    chatSessionTimeoutMinutes: {
+        type: Number,
+        required: true,
+        default: 30,
+        min: 1,
     },
 }, {
     timestamps: true,

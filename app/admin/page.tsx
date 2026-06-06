@@ -53,6 +53,7 @@ interface SettingsData {
     pixEnabled: boolean;
     creditCardEnabled: boolean;
     couponsEnabled: boolean;
+    chatSessionTimeoutMinutes: number;
 }
 
 interface ChatMessage {
@@ -131,6 +132,7 @@ export default function AdminPage() {
     const [pixEnabled, setPixEnabled] = useState(true);
     const [creditCardEnabled, setCreditCardEnabled] = useState(true);
     const [couponsEnabled, setCouponsEnabled] = useState(true);
+    const [chatSessionTimeoutMinutes, setChatSessionTimeoutMinutes] = useState(30);
     const [saving, setSaving] = useState(false);
 
     // Estados de Gerenciamento de Administradores Ricos
@@ -226,6 +228,7 @@ export default function AdminPage() {
                     setPixEnabled(s.pixEnabled !== undefined ? s.pixEnabled : true);
                     setCreditCardEnabled(s.creditCardEnabled !== undefined ? s.creditCardEnabled : true);
                     setCouponsEnabled(s.couponsEnabled !== undefined ? s.couponsEnabled : true);
+                    setChatSessionTimeoutMinutes(s.chatSessionTimeoutMinutes !== undefined ? s.chatSessionTimeoutMinutes : 30);
                     setIsAuthorized(true);
                 } else if (response.status === 403) {
                     setIsAuthorized(false);
@@ -610,6 +613,7 @@ export default function AdminPage() {
                     pixEnabled,
                     creditCardEnabled,
                     couponsEnabled,
+                    chatSessionTimeoutMinutes,
                 }),
             });
 
@@ -1258,6 +1262,36 @@ export default function AdminPage() {
                                             </select>
                                         </div>
                                     </div>
+
+                                    {/* Tempo de Sessão de Chat */}
+                                    <div className="pt-4 border-t border-slate-100">
+                                        <div className="flex items-start gap-4">
+                                            <div className="flex-1 space-y-2">
+                                                <label className="text-xs font-bold text-slate-600 uppercase block flex items-center gap-1.5">
+                                                    <Clock size={12} className="text-purple-500" />
+                                                    Tempo de Sessão de Chat (minutos)
+                                                </label>
+                                                <input 
+                                                    type="number" 
+                                                    value={chatSessionTimeoutMinutes} 
+                                                    onChange={(e) => setChatSessionTimeoutMinutes(Number(e.target.value))}
+                                                    min={1}
+                                                    max={1440}
+                                                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700" 
+                                                />
+                                            </div>
+                                            <div className="flex-[2] bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 mt-6">
+                                                <p className="text-xs font-semibold text-amber-800 flex items-center gap-1.5 mb-1">
+                                                    <AlertCircle size={11} />
+                                                    Como funciona
+                                                </p>
+                                                <p className="text-[11px] text-amber-700 leading-relaxed">
+                                                    Se o intervalo entre a última mensagem e a próxima for maior ou igual a <strong>{chatSessionTimeoutMinutes} min</strong>, o sistema considera que uma nova conversa foi iniciada. Isso é usado para disparar notificações por e-mail ao profissional.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
 
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-slate-100">
                                         <div className="space-y-2">

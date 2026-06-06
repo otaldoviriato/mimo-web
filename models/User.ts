@@ -37,6 +37,7 @@ export interface IUser extends Document {
     bio?: string;
     isOnline?: boolean;
     lastSeen?: Date;
+    emailNotificationsEnabled?: boolean;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -147,6 +148,10 @@ const UserSchema = new Schema<IUser>({
     lastSeen: {
         type: Date,
         default: Date.now,
+    },
+    emailNotificationsEnabled: {
+        type: Boolean,
+        default: false,
     },
 }, {
     timestamps: true,
