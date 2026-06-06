@@ -6,6 +6,7 @@ import { PaymentProvider } from '@/context/PaymentContext';
 import { PWAProvider } from '@/context/PWAContext';
 import { Viewport } from 'next';
 import { Toaster } from 'react-hot-toast';
+import { CookieBanner } from '@/components/CookieBanner';
 
 export const metadata: Metadata = {
     title: 'Mimo Chat | Monetize suas Mensagens e Interações com Fãs',
@@ -38,6 +39,7 @@ export const metadata: Metadata = {
         ],
         locale: 'pt_BR',
         type: 'website',
+        // Omitido ou corrigido
     },
     twitter: {
         card: 'summary_large_image',
@@ -71,6 +73,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                             <PaymentProvider>
                                 {children}
                                 <Toaster position="top-center" />
+                                <CookieBanner />
                             </PaymentProvider>
                         </PWAProvider>
                     </QueryProvider>

@@ -7,6 +7,7 @@ import { useMyProfile, useUpdateProfile } from '@/hooks/useQueries';
 import { usePWA } from '@/context/PWAContext';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { formatCPF, formatPhone } from '@/components/RechargeModal';
+import Link from 'next/link';
 
 function SkeletonField() {
     return (
@@ -79,8 +80,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                 name,
                 username,
                 taxId: taxId.replace(/\D/g, ''),
-                phone: phone.replace(/\D/g, ''),
-                pixKey: pixKey
+                phone: phone.replace(/\D/g, '')
             };
 
             if (userData?.isProfessional) {
@@ -93,6 +93,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                 }
                 updateData.subscriptionPrice = price;
                 updateData.bio = bio;
+                updateData.pixKey = pixKey;
             } else {
                 updateData.bio = '';
             }
@@ -214,16 +215,18 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                         type="tel"
                                     />
                                 </div>
-                                {/* Chave Pix (Nova adição ou alteração, igual ao que estava no modal ou de forma direta) */}
-                                <div className="px-4 py-3.5 border-b border-gray-50">
-                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Chave Pix</label>
-                                    <input
-                                        className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
-                                        placeholder="CPF, E-mail, Telefone ou Aleatória"
-                                        value={pixKey}
-                                        onChange={(e) => setPixKey(e.target.value)}
-                                    />
-                                </div>
+                                {/* Chave Pix (apenas profissionais) */}
+                                {profileIsProfessional && (
+                                    <div className="px-4 py-3.5 border-b border-gray-50">
+                                        <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Chave Pix</label>
+                                        <input
+                                            className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
+                                            placeholder="CPF, E-mail, Telefone ou Aleatória"
+                                            value={pixKey}
+                                            onChange={(e) => setPixKey(e.target.value)}
+                                        />
+                                    </div>
+                                )}
                                 {/* Biografia (apenas profissionais) */}
                                 {profileIsProfessional && (
                                     <div className="px-4 py-3.5">
@@ -407,6 +410,40 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                         </div>
                                     </div>
                                 )}
+
+                                {/* Links de Conformidade Legal */}
+                                <div className="border-t border-gray-100 flex flex-col bg-gray-50/30">
+                                    <Link
+                                        href="/termos-de-uso"
+                                        target="_blank"
+                                        className="px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-5 h-5 flex items-center justify-center text-xs">
+                                                📜
+                                            </div>
+                                            <span className="text-xs text-gray-700 font-medium">Termos de Uso</span>
+                                        </div>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-gray-400">
+                                            <polyline points="9 18 15 12 9 6"/>
+                                        </svg>
+                                    </Link>
+                                    <Link
+                                        href="/politica-de-privacidade"
+                                        target="_blank"
+                                        className="px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-5 h-5 flex items-center justify-center text-xs">
+                                                🔒
+                                            </div>
+                                            <span className="text-xs text-gray-700 font-medium">Política de Privacidade</span>
+                                        </div>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-gray-400">
+                                            <polyline points="9 18 15 12 9 6"/>
+                                        </svg>
+                                    </Link>
+                                </div>
                             </div>
                         </div>
 

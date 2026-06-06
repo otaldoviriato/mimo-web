@@ -7,6 +7,7 @@ import { useSignIn, useSignUp } from '@clerk/nextjs/legacy';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { usePWA } from '@/context/PWAContext';
+import Link from 'next/link';
 
 function GiftCapture() {
     const searchParams = useSearchParams();
@@ -33,6 +34,7 @@ export default function LoginPage() {
     const [emailLoading, setEmailLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
     const [error, setError] = useState('');
+    const [ageAccepted, setAgeAccepted] = useState(false);
 
     useEffect(() => {
         if (isSignedIn) {
@@ -51,6 +53,7 @@ export default function LoginPage() {
     const onSendCode = async () => {
         if (!email.trim()) { setError('Por favor, insira seu email'); return; }
         if (!signInLoaded || !signUpLoaded) { setError('Serviço de autenticação não carregado'); return; }
+        if (!ageAccepted) { setError('Você precisa declarar que é maior de 18 anos e concordar com os termos'); return; }
 
         setEmailLoading(true);
         setError('');
@@ -128,6 +131,10 @@ export default function LoginPage() {
             setError('Serviço de autenticação não carregado');
             return;
         }
+        if (!ageAccepted) {
+            setError('Você precisa declarar que é maior de 18 anos e concordar com os termos');
+            return;
+        }
 
         setGoogleLoading(true);
         setError('');
@@ -154,7 +161,7 @@ export default function LoginPage() {
     const isReady = signInLoaded && signUpLoaded;
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
             <Suspense fallback={null}>
                 <GiftCapture />
             </Suspense>
@@ -188,11 +195,12 @@ export default function LoginPage() {
                                 error={error}
                                 disabled={!isReady}
                             />
+
                             <Button
                                 title="Continuar com Email"
                                 onPress={onSendCode}
                                 loading={emailLoading}
-                                disabled={!isReady}
+                                disabled={!isReady || !ageAccepted}
                                 size="lg"
                                 className="w-full"
                             />
@@ -207,7 +215,7 @@ export default function LoginPage() {
                                 title={googleLoading ? 'Aguarde...' : 'Entrar com Google'}
                                 onPress={onSignInWithGoogle}
                                 loading={googleLoading}
-                                disabled={!isReady}
+                                disabled={!isReady || !ageAccepted}
                                 variant="outline"
                                 size="lg"
                                 icon={
@@ -220,6 +228,28 @@ export default function LoginPage() {
                                 }
                                 className="w-full"
                             />
+
+                            {/* Checkbox de Maioridade e Consentimento Legal */}
+                            <div className="flex items-start gap-2.5 mt-2 mb-0.5 text-left select-none">
+                                <input
+                                    type="checkbox"
+                                    id="age-gate-checkbox"
+                                    checked={ageAccepted}
+                                    onChange={(e) => setAgeAccepted(e.target.checked)}
+                                    className="mt-0.5 h-3.5 w-3.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 accent-purple-600 cursor-pointer shrink-0"
+                                />
+                                <label htmlFor="age-gate-checkbox" className="text-[11px] text-gray-400 leading-snug cursor-pointer">
+                                    Declaro que sou <strong className="text-gray-500 font-semibold">maior de 18 anos</strong> e concordo com os{' '}
+                                    <Link href="/termos-de-uso" target="_blank" className="text-purple-500 hover:text-purple-600 underline">
+                                        Termos de Uso
+                                    </Link>{' '}
+                                    e{' '}
+                                    <Link href="/politica-de-privacidade" target="_blank" className="text-purple-500 hover:text-purple-600 underline">
+                                        Política de Privacidade
+                                    </Link>{' '}
+                                    do MimoChat.
+                                </label>
+                            </div>
                         </div>
                     ) : (
                         <div className="flex flex-col gap-4">
@@ -285,9 +315,25 @@ export default function LoginPage() {
                     </div>
                 )}
 
-                <p className="text-xs text-gray-400 text-center mt-6">
-                    Ao continuar, você concorda com nossos Termos e Política de Privacidade
-                </p>
+                <div className="mt-8 text-center text-[10px] text-gray-400 leading-relaxed space-y-1">
+                    <p>
+                        Ao continuar, você concorda com nossos{' '}
+                        <Link href="/termos-de-uso" target="_blank" className="underline hover:text-purple-600 font-semibold">
+                            Termos de Uso
+                        </Link>{' '}
+                        e{' '}
+                        <Link href="/politica-de-privacidade" target="_blank" className="underline hover:text-purple-600 font-semibold">
+                            Política de Privacidade
+                        </Link>.
+                    </p>
+                    <div className="border-t border-gray-100 pt-4 mt-4 space-y-0.5 select-none">
+                        <p className="font-semibold text-gray-500">LEAD CONTEUDOS DIGITAIS LTDA</p>
+                        <p>CNPJ: 60.312.273/0001-01 | EEL CONTEUDOS DIGITAIS</p>
+                        <p className="text-purple-400 font-medium hover:text-purple-500">
+                            <a href="mailto:suporte@mimochat.com.br">suporte@mimochat.com.br</a>
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
     );
