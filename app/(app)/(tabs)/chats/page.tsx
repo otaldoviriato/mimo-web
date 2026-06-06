@@ -331,7 +331,13 @@ export default function ChatsPage() {
                     </div>
                 ) : (
                     <ul>
-                        {rooms.map((room: Room) => {
+                        {[...rooms]
+                            .sort((a, b) => {
+                                const timeA = new Date(a.lastMessageTime ?? a.updatedAt).getTime();
+                                const timeB = new Date(b.lastMessageTime ?? b.updatedAt).getTime();
+                                return timeB - timeA;
+                            })
+                            .map((room: Room) => {
                             const otherUserId = room.participants.find((p) => p !== user?.id);
                             // roomId como string de clerkIds — corresponde ao que o servidor envia no typing
                             const derivedRoomId = room.roomId ?? room.participants.slice().sort().join('_');

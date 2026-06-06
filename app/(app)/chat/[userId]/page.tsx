@@ -322,20 +322,29 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                 const newMessages = [...prev, { ...data.message, status: 'sent' as const }];
                 if (data.message.receiverId === user?.id) {
                     socket.emit('mark_as_read', { roomId });
-
-                    // Atualiza cache local de rooms
-                    queryClient.setQueryData(QueryKeys.rooms(user.id!), (old: any) => {
-                        if (!old) return old;
-                        return old.map((r: any) => {
-                            const rId = r.roomId ?? [...r.participants].sort().join('_');
-                            if (rId === roomId) {
-                                return { ...r, unreadCount: { ...r.unreadCount, [user.id!]: 0 } };
-                            }
-                            return r;
-                        });
-                    });
                 }
                 return newMessages;
+            });
+
+            // Atualiza cache local de rooms para refletir a última mensagem recebida/enviada em tempo real
+            queryClient.setQueryData(QueryKeys.rooms(user?.id ?? ''), (old: any) => {
+                if (!old) return old;
+                return old.map((r: any) => {
+                    const rId = r.roomId ?? [...r.participants].sort().join('_');
+                    if (rId === roomId) {
+                        return {
+                            ...r,
+                            lastMessage: data.message.content.substring(0, 100),
+                            lastMessageTime: data.message.timestamp,
+                            updatedAt: data.message.timestamp,
+                            unreadCount: {
+                                ...r.unreadCount,
+                                [user?.id ?? '']: data.message.receiverId === user?.id ? 0 : (r.unreadCount?.[user?.id ?? ''] ?? 0)
+                            }
+                        };
+                    }
+                    return r;
+                });
             });
         });
 
@@ -609,7 +618,13 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
             return old.map((r: any) => {
                 const rId = r.roomId ?? [...r.participants].sort().join('_');
                 if (rId === roomId) {
-                    return { ...r, unreadCount: { ...r.unreadCount, [user?.id ?? '']: 0 } };
+                    return {
+                        ...r,
+                        lastMessage: messageText.trim().substring(0, 100),
+                        lastMessageTime: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                        unreadCount: { ...r.unreadCount, [user?.id ?? '']: 0 }
+                    };
                 }
                 return r;
             });

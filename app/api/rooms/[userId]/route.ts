@@ -22,7 +22,7 @@ export async function GET(
         // Busca todas as salas onde o usuário é participante
         const rooms = await Room.find({
             participants: userId
-        }).sort({ updatedAt: -1 }).lean();
+        }).sort({ lastMessageTime: -1, updatedAt: -1 }).lean();
 
         // Enriquece cada sala com os dados do OUTRO participante
         const enrichedRooms = await Promise.all(rooms.map(async (room) => {
