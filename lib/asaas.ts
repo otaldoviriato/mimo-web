@@ -61,10 +61,14 @@ export type AsaasSavedCardPaymentInput = {
 };
 
 function getAsaasApiKey() {
-    const apiKey = process.env.ASAAS_API_KEY || process.env.ASSAS_API_KEY;
+    let apiKey = process.env.ASAAS_API_KEY;
 
     if (!apiKey) {
-        throw new Error('ASAAS_API_KEY or ASSAS_API_KEY is not configured');
+        throw new Error('ASAAS_API_KEY is not configured');
+    }
+
+    if (apiKey.startsWith('\\$')) {
+        apiKey = apiKey.substring(1);
     }
 
     return apiKey;
