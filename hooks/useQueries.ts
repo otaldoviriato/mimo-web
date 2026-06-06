@@ -347,10 +347,29 @@ export function useUploadToGallery() {
                 body: formData,
             });
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Erro ao fazer upload');
+                let errorMessage = 'Erro ao fazer upload';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorData.message || errorMessage;
+                } catch {
+                    try {
+                        const textError = await response.text();
+                        if (response.status === 413 || textError.toLowerCase().includes('too large')) {
+                            errorMessage = 'O arquivo é muito grande para o servidor. Escolha um arquivo de até 8MB.';
+                        } else {
+                            errorMessage = textError.substring(0, 100) || `Erro HTTP ${response.status}`;
+                        }
+                    } catch {
+                        errorMessage = `Erro HTTP ${response.status}`;
+                    }
+                }
+                throw new Error(errorMessage);
             }
-            return response.json();
+            try {
+                return await response.json();
+            } catch {
+                throw new Error('Resposta do servidor inválida');
+            }
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['gallery', 'me'] });

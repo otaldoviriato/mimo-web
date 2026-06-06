@@ -303,6 +303,15 @@ export default function ProfilePage() {
     const handleGalleryFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+
+        // Validar tamanho do arquivo (limite de 8MB para evitar erro HTTP 413 do ngrok/servidor)
+        const maxSizeBytes = 8 * 1024 * 1024;
+        if (file.size > maxSizeBytes) {
+            alert('Esta imagem é muito grande. Escolha uma foto de no máximo 8MB.');
+            if (galleryInputRef.current) galleryInputRef.current.value = '';
+            return;
+        }
+
         setSaveError('');
         setSelectedVisibility('public');
         setVisibilityModal({ open: true, file });
@@ -311,6 +320,14 @@ export default function ProfilePage() {
     const handlePrivateGalleryFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+
+        // Validar tamanho do arquivo (limite de 8MB)
+        const maxSizeBytes = 8 * 1024 * 1024;
+        if (file.size > maxSizeBytes) {
+            alert('Este arquivo é muito grande. Escolha um arquivo de no máximo 8MB.');
+            if (privateGalleryInputRef.current) privateGalleryInputRef.current.value = '';
+            return;
+        }
 
         if (confirm(`Deseja adicionar este arquivo (${file.type.startsWith('video/') ? 'vídeo' : 'foto'}) à sua Galeria Privada?`)) {
             setUploadingGallery(true);
