@@ -79,6 +79,7 @@ export default function ProfilePage() {
     const [saveError, setSaveError] = useState('');
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [uploadingGallery, setUploadingGallery] = useState(false);
+    const [selectedVisibility, setSelectedVisibility] = useState<'public' | 'subscribers'>('public');
     const [visibilityModal, setVisibilityModal] = useState<{ open: boolean, file?: File }>({ open: false });
     const [cropperState, setCropperState] = useState<{ open: boolean; imageSrc: string; type: 'photo' | 'cover' } | null>(null);
     const [activeGalleryTab, setActiveGalleryTab] = useState<'public' | 'private'>('public');
@@ -302,6 +303,8 @@ export default function ProfilePage() {
     const handleGalleryFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        setSaveError('');
+        setSelectedVisibility('public');
         setVisibilityModal({ open: true, file });
     };
 
@@ -333,6 +336,7 @@ export default function ProfilePage() {
         if (!visibilityModal.file) return;
         
         setUploadingGallery(true);
+        setSaveError('');
         const formData = new FormData();
         formData.append('photo', visibilityModal.file);
         formData.append('visibility', visibility);
@@ -343,7 +347,9 @@ export default function ProfilePage() {
             setVisibilityModal({ open: false });
             if (galleryInputRef.current) galleryInputRef.current.value = '';
         } catch (error: any) {
-            setSaveError(error.message || 'Erro ao subir foto para galeria');
+            console.error('Erro no upload da galeria:', error);
+            const msg = error.response?.data?.error || error.response?.data?.message || error.message || 'Erro ao subir foto para galeria';
+            setSaveError(msg);
         } finally {
             setUploadingGallery(false);
         }
@@ -1055,20 +1061,26 @@ export default function ProfilePage() {
                         
                         <div className="flex flex-col gap-3">
                             <div
-                                onClick={() => !uploadingGallery && confirmGalleryUpload('public')}
+                                onClick={() => !uploadingGallery && setSelectedVisibility('public')}
                                 role="button"
                                 tabIndex={0}
                                 onKeyDown={(e) => {
                                     if ((e.key === 'Enter' || e.key === ' ') && !uploadingGallery) {
-                                        confirmGalleryUpload('public');
+                                        setSelectedVisibility('public');
                                     }
                                 }}
-                                className={`w-full p-4 rounded-2xl border-2 border-gray-100 hover:border-purple-600 hover:bg-purple-50 transition-all flex items-center gap-4 group text-left cursor-pointer ${
-                                    uploadingGallery ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
-                                }`}
+                                className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center gap-4 group text-left cursor-pointer ${
+                                    selectedVisibility === 'public'
+                                        ? 'border-purple-600 bg-purple-50/50'
+                                        : 'border-gray-100 hover:border-purple-300 hover:bg-purple-50/10'
+                                } ${uploadingGallery ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
                             >
-                                <div className="w-10 h-10 rounded-xl bg-gray-50 group-hover:bg-purple-100/50 flex items-center justify-center transition-colors">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500 group-hover:text-purple-600 transition-colors">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                                    selectedVisibility === 'public' ? 'bg-purple-100' : 'bg-gray-50 group-hover:bg-purple-100/50'
+                                }`}>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`transition-colors ${
+                                        selectedVisibility === 'public' ? 'text-purple-600' : 'text-gray-500 group-hover:text-purple-600'
+                                    }`}>
                                         <circle cx="12" cy="12" r="10" />
                                         <line x1="2" y1="12" x2="22" y2="12" />
                                         <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
@@ -1078,24 +1090,33 @@ export default function ProfilePage() {
                                     <p className="font-bold text-gray-900 leading-tight">Público</p>
                                     <p className="text-xs text-gray-500">Qualquer pessoa pode ver</p>
                                 </div>
+                                {selectedVisibility === 'public' && (
+                                    <span className="text-purple-600 font-bold text-lg">✓</span>
+                                )}
                             </div>
 
                             {profileIsProfessional && (
                                 <div
-                                    onClick={() => !uploadingGallery && confirmGalleryUpload('subscribers')}
+                                    onClick={() => !uploadingGallery && setSelectedVisibility('subscribers')}
                                     role="button"
                                     tabIndex={0}
                                     onKeyDown={(e) => {
                                         if ((e.key === 'Enter' || e.key === ' ') && !uploadingGallery) {
-                                            confirmGalleryUpload('subscribers');
+                                            setSelectedVisibility('subscribers');
                                         }
                                     }}
-                                    className={`w-full p-4 rounded-2xl border-2 border-gray-100 hover:border-purple-600 hover:bg-purple-50 transition-all flex items-center gap-4 group text-left cursor-pointer ${
-                                        uploadingGallery ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
-                                    }`}
+                                    className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center gap-4 group text-left cursor-pointer ${
+                                        selectedVisibility === 'subscribers'
+                                            ? 'border-purple-600 bg-purple-50/50'
+                                            : 'border-gray-100 hover:border-purple-300 hover:bg-purple-50/10'
+                                    } ${uploadingGallery ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
                                 >
-                                    <div className="w-10 h-10 rounded-xl bg-gray-50 group-hover:bg-purple-100/50 flex items-center justify-center transition-colors">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500 group-hover:text-purple-600 transition-colors">
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                                        selectedVisibility === 'subscribers' ? 'bg-purple-100' : 'bg-gray-50 group-hover:bg-purple-100/50'
+                                    }`}>
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`transition-colors ${
+                                            selectedVisibility === 'subscribers' ? 'text-purple-600' : 'text-gray-500 group-hover:text-purple-600'
+                                        }`}>
                                             <polygon points="12 2 22 8.5 12 15 2 8.5 12 2" />
                                             <line x1="2" y1="8.5" x2="12" y2="15" />
                                             <line x1="22" y1="8.5" x2="12" y2="15" />
@@ -1106,18 +1127,40 @@ export default function ProfilePage() {
                                         <p className="font-bold text-gray-900 leading-tight">Somente Assinantes</p>
                                         <p className="text-xs text-gray-500">Apenas quem assina seu perfil</p>
                                     </div>
+                                    {selectedVisibility === 'subscribers' && (
+                                        <span className="text-purple-600 font-bold text-lg">✓</span>
+                                    )}
                                 </div>
                             )}
                         </div>
 
-                        <Button
-                            title="Cancelar"
-                            onPress={() => setVisibilityModal({ open: false })}
-                            variant="outline"
-                            size="md"
-                            className="w-full"
-                            disabled={uploadingGallery}
-                        />
+                        {saveError && (
+                            <div className="bg-red-50 border border-red-200 text-red-600 text-xs rounded-xl p-3 flex items-start gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <span className="text-sm shrink-0">⚠️</span>
+                                <div className="font-medium break-words leading-tight flex-1">
+                                    {saveError}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex gap-3">
+                            <Button
+                                title="Cancelar"
+                                onPress={() => setVisibilityModal({ open: false })}
+                                variant="outline"
+                                size="md"
+                                className="flex-1"
+                                disabled={uploadingGallery}
+                            />
+                            <Button
+                                title="Confirmar"
+                                onPress={() => confirmGalleryUpload(selectedVisibility)}
+                                size="md"
+                                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+                                disabled={uploadingGallery}
+                                loading={uploadingGallery}
+                            />
+                        </div>
                     </div>
                 </div>
             )}
