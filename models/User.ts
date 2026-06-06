@@ -34,6 +34,8 @@ export interface IUser extends Document {
     claimedGiftCodes: string[];
     isHighSpender: boolean;
     bio?: string;
+    isOnline?: boolean;
+    lastSeen?: Date;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -132,6 +134,14 @@ const UserSchema = new Schema<IUser>({
         type: String,
         maxlength: 300,
         default: '',
+    },
+    isOnline: {
+        type: Boolean,
+        default: false,
+    },
+    lastSeen: {
+        type: Date,
+        default: Date.now,
     },
 }, {
     timestamps: true,

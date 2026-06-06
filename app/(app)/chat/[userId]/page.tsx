@@ -47,6 +47,39 @@ interface CachedRoom {
     };
 }
 
+function formatLastSeen(isOnline?: boolean, lastSeenDateStr?: string | Date) {
+    if (isOnline) return 'Online';
+    if (!lastSeenDateStr) return '';
+    
+    try {
+        const date = new Date(lastSeenDateStr);
+        const now = new Date();
+        
+        const isToday = date.getDate() === now.getDate() &&
+            date.getMonth() === now.getMonth() &&
+            date.getFullYear() === now.getFullYear();
+            
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+        const isYesterday = date.getDate() === yesterday.getDate() &&
+            date.getMonth() === yesterday.getMonth() &&
+            date.getFullYear() === yesterday.getFullYear();
+            
+        const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        
+        if (isToday) {
+            return `visto por último hoje às ${timeStr}`;
+        } else if (isYesterday) {
+            return `visto por último ontem às ${timeStr}`;
+        } else {
+            const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            return `visto por último em ${dateStr} às ${timeStr}`;
+        }
+    } catch (e) {
+        return '';
+    }
+}
+
 export default function ChatPage({ params, userId: propUserId, onBack, isSubPage = false, isClosing = false }: ChatPageProps) {
     const resolvedParams = params ? use(params) : null;
     const otherUserId = propUserId || resolvedParams?.userId || '';
@@ -258,6 +291,19 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
             });
         });
 
+        socket.on('user_presence', (data: { userId: string; isOnline: boolean; lastSeen: string }) => {
+            if (data.userId === otherUserId) {
+                queryClient.setQueryData(QueryKeys.userById(otherUserId), (old: any) => {
+                    if (!old) return old;
+                    return {
+                        ...old,
+                        isOnline: data.isOnline,
+                        lastSeen: data.lastSeen
+                    };
+                });
+            }
+        });
+
         socketService.onNewMessage((data: { message: Message; tempId?: string }) => {
             setMessages((prev) => {
                 // Se for uma mensagem que nós enviamos (tem tempId), atualiza a mensagem otimista
@@ -348,6 +394,7 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
         return () => {
             socketService.leaveRoom(roomId);
             socket.off('room_joined');
+            socket.off('user_presence');
             socketService.offNewMessage();
             socket.off('balance_update');
             socket.off('message_error');
@@ -512,7 +559,11 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
 }
 
     const handleSend = () => {
-        if (!messageText.trim() || sending || !socket) return;
+        console.log('[handleSend] Tentando enviar mensagem. Texto:', messageText.trim().substring(0, 20), 'sending:', sending, 'socket:', !!socket);
+        if (!messageText.trim() || sending || !socket) {
+            console.warn('[handleSend] Retorno antecipado (condição inválida). Texto vazio, sending true ou socket nulo.');
+            return;
+        }
         
         const charCount = messageText.trim().length;
         let costInCents = 0;
@@ -522,7 +573,10 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
             costInCents = Math.max(1, Math.ceil(rawCostInCents));
         }
 
+        console.log('[handleSend] Dados de custo. charCount:', charCount, 'receiverIsProfessional:', receiver?.isProfessional, 'costInCents:', costInCents, 'balance:', balance);
+
         if (receiver?.isProfessional && balance < costInCents) {
+            console.warn('[handleSend] Saldo insuficiente. Requerido:', costInCents, 'Disponível:', balance);
             openRechargeModal('Você não tem saldo suficiente para enviar esta mensagem. Por favor, recarregue sua carteira.');
             return;
         }
@@ -540,6 +594,7 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
             status: 'sending'
         };
 
+        console.log('[handleSend] Inserindo mensagem otimista e limpando input. tempId:', tempId);
         setMessages(prev => [...prev, newMsg]);
         setMessageText('');
         inputRef.current?.focus();
@@ -833,7 +888,9 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
     const charCount = messageText.length;
     const isSubscriber = receiver?.subscribers?.includes(user?.id ?? '');
     const currentRate = receiver?.isProfessional 
-        ? (isSubscriber ? receiver.chargePerCharSubscribers : receiver.chargePerCharNonSubscribers) ?? 0.005
+        ? (isSubscriber 
+            ? (receiver.chargePerCharSubscribers ?? 0.002) 
+            : (receiver.chargePerCharNonSubscribers ?? 0.005))
         : 0;
 
     let estimatedCostInReais = 0;
@@ -913,13 +970,6 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                         >
                             <div className={`relative shrink-0 ${!receiver ? 'animate-pulse' : ''}`}>
                                 <Avatar uri={receiver?.photoUrl} size={46} />
-                                {userData?.isProfessional && (
-                                    <div className="absolute -bottom-1 -right-1 bg-white text-purple-700 rounded-full px-1.5 py-0.5 border border-purple-200 flex items-center justify-center shadow-sm">
-                                        <span className="text-[9px] font-bold leading-none whitespace-nowrap">
-                                            R$ {(receiverBalance / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </span>
-                                    </div>
-                                )}
                                 {connected && <div className="absolute -right-0.5 top-0 w-2.5 h-2.5 bg-green-500 border-2 border-purple-600 rounded-full" />}
                             </div>
                             <div className={`flex-1 min-w-0 ${!receiver ? 'animate-pulse' : ''}`}>
@@ -932,8 +982,8 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                     ) : isTyping ? (
                                         <span className="text-[10px] text-white font-black animate-pulse uppercase tracking-widest">Digitando...</span>
                                     ) : (
-                                        <span className="text-[10px] text-white/60 font-medium truncate uppercase tracking-tighter">
-                                            {receiver?.username ? `@${receiver.username}` : 'Ver perfil'}
+                                        <span className="text-[10px] text-white/65 font-medium truncate tracking-tight normal-case">
+                                            {receiver ? formatLastSeen(receiver.isOnline, receiver.lastSeen) : (receiver?.username ? `@${receiver.username}` : 'Ver perfil')}
                                         </span>
                                     )}
                                 </div>

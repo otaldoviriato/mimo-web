@@ -116,9 +116,10 @@ export default function ChatsPage() {
                     // Usa mongoRoomId (ObjectId) para encontrar a sala no cache
                     // pois room._id vem do MongoDB como string ObjectId
                     const updated = old.map((room) => {
+                        const derivedRoomId = room.roomId ?? [...room.participants].sort().join('_');
                         const match = data.mongoRoomId
                             ? room._id === data.mongoRoomId
-                            : room.participants.includes(data.senderId);
+                            : derivedRoomId === data.roomId;
                         if (match) {
                             const currentUnread = room.unreadCount?.[user.id!] ?? 0;
                             const isMe = data.senderId === user.id;

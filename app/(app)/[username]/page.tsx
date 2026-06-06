@@ -158,6 +158,83 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                     @{user.username}
                 </p>
 
+                {/* Painel de Relacionamento Exclusivo para Profissionais */}
+                {me?.isProfessional && !user.isProfessional && (user as any).relationshipStats && (
+                    <div className="w-full max-w-md mt-6 bg-white/85 backdrop-blur-md border border-purple-100 rounded-2xl p-5 shadow-lg shadow-purple-950/5 z-10 animate-in fade-in slide-in-from-bottom-3 duration-500">
+                        <div className="flex items-center justify-between border-b border-purple-50 pb-3 mb-4">
+                            <div className="flex items-center gap-2">
+                                <span className="text-lg">💼</span>
+                                <h3 className="font-black text-slate-800 text-sm tracking-tight uppercase">Informações do Cliente</h3>
+                            </div>
+                            <span className="text-[10px] bg-purple-100 text-purple-700 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                Privado
+                            </span>
+                        </div>
+
+                        {/* Top Highlights: Saldo e Total Gasto */}
+                        <div className="grid grid-cols-2 gap-3 mb-4">
+                            <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-3 flex flex-col hover:bg-slate-50 transition-colors">
+                                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Saldo da Carteira</span>
+                                <span className="text-lg font-black text-slate-800 tracking-tight mt-1">
+                                    R$ {(((user as any).balance ?? 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                            <div className="bg-purple-50/50 border border-purple-100/50 rounded-xl p-3 flex flex-col hover:bg-purple-50 transition-colors">
+                                <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider">Gastou com Você</span>
+                                <span className="text-lg font-black text-purple-700 tracking-tight mt-1">
+                                    R$ {(((user as any).relationshipStats.totalSpent ?? 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Detalhamento de Gastos */}
+                        <div className="space-y-2.5 mb-4 bg-slate-50/40 border border-slate-100/80 rounded-xl p-3 w-full">
+                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Origem dos Gastos</h4>
+                            
+                            <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
+                                <span className="flex items-center gap-1.5">💬 Mensagens Pagas ({(user as any).relationshipStats.detailStats?.message?.count ?? 0})</span>
+                                <span className="font-bold text-slate-800">
+                                    R$ {(((user as any).relationshipStats.detailStats?.message?.amount ?? 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
+                                <span className="flex items-center gap-1.5">📸 Mídias Desbloqueadas ({(user as any).relationshipStats.detailStats?.image_unlock?.count ?? 0})</span>
+                                <span className="font-bold text-slate-800">
+                                    R$ {(((user as any).relationshipStats.detailStats?.image_unlock?.amount ?? 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
+                                <span className="flex items-center gap-1.5">🎁 Presentes Enviados ({(user as any).relationshipStats.detailStats?.gift?.count ?? 0})</span>
+                                <span className="font-bold text-slate-800">
+                                    R$ {(((user as any).relationshipStats.detailStats?.gift?.amount ?? 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
+                                <span className="flex items-center gap-1.5">👑 Assinatura do Canal ({(user as any).relationshipStats.detailStats?.subscription?.count ?? 0})</span>
+                                <span className="font-bold text-slate-800">
+                                    R$ {(((user as any).relationshipStats.detailStats?.subscription?.amount ?? 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Estatísticas de Conversa */}
+                        <div className="grid grid-cols-2 gap-2 text-center text-[11px] text-slate-400 border-t border-purple-50 pt-3.5 w-full">
+                            <div className="flex flex-col border-r border-slate-100">
+                                <span className="font-bold text-slate-700 text-sm">{(user as any).relationshipStats.totalMessages}</span>
+                                <span className="mt-0.5 font-semibold text-[9px] uppercase tracking-wider">mensagens trocadas</span>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="font-bold text-slate-700 text-sm">
+                                    {(user as any).relationshipStats.conversationStart 
+                                        ? new Date((user as any).relationshipStats.conversationStart).toLocaleDateString('pt-BR') 
+                                        : 'N/A'}
+                                </span>
+                                <span className="mt-0.5 font-semibold text-[9px] uppercase tracking-wider">início do contato</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Galeria Privada - Contador minimalista e discreto no topo */}
                 {user.isProfessional && ((galleryData?.privatePhotosCount ?? 0) > 0 || (galleryData?.privateVideosCount ?? 0) > 0) && (
                     <div className="mt-2.5 flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-full text-[10px] text-slate-500 font-medium border border-slate-200/50 shadow-sm z-10 animate-in fade-in duration-300">

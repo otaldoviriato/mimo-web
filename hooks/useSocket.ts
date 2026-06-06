@@ -65,6 +65,7 @@ export function useSocket(userId: string | undefined) {
         cleanupRef.current = () => {
             s.off('connect', handleConnect);
             s.off('disconnect', handleDisconnect);
+            setConnected(false);
         };
 
         return () => {
