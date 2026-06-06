@@ -33,6 +33,13 @@ interface Message {
     tempId?: string;
 }
 
+interface UploadTask {
+    tempId: string;
+    progress: number;
+    status: 'uploading' | 'success' | 'error';
+    error?: string;
+}
+
 interface ChatPageProps {
     params?: Promise<{ userId: string }>;
     userId?: string;
@@ -106,6 +113,9 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
     const [uploadingMedia, setUploadingMedia] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<number | null>(null);
     const [mediaPriceStr, setMediaPriceStr] = useState('');
+    const [mediaPriceType, setMediaPriceType] = useState<'free' | 'paid'>('free');
+    const [mediaPriceFormatted, setMediaPriceFormatted] = useState('R$ 0,00');
+    const [uploadTasks, setUploadTasks] = useState<Record<string, UploadTask>>({});
     const [showFreeMediaConfirm, setShowFreeMediaConfirm] = useState(false);
     const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
     const [galleryVisible, setGalleryVisible] = useState(false);
@@ -424,10 +434,43 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
         const pending = pendingMediaRef.current;
         if (!pending || userData === undefined) return;
         pendingMediaRef.current = null;
-        if (!userData.isProfessional) {
-            handleAutoSendMedia(pending.file, pending.isVideoFile);
+        if (userData.isProfessional === false) {
+            setSelectedFile(null);
+            setPreviewUrl(null);
+            
+            const file = pending.file;
+            const isVideoFile = pending.isVideoFile;
+            
+            (async () => {
+                let localPreview = '';
+                if (isVideoFile) {
+                    localPreview = await generateVideoThumbnail(file);
+                } else {
+                    localPreview = URL.createObjectURL(file);
+                }
+                
+                const tempId = `temp-media-${Date.now()}`;
+                const newMsg: Message = {
+                    _id: tempId,
+                    tempId: tempId,
+                    senderId: user?.id ?? '',
+                    receiverId: otherUserId,
+                    content: isVideoFile ? 'Vídeo' : 'Foto',
+                    charCount: 0,
+                    cost: 0,
+                    timestamp: new Date().toISOString(),
+                    status: 'sending',
+                    isVideo: isVideoFile,
+                    thumbnailUrl: isVideoFile ? localPreview : undefined,
+                    originalImageUrl: !isVideoFile ? localPreview : undefined,
+                    isLockedImage: false,
+                    lockedImagePrice: 0
+                };
+                setMessages(prev => [...prev, newMsg]);
+
+                startMediaUpload(file, isVideoFile, 0, tempId, localPreview);
+            })();
         }
-        // isProfessional === true: selectedFile is already set, the modal renders automatically.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [userData]);
 
@@ -435,25 +478,199 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
         return new Promise((resolve) => {
             const video = document.createElement('video');
             video.preload = 'metadata';
-            video.src = URL.createObjectURL(file);
             video.muted = true;
             video.playsInline = true;
 
+            const timeoutId = setTimeout(() => {
+                cleanup();
+                resolve('');
+            }, 3000);
+
+            const cleanup = () => {
+                clearTimeout(timeoutId);
+                video.onloadeddata = null;
+                video.onseeked = null;
+                video.onerror = null;
+                try {
+                    URL.revokeObjectURL(video.src);
+                } catch (e) {}
+            };
+
             video.onloadeddata = () => {
-                video.currentTime = 1; 
+                video.currentTime = 0.5; 
             };
 
             video.onseeked = () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                const ctx = canvas.getContext('2d');
-                ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
-                const thumbData = canvas.toDataURL('image/jpeg');
-                URL.revokeObjectURL(video.src);
-                resolve(thumbData);
+                try {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth || 320;
+                    canvas.height = video.videoHeight || 240;
+                    const ctx = canvas.getContext('2d');
+                    ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const thumbData = canvas.toDataURL('image/jpeg');
+                    cleanup();
+                    resolve(thumbData);
+                } catch (e) {
+                    cleanup();
+                    resolve('');
+                }
             };
+
+            video.onerror = () => {
+                cleanup();
+                resolve('');
+            };
+
+            try {
+                video.src = URL.createObjectURL(file);
+                video.load();
+            } catch (e) {
+                cleanup();
+                resolve('');
+            }
         });
+    };
+
+    const startMediaUpload = async (
+        file: File,
+        isVideoFile: boolean,
+        priceInCents: number,
+        tempId: string,
+        localPreviewUrl: string
+    ) => {
+        setUploadTasks(prev => ({
+            ...prev,
+            [tempId]: { tempId, progress: 0, status: 'uploading' }
+        }));
+
+        try {
+            let finalVideoUrl = '';
+            
+            if (isVideoFile) {
+                const signedRes = await fetch('/api/chats/media/signed-url', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        roomId,
+                        contentType: file.type,
+                        fileName: file.name,
+                        isVideo: true
+                    })
+                });
+                
+                if (!signedRes.ok) throw new Error('Falha ao obter URL assinada para o vídeo');
+                const signedData = await signedRes.json();
+                
+                if (signedData.signedUrl) {
+                    await axios.put(signedData.signedUrl, file, {
+                        headers: { 'Content-Type': file.type },
+                        onUploadProgress: (progressEvent) => {
+                            const percentCompleted = Math.round(
+                                (progressEvent.loaded * 100) / (progressEvent.total || 1)
+                            );
+                            setUploadTasks(prev => {
+                                if (!prev[tempId]) return prev;
+                                return {
+                                    ...prev,
+                                    [tempId]: { ...prev[tempId], progress: Math.min(90, Math.round(percentCompleted * 0.9)) }
+                                };
+                            });
+                        }
+                    });
+                    finalVideoUrl = signedData.publicUrl;
+                } else {
+                    throw new Error('Signed URL vazia');
+                }
+            }
+
+            const formData = new FormData();
+            if (isVideoFile) {
+                formData.append('videoUrl', finalVideoUrl);
+            } else {
+                formData.append('file', file);
+            }
+            
+            formData.append('roomId', roomId);
+            formData.append('receiverId', otherUserId);
+            formData.append('lockedPrice', (priceInCents / 100).toString());
+            formData.append('isVideo', isVideoFile.toString());
+            
+            if (isVideoFile) {
+                let thumbUrl = localPreviewUrl;
+                if (!thumbUrl || thumbUrl.startsWith('blob:')) {
+                    thumbUrl = await generateVideoThumbnail(file);
+                }
+                if (thumbUrl && !thumbUrl.startsWith('blob:')) {
+                    const thumbBlob = await (await fetch(thumbUrl)).blob();
+                    formData.append('thumbnail', new File([thumbBlob], 'thumb.jpg', { type: 'image/jpeg' }));
+                }
+            }
+
+            const res = await axios.post('/api/chats/media', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                onUploadProgress: (progressEvent) => {
+                    if (!isVideoFile) {
+                        const percentCompleted = Math.round(
+                            (progressEvent.loaded * 100) / (progressEvent.total || 1)
+                        );
+                        setUploadTasks(prev => {
+                            if (!prev[tempId]) return prev;
+                            return {
+                                ...prev,
+                                [tempId]: { ...prev[tempId], progress: percentCompleted }
+                            };
+                        });
+                    } else {
+                        setUploadTasks(prev => {
+                            if (!prev[tempId]) return prev;
+                            return {
+                                ...prev,
+                                [tempId]: { ...prev[tempId], progress: 95 }
+                            };
+                        });
+                    }
+                }
+            });
+
+            const data = res.data;
+            if (!data.success) {
+                throw new Error(data.error || 'Erro ao processar mídia');
+            }
+
+            setUploadTasks(prev => {
+                const next = { ...prev };
+                delete next[tempId];
+                return next;
+            });
+
+        } catch (e: any) {
+            console.error('Erro no upload em background:', e);
+            setUploadTasks(prev => {
+                if (!prev[tempId]) return prev;
+                return {
+                    ...prev,
+                    [tempId]: { ...prev[tempId], status: 'error', error: e.message || 'Erro no upload' }
+                };
+            });
+            setMessages(prev => prev.map(m => m.tempId === tempId ? { ...m, status: 'error' } : m));
+        }
+    };
+
+    const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        const cleanValue = value.replace(/\D/g, '');
+        const numberValue = parseFloat(cleanValue) / 100;
+        if (isNaN(numberValue)) {
+            setMediaPriceFormatted('R$ 0,00');
+            setMediaPriceStr('0');
+            return;
+        }
+        const formatted = numberValue.toLocaleString('pt-BR', {
+            style: 'currency',
+            currency: 'BRL'
+        });
+        setMediaPriceFormatted(formatted);
+        setMediaPriceStr(numberValue.toFixed(2));
     };
 
     const handleStartPress = (msgId: string, e: React.TouchEvent | React.MouseEvent) => {
@@ -659,11 +876,13 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
         setSelectedFile(file);
         setIsVideo(isVideoFile);
 
+        let localPreview = '';
         if (isVideoFile) {
-            const thumb = await generateVideoThumbnail(file);
-            setPreviewUrl(thumb);
+            localPreview = await generateVideoThumbnail(file);
+            setPreviewUrl(localPreview);
         } else {
-            setPreviewUrl(URL.createObjectURL(file));
+            localPreview = URL.createObjectURL(file);
+            setPreviewUrl(localPreview);
         }
 
         if (userData === undefined) {
@@ -677,168 +896,31 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
         // is NOT a professional. Using strict `=== false` prevents the case
         // where userData is undefined from being treated as "non-professional".
         if (userData.isProfessional === false) {
-            handleAutoSendMedia(file, isVideoFile);
+            setSelectedFile(null);
+            setPreviewUrl(null);
+
+            const tempId = `temp-media-${Date.now()}`;
+            const newMsg: Message = {
+                _id: tempId,
+                tempId: tempId,
+                senderId: user?.id ?? '',
+                receiverId: otherUserId,
+                content: isVideoFile ? 'Vídeo' : 'Foto',
+                charCount: 0,
+                cost: 0,
+                timestamp: new Date().toISOString(),
+                status: 'sending',
+                isVideo: isVideoFile,
+                thumbnailUrl: isVideoFile ? localPreview : undefined,
+                originalImageUrl: !isVideoFile ? localPreview : undefined,
+                isLockedImage: false,
+                lockedImagePrice: 0
+            };
+            setMessages(prev => [...prev, newMsg]);
+
+            startMediaUpload(file, isVideoFile, 0, tempId, localPreview);
         }
         // isProfessional === true: the price modal renders because selectedFile is set.
-    };
-
-    const handleAutoSendMedia = async (file: File, isVideoFile: boolean) => {
-        if (!file || !user?.id) return;
-        setUploadingMedia(true);
-        setUploadProgress(0);
-        try {
-            let finalVideoUrl = '';
-            
-            if (isVideoFile) {
-                const signedRes = await fetch('/api/chats/media/signed-url', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        roomId,
-                        contentType: file.type,
-                        fileName: file.name,
-                        isVideo: true
-                    })
-                });
-                const signedData = await signedRes.json();
-                
-                if (signedData.signedUrl) {
-                    await axios.put(signedData.signedUrl, file, {
-                        headers: { 'Content-Type': file.type },
-                        onUploadProgress: (progressEvent) => {
-                            const percentCompleted = Math.round(
-                                (progressEvent.loaded * 100) / (progressEvent.total || 1)
-                            );
-                            setUploadProgress(percentCompleted);
-                        }
-                    });
-                    finalVideoUrl = signedData.publicUrl;
-                }
-            }
-
-            const formData = new FormData();
-            if (isVideoFile) {
-                formData.append('videoUrl', finalVideoUrl);
-            } else {
-                formData.append('file', file);
-            }
-            
-            formData.append('roomId', roomId);
-            formData.append('receiverId', otherUserId);
-            formData.append('lockedPrice', '0');
-            formData.append('isVideo', isVideoFile.toString());
-            
-            if (isVideoFile) {
-                const thumbUrl = await generateVideoThumbnail(file);
-                const thumbBlob = await (await fetch(thumbUrl)).blob();
-                formData.append('thumbnail', new File([thumbBlob], 'thumb.jpg', { type: 'image/jpeg' }));
-            }
-
-            const res = await axios.post('/api/chats/media', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-                onUploadProgress: (progressEvent) => {
-                    if (!isVideoFile) {
-                        const percentCompleted = Math.round(
-                            (progressEvent.loaded * 100) / (progressEvent.total || 1)
-                        );
-                        setUploadProgress(percentCompleted);
-                    }
-                }
-            });
-            const data = res.data;
-            if (!data.success) {
-                alert(data.error || 'Erro ao enviar mídia');
-            }
-            setSelectedFile(null);
-            setPreviewUrl(null);
-        } catch (e) {
-            console.error(e);
-            alert('Erro ao enviar mídia');
-        } finally {
-            setUploadingMedia(false);
-            setUploadProgress(null);
-        }
-    };
-
-    const handleSendMedia = async () => {
-        if (!selectedFile || !user?.id) return;
-        setUploadingMedia(true);
-        setUploadProgress(0);
-        try {
-            let finalVideoUrl = '';
-            
-            if (isVideo) {
-                const signedRes = await fetch('/api/chats/media/signed-url', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        roomId,
-                        contentType: selectedFile.type,
-                        fileName: selectedFile.name,
-                        isVideo: true
-                    })
-                });
-                const signedData = await signedRes.json();
-                
-                if (signedData.signedUrl) {
-                    await axios.put(signedData.signedUrl, selectedFile, {
-                        headers: { 'Content-Type': selectedFile.type },
-                        onUploadProgress: (progressEvent) => {
-                            const percentCompleted = Math.round(
-                                (progressEvent.loaded * 100) / (progressEvent.total || 1)
-                            );
-                            setUploadProgress(percentCompleted);
-                        }
-                    });
-                    finalVideoUrl = signedData.publicUrl;
-                }
-            }
-
-            const formData = new FormData();
-            if (isVideo) {
-                formData.append('videoUrl', finalVideoUrl);
-            } else {
-                formData.append('file', selectedFile);
-            }
-            
-            formData.append('roomId', roomId);
-            formData.append('receiverId', otherUserId);
-            formData.append('lockedPrice', mediaPriceStr || '0');
-            formData.append('isVideo', isVideo.toString());
-
-            if (isVideo) {
-                const thumbUrl = await generateVideoThumbnail(selectedFile);
-                const thumbBlob = await (await fetch(thumbUrl)).blob();
-                formData.append('thumbnail', new File([thumbBlob], 'thumb.jpg', { type: 'image/jpeg' }));
-            }
-
-            const res = await axios.post('/api/chats/media', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-                onUploadProgress: (progressEvent) => {
-                    if (!isVideo) {
-                        const percentCompleted = Math.round(
-                            (progressEvent.loaded * 100) / (progressEvent.total || 1)
-                        );
-                        setUploadProgress(percentCompleted);
-                    }
-                }
-            });
-            const data = res.data;
-            if (!data.success) {
-                alert(data.error || 'Erro ao enviar mídia');
-            }
-            setSelectedFile(null);
-            setPreviewUrl(null);
-            setMediaPriceStr('');
-            setShowFreeMediaConfirm(false);
-            setAttachMenuVisible(false);
-        } catch (e) {
-            console.error(e);
-            alert('Erro ao enviar mídia');
-        } finally {
-            setUploadingMedia(false);
-            setUploadProgress(null);
-        }
     };
 
     const handleUnlockImage = async (messageId: string, priceInCents: number, isVideoMessage: boolean = false) => {
@@ -1231,11 +1313,63 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                                         }
                                                     }
                                                 }}>
-                                                    <img 
-                                                        src={(isMine ? (item.isVideo ? item.thumbnailUrl : item.originalImageUrl) : item.blurredImageUrl) || ''} 
-                                                        className="w-full h-full object-cover" 
-                                                        alt="Locked Media" 
-                                                    />
+                                                    {(item.isVideo ? item.thumbnailUrl : item.originalImageUrl) ? (
+                                                        <img 
+                                                            src={(isMine ? (item.isVideo ? item.thumbnailUrl : item.originalImageUrl) : item.blurredImageUrl) || ''} 
+                                                            className="w-full h-full object-cover" 
+                                                            alt="Locked Media" 
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full bg-purple-950/20 flex flex-col items-center justify-center gap-2 text-purple-600">
+                                                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                                <path d="M23 7l-7 5 7 5V7z" />
+                                                                <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                                                            </svg>
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700/60">Vídeo</span>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Progresso de upload circular para envio em background */}
+                                                    {isMine && item.tempId && uploadTasks[item.tempId] && (
+                                                        <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px] flex flex-col items-center justify-center p-2 z-10">
+                                                            {uploadTasks[item.tempId].status === 'uploading' ? (
+                                                                <div className="w-16 h-16 relative flex items-center justify-center">
+                                                                    <svg className="w-full h-full transform -rotate-90">
+                                                                        <circle
+                                                                            cx="32"
+                                                                            cy="32"
+                                                                            r="24"
+                                                                            stroke="rgba(255, 255, 255, 0.2)"
+                                                                            strokeWidth="3.5"
+                                                                            fill="transparent"
+                                                                        />
+                                                                        <circle
+                                                                            cx="32"
+                                                                            cy="32"
+                                                                            r="24"
+                                                                            stroke="#a855f7"
+                                                                            strokeWidth="3.5"
+                                                                            fill="transparent"
+                                                                            strokeDasharray={2 * Math.PI * 24}
+                                                                            strokeDashoffset={2 * Math.PI * 24 * (1 - (uploadTasks[item.tempId].progress || 0) / 100)}
+                                                                            className="transition-all duration-300 ease-out"
+                                                                        />
+                                                                    </svg>
+                                                                    <span className="absolute text-xs font-black text-white">{uploadTasks[item.tempId].progress}%</span>
+                                                                </div>
+                                                            ) : uploadTasks[item.tempId].status === 'error' ? (
+                                                                <div className="flex flex-col items-center gap-1 text-center">
+                                                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-red-500">
+                                                                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                                                                        <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" strokeWidth="2"/>
+                                                                        <line x1="12" y1="16" x2="12.01" y2="16" stroke="currentColor" strokeWidth="2"/>
+                                                                    </svg>
+                                                                    <span className="text-[10px] font-bold text-white uppercase tracking-wider">Falhou</span>
+                                                                </div>
+                                                            ) : null}
+                                                        </div>
+                                                    )}
+
                                                     {!isMine ? (
                                                         <div className="absolute inset-0 bg-black/40 backdrop-blur-[1.5px] flex flex-col items-center justify-center gap-2">
                                                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="opacity-90 drop-shadow">
@@ -1250,12 +1384,14 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                                             </span>
                                                         </div>
                                                     ) : (
-                                                        <div className="absolute top-2 right-2">
-                                                            <div className="bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 flex items-center gap-1.5 shadow-md">
-                                                                <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                                                                <span className="text-[8px] font-bold text-white uppercase tracking-wider">Aguardando</span>
+                                                        (!item.tempId || !uploadTasks[item.tempId]) && (
+                                                            <div className="absolute top-2 right-2">
+                                                                <div className="bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 flex items-center gap-1.5 shadow-md">
+                                                                    <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                                                                    <span className="text-[8px] font-bold text-white uppercase tracking-wider">Aguardando</span>
+                                                                </div>
                                                             </div>
-                                                        </div>
+                                                        )
                                                     )}
                                                 </div>
                                             ) : (
@@ -1269,12 +1405,64 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                                         }
                                                     }}
                                                 >
-                                                    <img 
-                                                        src={(item.isVideo ? item.thumbnailUrl : item.originalImageUrl) || ''} 
-                                                        className="w-full h-full object-cover animate-in fade-in duration-300" 
-                                                        alt="Media" 
-                                                    />
-                                                    {item.isVideo && (
+                                                    {(item.isVideo ? item.thumbnailUrl : item.originalImageUrl) ? (
+                                                        <img 
+                                                            src={(item.isVideo ? item.thumbnailUrl : item.originalImageUrl) || ''} 
+                                                            className="w-full h-full object-cover animate-in fade-in duration-300" 
+                                                            alt="Media" 
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full bg-purple-950/20 flex flex-col items-center justify-center gap-2 text-purple-600">
+                                                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                                <path d="M23 7l-7 5 7 5V7z" />
+                                                                <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                                                            </svg>
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700/60">Vídeo</span>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Progresso de upload circular para envio em background */}
+                                                    {isMine && item.tempId && uploadTasks[item.tempId] && (
+                                                        <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px] flex flex-col items-center justify-center p-2 z-10">
+                                                            {uploadTasks[item.tempId].status === 'uploading' ? (
+                                                                <div className="w-16 h-16 relative flex items-center justify-center">
+                                                                    <svg className="w-full h-full transform -rotate-90">
+                                                                        <circle
+                                                                            cx="32"
+                                                                            cy="32"
+                                                                            r="24"
+                                                                            stroke="rgba(255, 255, 255, 0.2)"
+                                                                            strokeWidth="3.5"
+                                                                            fill="transparent"
+                                                                        />
+                                                                        <circle
+                                                                            cx="32"
+                                                                            cy="32"
+                                                                            r="24"
+                                                                            stroke="#a855f7"
+                                                                            strokeWidth="3.5"
+                                                                            fill="transparent"
+                                                                            strokeDasharray={2 * Math.PI * 24}
+                                                                            strokeDashoffset={2 * Math.PI * 24 * (1 - (uploadTasks[item.tempId].progress || 0) / 100)}
+                                                                            className="transition-all duration-300 ease-out"
+                                                                        />
+                                                                    </svg>
+                                                                    <span className="absolute text-xs font-black text-white">{uploadTasks[item.tempId].progress}%</span>
+                                                                </div>
+                                                            ) : uploadTasks[item.tempId].status === 'error' ? (
+                                                                <div className="flex flex-col items-center gap-1 text-center">
+                                                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-red-500">
+                                                                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                                                                        <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" strokeWidth="2"/>
+                                                                        <line x1="12" y1="16" x2="12.01" y2="16" stroke="currentColor" strokeWidth="2"/>
+                                                                    </svg>
+                                                                    <span className="text-[10px] font-bold text-white uppercase tracking-wider">Falhou</span>
+                                                                </div>
+                                                            ) : null}
+                                                        </div>
+                                                    )}
+
+                                                    {item.isVideo && (!item.tempId || !uploadTasks[item.tempId]) && (
                                                         <div className="absolute inset-0 flex items-center justify-center">
                                                             <div className="w-12 h-12 rounded-full bg-black/45 backdrop-blur-sm flex items-center justify-center text-white border border-white/10 group-hover:scale-110 transition-transform">
                                                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
@@ -1283,7 +1471,7 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                                             </div>
                                                         </div>
                                                     )}
-                                                    {isMine && item.lockedImagePrice! > 0 && (
+                                                    {isMine && item.lockedImagePrice! > 0 && (!item.tempId || !uploadTasks[item.tempId]) && (
                                                         <div className="absolute top-2 right-2">
                                                             <div className="bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 flex items-center gap-1 shadow-md">
                                                                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" className="text-white">
@@ -1484,13 +1672,15 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                 </div>
             </div>
 
-             {selectedFile && userData?.isProfessional && (
+            {selectedFile && userData?.isProfessional && (
                 <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm flex flex-col items-center shadow-2xl">
-                        <h3 className="font-bold text-xl text-gray-900 mb-4 tracking-tight">
-                            Valor d{isVideo ? 'o vídeo' : 'a foto'}
+                    <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm flex flex-col items-center shadow-2xl animate-in zoom-in duration-200">
+                        <h3 className="font-black text-xl text-gray-900 mb-4 tracking-tight">
+                            Enviar {isVideo ? 'Vídeo' : 'Foto'}
                         </h3>
-                        <div className="w-full relative rounded-2xl overflow-hidden mb-6 aspect-square bg-gray-100 flex items-center justify-center">
+                        
+                        {/* Preview */}
+                        <div className="w-full relative rounded-2xl overflow-hidden mb-5 aspect-square bg-gray-100 flex items-center justify-center border border-gray-100 shadow-inner">
                             {previewUrl ? (
                                 <div className="relative w-full h-full">
                                     <img src={previewUrl} className="w-full h-full object-cover" alt="Preview" />
@@ -1503,39 +1693,6 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                             </div>
                                         </div>
                                     )}
-
-                                    {/* Overlay de progresso de upload com design premium desfocado e círculo SVG */}
-                                    {uploadingMedia && uploadProgress !== null && (
-                                        <div className="absolute inset-0 bg-black/75 backdrop-blur-sm flex flex-col items-center justify-center p-4 transition-all duration-300">
-                                            <div className="w-20 h-20 relative flex items-center justify-center mb-3">
-                                                <svg className="w-full h-full transform -rotate-90">
-                                                    <circle
-                                                        cx="40"
-                                                        cy="40"
-                                                        r="34"
-                                                        stroke="rgba(255, 255, 255, 0.15)"
-                                                        strokeWidth="4"
-                                                        fill="transparent"
-                                                    />
-                                                    <circle
-                                                        cx="40"
-                                                        cy="40"
-                                                        r="34"
-                                                        stroke="#a855f7" // Purple-500
-                                                        strokeWidth="4"
-                                                        fill="transparent"
-                                                        strokeDasharray={2 * Math.PI * 34}
-                                                        strokeDashoffset={2 * Math.PI * 34 * (1 - uploadProgress / 100)}
-                                                        className="transition-all duration-300 ease-out"
-                                                    />
-                                                </svg>
-                                                <span className="absolute text-base font-black text-white">{uploadProgress}%</span>
-                                            </div>
-                                            <span className="text-xs font-bold text-white/95 uppercase tracking-widest animate-pulse">
-                                                Enviando {isVideo ? 'vídeo' : 'foto'}...
-                                            </span>
-                                        </div>
-                                    )}
                                 </div>
                             ) : (
                                 <div className="animate-pulse flex flex-col items-center gap-2">
@@ -1544,77 +1701,114 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                 </div>
                             )}
                         </div>
-                        <div className="w-full relative mb-6">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-gray-400">R$</span>
-                            <input type="number" step="0.01" className="bg-gray-50 border border-gray-100 rounded-2xl p-4 pl-10 w-full text-center text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all" placeholder="0.00" value={mediaPriceStr} onChange={e => setMediaPriceStr(e.target.value)} />
+
+                        {/* Seletor Grátis / Pago */}
+                        <div className="flex w-full bg-gray-100 p-1 rounded-2xl mb-5 border border-gray-200">
+                            <button
+                                type="button"
+                                className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${
+                                    mediaPriceType === 'free'
+                                        ? 'bg-white text-purple-700 shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                                onClick={() => {
+                                    setMediaPriceType('free');
+                                    setMediaPriceStr('0');
+                                    setMediaPriceFormatted('R$ 0,00');
+                                }}
+                            >
+                                Grátis
+                            </button>
+                            <button
+                                type="button"
+                                className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${
+                                    mediaPriceType === 'paid'
+                                        ? 'bg-white text-purple-700 shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                                onClick={() => {
+                                    setMediaPriceType('paid');
+                                }}
+                            >
+                                Pago (Bloqueado)
+                            </button>
                         </div>
+
+                        {/* Input do Valor */}
+                        {mediaPriceType === 'paid' && (
+                            <div className="w-full relative mb-5 animate-in slide-in-from-top-2 duration-200">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-gray-400">R$</span>
+                                <input
+                                    type="text"
+                                    className="bg-gray-50 border border-gray-200 rounded-2xl p-4 pl-10 w-full text-center text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-gray-900"
+                                    placeholder="R$ 0,00"
+                                    value={mediaPriceFormatted}
+                                    onChange={handlePriceChange}
+                                />
+                                <p className="text-[10px] text-center text-gray-400 mt-2 font-medium">
+                                    Defina o valor em reais que o cliente pagará para desbloquear a mídia.
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Botões de Ação */}
                         <div className="flex gap-3 w-full">
                             <button
-                                disabled={uploadingMedia}
-                                className="flex-1 h-12 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-semibold transition-colors disabled:opacity-50"
-                                onClick={() => { setSelectedFile(null); setPreviewUrl(null); setMediaPriceStr(''); setShowFreeMediaConfirm(false); }}
+                                className="flex-1 h-12 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-bold transition-all active:scale-98"
+                                onClick={() => {
+                                    setSelectedFile(null);
+                                    setPreviewUrl(null);
+                                    setMediaPriceStr('');
+                                    setMediaPriceFormatted('R$ 0,00');
+                                    setMediaPriceType('free');
+                                }}
                             >
                                 Cancelar
                             </button>
                             <button
-                                disabled={uploadingMedia || (isVideo && !previewUrl)}
-                                className="flex-1 h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-semibold flex justify-center items-center transition-colors shadow-lg shadow-purple-600/30 disabled:opacity-50"
+                                disabled={isVideo && !previewUrl}
+                                className="flex-1 h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-bold flex justify-center items-center transition-all shadow-lg shadow-purple-600/20 active:scale-98 disabled:opacity-50"
                                 onClick={() => {
                                     const price = parseFloat(mediaPriceStr || '0');
-                                    if (!price || price <= 0) {
-                                        setShowFreeMediaConfirm(true);
-                                    } else {
-                                        handleSendMedia();
+                                    if (mediaPriceType === 'paid' && (!price || price <= 0)) {
+                                        alert('Por favor, defina um valor maior que R$ 0,00 para mídias pagas.');
+                                        return;
                                     }
-                                }}
-                            >
-                                {uploadingMedia ? (
-                                    <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                    </svg>
-                                ) : "Enviar"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+                                    
+                                    const file = selectedFile;
+                                    const isVideoFile = isVideo;
+                                    const preview = previewUrl || '';
+                                    
+                                    setSelectedFile(null);
+                                    setPreviewUrl(null);
+                                    setMediaPriceStr('');
+                                    setMediaPriceFormatted('R$ 0,00');
+                                    setMediaPriceType('free');
 
-            {showFreeMediaConfirm && (
-                <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm flex flex-col items-center shadow-2xl">
-                        <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mb-4">
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-                                <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="#D97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                        </div>
-                        <h3 className="font-bold text-xl text-gray-900 mb-2 tracking-tight text-center">
-                            Enviar gratuitamente?
-                        </h3>
-                        <p className="text-sm text-gray-500 text-center mb-6 leading-relaxed">
-                            Você está prestes a enviar {isVideo ? 'este vídeo' : 'esta foto'} de forma <span className="font-semibold text-gray-700">gratuita (R$&nbsp;0,00)</span>. Tem certeza?
-                        </p>
-                        <div className="flex gap-3 w-full">
-                            <button
-                                className="flex-1 h-12 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-semibold transition-colors"
-                                onClick={() => setShowFreeMediaConfirm(false)}
-                            >
-                                Voltar
-                            </button>
-                            <button
-                                disabled={uploadingMedia}
-                                className="flex-1 h-12 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-semibold flex justify-center items-center transition-colors shadow-lg shadow-amber-500/30 disabled:opacity-50"
-                                onClick={() => {
-                                    setShowFreeMediaConfirm(false);
-                                    handleSendMedia();
+                                    const tempId = `temp-media-${Date.now()}`;
+                                    const priceInCents = Math.round(price * 100);
+                                    const newMsg: Message = {
+                                        _id: tempId,
+                                        tempId: tempId,
+                                        senderId: user?.id ?? '',
+                                        receiverId: otherUserId,
+                                        content: isVideoFile ? 'Vídeo' : 'Foto',
+                                        charCount: 0,
+                                        cost: 0,
+                                        timestamp: new Date().toISOString(),
+                                        status: 'sending',
+                                        isVideo: isVideoFile,
+                                        thumbnailUrl: isVideoFile ? preview : undefined,
+                                        originalImageUrl: !isVideoFile ? preview : undefined,
+                                        isLockedImage: priceInCents > 0,
+                                        lockedImagePrice: priceInCents
+                                    };
+                                    setMessages(prev => [...prev, newMsg]);
+
+                                    startMediaUpload(file, isVideoFile, priceInCents, tempId, preview);
                                 }}
                             >
-                                {uploadingMedia ? (
-                                    <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                    </svg>
-                                ) : "Sim, enviar grátis"}
+                                Enviar
                             </button>
                         </div>
                     </div>
