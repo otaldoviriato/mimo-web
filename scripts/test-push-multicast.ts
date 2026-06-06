@@ -59,7 +59,7 @@ async function runTest() {
         console.log('Token legado fcmToken restante:', updatedUser.fcmToken);
 
         // O teste é bem sucedido se o token inválido 2 for limpo e o válido 1 for mantido
-        const limpouApenasInvalido = !updatedUser.fcmTokens.includes(tokenInvalido2) && updatedUser.fcmTokens.includes(tokenInvalido1);
+        const limpouApenasInvalido = !(updatedUser.fcmTokens ?? []).includes(tokenInvalido2) && (updatedUser.fcmTokens ?? []).includes(tokenInvalido1);
 
         if (limpouApenasInvalido) {
             console.log('\n✅ TESTE BEM SUCEDIDO!');

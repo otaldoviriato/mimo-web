@@ -20,6 +20,7 @@ interface Message {
     cost: number;
     timestamp: string;
     isRead?: boolean;
+    isDelivered?: boolean;
     isLockedImage?: boolean;
     lockedImagePrice?: number;
     originalImageUrl?: string;
@@ -380,7 +381,18 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
             if (data.roomId === roomId) {
                 setMessages((prev) => prev.map((msg) => {
                     if (msg.senderId === user?.id && data.readBy !== user?.id) {
-                        return { ...msg, isRead: true };
+                        return { ...msg, isRead: true, isDelivered: true };
+                    }
+                    return msg;
+                }));
+            }
+        });
+
+        socket.on('messages_delivered', (data: { roomId: string; receiverId: string }) => {
+            if (data.roomId === roomId && data.receiverId !== user?.id) {
+                setMessages((prev) => prev.map((msg) => {
+                    if (msg.senderId === user?.id && !msg.isDelivered) {
+                        return { ...msg, isDelivered: true };
                     }
                     return msg;
                 }));
@@ -421,6 +433,7 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
             socket.off('message_error');
             socket.off('user_typing');
             socket.off('messages_read');
+            socket.off('messages_delivered');
             socket.off('message_updated');
             socket.off('message_deleted');
             socket.off('room_read');
@@ -840,6 +853,9 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
         console.log('[handleSend] Inserindo mensagem otimista e limpando input. tempId:', tempId);
         setMessages(prev => [...prev, newMsg]);
         setMessageText('');
+        if (inputRef.current) {
+            inputRef.current.style.height = 'auto';
+        }
         inputRef.current?.focus();
         
         // setSending(true); // Removido para permitir múltiplas mensagens rápidas
@@ -1110,14 +1126,13 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                         </button>
                         <button 
                             onClick={() => receiver?.username && router.push(`/${receiver.username}`)}
-                            className="flex-1 flex items-center gap-2 min-w-0 text-left py-0.5"
+                            className="flex-1 flex items-center gap-3 min-w-0 text-left py-0.5"
                         >
                             <div className={`relative shrink-0 ${!receiver ? 'animate-pulse' : ''}`}>
-                                <Avatar uri={receiver?.photoUrl} size={46} />
-                                {connected && <div className="absolute -right-0.5 top-0 w-2.5 h-2.5 bg-green-500 border-2 border-purple-600 rounded-full" />}
+                                <Avatar uri={receiver?.photoUrl} size={40} />
                             </div>
                             <div className={`flex-1 min-w-0 ${!receiver ? 'animate-pulse' : ''}`}>
-                                <p className="text-base font-black text-white truncate tracking-tight">
+                                <p className="text-base font-bold text-white truncate tracking-tight">
                                     {receiver?.name || receiver?.username || (otherUserId ? `Usuário ${otherUserId.substring(0, 8)}` : 'Conversa')}
                                 </p>
                                 <div className="flex items-center gap-1.5 mt-0.5">
@@ -1296,14 +1311,17 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                                             <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                                                         </svg>
-                                                    ) : (
-                                                        item.isRead ? (
-                                                            <div className="inline-flex items-center">
-                                                                <span className="relative">✓</span>
-                                                                <span className="relative -ml-1.5">✓</span>
-                                                            </div>
-                                                        ) : '✓'
-                                                    )}
+                                                    ) : item.isRead ? (
+                                                        <div className="inline-flex items-center">
+                                                            <span className="relative">✓</span>
+                                                            <span className="relative -ml-1.5">✓</span>
+                                                        </div>
+                                                    ) : item.isDelivered ? (
+                                                        <div className="inline-flex items-center">
+                                                            <span className="relative">✓</span>
+                                                            <span className="relative -ml-1.5">✓</span>
+                                                        </div>
+                                                    ) : '✓'}
                                                 </span>
                                             )}
                                         </div>
@@ -1533,14 +1551,17 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                                                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                                                     <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                                                                 </svg>
-                                                            ) : (
-                                                                item.isRead ? (
-                                                                    <div className="inline-flex items-center">
-                                                                        <span className="relative">✓</span>
-                                                                        <span className="relative -ml-1.5">✓</span>
-                                                                    </div>
-                                                                ) : '✓'
-                                                            )}
+                                                            ) : item.isRead ? (
+                                                                <div className="inline-flex items-center">
+                                                                    <span className="relative">✓</span>
+                                                                    <span className="relative -ml-1.5">✓</span>
+                                                                </div>
+                                                            ) : item.isDelivered ? (
+                                                                <div className="inline-flex items-center">
+                                                                    <span className="relative">✓</span>
+                                                                    <span className="relative -ml-1.5">✓</span>
+                                                                </div>
+                                                            ) : '✓'}
                                                         </span>
                                                     )}
                                                 </div>
@@ -1568,14 +1589,17 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                                             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                                                 <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                                                             </svg>
-                                                        ) : (
-                                                            item.isRead ? (
-                                                                <div className="inline-flex items-center">
-                                                                    <span className="relative">✓</span>
-                                                                    <span className="relative -ml-1.5">✓</span>
-                                                                </div>
-                                                            ) : '✓'
-                                                        )}
+                                                        ) : item.isRead ? (
+                                                            <div className="inline-flex items-center">
+                                                                <span className="relative">✓</span>
+                                                                <span className="relative -ml-1.5">✓</span>
+                                                            </div>
+                                                        ) : item.isDelivered ? (
+                                                            <div className="inline-flex items-center">
+                                                                <span className="relative">✓</span>
+                                                                <span className="relative -ml-1.5">✓</span>
+                                                            </div>
+                                                        ) : '✓'}
                                                     </span>
                                                 )}
                                             </div>
