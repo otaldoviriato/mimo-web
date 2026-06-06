@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, use } from 'react';
+import axios from 'axios';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useUser } from '@clerk/nextjs';
 import { useQueryClient } from '@tanstack/react-query';
@@ -103,6 +104,7 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [isVideo, setIsVideo] = useState(false);
     const [uploadingMedia, setUploadingMedia] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState<number | null>(null);
     const [mediaPriceStr, setMediaPriceStr] = useState('');
     const [showFreeMediaConfirm, setShowFreeMediaConfirm] = useState(false);
     const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
@@ -683,6 +685,7 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
     const handleAutoSendMedia = async (file: File, isVideoFile: boolean) => {
         if (!file || !user?.id) return;
         setUploadingMedia(true);
+        setUploadProgress(0);
         try {
             let finalVideoUrl = '';
             
@@ -700,10 +703,14 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                 const signedData = await signedRes.json();
                 
                 if (signedData.signedUrl) {
-                    await fetch(signedData.signedUrl, {
-                        method: 'PUT',
-                        body: file,
-                        headers: { 'Content-Type': file.type }
+                    await axios.put(signedData.signedUrl, file, {
+                        headers: { 'Content-Type': file.type },
+                        onUploadProgress: (progressEvent) => {
+                            const percentCompleted = Math.round(
+                                (progressEvent.loaded * 100) / (progressEvent.total || 1)
+                            );
+                            setUploadProgress(percentCompleted);
+                        }
                     });
                     finalVideoUrl = signedData.publicUrl;
                 }
@@ -727,11 +734,18 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                 formData.append('thumbnail', new File([thumbBlob], 'thumb.jpg', { type: 'image/jpeg' }));
             }
 
-            const res = await fetch('/api/chats/media', {
-                method: 'POST',
-                body: formData,
+            const res = await axios.post('/api/chats/media', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                onUploadProgress: (progressEvent) => {
+                    if (!isVideoFile) {
+                        const percentCompleted = Math.round(
+                            (progressEvent.loaded * 100) / (progressEvent.total || 1)
+                        );
+                        setUploadProgress(percentCompleted);
+                    }
+                }
             });
-            const data = await res.json();
+            const data = res.data;
             if (!data.success) {
                 alert(data.error || 'Erro ao enviar mídia');
             }
@@ -742,12 +756,14 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
             alert('Erro ao enviar mídia');
         } finally {
             setUploadingMedia(false);
+            setUploadProgress(null);
         }
     };
 
     const handleSendMedia = async () => {
         if (!selectedFile || !user?.id) return;
         setUploadingMedia(true);
+        setUploadProgress(0);
         try {
             let finalVideoUrl = '';
             
@@ -765,10 +781,14 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                 const signedData = await signedRes.json();
                 
                 if (signedData.signedUrl) {
-                    await fetch(signedData.signedUrl, {
-                        method: 'PUT',
-                        body: selectedFile,
-                        headers: { 'Content-Type': selectedFile.type }
+                    await axios.put(signedData.signedUrl, selectedFile, {
+                        headers: { 'Content-Type': selectedFile.type },
+                        onUploadProgress: (progressEvent) => {
+                            const percentCompleted = Math.round(
+                                (progressEvent.loaded * 100) / (progressEvent.total || 1)
+                            );
+                            setUploadProgress(percentCompleted);
+                        }
                     });
                     finalVideoUrl = signedData.publicUrl;
                 }
@@ -792,11 +812,18 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                 formData.append('thumbnail', new File([thumbBlob], 'thumb.jpg', { type: 'image/jpeg' }));
             }
 
-            const res = await fetch('/api/chats/media', {
-                method: 'POST',
-                body: formData,
+            const res = await axios.post('/api/chats/media', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                onUploadProgress: (progressEvent) => {
+                    if (!isVideo) {
+                        const percentCompleted = Math.round(
+                            (progressEvent.loaded * 100) / (progressEvent.total || 1)
+                        );
+                        setUploadProgress(percentCompleted);
+                    }
+                }
             });
-            const data = await res.json();
+            const data = res.data;
             if (!data.success) {
                 alert(data.error || 'Erro ao enviar mídia');
             }
@@ -810,6 +837,7 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
             alert('Erro ao enviar mídia');
         } finally {
             setUploadingMedia(false);
+            setUploadProgress(null);
         }
     };
 
@@ -1475,6 +1503,39 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                             </div>
                                         </div>
                                     )}
+
+                                    {/* Overlay de progresso de upload com design premium desfocado e círculo SVG */}
+                                    {uploadingMedia && uploadProgress !== null && (
+                                        <div className="absolute inset-0 bg-black/75 backdrop-blur-sm flex flex-col items-center justify-center p-4 transition-all duration-300">
+                                            <div className="w-20 h-20 relative flex items-center justify-center mb-3">
+                                                <svg className="w-full h-full transform -rotate-90">
+                                                    <circle
+                                                        cx="40"
+                                                        cy="40"
+                                                        r="34"
+                                                        stroke="rgba(255, 255, 255, 0.15)"
+                                                        strokeWidth="4"
+                                                        fill="transparent"
+                                                    />
+                                                    <circle
+                                                        cx="40"
+                                                        cy="40"
+                                                        r="34"
+                                                        stroke="#a855f7" // Purple-500
+                                                        strokeWidth="4"
+                                                        fill="transparent"
+                                                        strokeDasharray={2 * Math.PI * 34}
+                                                        strokeDashoffset={2 * Math.PI * 34 * (1 - uploadProgress / 100)}
+                                                        className="transition-all duration-300 ease-out"
+                                                    />
+                                                </svg>
+                                                <span className="absolute text-base font-black text-white">{uploadProgress}%</span>
+                                            </div>
+                                            <span className="text-xs font-bold text-white/95 uppercase tracking-widest animate-pulse">
+                                                Enviando {isVideo ? 'vídeo' : 'foto'}...
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="animate-pulse flex flex-col items-center gap-2">
@@ -1488,7 +1549,13 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                             <input type="number" step="0.01" className="bg-gray-50 border border-gray-100 rounded-2xl p-4 pl-10 w-full text-center text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all" placeholder="0.00" value={mediaPriceStr} onChange={e => setMediaPriceStr(e.target.value)} />
                         </div>
                         <div className="flex gap-3 w-full">
-                            <button className="flex-1 h-12 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-semibold transition-colors" onClick={() => { setSelectedFile(null); setPreviewUrl(null); setMediaPriceStr(''); setShowFreeMediaConfirm(false); }}>Cancelar</button>
+                            <button
+                                disabled={uploadingMedia}
+                                className="flex-1 h-12 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-semibold transition-colors disabled:opacity-50"
+                                onClick={() => { setSelectedFile(null); setPreviewUrl(null); setMediaPriceStr(''); setShowFreeMediaConfirm(false); }}
+                            >
+                                Cancelar
+                            </button>
                             <button
                                 disabled={uploadingMedia || (isVideo && !previewUrl)}
                                 className="flex-1 h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-semibold flex justify-center items-center transition-colors shadow-lg shadow-purple-600/30 disabled:opacity-50"

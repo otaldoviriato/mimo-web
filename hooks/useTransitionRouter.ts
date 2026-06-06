@@ -3,9 +3,9 @@
 import { useRouter as useNextRouter } from 'next/navigation';
 import { useStackNavigation } from '@/context/StackNavigationContext';
 
-const reservedRoutes = ['chats', 'search', 'profile', 'settings', 'login', 'sso-callback', 'api', 'admin'];
+export const reservedRoutes = ['chats', 'search', 'profile', 'settings', 'login', 'sso-callback', 'api', 'admin', 'termos-de-uso', 'politica-de-privacidade'];
 
-const isReservedRoute = (path: string) => {
+export const isReservedRoute = (path: string) => {
     const cleaned = path.replace(/^\//, ''); // Remove leading slash
     const parts = cleaned.split('/');
     const base = parts[0];

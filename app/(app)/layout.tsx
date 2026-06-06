@@ -7,6 +7,7 @@ import { setupAxiosInterceptors } from '@/services/api';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { NotificationPromptModal } from '@/components';
 import { StackNavigationProvider, useStackNavigation } from '@/context/StackNavigationContext';
+import { isReservedRoute } from '@/hooks/useTransitionRouter';
 import ChatPage from './chat/[userId]/page';
 import UserProfilePage from './[username]/page';
 import SettingsPage from './settings/page';
@@ -21,12 +22,72 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
     const { handleRequestPermission } = usePushNotifications();
-    const { screens, popVirtual } = useStackNavigation();
+    const { screens, popVirtual, pushVirtual } = useStackNavigation();
     const screensRef = useRef(screens);
+    const [isNavInitialized, setIsNavInitialized] = React.useState(false);
 
     useEffect(() => {
         screensRef.current = screens;
     }, [screens]);
+
+    // Inicialização de roteamento para Deep Links no carregamento inicial da sessão
+    useEffect(() => {
+        if (!isLoaded || !isSignedIn) return;
+
+        const initDeepLinkRoute = async () => {
+            if (typeof window === 'undefined') return;
+
+            // Se já inicializamos o roteamento nesta sessão do app, não repetimos
+            if ((window as any).__mimo_nav_initialized) {
+                setIsNavInitialized(true);
+                return;
+            }
+            (window as any).__mimo_nav_initialized = true;
+
+            const currentPath = window.location.pathname;
+
+            // 1. Caso seja rota de chat: /chat/userId
+            const chatMatch = currentPath.match(/^\/chat\/([^\/]+)$/);
+            if (chatMatch) {
+                const userId = chatMatch[1];
+                // Redireciona a rota real para chats
+                router.replace('/chats');
+                // Empilha virtualmente o chat por cima
+                pushVirtual('chat', { userId });
+                setTimeout(() => {
+                    setIsNavInitialized(true);
+                }, 150);
+                return;
+            }
+
+            // 2. Caso seja rota de configurações: /settings
+            if (currentPath === '/settings') {
+                router.replace('/profile');
+                pushVirtual('settings', {});
+                setTimeout(() => {
+                    setIsNavInitialized(true);
+                }, 150);
+                return;
+            }
+
+            // 3. Caso seja rota de perfil público: /[username]
+            const cleanedPath = currentPath.replace(/^\//, '');
+            if (cleanedPath.length > 0 && !isReservedRoute(currentPath)) {
+                const username = cleanedPath.replace(/^@/, '');
+                router.replace('/chats');
+                pushVirtual('profile', { username });
+                setTimeout(() => {
+                    setIsNavInitialized(true);
+                }, 150);
+                return;
+            }
+
+            // Se for uma rota base ou qualquer outra, apenas inicializa
+            setIsNavInitialized(true);
+        };
+
+        initDeepLinkRoute();
+    }, [isLoaded, isSignedIn]);
 
     useEffect(() => {
         // Se a rota for o chat, deixamos a própria página de chat gerenciar a resolução
@@ -110,7 +171,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         }
     }, [isSignedIn, user, getToken]);
 
-    if (!isLoaded) {
+    if (!isLoaded || (isSignedIn && !isNavInitialized)) {
         return (
             <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gradient-to-br from-[#4C1D95] via-[#6D28D9] to-[#8B5CF6] select-none">
                 <div className="flex flex-col items-center animate-fade-in-up">
