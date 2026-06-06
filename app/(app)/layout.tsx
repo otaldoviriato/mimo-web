@@ -79,31 +79,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                 return;
             }
 
-            // 3. Caso seja rota de chat pelo username: /[username]/chat
-            const usernameChatMatch = currentPath.match(/^\/([^\/]+)\/chat$/);
-            if (usernameChatMatch && !isReservedRoute(currentPath)) {
-                const username = usernameChatMatch[1].replace(/^@/, '');
-                
-                try {
-                    const response = await fetch(`/api/users/username/${encodeURIComponent(username)}`);
-                    if (response.ok) {
-                        const data = await response.json();
-                        const userId = data.user?.clerkId;
-                        if (userId) {
-                            router.replace('/chats' + window.location.search);
-                            pushVirtual('chat', { userId });
-                            setTimeout(() => {
-                                setIsNavInitialized(true);
-                            }, 150);
-                            return;
-                        }
-                    }
-                } catch (err) {
-                    console.error('Error resolving username for deep link chat:', err);
-                }
-            }
-
-            // 4. Caso seja rota de perfil público: /[username]
+            // 3. Caso seja rota de perfil público: /[username]
             const cleanedPath = currentPath.replace(/^\//, '');
             if (cleanedPath.length > 0 && !isReservedRoute(currentPath)) {
                 const username = cleanedPath.replace(/^@/, '');
@@ -190,6 +166,11 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (isLoaded && !isSignedIn) {
             if (typeof window !== 'undefined') {
+                const searchParams = new URLSearchParams(window.location.search);
+                const gift = searchParams.get('gift');
+                if (gift) {
+                    sessionStorage.setItem('mimo_pending_gift', gift);
+                }
                 const currentPath = window.location.pathname + window.location.search;
                 if (window.location.pathname && window.location.pathname !== '/login' && window.location.pathname !== '/') {
                     sessionStorage.setItem('mimo_redirect_after_login', currentPath);

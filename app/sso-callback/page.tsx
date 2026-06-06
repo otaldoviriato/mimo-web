@@ -1,15 +1,26 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { AuthenticateWithRedirectCallback } from '@clerk/nextjs';
 
 export default function SSOCallbackPage() {
+    const [redirectUrl, setRedirectUrl] = useState('/chats');
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const pendingRedirect = sessionStorage.getItem('mimo_redirect_after_login');
+            if (pendingRedirect) {
+                setRedirectUrl(pendingRedirect);
+            }
+        }
+    }, []);
+
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
             <div className="text-center flex flex-col items-center">
                 <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-purple-600 border-t-transparent mb-4" />
                 <p className="text-gray-500 mb-4">Autenticando...</p>
-                {/* O Clerk cuida de processar a URL do Google e redirecionar pra /chats */}
-                <AuthenticateWithRedirectCallback signUpForceRedirectUrl="/chats" signInForceRedirectUrl="/chats" />
+                <AuthenticateWithRedirectCallback signUpForceRedirectUrl={redirectUrl} signInForceRedirectUrl={redirectUrl} />
             </div>
         </div>
     );

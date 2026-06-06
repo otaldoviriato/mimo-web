@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, use } from 'react';
+import { useEffect, use, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStackNavigation } from '@/context/StackNavigationContext';
 import { userApi } from '@/services/api';
@@ -13,11 +13,13 @@ export default function UsernameChatPage({ params }: UsernameChatPageProps) {
     const { username } = use(params);
     const router = useRouter();
     const { pushVirtual } = useStackNavigation();
+    const redirectedRef = useRef(false);
 
     useEffect(() => {
-        if (!username) return;
+        if (!username || redirectedRef.current) return;
 
         const resolveUsernameAndRedirect = async () => {
+            redirectedRef.current = true;
             try {
                 const cleanedUsername = username.replace(/^@/, '');
                 const data = await userApi.getUserByUsername(cleanedUsername);
@@ -25,6 +27,12 @@ export default function UsernameChatPage({ params }: UsernameChatPageProps) {
                 
                 if (userId) {
                     const searchParams = window.location.search;
+                    
+                    // Salva o cupom promocional no sessionStorage se ele estiver presente na URL
+                    const gift = new URLSearchParams(searchParams).get('gift');
+                    if (gift) {
+                        sessionStorage.setItem('mimo_pending_gift', gift.trim());
+                    }
                     
                     // Redireciona a rota física para /chats
                     router.replace(`/chats${searchParams}`);
