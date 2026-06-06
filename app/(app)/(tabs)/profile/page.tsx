@@ -1054,10 +1054,18 @@ export default function ProfilePage() {
                         )}
                         
                         <div className="flex flex-col gap-3">
-                            <button
-                                onClick={() => confirmGalleryUpload('public')}
-                                disabled={uploadingGallery}
-                                className="w-full p-4 rounded-2xl border-2 border-gray-100 hover:border-purple-600 hover:bg-purple-50 transition-all flex items-center gap-4 group text-left"
+                            <div
+                                onClick={() => !uploadingGallery && confirmGalleryUpload('public')}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => {
+                                    if ((e.key === 'Enter' || e.key === ' ') && !uploadingGallery) {
+                                        confirmGalleryUpload('public');
+                                    }
+                                }}
+                                className={`w-full p-4 rounded-2xl border-2 border-gray-100 hover:border-purple-600 hover:bg-purple-50 transition-all flex items-center gap-4 group text-left cursor-pointer ${
+                                    uploadingGallery ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
+                                }`}
                             >
                                 <div className="w-10 h-10 rounded-xl bg-gray-50 group-hover:bg-purple-100/50 flex items-center justify-center transition-colors">
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500 group-hover:text-purple-600 transition-colors">
@@ -1070,13 +1078,21 @@ export default function ProfilePage() {
                                     <p className="font-bold text-gray-900 leading-tight">Público</p>
                                     <p className="text-xs text-gray-500">Qualquer pessoa pode ver</p>
                                 </div>
-                            </button>
+                            </div>
 
                             {profileIsProfessional && (
-                                <button
-                                    onClick={() => confirmGalleryUpload('subscribers')}
-                                    disabled={uploadingGallery}
-                                    className="w-full p-4 rounded-2xl border-2 border-gray-100 hover:border-purple-600 hover:bg-purple-50 transition-all flex items-center gap-4 group text-left"
+                                <div
+                                    onClick={() => !uploadingGallery && confirmGalleryUpload('subscribers')}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(e) => {
+                                        if ((e.key === 'Enter' || e.key === ' ') && !uploadingGallery) {
+                                            confirmGalleryUpload('subscribers');
+                                        }
+                                    }}
+                                    className={`w-full p-4 rounded-2xl border-2 border-gray-100 hover:border-purple-600 hover:bg-purple-50 transition-all flex items-center gap-4 group text-left cursor-pointer ${
+                                        uploadingGallery ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
+                                    }`}
                                 >
                                     <div className="w-10 h-10 rounded-xl bg-gray-50 group-hover:bg-purple-100/50 flex items-center justify-center transition-colors">
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500 group-hover:text-purple-600 transition-colors">
@@ -1090,7 +1106,7 @@ export default function ProfilePage() {
                                         <p className="font-bold text-gray-900 leading-tight">Somente Assinantes</p>
                                         <p className="text-xs text-gray-500">Apenas quem assina seu perfil</p>
                                     </div>
-                                </button>
+                                </div>
                             )}
                         </div>
 
