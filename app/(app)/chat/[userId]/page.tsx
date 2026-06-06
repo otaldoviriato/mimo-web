@@ -924,6 +924,10 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
     };
 
     const handleUnlockImage = async (messageId: string, priceInCents: number, isVideoMessage: boolean = false) => {
+        if (balance < priceInCents) {
+            openRechargeModal('Você não tem saldo suficiente para desbloquear este conteúdo. Por favor, recarregue sua carteira.');
+            return;
+        }
         setUnlockData({ id: messageId, price: priceInCents, isVideo: isVideoMessage });
         setUnlockModalVisible(true);
     };
