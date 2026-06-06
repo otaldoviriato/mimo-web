@@ -102,6 +102,22 @@ export function ClientsTable() {
         return name.substring(0, 2).toUpperCase();
     };
 
+    const formatLastSeen = (lastSeenStr: string | null) => {
+        if (!lastSeenStr) return 'Nunca';
+        try {
+            const date = new Date(lastSeenStr);
+            return date.toLocaleString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            }).replace(',', ' às');
+        } catch (e) {
+            return 'N/A';
+        }
+    };
+
     return (
         <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full relative">
             {/* Título e Ações Superiores */}
@@ -151,7 +167,11 @@ export function ClientsTable() {
                         <tbody className="divide-y divide-slate-100">
                             {users.length > 0 ? (
                                 users.map((user) => (
-                                    <tr key={user.clerkId} className="hover:bg-slate-50/40 transition-colors group">
+                                    <tr 
+                                        key={user.clerkId} 
+                                        onClick={() => router.push(`/admin/users/${user.clerkId}`)}
+                                        className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
+                                    >
                                         {/* Info Usuário */}
                                         <td className="py-4 px-6">
                                             <div className="flex items-center gap-3">
@@ -169,6 +189,19 @@ export function ClientsTable() {
                                                     <span className="text-xs text-slate-400 font-medium flex items-center gap-1 mt-0.5">
                                                         <Mail size={12} />
                                                         {user.email}
+                                                    </span>
+                                                    <span className="text-[10px] font-semibold flex items-center gap-1.5 mt-1 select-none text-slate-400">
+                                                        {user.isOnline ? (
+                                                            <>
+                                                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse border border-white" />
+                                                                <span className="text-emerald-600 font-bold">Online</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <span className="w-2.5 h-2.5 rounded-full bg-slate-300 border border-white" />
+                                                                <span>Visto por último: {formatLastSeen(user.lastSeen)}</span>
+                                                            </>
+                                                        )}
                                                     </span>
                                                 </div>
                                             </div>
@@ -205,9 +238,12 @@ export function ClientsTable() {
                                         </td>
 
                                         {/* Ações */}
-                                        <td className="py-4 px-6 text-center relative">
+                                        <td className="py-4 px-6 text-center relative" onClick={(e) => e.stopPropagation()}>
                                             <button
-                                                onClick={() => setSelectedUserMenu(selectedUserMenu === user.clerkId ? null : user.clerkId)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedUserMenu(selectedUserMenu === user.clerkId ? null : user.clerkId);
+                                                }}
                                                 className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
                                             >
                                                 <MoreVertical size={16} />
@@ -218,12 +254,19 @@ export function ClientsTable() {
                                                 <>
                                                     <div 
                                                         className="fixed inset-0 z-20" 
-                                                        onClick={() => setSelectedUserMenu(null)}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedUserMenu(null);
+                                                        }}
                                                     />
-                                                    <div className="absolute right-6 mt-1 w-48 bg-white border border-slate-200 rounded-xl shadow-xl z-30 py-1.5 divide-y divide-slate-50 animate-fade-in-up">
+                                                    <div 
+                                                        className="absolute right-6 mt-1 w-48 bg-white border border-slate-200 rounded-xl shadow-xl z-30 py-1.5 divide-y divide-slate-50 animate-fade-in-up"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
                                                         <div className="py-1">
                                                             <button
-                                                                onClick={() => {
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
                                                                     setSelectedUserMenu(null);
                                                                     router.push(`/admin/users/${user.clerkId}`);
                                                                 }}
@@ -234,7 +277,10 @@ export function ClientsTable() {
                                                             </button>
 
                                                             <button
-                                                                onClick={() => handlePromoteToProfessional(user.clerkId)}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handlePromoteToProfessional(user.clerkId);
+                                                                }}
                                                                 className="w-full flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer text-left"
                                                             >
                                                                 <UserCheck size={14} className="text-indigo-500" />
@@ -244,7 +290,10 @@ export function ClientsTable() {
 
                                                         <div className="py-1">
                                                             <button
-                                                                onClick={() => handleDeleteUser(user.clerkId, user.name)}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleDeleteUser(user.clerkId, user.name);
+                                                                }}
                                                                 className="w-full flex items-center gap-2 px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 cursor-pointer text-left"
                                                             >
                                                                 <Trash2 size={14} className="text-rose-500" />
