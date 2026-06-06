@@ -314,8 +314,12 @@ export default function ProfilePage() {
 
         if (confirm(`Deseja adicionar este arquivo (${file.type.startsWith('video/') ? 'vídeo' : 'foto'}) à sua Galeria Privada?`)) {
             setUploadingGallery(true);
+            const originalName = file.name || 'file.jpg';
+            const extension = originalName.split('.').pop() || 'jpg';
+            const cleanName = `private_${Date.now()}.${extension}`;
+
             const formData = new FormData();
-            formData.append('photo', file);
+            formData.append('photo', file, cleanName);
             formData.append('galleryType', 'private');
             formData.append('visibility', 'subscribers');
 
@@ -337,8 +341,12 @@ export default function ProfilePage() {
         
         setUploadingGallery(true);
         setSaveError('');
+        const originalName = visibilityModal.file.name || 'photo.jpg';
+        const extension = originalName.split('.').pop() || 'jpg';
+        const cleanName = `public_${Date.now()}.${extension}`;
+
         const formData = new FormData();
-        formData.append('photo', visibilityModal.file);
+        formData.append('photo', visibilityModal.file, cleanName);
         formData.append('visibility', visibility);
         formData.append('galleryType', 'public');
 
