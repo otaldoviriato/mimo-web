@@ -8,7 +8,8 @@ export async function POST(request: NextRequest) {
         const { userId } = await auth();
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const { roomId, contentType, fileName, isVideo } = await request.body ? await request.json() : {};
+        const body = await request.json().catch(() => ({}));
+        const { roomId, contentType, fileName, isVideo } = body;
         
         if (!roomId || !contentType) {
             return NextResponse.json({ error: 'Missing roomId or contentType' }, { status: 400 });
@@ -24,6 +25,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ signedUrl, publicUrl, path });
     } catch (error: any) {
         console.error('Error generating signed URL:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
     }
 }

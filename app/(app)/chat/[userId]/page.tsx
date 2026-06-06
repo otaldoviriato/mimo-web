@@ -558,7 +558,10 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                     })
                 });
                 
-                if (!signedRes.ok) throw new Error('Falha ao obter URL assinada para o vídeo');
+                if (!signedRes.ok) {
+                    const errJson = await signedRes.json().catch(() => ({}));
+                    throw new Error(errJson.error || 'Falha ao obter URL assinada para o vídeo');
+                }
                 const signedData = await signedRes.json();
                 
                 if (signedData.signedUrl) {
@@ -645,11 +648,23 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
 
         } catch (e: any) {
             console.error('Erro no upload em background:', e);
+            let errMsg = e.message || 'Erro no upload';
+            if (e.response?.data?.error) {
+                errMsg = e.response.data.error;
+            } else if (e.response?.data?.message) {
+                errMsg = e.response.data.message;
+            } else if (e.message?.includes('Network Error')) {
+                errMsg = 'Erro de rede. Verifique sua conexão.';
+            }
+            
+            // Exibir alerta explicativo do erro
+            alert(`Falha no envio de mídia: ${errMsg}`);
+
             setUploadTasks(prev => {
                 if (!prev[tempId]) return prev;
                 return {
                     ...prev,
-                    [tempId]: { ...prev[tempId], status: 'error', error: e.message || 'Erro no upload' }
+                    [tempId]: { ...prev[tempId], status: 'error', error: errMsg }
                 };
             });
             setMessages(prev => prev.map(m => m.tempId === tempId ? { ...m, status: 'error' } : m));
@@ -1369,6 +1384,11 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                                                         <line x1="12" y1="16" x2="12.01" y2="16" stroke="currentColor" strokeWidth="2"/>
                                                                     </svg>
                                                                     <span className="text-[10px] font-bold text-white uppercase tracking-wider">Falhou</span>
+                                                                    {uploadTasks[item.tempId].error && (
+                                                                        <span className="text-[8px] font-medium text-red-300 leading-tight break-words px-1 max-w-[95%] text-center">
+                                                                            {uploadTasks[item.tempId].error}
+                                                                        </span>
+                                                                    )}
                                                                 </div>
                                                             ) : null}
                                                         </div>
@@ -1461,6 +1481,11 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
                                                                         <line x1="12" y1="16" x2="12.01" y2="16" stroke="currentColor" strokeWidth="2"/>
                                                                     </svg>
                                                                     <span className="text-[10px] font-bold text-white uppercase tracking-wider">Falhou</span>
+                                                                    {uploadTasks[item.tempId].error && (
+                                                                        <span className="text-[8px] font-medium text-red-300 leading-tight break-words px-1 max-w-[95%] text-center">
+                                                                            {uploadTasks[item.tempId].error}
+                                                                        </span>
+                                                                    )}
                                                                 </div>
                                                             ) : null}
                                                         </div>
