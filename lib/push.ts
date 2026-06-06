@@ -11,24 +11,31 @@ export async function sendPushNotification(userId: string, title: string, body: 
             return { error: 'User not found' };
         }
 
-        if (!user.fcmToken) {
-            console.warn(`[Push] O usuário ${userId} (${user.username}) não possui fcmToken cadastrado.`);
+        const tokens: string[] = [];
+        if (user.fcmTokens && Array.isArray(user.fcmTokens)) {
+            tokens.push(...user.fcmTokens);
+        }
+        if (user.fcmToken && !tokens.includes(user.fcmToken)) {
+            tokens.push(user.fcmToken);
+        }
+
+        if (tokens.length === 0) {
+            console.warn(`[Push] O usuário ${userId} (${user.username}) não possui tokens de push cadastrados.`);
             return { error: 'Token missing' };
         }
 
-        const pushToken = user.fcmToken;
-        console.log(`[Push] Token encontrado para ${user.username} (ID: ${userId}): ${pushToken.substring(0, 15)}...`);
+        console.log(`[Push] ${tokens.length} token(s) encontrado(s) para ${user.username} (ID: ${userId})`);
 
-        console.log(`[Push] Contexto do envio:`, { title, body, hasData: !!data });
-        console.log(`[Push] Enviando via Firebase Admin (FCM)...`);
-        
         if (!adminMessaging) {
             console.error('[Push] Firebase Admin não configurado. Verifique FIREBASE_SERVICE_ACCOUNT no .env');
-            return;
+            return { error: 'Firebase Admin not configured' };
         }
 
+        console.log(`[Push] Contexto do envio:`, { title, body, hasData: !!data });
+        console.log(`[Push] Enviando via Firebase Admin (FCM Multicast)...`);
+
         const payload: any = {
-            token: pushToken,
+            tokens: tokens,
             notification: {
                 title,
                 body,
@@ -52,18 +59,39 @@ export async function sendPushNotification(userId: string, title: string, body: 
         console.log('[Push] Payload final:', JSON.stringify(payload, null, 2));
 
         try {
-            const response = await adminMessaging.send(payload);
-            console.log('[Push] ✓ Sucesso ao enviar via Firebase! Message ID:', response);
-            return { success: true, messageId: response };
-        } catch (error: any) {
-            console.error('[Push] ✗ Erro ao enviar via Firebase:', error.message);
-            return { error: error.message, code: error.code };
-            
-            // Se o token for inválido, podemos removê-lo do banco para evitar retentativas inúteis
-            if (error.code === 'messaging/registration-token-not-registered') {
-                console.log(`[Push] Removendo token inválido do usuário ${userId}`);
-                await User.updateOne({ clerkId: userId }, { $unset: { fcmToken: "" } });
+            const response = await adminMessaging.sendEachForMulticast(payload);
+            console.log(`[Push] ✓ Processamento multicast concluído. Sucessos: ${response.successCount}, Falhas: ${response.failureCount}`);
+
+            const tokensToRemove: string[] = [];
+            response.responses.forEach((res, idx) => {
+                if (!res.success && res.error) {
+                    const token = tokens[idx];
+                    console.warn(`[Push] Falha no token ${token.substring(0, 10)}... - Código do Erro: ${res.error.code}`);
+                    
+                    if (
+                        res.error.code === 'messaging/registration-token-not-registered' ||
+                        res.error.code === 'messaging/invalid-argument'
+                    ) {
+                        tokensToRemove.push(token);
+                    }
+                }
+            });
+
+            if (tokensToRemove.length > 0) {
+                console.log(`[Push] Removendo ${tokensToRemove.length} token(s) inválido(s) do usuário ${userId}`);
+                await User.updateOne(
+                    { clerkId: userId },
+                    {
+                        $pull: { fcmTokens: { $in: tokensToRemove } },
+                        ...(user.fcmToken && tokensToRemove.includes(user.fcmToken) ? { $unset: { fcmToken: "" } } : {})
+                    }
+                );
             }
+
+            return { success: true, successCount: response.successCount, failureCount: response.failureCount };
+        } catch (error: any) {
+            console.error('[Push] ✗ Erro ao enviar lote multicast via Firebase:', error.message);
+            return { error: error.message, code: error.code };
         }
 
         console.log(`[Push] Processo de envio finalizado para ${userId}`);

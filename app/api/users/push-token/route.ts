@@ -30,18 +30,26 @@ export async function POST(request: NextRequest) {
 
         console.log(`[Push Token API] Salvando token para ${userId}: ${fcmToken.substring(0, 10)}...`);
 
+        const updateQuery: any = {
+            $setOnInsert: {
+                email: `user_${userId}@placeholder.com`,
+                username: `user_${userId.substring(0, 8)}`,
+                balance: 0,
+                chargeMode: false,
+                chargePerChar: 0.002
+            }
+        };
+
+        if (fcmToken) {
+            updateQuery.$addToSet = { fcmTokens: fcmToken };
+            updateQuery.$set = { fcmToken: fcmToken };
+        } else {
+            updateQuery.$unset = { fcmToken: "" };
+        }
+
         const updatedUser = await User.findOneAndUpdate(
             { clerkId: userId },
-            {
-                $set: { fcmToken: fcmToken },
-                $setOnInsert: {
-                    email: `user_${userId}@placeholder.com`,
-                    username: `user_${userId.substring(0, 8)}`,
-                    balance: 0,
-                    chargeMode: false,
-                    chargePerChar: 0.002
-                }
-            },
+            updateQuery,
             { returnDocument: 'after', upsert: true }
         );
 

@@ -29,6 +29,7 @@ export interface IUser extends Document {
     chargePerCharNonSubscribers: number;
     subscribers: string[]; // Array of clerkIds
     fcmToken?: string;
+    fcmTokens?: string[];
     pixKey?: string;
     savedCards: ICard[];
     claimedGiftCodes: string[];
@@ -103,6 +104,10 @@ const UserSchema = new Schema<IUser>({
     },
     fcmToken: {
         type: String,
+    },
+    fcmTokens: {
+        type: [String],
+        default: [],
     },
     pixKey: {
         type: String,
