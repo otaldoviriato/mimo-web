@@ -36,14 +36,22 @@ export async function GET() {
                     email: email,
                     username: username,
                     name: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' '),
-                    balance: 0,
+                    balance: 1000,
                     isProfessional: false,
                     chargePerCharSubscribers: 0.002,
                     chargePerCharNonSubscribers: 0.005,
                 });
-            } catch (createError) {
-                console.error("Error lazy creating user:", createError);
-                return NextResponse.json({ error: 'User not found' }, { status: 404 });
+            } catch (createError: any) {
+                if (createError.code === 11000) {
+                    user = await User.findOne({ clerkId: userId });
+                    if (user) {
+                        console.log(`💡 Concorrência de cadastro: Usuário ${userId} inserido concorrentemente.`);
+                    }
+                }
+                if (!user) {
+                    console.error("Error lazy creating user:", createError);
+                    return NextResponse.json({ error: 'User not found' }, { status: 404 });
+                }
             }
         } else if (user.email.includes('@placeholder.com')) {
             try {
