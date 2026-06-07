@@ -208,8 +208,21 @@ export default function ChatsPage() {
 
         const stored = sessionStorage.getItem('mimo_pending_gift');
         const fromUrl = new URLSearchParams(window.location.search).get('gift');
+        const openChat = new URLSearchParams(window.location.search).get('openChat');
+
+        // Se formos abrir um chat virtual por cima, não resgatamos o cupom aqui na lista de conversas.
+        // O chat virtual cuidará do resgate.
+        if (openChat) return;
+
         const code = stored || fromUrl;
         if (!code) return;
+
+        // Trava global de sessão do front-end para evitar requisições concorrentes duplicadas
+        if (typeof window !== 'undefined') {
+            const claims = (window as any).__claimingGiftCodes = (window as any).__claimingGiftCodes || {};
+            if (claims[code]) return;
+            claims[code] = true;
+        }
 
         giftClaimedRef.current = true;
         sessionStorage.removeItem('mimo_pending_gift');
@@ -228,8 +241,15 @@ export default function ChatsPage() {
                 if (user?.id) {
                     queryClient.invalidateQueries({ queryKey: QueryKeys.balance(user.id) });
                 }
+            } else if (typeof window !== 'undefined' && (window as any).__claimingGiftCodes) {
+                // Se falhou, libera a trava global para permitir tentativas futuras
+                delete (window as any).__claimingGiftCodes[code];
             }
-        }).catch(() => {});
+        }).catch(() => {
+            if (typeof window !== 'undefined' && (window as any).__claimingGiftCodes) {
+                delete (window as any).__claimingGiftCodes[code];
+            }
+        });
     }, [user?.id, queryClient]);
 
     // Abre a tela de conversa física usando o roteador de transição

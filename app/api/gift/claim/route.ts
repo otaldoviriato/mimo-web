@@ -59,17 +59,47 @@ export async function POST(req: NextRequest) {
 
         const amount = giftCode.amount;
 
-        // Credita saldo e contabiliza uso de forma atômica
-        await Promise.all([
-            User.findOneAndUpdate(
+        // 1. Tenta creditar o saldo e registrar o cupom na conta do usuário de forma atômica.
+        // A condição `claimedGiftCodes: { $ne: rawCode }` garante que se duas requisições
+        // chegarem em paralelo, apenas uma conseguirá dar match e atualizar o documento.
+        const updatedUser = await User.findOneAndUpdate(
+            { clerkId: userId, claimedGiftCodes: { $ne: rawCode } },
+            {
+                $inc: { balance: amount },
+                $push: { claimedGiftCodes: rawCode },
+            },
+            { new: true }
+        );
+
+        if (!updatedUser) {
+            // Se falhar, é porque o cupom já foi marcado como resgatado no usuário
+            return NextResponse.json({ error: 'already_claimed' }, { status: 409 });
+        }
+
+        // 2. Tenta incrementar o número de usos totais do cupom de forma atômica
+        // respeitando o limite maxUses (se houver).
+        const codeQuery: any = { _id: giftCode._id };
+        if (giftCode.maxUses !== null && giftCode.maxUses !== undefined) {
+            codeQuery.totalUses = { $lt: giftCode.maxUses };
+        }
+
+        const updatedGift = await GiftCode.findOneAndUpdate(
+            codeQuery,
+            { $inc: { totalUses: 1 } },
+            { new: true }
+        );
+
+        if (!updatedGift) {
+            // Reverte o crédito inserido no usuário para manter a consistência do sistema
+            await User.findOneAndUpdate(
                 { clerkId: userId },
                 {
-                    $inc: { balance: amount },
-                    $push: { claimedGiftCodes: rawCode },
+                    $inc: { balance: -amount },
+                    $pull: { claimedGiftCodes: rawCode }
                 }
-            ),
-            GiftCode.findByIdAndUpdate(giftCode._id, { $inc: { totalUses: 1 } }),
-        ]);
+            );
+            return NextResponse.json({ error: 'code_exhausted' }, { status: 409 });
+        }
 
         await MicroTransaction.create({
             userId,

@@ -234,6 +234,13 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         const code = fromProp || fromLocalStorage || fromSessionStorage || fromUrl;
         if (!code) return;
 
+        // Trava global de sessão do front-end para evitar requisições concorrentes duplicadas
+        if (typeof window !== 'undefined') {
+            const claims = (window as any).__claimingGiftCodes = (window as any).__claimingGiftCodes || {};
+            if (claims[code]) return;
+            claims[code] = true;
+        }
+
         couponClaimedRef.current = true;
         localStorage.removeItem('mimo_pending_gift');
         sessionStorage.removeItem('mimo_pending_gift');
@@ -257,9 +264,15 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 // Invalida os caches do perfil e do saldo
                 queryClient.invalidateQueries({ queryKey: QueryKeys.me });
                 queryClient.invalidateQueries({ queryKey: QueryKeys.balance(user.id) });
+            } else if (typeof window !== 'undefined' && (window as any).__claimingGiftCodes) {
+                // Se falhou, libera a trava global para permitir novas tentativas
+                delete (window as any).__claimingGiftCodes[code];
             }
         }).catch((err) => {
             console.error('Error claiming coupon in chat screen:', err);
+            if (typeof window !== 'undefined' && (window as any).__claimingGiftCodes) {
+                delete (window as any).__claimingGiftCodes[code];
+            }
         });
     }, [user?.id, propGiftCode, queryClient]);
 
