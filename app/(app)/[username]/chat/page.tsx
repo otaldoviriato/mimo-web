@@ -12,7 +12,6 @@ interface UsernameChatPageProps {
 export default function UsernameChatPage({ params }: UsernameChatPageProps) {
     const { username } = use(params);
     const router = useRouter();
-    const { pushVirtual } = useStackNavigation();
     const redirectedRef = useRef(false);
 
     useEffect(() => {
@@ -36,10 +35,10 @@ export default function UsernameChatPage({ params }: UsernameChatPageProps) {
                         localStorage.setItem('mimo_pending_gift', gift.trim());
                     }
                     
-                    // Cria uma base interna antes da sala para que voltar nunca
-                    // retorne ao site/app que abriu o link direto.
-                    window.history.replaceState({}, '', '/chats');
-                    pushVirtual('chat', { userId, giftCode: gift?.trim() || undefined });
+                    // Redireciona fisicamente para /chats passando os query params para que
+                    // a página por baixo do chat virtual seja a lista de conversas.
+                    const giftQuery = gift?.trim() ? `&gift=${encodeURIComponent(gift.trim())}` : '';
+                    router.replace(`/chats?openChat=${userId}${giftQuery}`);
                 } else {
                     router.replace('/chats');
                 }
@@ -50,7 +49,7 @@ export default function UsernameChatPage({ params }: UsernameChatPageProps) {
         };
 
         resolveUsernameAndRedirect();
-    }, [username, router, pushVirtual]);
+    }, [username, router]);
 
     return (
         <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gradient-to-br from-[#4C1D95] via-[#6D28D9] to-[#8B5CF6] select-none">

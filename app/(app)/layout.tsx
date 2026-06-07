@@ -66,13 +66,10 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             const chatMatch = currentPath.match(/^\/chat\/([^\/]+)$/);
             if (chatMatch) {
                 const userId = chatMatch[1];
-                // Garante que o voltar da sala permaneça no app mesmo quando
-                // o chat foi a primeira página aberta pelo usuário.
-                window.history.replaceState({}, '', '/chats');
-                pushVirtual('chat', { userId });
-                setTimeout(() => {
-                    setIsNavInitialized(true);
-                }, 150);
+                // Redireciona fisicamente para /chats com openChat para que o layout abra a tela virtual
+                // por cima de forma consistente e evite o bug de voltar do histórico.
+                router.replace(`/chats?openChat=${userId}`);
+                setIsNavInitialized(true);
                 return;
             }
 
@@ -107,6 +104,25 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
         initDeepLinkRoute();
     }, [isLoaded, isSignedIn]);
+
+    // Escuta parâmetros de busca (query params) para abrir salas de chat virtuais
+    useEffect(() => {
+        if (typeof window === 'undefined' || !isNavInitialized) return;
+
+        const params = new URLSearchParams(window.location.search);
+        const openChatId = params.get('openChat');
+        const giftCode = params.get('gift');
+
+        if (openChatId) {
+            // Remove os query params da URL silenciosamente para não reabrir o chat ao atualizar a página
+            const url = new URL(window.location.href);
+            url.searchParams.delete('openChat');
+            url.searchParams.delete('gift');
+            window.history.replaceState({}, '', url.pathname + url.search);
+
+            pushVirtual('chat', { userId: openChatId, giftCode: giftCode || undefined });
+        }
+    }, [pathname, isNavInitialized, pushVirtual]);
 
     useEffect(() => {
         // Se a rota for o chat, deixamos a própria página de chat gerenciar a resolução
