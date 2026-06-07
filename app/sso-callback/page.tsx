@@ -70,21 +70,6 @@ function LoadingCard() {
 }
 
 export default function SSOCallbackPage() {
-    const [redirectUrl, setRedirectUrl] = useState('/chats');
-    const [isReady, setIsReady] = useState(false);
-
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            // O redirectUrlComplete do Google OAuth já deve trazer a URL correta.
-            // Este localStorage serve como fallback de segurança.
-            const pendingRedirect = localStorage.getItem('mimo_redirect_after_login');
-            if (pendingRedirect) {
-                setRedirectUrl(pendingRedirect);
-            }
-            setIsReady(true);
-        }
-    }, []);
-
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4">
             <div className="w-full max-w-sm text-center">
@@ -107,9 +92,7 @@ export default function SSOCallbackPage() {
             </div>
 
             {/* Componente que processa a autenticação do Clerk por baixo dos panos */}
-            {isReady && (
-                <AuthenticateWithRedirectCallback signUpForceRedirectUrl={redirectUrl} signInForceRedirectUrl={redirectUrl} />
-            )}
+            <AuthenticateWithRedirectCallback signUpForceRedirectUrl="/chats" signInForceRedirectUrl="/chats" />
         </div>
     );
 }
