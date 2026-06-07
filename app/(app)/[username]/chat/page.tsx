@@ -36,10 +36,9 @@ export default function UsernameChatPage({ params }: UsernameChatPageProps) {
                         localStorage.setItem('mimo_pending_gift', gift.trim());
                     }
                     
-                    // Redireciona a rota física para /chats (sem o query param de gift)
-                    router.replace('/chats');
-                    
-                    // Empilha virtualmente o chat por cima, passando giftCode como parâmetro direto
+                    // Cria uma base interna antes da sala para que voltar nunca
+                    // retorne ao site/app que abriu o link direto.
+                    window.history.replaceState({}, '', '/chats');
                     pushVirtual('chat', { userId, giftCode: gift?.trim() || undefined });
                 } else {
                     router.replace('/chats');

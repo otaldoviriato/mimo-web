@@ -66,9 +66,9 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             const chatMatch = currentPath.match(/^\/chat\/([^\/]+)$/);
             if (chatMatch) {
                 const userId = chatMatch[1];
-                // Redireciona a rota real para chats
-                router.replace('/chats');
-                // Empilha virtualmente o chat por cima
+                // Garante que o voltar da sala permaneça no app mesmo quando
+                // o chat foi a primeira página aberta pelo usuário.
+                window.history.replaceState({}, '', '/chats');
                 pushVirtual('chat', { userId });
                 setTimeout(() => {
                     setIsNavInitialized(true);
