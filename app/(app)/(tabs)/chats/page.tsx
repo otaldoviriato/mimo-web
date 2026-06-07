@@ -115,12 +115,13 @@ export default function ChatsPage() {
                     if (!old) return old;
                     // Usa mongoRoomId (ObjectId) para encontrar a sala no cache
                     // pois room._id vem do MongoDB como string ObjectId
+                    let matchedRoom = false;
                     const updated = old.map((room) => {
                         const derivedRoomId = room.roomId ?? [...room.participants].sort().join('_');
-                        const match = data.mongoRoomId
-                            ? room._id === data.mongoRoomId
-                            : derivedRoomId === data.roomId;
+                        const match = room._id === data.mongoRoomId
+                            || derivedRoomId === data.roomId;
                         if (match) {
+                            matchedRoom = true;
                             const currentUnread = room.unreadCount?.[user.id!] ?? 0;
                             const isMe = data.senderId === user.id;
                             return {
@@ -136,6 +137,9 @@ export default function ChatsPage() {
                         }
                         return room;
                     });
+                    if (!matchedRoom) {
+                        queryClient.invalidateQueries({ queryKey: QueryKeys.rooms(user.id!) });
+                    }
                     // Reordena: sala com mensagem mais recente primeiro
                     return [...updated].sort(
                         (a, b) =>

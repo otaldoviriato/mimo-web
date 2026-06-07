@@ -19,10 +19,19 @@ export async function GET(
 
         await connectToDatabase();
 
-        // Busca todas as salas onde o usuário é participante
-        const rooms = await Room.find({
-            participants: userId
-        }).sort({ lastMessageTime: -1, updatedAt: -1 }).lean();
+        const currentUser = await User.findOne({ clerkId: userId })
+            .select('isProfessional')
+            .lean();
+
+        // Professionals only see a conversation after its first message.
+        // This also hides empty rooms left behind by the previous join flow.
+        const roomFilter = currentUser?.isProfessional
+            ? { participants: userId, lastMessageTime: { $exists: true } }
+            : { participants: userId };
+
+        const rooms = await Room.find(roomFilter)
+            .sort({ lastMessageTime: -1, updatedAt: -1 })
+            .lean();
 
         // Enriquece cada sala com os dados do OUTRO participante
         const enrichedRooms = await Promise.all(rooms.map(async (room) => {

@@ -73,7 +73,27 @@ export function useChatRooms() {
             if (!response.ok) throw new Error('Falha ao buscar salas');
             const data = await response.json();
             // A rota Next.js retorna array diretamente (enriquecido com otherParticipant)
-            const rooms = Array.isArray(data) ? data : (data.rooms ?? []);
+            const persistedRooms = Array.isArray(data) ? data : (data.rooms ?? []);
+            const pendingKey = `mimo_pending_rooms_${user.id}`;
+            let pendingRooms: any[] = [];
+            try {
+                const cachedPending = localStorage.getItem(pendingKey);
+                pendingRooms = cachedPending ? JSON.parse(cachedPending) : [];
+            } catch {
+                pendingRooms = [];
+            }
+
+            const persistedRoomIds = new Set(
+                persistedRooms.map((room: any) =>
+                    room.roomId ?? [...room.participants].sort().join('_')
+                )
+            );
+            const unresolvedPendingRooms = pendingRooms.filter(
+                (room: any) => !persistedRoomIds.has(room.roomId)
+            );
+            const rooms = [...persistedRooms, ...unresolvedPendingRooms];
+
+            localStorage.setItem(pendingKey, JSON.stringify(unresolvedPendingRooms));
             if (typeof window !== 'undefined') {
                 localStorage.setItem(`mimo_rooms_${user.id}`, JSON.stringify(rooms));
             }

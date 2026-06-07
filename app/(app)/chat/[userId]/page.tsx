@@ -343,14 +343,46 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
             // Atualiza cache local de rooms
             queryClient.setQueryData(QueryKeys.rooms(user.id!), (old: any) => {
-                if (!old) return old;
-                return old.map((r: any) => {
+                const currentRooms = Array.isArray(old) ? old : [];
+                const roomExists = currentRooms.some((r: any) => {
+                    const rId = r.roomId ?? [...r.participants].sort().join('_');
+                    return rId === roomId;
+                });
+
+                let updatedRooms = currentRooms.map((r: any) => {
                     const rId = r.roomId ?? [...r.participants].sort().join('_');
                     if (rId === roomId) {
                         return { ...r, unreadCount: { ...r.unreadCount, [user.id!]: 0 } };
                     }
                     return r;
                 });
+
+                if (!roomExists && receiver?.isProfessional) {
+                    const pendingRoom = {
+                        _id: `pending-${roomId}`,
+                        roomId,
+                        participants: [user.id!, otherUserId].sort(),
+                        otherUser: receiver,
+                        unreadCount: { [user.id!]: 0 },
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                    };
+                    updatedRooms = [...updatedRooms, pendingRoom];
+
+                    const pendingKey = `mimo_pending_rooms_${user.id!}`;
+                    let pendingRooms: any[] = [];
+                    try {
+                        pendingRooms = JSON.parse(localStorage.getItem(pendingKey) || '[]');
+                    } catch {
+                        pendingRooms = [];
+                    }
+                    localStorage.setItem(pendingKey, JSON.stringify([
+                        ...pendingRooms.filter((r: any) => r.roomId !== roomId),
+                        pendingRoom,
+                    ]));
+                }
+
+                return updatedRooms;
             });
         });
 
@@ -488,7 +520,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             socket.off('message_deleted');
             socket.off('room_read');
         };
-    }, [socket, socketVersion, roomId, otherUserId]);
+    }, [socket, socketVersion, roomId, otherUserId, user?.id, receiver, queryClient]);
 
     // Handles the edge case where the user selects a file before userData finishes
     // loading. Once userData is available we decide: auto-send (non-professional)
