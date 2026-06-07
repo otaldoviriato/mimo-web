@@ -27,6 +27,8 @@ export function StackNavigationProvider({ children }: { children: React.ReactNod
         screensRef.current = screens;
     }, [screens]);
 
+    const isManualPopRef = useRef(false);
+
     const pushVirtual = (type: 'chat' | 'profile' | 'settings', params: any) => {
         const key = `${type}-${Date.now()}`;
         const newScreen: StackScreen = { type, key, params };
@@ -63,11 +65,27 @@ export function StackNavigationProvider({ children }: { children: React.ReactNod
         setTimeout(() => {
             setScreens((prev) => prev.filter((s) => s.key !== lastScreen.key));
         }, 250);
+
+        // CRÍTICO: se a URL atual foi empurrada via pushState pelo pushVirtual (isVirtual: true),
+        // o Next.js App Router intercepta esse pushState e atualiza seu routing interno para
+        // a rota /chat/[userId]. Quando o popVirtual remove a tela virtual, o children do layout
+        // passa a ser o ChatPage real — causando o "chat carregando infinitamente".
+        // A solução é voltar na história do browser para que o Next.js retorne para /chats.
+        // Usamos isManualPopRef para evitar que o handlePopState abaixo chame popVirtual de novo.
+        if (typeof window !== 'undefined' && window.history.state?.isVirtual) {
+            isManualPopRef.current = true;
+            window.history.back();
+        }
     };
 
     // Escuta o evento de voltar do navegador (gesto ou botão de voltar do Android/iOS)
     useEffect(() => {
         const handlePopState = (e: PopStateEvent) => {
+            // Pop foi iniciado programaticamente pelo nosso popVirtual — ignoramos para evitar duplo-pop
+            if (isManualPopRef.current) {
+                isManualPopRef.current = false;
+                return;
+            }
             const currentScreens = screensRef.current;
             if (currentScreens.length > 0) {
                 // Se o popstate disparou e tínhamos telas virtuais, removemos a tela do topo

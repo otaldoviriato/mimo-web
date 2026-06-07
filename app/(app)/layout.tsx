@@ -47,12 +47,9 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                 (window as any).__mimo_handled_pending_redirect = true;
                 (window as any).__mimo_nav_initialized = true;
                 router.replace(pendingRedirect);
-                // Não setamos isNavInitialized aqui — a página de destino (ex: [username]/chat)
-                // vai fazer o redirect final e o layout será reinicializado com a rota correta.
-                // Mas para não travar a UI, inicializamos após um pequeno delay.
-                setTimeout(() => {
-                    setIsNavInitialized(true);
-                }, 300);
+                // A página [username]/chat tem sua própria tela de loading enquanto resolve o username.
+                // Não precisamos de splash screen extra — inicializamos imediatamente.
+                setIsNavInitialized(true);
                 return;
             }
 
