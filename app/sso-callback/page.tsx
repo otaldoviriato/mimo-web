@@ -92,6 +92,8 @@ export default function SSOCallbackPage() {
             </div>
 
             {/* Componente que processa a autenticação do Clerk por baixo dos panos */}
+            {/* Required when a new OAuth user is transferred from sign-in to sign-up. */}
+            <div id="clerk-captcha" />
             <AuthenticateWithRedirectCallback signUpForceRedirectUrl="/chats" signInForceRedirectUrl="/chats" />
         </div>
     );
