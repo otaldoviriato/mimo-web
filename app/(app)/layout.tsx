@@ -42,6 +42,14 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             const pendingRedirect = localStorage.getItem('mimo_redirect_after_login');
             if (pendingRedirect) {
                 localStorage.removeItem('mimo_redirect_after_login');
+                
+                // Se o redirecionamento pendente for para configurações, ignoramos para evitar
+                // o redirecionamento incorreto e o bug do botão de voltar para o Google OAuth.
+                if (pendingRedirect === '/settings' || pendingRedirect.startsWith('/settings?')) {
+                    setIsNavInitialized(true);
+                    return;
+                }
+
                 // Marcamos um flag para que o initDeepLinkRoute não reprocesse a URL
                 // depois que o router.replace levar para a nova página (ex: /juaccioli/chat)
                 (window as any).__mimo_handled_pending_redirect = true;
@@ -199,7 +207,12 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                     localStorage.setItem('mimo_pending_gift', gift);
                 }
                 const currentPath = window.location.pathname + window.location.search;
-                if (window.location.pathname && window.location.pathname !== '/login' && window.location.pathname !== '/') {
+                if (
+                    window.location.pathname &&
+                    window.location.pathname !== '/login' &&
+                    window.location.pathname !== '/' &&
+                    window.location.pathname !== '/settings'
+                ) {
                     localStorage.setItem('mimo_redirect_after_login', currentPath);
                 }
             }
