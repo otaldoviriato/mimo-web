@@ -28,17 +28,19 @@ export default function UsernameChatPage({ params }: UsernameChatPageProps) {
                 if (userId) {
                     const searchParams = window.location.search;
                     
-                    // Salva o cupom promocional no sessionStorage se ele estiver presente na URL
+                    // Extrai o cupom da URL para passá-lo diretamente ao chat via params
+                    // (mais confiável do que salvar em storage, evita race conditions)
                     const gift = new URLSearchParams(searchParams).get('gift');
                     if (gift) {
-                        sessionStorage.setItem('mimo_pending_gift', gift.trim());
+                        // Mantém no localStorage como fallback (ex: reload da página)
+                        localStorage.setItem('mimo_pending_gift', gift.trim());
                     }
                     
-                    // Redireciona a rota física para /chats
-                    router.replace(`/chats${searchParams}`);
+                    // Redireciona a rota física para /chats (sem o query param de gift)
+                    router.replace('/chats');
                     
-                    // Empilha virtualmente o chat por cima
-                    pushVirtual('chat', { userId });
+                    // Empilha virtualmente o chat por cima, passando giftCode como parâmetro direto
+                    pushVirtual('chat', { userId, giftCode: gift?.trim() || undefined });
                 } else {
                     router.replace('/chats');
                 }

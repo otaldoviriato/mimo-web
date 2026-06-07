@@ -8,7 +8,9 @@ export default function SSOCallbackPage() {
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
-            const pendingRedirect = sessionStorage.getItem('mimo_redirect_after_login');
+            // O redirectUrlComplete do Google OAuth já deve trazer a URL correta.
+            // Este localStorage serve como fallback de segurança.
+            const pendingRedirect = localStorage.getItem('mimo_redirect_after_login');
             if (pendingRedirect) {
                 setRedirectUrl(pendingRedirect);
             }

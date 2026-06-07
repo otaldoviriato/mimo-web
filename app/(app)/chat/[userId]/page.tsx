@@ -44,6 +44,7 @@ interface UploadTask {
 interface ChatPageProps {
     params?: Promise<{ userId: string }>;
     userId?: string;
+    giftCode?: string;
     onBack?: () => void;
     isSubPage?: boolean;
     isClosing?: boolean;
@@ -89,7 +90,7 @@ function formatLastSeen(isOnline?: boolean, lastSeenDateStr?: string | Date) {
     }
 }
 
-export default function ChatPage({ params, userId: propUserId, onBack, isSubPage = false, isClosing = false }: ChatPageProps) {
+export default function ChatPage({ params, userId: propUserId, giftCode: propGiftCode, onBack, isSubPage = false, isClosing = false }: ChatPageProps) {
     const resolvedParams = params ? use(params) : null;
     const otherUserId = propUserId || resolvedParams?.userId || '';
     const { openRechargeModal } = usePayment();
@@ -221,12 +222,20 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
     useEffect(() => {
         if (!user?.id || couponClaimedRef.current) return;
 
-        const stored = sessionStorage.getItem('mimo_pending_gift');
+        // Ordem de prioridade para encontrar o código do cupom:
+        // 1. Prop direta (passada pelo layout virtual via pushVirtual params) — mais confiável
+        // 2. localStorage (sobrevive a redirects OAuth no PWA)
+        // 3. sessionStorage (fallback legado)
+        // 4. URL query param (usuário já logado acessando o link diretamente)
+        const fromProp = propGiftCode;
+        const fromLocalStorage = localStorage.getItem('mimo_pending_gift');
+        const fromSessionStorage = sessionStorage.getItem('mimo_pending_gift');
         const fromUrl = new URLSearchParams(window.location.search).get('gift');
-        const code = stored || fromUrl;
+        const code = fromProp || fromLocalStorage || fromSessionStorage || fromUrl;
         if (!code) return;
 
         couponClaimedRef.current = true;
+        localStorage.removeItem('mimo_pending_gift');
         sessionStorage.removeItem('mimo_pending_gift');
 
         // Limpa a URL para remover o query param 'gift'
@@ -252,7 +261,7 @@ export default function ChatPage({ params, userId: propUserId, onBack, isSubPage
         }).catch((err) => {
             console.error('Error claiming coupon in chat screen:', err);
         });
-    }, [user?.id, queryClient]);
+    }, [user?.id, propGiftCode, queryClient]);
 
     const roomId = [user?.id, otherUserId].sort().join('_');
 

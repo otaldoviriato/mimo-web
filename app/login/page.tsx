@@ -14,7 +14,8 @@ function GiftCapture() {
     useEffect(() => {
         const gift = searchParams.get('gift');
         if (gift?.trim()) {
-            sessionStorage.setItem('mimo_pending_gift', gift.trim());
+            // localStorage persiste em redirects OAuth no PWA (sessionStorage pode ser destruído)
+            localStorage.setItem('mimo_pending_gift', gift.trim());
         }
     }, [searchParams]);
     return null;
@@ -38,9 +39,9 @@ export default function LoginPage() {
 
     useEffect(() => {
         if (isSignedIn) {
-            const redirectPath = sessionStorage.getItem('mimo_redirect_after_login');
+            const redirectPath = localStorage.getItem('mimo_redirect_after_login');
             if (redirectPath) {
-                sessionStorage.removeItem('mimo_redirect_after_login');
+                localStorage.removeItem('mimo_redirect_after_login');
                 router.replace(redirectPath);
             } else {
                 router.replace('/chats');
@@ -116,9 +117,9 @@ export default function LoginPage() {
                 await signUp!.attemptEmailAddressVerification({ code });
                 if (signUp!.status === 'complete') {
                     await setSignUpActive!({ session: signUp!.createdSessionId });
-                    const redirectPath = sessionStorage.getItem('mimo_redirect_after_login');
+                    const redirectPath = localStorage.getItem('mimo_redirect_after_login');
                     if (redirectPath) {
-                        sessionStorage.removeItem('mimo_redirect_after_login');
+                        localStorage.removeItem('mimo_redirect_after_login');
                         router.replace(redirectPath);
                     } else {
                         router.replace('/chats');
@@ -128,9 +129,9 @@ export default function LoginPage() {
                 await signIn!.attemptFirstFactor({ strategy: 'email_code', code });
                 if (signIn!.status === 'complete') {
                     await setSignInActive!({ session: signIn!.createdSessionId });
-                    const redirectPath = sessionStorage.getItem('mimo_redirect_after_login');
+                    const redirectPath = localStorage.getItem('mimo_redirect_after_login');
                     if (redirectPath) {
-                        sessionStorage.removeItem('mimo_redirect_after_login');
+                        localStorage.removeItem('mimo_redirect_after_login');
                         router.replace(redirectPath);
                     } else {
                         router.replace('/chats');
@@ -158,10 +159,14 @@ export default function LoginPage() {
         setError('');
 
         try {
+            // Para o Google OAuth, o sessionStorage pode ser destruído durante o redirect externo.
+            // Usamos o localStorage para preservar o pending redirect.
+            // O sso-callback irá ler o localStorage e redirecionar corretamente após a autenticação.
+            const pendingRedirect = localStorage.getItem('mimo_redirect_after_login') || '/chats';
             await signIn.authenticateWithRedirect({
                 strategy: 'oauth_google',
                 redirectUrl: '/sso-callback',
-                redirectUrlComplete: '/chats',
+                redirectUrlComplete: pendingRedirect,
             });
         } catch (err: unknown) {
             setError(clerkError(err, 'Erro no login com Google'));

@@ -37,12 +37,22 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         const initDeepLinkRoute = async () => {
             if (typeof window === 'undefined') return;
 
-            // Se houver um redirecionamento pendente no sessionStorage (pós-login), usamos ele!
-            const pendingRedirect = sessionStorage.getItem('mimo_redirect_after_login');
+            // Se houver um redirecionamento pendente no localStorage (pós-login), usamos ele!
+            // Usamos localStorage em vez de sessionStorage para sobreviver a redirects OAuth no PWA.
+            const pendingRedirect = localStorage.getItem('mimo_redirect_after_login');
             if (pendingRedirect) {
-                sessionStorage.removeItem('mimo_redirect_after_login');
+                localStorage.removeItem('mimo_redirect_after_login');
+                // Marcamos um flag para que o initDeepLinkRoute não reprocesse a URL
+                // depois que o router.replace levar para a nova página (ex: /juaccioli/chat)
+                (window as any).__mimo_handled_pending_redirect = true;
+                (window as any).__mimo_nav_initialized = true;
                 router.replace(pendingRedirect);
-                setIsNavInitialized(true);
+                // Não setamos isNavInitialized aqui — a página de destino (ex: [username]/chat)
+                // vai fazer o redirect final e o layout será reinicializado com a rota correta.
+                // Mas para não travar a UI, inicializamos após um pequeno delay.
+                setTimeout(() => {
+                    setIsNavInitialized(true);
+                }, 300);
                 return;
             }
 
@@ -80,8 +90,11 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             }
 
             // 3. Caso seja rota de perfil público: /[username]
+            // ATENÇÃO: Rotas como /juaccioli/chat são tratadas pela própria página [username]/chat.
+            // Aqui tratamos apenas o caso /[username] sem subrotas adicionais.
             const cleanedPath = currentPath.replace(/^\//, '');
-            if (cleanedPath.length > 0 && !isReservedRoute(currentPath)) {
+            // Ignora caminhos com sub-segmentos (ex: juaccioli/chat) — a página cuida disso
+            if (cleanedPath.length > 0 && !cleanedPath.includes('/') && !isReservedRoute(currentPath)) {
                 const username = cleanedPath.replace(/^@/, '');
                 router.replace('/chats');
                 pushVirtual('profile', { username });
@@ -169,11 +182,12 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                 const searchParams = new URLSearchParams(window.location.search);
                 const gift = searchParams.get('gift');
                 if (gift) {
-                    sessionStorage.setItem('mimo_pending_gift', gift);
+                    // localStorage persiste em redirects OAuth no PWA (sessionStorage pode ser destruído)
+                    localStorage.setItem('mimo_pending_gift', gift);
                 }
                 const currentPath = window.location.pathname + window.location.search;
                 if (window.location.pathname && window.location.pathname !== '/login' && window.location.pathname !== '/') {
-                    sessionStorage.setItem('mimo_redirect_after_login', currentPath);
+                    localStorage.setItem('mimo_redirect_after_login', currentPath);
                 }
             }
             router.replace('/login');
@@ -241,6 +255,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                         {screen.type === 'chat' && (
                             <ChatPage
                                 userId={screen.params.userId}
+                                giftCode={screen.params.giftCode}
                                 isSubPage={true}
                                 isClosing={isClosing}
                                 onBack={popVirtual}
