@@ -61,7 +61,7 @@ export async function POST(req: Request) {
                     ...(image_url ? { photoUrl: image_url } : {}),
                 },
                 $setOnInsert: {
-                    balance: 1000, 
+                    balance: 0, 
                     isProfessional: false,
                     chargePerCharSubscribers: 0.002,
                     chargePerCharNonSubscribers: 0.005,

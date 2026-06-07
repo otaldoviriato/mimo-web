@@ -36,7 +36,7 @@ export async function GET() {
                     email: email,
                     username: username,
                     name: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' '),
-                    balance: 1000,
+                    balance: 0,
                     isProfessional: false,
                     chargePerCharSubscribers: 0.002,
                     chargePerCharNonSubscribers: 0.005,
