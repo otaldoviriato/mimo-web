@@ -236,7 +236,8 @@ export async function GET(request: NextRequest) {
             }
 
             return {
-                id: tx.abacatePayId || tx._id?.toString() || `TX-${Math.floor(Math.random() * 100000)}`,
+                id: tx._id?.toString(),
+                displayId: tx.abacatePayId || tx._id?.toString() || `TX-${Math.floor(Math.random() * 100000)}`,
                 user: userName,
                 val: valInReais,
                 type: typeLabel,

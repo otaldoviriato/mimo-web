@@ -367,6 +367,38 @@ export default function AdminPage() {
         }
     };
 
+    // Exclui uma transação financeira permanentemente
+    const handleDeleteTransaction = async (id: string, displayId: string) => {
+        const confirmDelete = window.confirm(
+            `ATENÇÃO: Deseja realmente excluir permanentemente a transação "${displayId}"?\nEsta ação removerá de forma definitiva o registro contábil e não pode ser desfeita.`
+        );
+        if (!confirmDelete) return;
+
+        try {
+            const response = await fetch(`/api/admin/transactions/${id}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                toast.success('Transação excluída com sucesso!', {
+                    style: {
+                        borderRadius: '12px',
+                        background: '#1E293B',
+                        color: '#FFF',
+                        fontWeight: 600,
+                    }
+                });
+                fetchDashboard(selectedPeriod);
+            } else {
+                const data = await response.json();
+                toast.error(data.error || 'Erro ao excluir transação.');
+            }
+        } catch (error) {
+            console.error('Erro ao excluir transação:', error);
+            toast.error('Erro de conexão com o servidor.');
+        }
+    };
+
     // Busca cupons de desconto
     const fetchCoupons = async () => {
         setLoadingCoupons(true);
@@ -859,11 +891,23 @@ export default function AdminPage() {
                                                             <span className="text-[10px] text-slate-400 font-semibold">{tx.type} • {tx.time}</span>
                                                         </div>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <span className="text-xs font-bold text-slate-700 block">
-                                                            {tx.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                                        </span>
-                                                        <span className="text-[9px] text-slate-400 font-semibold uppercase">{tx.id}</span>
+                                                    <div className="text-right flex items-center gap-2">
+                                                        <div className="flex flex-col text-right">
+                                                            <span className="text-xs font-bold text-slate-700 block">
+                                                                {tx.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                            </span>
+                                                            <span className="text-[9px] text-slate-400 font-semibold uppercase">{tx.displayId || tx.id}</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleDeleteTransaction(tx.id, tx.displayId || tx.id);
+                                                            }}
+                                                            className="p-1 hover:text-rose-600 rounded-lg text-slate-350 hover:bg-rose-50 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            title="Excluir Transação"
+                                                        >
+                                                            <Trash2 size={13} />
+                                                        </button>
                                                     </div>
                                                 </div>
                                             ))
@@ -1021,12 +1065,13 @@ export default function AdminPage() {
                                             <th className="py-4 px-6">Valor</th>
                                             <th className="py-4 px-6">Data/Hora</th>
                                             <th className="py-4 px-6">Status</th>
+                                            <th className="py-4 px-6 text-center">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {loadingDashboard ? (
                                             <tr>
-                                                <td colSpan={6} className="py-20 text-center text-sm font-semibold text-slate-400">
+                                                <td colSpan={7} className="py-20 text-center text-sm font-semibold text-slate-400">
                                                     <div className="flex flex-col items-center gap-2">
                                                         <div className="animate-spin h-6 w-6 text-purple-600 rounded-full border-2 border-slate-200 border-t-purple-600" />
                                                         <span>Buscando transações reais...</span>
@@ -1036,7 +1081,7 @@ export default function AdminPage() {
                                         ) : dashboardData?.recentTransactions?.length > 0 ? (
                                             dashboardData.recentTransactions.map((tx: any) => (
                                                 <tr key={tx.id} className="hover:bg-slate-50/40 transition-colors">
-                                                    <td className="py-4 px-6 text-xs font-bold text-slate-500 uppercase">{tx.id}</td>
+                                                    <td className="py-4 px-6 text-xs font-bold text-slate-500 uppercase">{tx.displayId || tx.id}</td>
                                                     <td className="py-4 px-6 text-sm font-bold text-slate-800">{tx.user}</td>
                                                     <td className="py-4 px-6 text-xs text-slate-500 font-semibold">{tx.type}</td>
                                                     <td className="py-4 px-6 text-sm font-bold text-slate-700">
@@ -1056,11 +1101,20 @@ export default function AdminPage() {
                                                             {tx.status}
                                                         </span>
                                                     </td>
+                                                    <td className="py-4 px-6 text-center">
+                                                        <button
+                                                            onClick={() => handleDeleteTransaction(tx.id, tx.displayId || tx.id)}
+                                                            className="p-1.5 bg-slate-50 border border-slate-200 text-slate-500 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100 rounded-lg cursor-pointer transition-all shadow-sm active:scale-95"
+                                                            title="Excluir Transação"
+                                                        >
+                                                            <Trash2 size={13} />
+                                                        </button>
+                                                    </td>
                                                 </tr>
                                             ))
                                         ) : (
                                             <tr>
-                                                <td colSpan={6} className="py-20 text-center text-sm font-semibold text-slate-400">
+                                                <td colSpan={7} className="py-20 text-center text-sm font-semibold text-slate-400">
                                                     Nenhuma transação real registrada na base de dados.
                                                 </td>
                                             </tr>
