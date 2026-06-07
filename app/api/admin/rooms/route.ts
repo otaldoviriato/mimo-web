@@ -30,8 +30,16 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Acesso proibido. Apenas administradores.' }, { status: 403 });
         }
 
-        // 2. Buscar todas as salas
-        const rooms = await Room.find().sort({ updatedAt: -1 }).lean() as any[];
+        const { searchParams } = new URL(request.url);
+        const filterUserId = searchParams.get('userId');
+
+        let query: any = {};
+        if (filterUserId) {
+            query.participants = filterUserId;
+        }
+
+        // 2. Buscar todas as salas (ou filtradas por participante)
+        const rooms = await Room.find(query).sort({ updatedAt: -1 }).lean() as any[];
 
         // Coletar todos os Clerk IDs dos participantes das salas para fazer uma única busca em lote
         const participantClerkIds = Array.from(

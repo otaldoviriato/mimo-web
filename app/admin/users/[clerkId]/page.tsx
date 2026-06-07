@@ -20,7 +20,11 @@ import {
     X, 
     Mail, 
     User,
-    Sparkles
+    Sparkles,
+    Eye,
+    MessageCircle,
+    AlertTriangle,
+    ShieldAlert
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -49,6 +53,24 @@ interface GalleryItemType {
     createdAt: string;
 }
 
+interface ChatMessage {
+    sender: string;
+    text: string;
+    time: string;
+    cost: number;
+}
+
+interface ChatRoom {
+    id: string;
+    userA: { name: string; email: string; clerkId: string };
+    userB: { name: string; email: string; clerkId: string };
+    messagesCount: number;
+    lastMessage: string;
+    time: string;
+    totalRevenue: number;
+    history: ChatMessage[];
+}
+
 export default function UserDetailPage() {
     const { isLoaded, isSignedIn, userId: adminUserId } = useAuth();
     const params = useParams();
@@ -63,6 +85,11 @@ export default function UserDetailPage() {
     // Estados do Formulário
     const [user, setUser] = useState<UserDetail | null>(null);
     const [gallery, setGallery] = useState<GalleryItemType[]>([]);
+
+    // Estados do Gerenciamento de Salas de Chat da Profissional
+    const [rooms, setRooms] = useState<ChatRoom[]>([]);
+    const [loadingRooms, setLoadingRooms] = useState(true);
+    const [selectedAuditChat, setSelectedAuditChat] = useState<ChatRoom | null>(null);
 
     // Inputs
     const [name, setName] = useState('');
@@ -82,6 +109,76 @@ export default function UserDetailPage() {
     const [coverUrl, setCoverUrl] = useState('');
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Busca as salas de chat envolvidas
+    const fetchRooms = async () => {
+        setLoadingRooms(true);
+        try {
+            const response = await fetch(`/api/admin/rooms?userId=${clerkId}`);
+            if (response.ok) {
+                const data = await response.json();
+                setRooms(data.rooms || []);
+            } else {
+                toast.error('Erro ao buscar salas de chat.');
+            }
+        } catch (error) {
+            console.error('Erro de conexão ao buscar salas:', error);
+            toast.error('Erro de conexão com o servidor.');
+        } finally {
+            setLoadingRooms(false);
+        }
+    };
+
+    // Abre o modal de auditoria buscando o histórico de mensagens reais
+    const handleOpenAuditModal = async (chat: ChatRoom) => {
+        setSelectedAuditChat({
+            ...chat,
+            history: []
+        });
+
+        try {
+            const response = await fetch(`/api/admin/rooms/${chat.id}/messages`);
+            if (response.ok) {
+                const data = await response.json();
+                setSelectedAuditChat({
+                    ...chat,
+                    history: data.history || []
+                });
+            } else {
+                toast.error('Erro ao buscar mensagens do chat.');
+            }
+        } catch (error) {
+            console.error('Erro de conexão ao buscar mensagens:', error);
+            toast.error('Erro de conexão com o servidor.');
+        }
+    };
+
+    // Exclui permanentemente uma sala de chat e suas mensagens
+    const handleDeleteRoom = async (chatId: string, otherName: string) => {
+        const confirmDelete = window.confirm(
+            `ATENÇÃO: Você deseja EXCLUIR permanentemente toda a conversa com "${otherName}"?\nEsta ação apagará todo o histórico de mensagens do banco de dados de forma definitiva e não poderá ser desfeita.`
+        );
+        if (!confirmDelete) return;
+
+        try {
+            const response = await fetch(`/api/admin/rooms/${chatId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                toast.success('Sala de chat e mensagens excluídas com sucesso!', {
+                    style: { borderRadius: '12px', background: '#1E293B', color: '#FFF', fontWeight: 600 }
+                });
+                setRooms(prev => prev.filter(r => r.id !== chatId));
+            } else {
+                const data = await response.json();
+                toast.error(data.error || 'Erro ao excluir sala de chat.');
+            }
+        } catch (error) {
+            console.error('Erro ao excluir sala de chat:', error);
+            toast.error('Erro de conexão com o servidor.');
+        }
+    };
 
     // Busca os dados do usuário e autorização do admin
     useEffect(() => {
@@ -117,6 +214,9 @@ export default function UserDetailPage() {
                     setCoverUrl(data.user.coverUrl || '');
 
                     setIsAuthorized(true);
+                    if (data.user.isProfessional) {
+                        fetchRooms();
+                    }
                 } else if (response.status === 403) {
                     setIsAuthorized(false);
                     toast.error('Acesso restrito a administradores.');
@@ -636,8 +736,201 @@ export default function UserDetailPage() {
                             )}
                         </div>
                     )}
+
+                    {/* Salas de Chat (Apenas se for profissional) */}
+                    {isProfessional && (
+                        <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-6">
+                            <div>
+                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                                    <MessageCircle size={16} className="text-purple-600" />
+                                    Salas de Chat e Auditoria
+                                </h3>
+                                <p className="text-[11px] text-slate-400 font-medium mt-0.5">Visualize as trocas de mensagens da profissional para fins de moderação e auditoria.</p>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+                                            <th className="py-4 px-6">Cliente</th>
+                                            <th className="py-4 px-6">Mensagens</th>
+                                            <th className="py-4 px-6">Faturamento</th>
+                                            <th className="py-4 px-6">Última Mensagem</th>
+                                            <th className="py-4 px-6">Último Contato</th>
+                                            <th className="py-4 px-6 text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {loadingRooms ? (
+                                            <tr>
+                                                <td colSpan={6} className="py-12 text-center text-xs font-semibold text-slate-400">
+                                                    <div className="flex flex-col items-center gap-2 justify-center">
+                                                        <Loader2 size={16} className="animate-spin text-purple-600" />
+                                                        <span>Buscando conversas reais...</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ) : rooms.length > 0 ? (
+                                            rooms.map((chat) => {
+                                                const otherParticipant = chat.userA.clerkId === clerkId ? chat.userB : chat.userA;
+                                                const otherInitials = otherParticipant.name ? 
+                                                    (otherParticipant.name.split(' ').length >= 2 ? `${otherParticipant.name.split(' ')[0][0]}${otherParticipant.name.split(' ')[1][0]}` : otherParticipant.name.substring(0,2)) : 'US';
+                                                return (
+                                                    <tr key={chat.id} className="hover:bg-slate-50/40 transition-colors group">
+                                                        <td className="py-4 px-6">
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-700 border border-blue-100 flex items-center justify-center font-bold text-xs">
+                                                                    {otherInitials.toUpperCase()}
+                                                                </div>
+                                                                <div className="flex flex-col min-w-0">
+                                                                    <span className="text-xs font-bold text-slate-800 leading-tight truncate">{otherParticipant.name}</span>
+                                                                    <span className="text-[10px] text-slate-400 font-semibold truncate">{otherParticipant.email}</span>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-4 px-6 text-xs text-slate-650 font-bold">
+                                                            {chat.messagesCount}
+                                                        </td>
+                                                        <td className="py-4 px-6">
+                                                            <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                                                                <Coins size={12} className="text-amber-500" />
+                                                                {chat.totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-4 px-6 text-xs text-slate-550 max-w-xs truncate" title={chat.lastMessage}>
+                                                            {chat.lastMessage}
+                                                        </td>
+                                                        <td className="py-4 px-6 text-xs text-slate-500 font-bold">
+                                                            {chat.time}
+                                                        </td>
+                                                        <td className="py-4 px-6 text-center" onClick={(e) => e.stopPropagation()}>
+                                                            <div className="flex justify-center gap-2">
+                                                                <button
+                                                                    onClick={() => handleOpenAuditModal(chat)}
+                                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-100 text-purple-600 text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-sm active:scale-95"
+                                                                >
+                                                                    <Eye size={12} />
+                                                                    Auditar
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDeleteRoom(chat.id, otherParticipant.name)}
+                                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-100 text-rose-600 text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-sm active:scale-95"
+                                                                >
+                                                                    <Trash2 size={12} />
+                                                                    Excluir
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={6} className="py-12 text-center text-xs font-semibold text-slate-400">
+                                                    Nenhuma conversa iniciada por esta profissional até o momento.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
                 </main>
             </div>
+
+            {/* MODAL DE AUDITORIA DE CONVERSAS (WhatsApp Style) */}
+            {selectedAuditChat && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-slate-950 border border-slate-800 rounded-3xl w-full max-w-2xl h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-fade-in-up">
+                        
+                        {/* Header do Modal */}
+                        <div className="p-6 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-purple-500/10 text-purple-500 rounded-2xl border border-purple-500/20">
+                                    <ShieldAlert size={22} />
+                                </div>
+                                <div>
+                                    <h3 className="text-white text-base font-bold tracking-tight">Auditoria de Conversa</h3>
+                                    <p className="text-slate-400 text-xs mt-0.5">
+                                        Histórico completo de <strong>{selectedAuditChat.userA.name}</strong> para <strong>{selectedAuditChat.userB.name}</strong>
+                                    </p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => setSelectedAuditChat(null)}
+                                className="p-2 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl transition-all cursor-pointer"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Corpo do Modal - Balões de Chat */}
+                        <div className="flex-1 p-6 overflow-y-auto bg-slate-950/40 space-y-4 flex flex-col">
+                            {selectedAuditChat.history.map((msg, idx) => {
+                                const isUserA = msg.sender === selectedAuditChat.userA.clerkId;
+                                return (
+                                    <div 
+                                        key={idx} 
+                                        className={`flex flex-col max-w-[80%] ${
+                                            isUserA ? 'self-start mr-auto' : 'self-end ml-auto items-end'
+                                        }`}
+                                    >
+                                        {/* Balão */}
+                                        <div className={`p-4 rounded-2xl text-sm leading-relaxed ${
+                                            isUserA 
+                                                ? 'bg-slate-900 text-slate-100 rounded-tl-none border border-slate-800' 
+                                                : 'bg-purple-950/80 text-purple-100 rounded-tr-none border border-purple-900/60'
+                                        }`}>
+                                            <p className="break-all whitespace-pre-wrap">{msg.text}</p>
+                                            {/* Info de Faturamento */}
+                                            {msg.cost > 0 && (
+                                                <span className="inline-flex items-center gap-0.5 mt-2 px-1.5 py-0.5 text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-md">
+                                                    Custo: R$ {msg.cost.toFixed(2)}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {/* Metadata */}
+                                        <span className="text-[10px] text-slate-500 font-semibold mt-1 px-1">
+                                            {isUserA ? selectedAuditChat.userA.name : selectedAuditChat.userB.name} • {msg.time}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Moderação Ações no Rodapé */}
+                        <div className="p-6 border-t border-slate-800 bg-slate-950/80 flex flex-col sm:flex-row gap-4 items-center justify-between">
+                            <div className="flex items-center gap-2 text-xs text-amber-500 font-bold bg-amber-500/5 px-3 py-1.5 rounded-xl border border-amber-500/10">
+                                <AlertTriangle size={14} />
+                                Apenas para moderação.
+                            </div>
+                            <div className="flex gap-2 w-full sm:w-auto">
+                                <button 
+                                    onClick={() => {
+                                        toast.success('Usuário advertido com sucesso! (Simulado)');
+                                        setSelectedAuditChat(null);
+                                    }}
+                                    className="flex-1 sm:flex-initial px-4 py-2 border border-slate-700 hover:border-slate-600 text-slate-300 text-xs font-bold rounded-xl transition-all cursor-pointer bg-slate-900"
+                                >
+                                    Advertir Remetente
+                                </button>
+                                <button 
+                                    onClick={() => {
+                                        const otherParticipant = selectedAuditChat.userA.clerkId === clerkId ? selectedAuditChat.userB : selectedAuditChat.userA;
+                                        handleDeleteRoom(selectedAuditChat.id, otherParticipant.name);
+                                        setSelectedAuditChat(null);
+                                    }}
+                                    className="flex-1 sm:flex-initial px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-lg shadow-rose-600/10 transition-all cursor-pointer"
+                                >
+                                    Excluir Conversa
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
