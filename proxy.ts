@@ -7,7 +7,10 @@ const isPublicRoute = createRouteMatcher([
     '/sso-callback(.*)',
     '/manifest.json',
     '/firebase-messaging-sw.js',
-    '/.well-known/(.*)'
+    '/.well-known/(.*)',
+    '/institucional(.*)',
+    '/termos-de-uso(.*)',
+    '/politica-de-privacidade(.*)'
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
