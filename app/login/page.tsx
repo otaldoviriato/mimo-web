@@ -332,7 +332,12 @@ export default function LoginPage() {
                     </p>
                     <div className="border-t border-gray-100 pt-4 mt-4 space-y-0.5 select-none">
                         <p className="font-semibold text-gray-500">LEAD CONTEUDOS DIGITAIS LTDA</p>
-                        <p>CNPJ: 60.312.273/0001-01 | EEL CONTEUDOS DIGITAIS</p>
+                        <p>
+                            CNPJ: 60.312.273/0001-01 | EEL CONTEUDOS DIGITAIS |{' '}
+                            <Link href="/institucional" className="underline hover:text-purple-600 font-semibold">
+                                Sobre Nós
+                            </Link>
+                        </p>
                         <p className="text-purple-400 font-medium hover:text-purple-500">
                             <a href="mailto:suporte@mimochat.com.br">suporte@mimochat.com.br</a>
                         </p>
