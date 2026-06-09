@@ -20,6 +20,7 @@ export async function GET() {
         const settings = await AppSettings.findOne({ key: 'global' });
         const maxPricePerChar = settings?.maxPricePerChar ?? 0.2;
         const maxSubscriptionPrice = settings?.maxSubscriptionPrice ?? 200;
+        const minSubscriptionPrice = settings?.minSubscriptionPrice ?? 10;
         const subscriberDiscountPercentage = settings?.subscriberDiscountPercentage ?? 20;
 
         let user = await User.findOne({ clerkId: userId });
@@ -89,6 +90,7 @@ export async function GET() {
                 balance: user.balance,
                 isProfessional: user.isProfessional,
                 subscriptionPrice: user.subscriptionPrice || 0,
+                isSubscriptionEnabled: user.isSubscriptionEnabled ?? false,
                 chargePerCharSubscribers: user.chargePerCharSubscribers ?? 0.002,
                 chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? 0.005,
                 subscribers: user.subscribers || [],
@@ -104,6 +106,7 @@ export async function GET() {
                 bio: user.bio || '',
                 maxPricePerChar,
                 maxSubscriptionPrice,
+                minSubscriptionPrice,
                 subscriberDiscountPercentage,
                 minPublicPhotos: settings?.minPublicPhotos ?? 6,
                 maxPublicPhotos: settings?.maxPublicPhotos ?? 12,
@@ -128,13 +131,14 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { username, name, photoUrl, coverUrl, phone, taxId, pixKey, isProfessional, subscriptionPrice, chargePerCharSubscribers, chargePerCharNonSubscribers, bio, emailNotificationsEnabled } = body;
+        const { username, name, photoUrl, coverUrl, phone, taxId, pixKey, isProfessional, subscriptionPrice, isSubscriptionEnabled, chargePerCharSubscribers, chargePerCharNonSubscribers, bio, emailNotificationsEnabled } = body;
 
         await connectToDatabase();
 
         const settings = await AppSettings.findOne({ key: 'global' });
         const maxPricePerChar = settings?.maxPricePerChar ?? 0.2;
         const maxSubscriptionPrice = settings?.maxSubscriptionPrice ?? 200;
+        const minSubscriptionPrice = settings?.minSubscriptionPrice ?? 10;
         const subscriberDiscountPercentage = settings?.subscriberDiscountPercentage ?? 20;
 
         const currentUser = await User.findOne({ clerkId: userId });
@@ -165,12 +169,28 @@ export async function PATCH(request: NextRequest) {
         
         if (isProfessional !== undefined) updateData.isProfessional = isProfessional;
         
+        if (isSubscriptionEnabled !== undefined) {
+            updateData.isSubscriptionEnabled = Boolean(isSubscriptionEnabled);
+        }
+
+        const currentIsSubscriptionEnabled = isSubscriptionEnabled !== undefined ? Boolean(isSubscriptionEnabled) : (currentUser?.isSubscriptionEnabled ?? false);
+        const currentSubscriptionPrice = subscriptionPrice !== undefined ? Number(subscriptionPrice) : (currentUser?.subscriptionPrice ?? 0);
+
         if (subscriptionPrice !== undefined) {
             if (subscriptionPrice < 0) return NextResponse.json({ error: 'Subscription price cannot be negative' }, { status: 400 });
             if (subscriptionPrice > maxSubscriptionPrice) {
                 return NextResponse.json({ error: `O preço da assinatura não pode ser maior que R$ ${maxSubscriptionPrice}` }, { status: 400 });
             }
             updateData.subscriptionPrice = subscriptionPrice;
+        }
+
+        if (currentIsSubscriptionEnabled) {
+            if (currentSubscriptionPrice <= 0) {
+                return NextResponse.json({ error: 'O preço da assinatura deve ser maior que zero ao habilitar o recurso' }, { status: 400 });
+            }
+            if (currentSubscriptionPrice < minSubscriptionPrice) {
+                return NextResponse.json({ error: `O preço mínimo da assinatura é R$ ${minSubscriptionPrice.toFixed(2)}` }, { status: 400 });
+            }
         }
 
         if (chargePerCharSubscribers !== undefined) {
@@ -243,6 +263,7 @@ export async function PATCH(request: NextRequest) {
                 balance: user.balance,
                 isProfessional: user.isProfessional,
                 subscriptionPrice: user.subscriptionPrice || 0,
+                isSubscriptionEnabled: user.isSubscriptionEnabled ?? false,
                 chargePerCharSubscribers: user.chargePerCharSubscribers ?? 0.002,
                 chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? 0.005,
                 subscribers: user.subscribers || [],
@@ -258,6 +279,7 @@ export async function PATCH(request: NextRequest) {
                 bio: user.bio || '',
                 maxPricePerChar,
                 maxSubscriptionPrice,
+                minSubscriptionPrice,
                 subscriberDiscountPercentage,
                 minPublicPhotos: settings?.minPublicPhotos ?? 6,
                 maxPublicPhotos: settings?.maxPublicPhotos ?? 12,

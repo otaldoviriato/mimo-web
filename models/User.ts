@@ -25,6 +25,7 @@ export interface IUser extends Document {
     balance: number;
     isProfessional: boolean;
     subscriptionPrice: number;
+    isSubscriptionEnabled: boolean;
     chargePerCharSubscribers: number;
     chargePerCharNonSubscribers: number;
     subscribers: string[]; // Array of clerkIds
@@ -88,6 +89,10 @@ const UserSchema = new Schema<IUser>({
         type: Number,
         default: 0,
         min: 0,
+    },
+    isSubscriptionEnabled: {
+        type: Boolean,
+        default: false,
     },
     chargePerCharSubscribers: {
         type: Number,

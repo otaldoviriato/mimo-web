@@ -20,6 +20,7 @@ async function getOrCreateSettings() {
             comparisonPeriod: 'none',
             maxPricePerChar: 0.2,
             maxSubscriptionPrice: 200,
+            minSubscriptionPrice: 10,
             subscriberDiscountPercentage: 20,
             minPublicPhotos: 6,
             maxPublicPhotos: 12,
@@ -37,6 +38,7 @@ async function getOrCreateSettings() {
         if (settings.creditCardEnabled === undefined) { settings.creditCardEnabled = true; updated = true; }
         if (settings.couponsEnabled === undefined) { settings.couponsEnabled = true; updated = true; }
         if (settings.chatSessionTimeoutMinutes === undefined) { settings.chatSessionTimeoutMinutes = 30; updated = true; }
+        if (settings.minSubscriptionPrice === undefined) { settings.minSubscriptionPrice = 10; updated = true; }
         if (updated) {
             await settings.save();
         }
@@ -125,6 +127,7 @@ export async function PUT(request: NextRequest) {
             comparisonPeriod,
             maxPricePerChar,
             maxSubscriptionPrice,
+            minSubscriptionPrice,
             subscriberDiscountPercentage,
             minPublicPhotos,
             maxPublicPhotos,
@@ -182,6 +185,18 @@ export async function PUT(request: NextRequest) {
                 return NextResponse.json({ error: 'Preço máximo de assinatura inválido' }, { status: 400 });
             }
             settings.maxSubscriptionPrice = price;
+        }
+
+        if (minSubscriptionPrice !== undefined) {
+            const price = Number(minSubscriptionPrice);
+            if (isNaN(price) || price < 0) {
+                return NextResponse.json({ error: 'Preço mínimo de assinatura inválido' }, { status: 400 });
+            }
+            settings.minSubscriptionPrice = price;
+        }
+
+        if (settings.minSubscriptionPrice > settings.maxSubscriptionPrice) {
+            return NextResponse.json({ error: 'O preço mínimo de assinatura não pode ser maior que o preço máximo' }, { status: 400 });
         }
 
         if (subscriberDiscountPercentage !== undefined) {

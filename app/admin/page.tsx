@@ -45,6 +45,7 @@ interface SettingsData {
     comparisonPeriod: 'none' | 'week' | 'month';
     maxPricePerChar: number;
     maxSubscriptionPrice: number;
+    minSubscriptionPrice: number;
     subscriberDiscountPercentage: number;
     minPublicPhotos: number;
     maxPublicPhotos: number;
@@ -124,6 +125,7 @@ export default function AdminPage() {
     const [comparisonPeriod, setComparisonPeriod] = useState<'none' | 'week' | 'month'>('none');
     const [maxPricePerChar, setMaxPricePerChar] = useState(0.2);
     const [maxSubscriptionPrice, setMaxSubscriptionPrice] = useState(200);
+    const [minSubscriptionPrice, setMinSubscriptionPrice] = useState(10);
     const [subscriberDiscountPercentage, setSubscriberDiscountPercentage] = useState(20);
     const [minPublicPhotos, setMinPublicPhotos] = useState(6);
     const [maxPublicPhotos, setMaxPublicPhotos] = useState(12);
@@ -220,6 +222,7 @@ export default function AdminPage() {
                     setAdminListRich(data.richAdmins || []);
                     setMaxPricePerChar(s.maxPricePerChar !== undefined ? s.maxPricePerChar : 0.2);
                     setMaxSubscriptionPrice(s.maxSubscriptionPrice !== undefined ? s.maxSubscriptionPrice : 200);
+                    setMinSubscriptionPrice(s.minSubscriptionPrice !== undefined ? s.minSubscriptionPrice : 10);
                     setSubscriberDiscountPercentage(s.subscriberDiscountPercentage !== undefined ? s.subscriberDiscountPercentage : 20);
                     setMinPublicPhotos(s.minPublicPhotos !== undefined ? s.minPublicPhotos : 6);
                     setMaxPublicPhotos(s.maxPublicPhotos !== undefined ? s.maxPublicPhotos : 12);
@@ -637,6 +640,7 @@ export default function AdminPage() {
                     comparisonPeriod,
                     maxPricePerChar,
                     maxSubscriptionPrice,
+                    minSubscriptionPrice,
                     subscriberDiscountPercentage,
                     minPublicPhotos,
                     maxPublicPhotos,
@@ -663,6 +667,7 @@ export default function AdminPage() {
                 setAdminListRich(data.richAdmins || []);
                 setMaxPricePerChar(data.settings.maxPricePerChar);
                 setMaxSubscriptionPrice(data.settings.maxSubscriptionPrice);
+                setMinSubscriptionPrice(data.settings.minSubscriptionPrice || 10);
                 setSubscriberDiscountPercentage(data.settings.subscriberDiscountPercentage);
                 setMinPublicPhotos(data.settings.minPublicPhotos);
                 setMaxPublicPhotos(data.settings.maxPublicPhotos);
@@ -1355,6 +1360,17 @@ export default function AdminPage() {
                                                 step="0.001"
                                                 value={maxPricePerChar} 
                                                 onChange={(e) => setMaxPricePerChar(Number(e.target.value))}
+                                                min={0}
+                                                className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700" 
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-600 uppercase block">Preço Mínimo da Assinatura (R$)</label>
+                                            <input 
+                                                type="number" 
+                                                step="0.01"
+                                                value={minSubscriptionPrice} 
+                                                onChange={(e) => setMinSubscriptionPrice(Number(e.target.value))}
                                                 min={0}
                                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700" 
                                             />

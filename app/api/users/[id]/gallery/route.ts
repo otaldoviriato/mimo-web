@@ -19,8 +19,8 @@ export async function GET(
             return NextResponse.json({ items: [], privateItems: [], privatePhotosCount: 0, privateVideosCount: 0 });
         }
 
-        // Verificar se quem está pedindo é assinante (assinatura só faz sentido para profissionais)
-        const isSubscriber = owner.isProfessional && requesterId && owner.subscribers?.includes(requesterId);
+        // Verificar se quem está pedindo é assinante (assinatura só faz sentido para profissionais com assinatura ativada)
+        const isSubscriber = owner.isProfessional && owner.isSubscriptionEnabled && requesterId && owner.subscribers?.includes(requesterId);
         const isOwner = requesterId === ownerId;
 
         const allItems = await GalleryItem.find({ ownerId }).sort({ createdAt: -1 });

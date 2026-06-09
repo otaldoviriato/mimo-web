@@ -40,6 +40,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const [phone, setPhone] = useState('');
     const [pixKey, setPixKey] = useState('');
     const [subscriptionPrice, setSubscriptionPrice] = useState('');
+    const [isSubscriptionEnabled, setIsSubscriptionEnabled] = useState(false);
     const [bio, setBio] = useState('');
 
     const [loading, setLoading] = useState(false);
@@ -67,6 +68,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             setPhone(userData.phone ? formatPhone(userData.phone) : '');
             setPixKey(userData.pixKey || '');
             setSubscriptionPrice(userData.subscriptionPrice?.toString() ?? '0');
+            setIsSubscriptionEnabled(userData.isSubscriptionEnabled ?? false);
             setBio(userData.bio || '');
             setEmailNotificationsEnabled(userData.emailNotificationsEnabled ?? false);
             hasPopulated.current = true;
@@ -88,12 +90,28 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
 
             if (userData?.isProfessional) {
                 const limitMax = userData?.maxSubscriptionPrice ?? 200;
+                const limitMin = userData?.minSubscriptionPrice ?? 10;
                 const price = Number(subscriptionPrice) || 0;
+
+                if (isSubscriptionEnabled) {
+                    if (price <= 0) {
+                        setSaveError('O preço da assinatura deve ser maior que zero');
+                        setLoading(false);
+                        return;
+                    }
+                    if (price < limitMin) {
+                        setSaveError(`O preço da assinatura não pode ser menor que o valor mínimo de R$ ${limitMin.toFixed(2)}`);
+                        setLoading(false);
+                        return;
+                    }
+                }
+
                 if (price > limitMax) {
                     setSaveError(`O preço da assinatura não pode ser maior que R$ ${limitMax.toFixed(2)}`);
                     setLoading(false);
                     return;
                 }
+                updateData.isSubscriptionEnabled = isSubscriptionEnabled;
                 updateData.subscriptionPrice = price;
                 updateData.bio = bio;
                 updateData.pixKey = pixKey;
@@ -258,24 +276,64 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                         {/* ── SEÇÃO: PREÇOS E GANHOS (Profissionais) ── */}
                         {profileIsProfessional && (
                             <div>
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Preços e Ganhos</p>
-                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                                    <div className="px-4 py-3.5">
-                                        <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Assinatura Mensal (R$)</label>
-                                        <input
-                                            className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
-                                            placeholder="0.00"
-                                            value={subscriptionPrice}
-                                            onChange={(e) => setSubscriptionPrice(e.target.value)}
-                                            type="number"
-                                            step="0.01"
-                                            inputMode="decimal"
-                                            max={userData?.maxSubscriptionPrice ?? 200}
-                                        />
-                                        <span className="text-[9px] text-gray-400 block mt-1">
-                                            Valor máximo permitido: R$ {(userData?.maxSubscriptionPrice ?? 200).toFixed(2)}
-                                        </span>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Assinatura e Ganhos</p>
+                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-50">
+                                    {/* Toggle Habilitar Assinatura */}
+                                    <div className="px-4 py-3.5 flex items-center justify-between">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-8 h-8 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-500">
+                                                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>
+                                                </svg>
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium text-gray-800">Oferecer Assinatura</p>
+                                                <p className="text-[10px] text-gray-400 leading-snug">
+                                                    Permita que os usuários assinem seu perfil para acessar sua galeria privada
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            id="subscription-enabled-toggle"
+                                            type="button"
+                                            onClick={() => setIsSubscriptionEnabled(!isSubscriptionEnabled)}
+                                            className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${
+                                                isSubscriptionEnabled ? 'bg-purple-600' : 'bg-gray-200'
+                                            }`}
+                                            aria-label="Habilitar assinatura no perfil"
+                                            role="switch"
+                                            aria-checked={isSubscriptionEnabled}
+                                        >
+                                            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                                                isSubscriptionEnabled ? 'translate-x-5' : 'translate-x-0'
+                                            }`} />
+                                        </button>
                                     </div>
+
+                                    {/* Preço da Assinatura (Exibe apenas se habilitado) */}
+                                    {isSubscriptionEnabled && (
+                                        <div className="px-4 py-3.5 bg-slate-50/30 transition-all">
+                                            <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Preço da Assinatura Mensal (R$)</label>
+                                            <input
+                                                className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
+                                                placeholder="0.00"
+                                                value={subscriptionPrice}
+                                                onChange={(e) => setSubscriptionPrice(e.target.value)}
+                                                type="number"
+                                                step="0.01"
+                                                inputMode="decimal"
+                                                max={userData?.maxSubscriptionPrice ?? 200}
+                                            />
+                                            <div className="flex flex-col gap-0.5 mt-1">
+                                                <span className="text-[9px] text-gray-400">
+                                                    Valor mínimo permitido: R$ {(userData?.minSubscriptionPrice ?? 10).toFixed(2)}
+                                                </span>
+                                                <span className="text-[9px] text-gray-400">
+                                                    Valor máximo permitido: R$ {(userData?.maxSubscriptionPrice ?? 200).toFixed(2)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}

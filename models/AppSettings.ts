@@ -10,6 +10,7 @@ export interface IAppSettings extends Document {
     comparisonPeriod: 'none' | 'week' | 'month';
     maxPricePerChar: number;
     maxSubscriptionPrice: number;
+    minSubscriptionPrice: number;
     subscriberDiscountPercentage: number;
     minPublicPhotos: number;
     maxPublicPhotos: number;
@@ -74,6 +75,12 @@ const AppSettingsSchema = new Schema<IAppSettings>({
         type: Number,
         required: true,
         default: 200,
+        min: 0,
+    },
+    minSubscriptionPrice: {
+        type: Number,
+        required: true,
+        default: 10,
         min: 0,
     },
     subscriberDiscountPercentage: {

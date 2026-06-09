@@ -43,7 +43,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
 
     const isSubscriber = galleryData?.isSubscriber;
     const isOwner = galleryData?.isOwner;
-    const showSubscribeButton = user?.isProfessional && !isSubscriber && !isOwner;
+    const showSubscribeButton = user?.isProfessional && user?.isSubscriptionEnabled && !isSubscriber && !isOwner;
 
     const handleBack = () => {
         if (onBack) {
@@ -289,8 +289,8 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                 )}
             </div>
 
-            {/* Seletor de Abas da Galeria (apenas para assinantes ou dono) */}
-            {user?.isProfessional && (isSubscriber || isOwner) ? (
+            {/* Seletor de Abas da Galeria (apenas para o dono ou se for assinante e o recurso estiver habilitado) */}
+            {user?.isProfessional && (isOwner || (isSubscriber && user?.isSubscriptionEnabled)) ? (
                 <div className="flex border-b border-purple-100/50 mb-2.5 px-6 shrink-0 z-10">
                     <button
                         onClick={() => setActiveGalleryTab('public')}

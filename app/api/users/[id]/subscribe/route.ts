@@ -28,6 +28,10 @@ export async function POST(
             return NextResponse.json({ error: 'Perfil não encontrado ou não profissional' }, { status: 404 });
         }
 
+        if (!owner.isSubscriptionEnabled) {
+            return NextResponse.json({ error: 'Este perfil não aceita assinaturas no momento' }, { status: 400 });
+        }
+
         if (!requester) {
             return NextResponse.json({ error: 'Seu perfil não foi encontrado' }, { status: 404 });
         }
