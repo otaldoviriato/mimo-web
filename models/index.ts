@@ -16,3 +16,6 @@ export type { IGalleryItem } from './GalleryItem';
 export { AppSettings } from './AppSettings';
 export type { IAppSettings } from './AppSettings';
 
+export { HelpTicket } from './HelpTicket';
+export type { IHelpTicket } from './HelpTicket';
+

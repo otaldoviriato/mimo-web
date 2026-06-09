@@ -12,6 +12,7 @@ import {
     ShieldAlert,
     Wallet,
     Ticket,
+    LifeBuoy,
     X
 } from 'lucide-react';
 import Link from 'next/link';
@@ -32,6 +33,7 @@ export function Sidebar({ activeTab, setActiveTab, isOpen = false, onClose }: Si
         { id: 'financial', label: 'Financeiro', icon: DollarSign },
         { id: 'withdrawals', label: 'Solicitações de Saque', icon: Wallet },
         { id: 'coupons', label: 'Cupons de Desconto', icon: Ticket },
+        { id: 'help-tickets', label: 'Tickets de Ajuda', icon: LifeBuoy },
     ];
 
     const handleTabChange = (tab: string) => {

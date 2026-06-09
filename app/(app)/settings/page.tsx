@@ -534,6 +534,20 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                 {/* Links de Conformidade Legal */}
                                 <div className="border-t border-gray-100 flex flex-col bg-gray-50/30">
                                     <Link
+                                        href="/ajuda"
+                                        className="px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-5 h-5 flex items-center justify-center text-xs">
+                                                💬
+                                            </div>
+                                            <span className="text-xs text-gray-700 font-medium">Central de Ajuda & Suporte</span>
+                                        </div>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-gray-400">
+                                            <polyline points="9 18 15 12 9 6"/>
+                                        </svg>
+                                    </Link>
+                                    <Link
                                         href="/termos-de-uso"
                                         target="_blank"
                                         className="px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100"

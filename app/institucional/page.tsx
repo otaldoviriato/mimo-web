@@ -277,10 +277,15 @@ export default function InstitucionalPage() {
 
                         {/* Suporte e Informações */}
                         <div className="space-y-3">
-                            <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Fale Conosco</h4>
+                            <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Suporte</h4>
                             <ul className="space-y-2 text-xs">
+                                <li>
+                                    <Link href="/ajuda" className="text-purple-600 hover:text-purple-700 font-semibold transition-colors">
+                                        Central de Ajuda & FAQ
+                                    </Link>
+                                </li>
                                 <li className="text-gray-500">
-                                    Contato e ajuda: <br />
+                                    E-mail de contato: <br />
                                     <a href="mailto:suporte@mimochat.com.br" className="text-purple-600 hover:underline">
                                         suporte@mimochat.com.br
                                     </a>
