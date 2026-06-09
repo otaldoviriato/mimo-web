@@ -197,7 +197,7 @@ export default function AdminPage() {
     const [loadingTickets, setLoadingTickets] = useState(true);
     const [selectedTicket, setSelectedTicket] = useState<HelpTicketData | null>(null);
     const [ticketSearch, setTicketSearch] = useState('');
-    const [ticketStatusFilter, setTicketStatusFilter] = useState<string>('all');
+    const [ticketStatusFilter, setTicketStatusFilter] = useState<string>('abertos');
     const [ticketFavoriteFilter, setTicketFavoriteFilter] = useState<boolean>(false);
     const [replyText, setReplyText] = useState('');
     const [sendingReply, setSendingReply] = useState(false);
@@ -2054,6 +2054,7 @@ export default function AdminPage() {
                                     {/* Abas horizontais de Status */}
                                     <div className="flex gap-1 overflow-x-auto pb-1 select-none scrollbar-none">
                                         {[
+                                            { id: 'abertos', label: 'Abertos' },
                                             { id: 'all', label: 'Todos' },
                                             { id: 'novo', label: 'Novos' },
                                             { id: 'em_atendimento', label: 'Em Fila' },
@@ -2089,7 +2090,11 @@ export default function AdminPage() {
                                                 (t.senderName && t.senderName.toLowerCase().includes(ticketSearch.toLowerCase())) ||
                                                 t.subject.toLowerCase().includes(ticketSearch.toLowerCase()) ||
                                                 t.message.toLowerCase().includes(ticketSearch.toLowerCase());
-                                            const matchesStatus = ticketStatusFilter === 'all' || t.status === ticketStatusFilter;
+                                            const matchesStatus = ticketStatusFilter === 'all' 
+                                                ? true 
+                                                : ticketStatusFilter === 'abertos' 
+                                                    ? ['novo', 'em_atendimento'].includes(t.status)
+                                                    : t.status === ticketStatusFilter;
                                             const matchesFav = !ticketFavoriteFilter || t.isFavorite;
                                             return matchesSearch && matchesStatus && matchesFav;
                                         });
@@ -2297,7 +2302,7 @@ export default function AdminPage() {
                                                     <button
                                                         onClick={() => handleSendReply(selectedTicket._id)}
                                                         disabled={sendingReply || !replyText.trim()}
-                                                        className="mt-2 w-fit px-5 py-2 bg-purple-650 hover:bg-purple-700 active:bg-purple-800 disabled:opacity-60 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-purple-650/15 cursor-pointer flex items-center gap-1.5"
+                                                        className="mt-2 w-fit px-5 py-2 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 disabled:opacity-60 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-purple-600/15 cursor-pointer flex items-center gap-1.5"
                                                     >
                                                         {sendingReply ? (
                                                             <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>

@@ -179,10 +179,14 @@ export async function POST(
             console.warn('RESEND_API_KEY não configurada. Resposta simulada localmente.');
         }
 
-        // Atualizar ticket para resolvido e salvar a resposta no histórico de anotações internas
+        // Salvar a resposta no histórico de anotações internas
         const historyLog = `\n\n--- RESPOSTA ENVIADA EM ${new Date().toLocaleString('pt-BR')} ---\n${replyMessage.trim()}`;
         ticket.notes = (ticket.notes || '') + historyLog;
-        ticket.status = 'resolvido';
+        
+        // Se for novo, muda automaticamente para em_atendimento
+        if (ticket.status === 'novo') {
+            ticket.status = 'em_atendimento';
+        }
         ticket.isRead = true;
 
         await ticket.save();
