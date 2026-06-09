@@ -59,6 +59,16 @@ export default function LoginPage() {
         setEmailLoading(true);
         setError('');
 
+        const targetEmail = email.trim().toLowerCase();
+
+        // Exceção de homologação Asaas - Pula o envio de e-mail OTP real do Clerk
+        if (targetEmail === 'homologacao-asaas@mimochat.com.br') {
+            setFlowType('signIn');
+            setPendingVerification(true);
+            setEmailLoading(false);
+            return;
+        }
+
         try {
             // Tenta login — se a conta existir, retorna os fatores disponíveis
             await signIn!.create({ identifier: email });
@@ -105,6 +115,37 @@ export default function LoginPage() {
 
         setEmailLoading(true);
         setError('');
+
+        const targetEmail = email.trim().toLowerCase();
+
+        // Exceção de homologação Asaas - Valida código 111111 e loga via senha do Clerk nos bastidores
+        if (targetEmail === 'homologacao-asaas@mimochat.com.br') {
+            if (code.trim() !== '111111') {
+                setError('Código incorreto');
+                setEmailLoading(false);
+                return;
+            }
+
+            try {
+                // Faz a autenticação real por senha do Clerk
+                const result = await signIn!.create({
+                    identifier: targetEmail,
+                    password: 'Asaas@MimoChat2026'
+                });
+                
+                if (result.status === 'complete') {
+                    await setSignInActive!({ session: result.createdSessionId });
+                    router.replace('/chats');
+                } else {
+                    setError('Não foi possível completar a autenticação.');
+                }
+            } catch (err: unknown) {
+                setError(clerkError(err, 'Erro ao autenticar conta de teste. Verifique se a senha do Asaas está configurada no Clerk.'));
+            } finally {
+                setEmailLoading(false);
+            }
+            return;
+        }
 
         try {
             if (flowType === 'signUp') {
