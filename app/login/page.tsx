@@ -137,7 +137,7 @@ export default function LoginPage() {
                     await setSignInActive!({ session: result.createdSessionId });
                     router.replace('/chats');
                 } else {
-                    setError('Não foi possível completar a autenticação.');
+                    setError(`Não foi possível completar a autenticação. (Status: ${result.status})`);
                 }
             } catch (err: unknown) {
                 setError(clerkError(err, 'Erro ao autenticar conta de teste. Verifique se a senha do Asaas está configurada no Clerk.'));
