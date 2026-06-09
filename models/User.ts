@@ -147,7 +147,6 @@ const UserSchema = new Schema<IUser>({
     },
     lastSeen: {
         type: Date,
-        default: Date.now,
     },
     emailNotificationsEnabled: {
         type: Boolean,
