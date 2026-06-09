@@ -146,8 +146,9 @@ export default function LoginPage() {
                 // O Clerk vai processar o ticket de forma legítima e redirecionar de volta já logado!
                 window.location.href = data.url;
                 
-            } catch (err: unknown) {
-                setError('Erro ao autenticar conta de homologação do Asaas.');
+            } catch (err: any) {
+                console.error('[Login Asaas Bypass Error]:', err);
+                setError(`Erro ao autenticar: ${err.message || err}`);
                 setEmailLoading(false);
             }
             return;

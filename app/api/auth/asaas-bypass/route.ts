@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClerkClient } from '@clerk/nextjs/server';
+import { clerkClient } from '@clerk/nextjs/server';
 
 export async function POST(req: Request) {
     try {
@@ -10,19 +10,21 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Credenciais inválidas' }, { status: 400 });
         }
 
-        const secretKey = process.env.CLERK_SECRET_KEY;
-        if (!secretKey) {
-            console.error('[Asaas Bypass Error]: CLERK_SECRET_KEY não configurada.');
-            return NextResponse.json({ error: 'Configuração do servidor incompleta.' }, { status: 500 });
-        }
+        // Resolver o cliente do Clerk de forma compatível com Clerk v4 (objeto) e Clerk v5+ (função assíncrona)
+        // Isso evita erros críticos de tipo/resolução de módulo no Next.js
+        const client: any = typeof clerkClient === 'function' 
+            ? await (clerkClient as any)() 
+            : clerkClient;
 
-        // Criar cliente do Clerk
-        const clerk = createClerkClient({ secretKey });
+        if (!client) {
+            console.error('[Asaas Bypass Error]: Não foi possível inicializar o cliente do Clerk.');
+            return NextResponse.json({ error: 'Erro de conexão com o provedor de autenticação.' }, { status: 500 });
+        }
 
         console.log('[Asaas Bypass]: Gerando Sign-in Token para user_3EsgEPUA8sBHCnpDhFEhhHynacW...');
 
         // Criar o token de sign-in de uso único válido por 5 minutos
-        const tokenResponse = await clerk.signInTokens.createSignInToken({
+        const tokenResponse = await client.signInTokens.createSignInToken({
             userId: 'user_3EsgEPUA8sBHCnpDhFEhhHynacW',
             expiresInSeconds: 60 * 5
         });
