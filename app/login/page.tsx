@@ -118,7 +118,7 @@ export default function LoginPage() {
 
         const targetEmail = email.trim().toLowerCase();
 
-        // Exceção de homologação Asaas - Valida código 111111 e loga via senha do Clerk nos bastidores
+        // Exceção de homologação Asaas - Valida código 111111 e loga via Sign-in Token gerado pelo backend
         if (targetEmail === 'homologacao-asaas@mimochat.com.br') {
             if (code.trim() !== '111111') {
                 setError('Código incorreto');
@@ -127,21 +127,27 @@ export default function LoginPage() {
             }
 
             try {
-                // Faz a autenticação real por senha do Clerk
-                const result = await signIn!.create({
-                    identifier: targetEmail,
-                    password: 'Asaas@MimoChat2026'
+                // Chama a nossa API de backend para obter o Sign-in Token
+                const response = await fetch('/api/auth/asaas-bypass', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: targetEmail, code: '111111' })
                 });
+
+                const data = await response.json();
                 
-                if (result.status === 'complete') {
-                    await setSignInActive!({ session: result.createdSessionId });
-                    router.replace('/chats');
-                } else {
-                    setError(`Não foi possível completar a autenticação. (Status: ${result.status})`);
+                if (!response.ok || !data.url) {
+                    setError(data.error || 'Erro ao gerar token de acesso de homologação.');
+                    setEmailLoading(false);
+                    return;
                 }
+
+                // Redireciona o usuário para a URL de login do Clerk gerada pelo backend
+                // O Clerk vai processar o ticket de forma legítima e redirecionar de volta já logado!
+                window.location.href = data.url;
+                
             } catch (err: unknown) {
-                setError(clerkError(err, 'Erro ao autenticar conta de teste. Verifique se a senha do Asaas está configurada no Clerk.'));
-            } finally {
+                setError('Erro ao autenticar conta de homologação do Asaas.');
                 setEmailLoading(false);
             }
             return;
