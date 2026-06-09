@@ -1,5 +1,4 @@
-const { MongoClient, ObjectId } = require('mongodb');
-require('dotenv').config();
+const mongoose = require('mongoose');
 
 // Para rodar: node scripts/populate_asaas_test.js <prod_mongodb_uri> <asaas_clerk_id>
 // Exemplo: node scripts/populate_asaas_test.js "mongodb+srv://..." "user_2a1b..."
@@ -24,16 +23,14 @@ if (!clerkIdAsaas) {
   process.exit(1);
 }
 
-const client = new MongoClient(mongoUri);
-
 async function run() {
   try {
-    await client.connect();
-    console.log("Conectado com sucesso ao banco de dados!");
+    console.log("Conectando via Mongoose ao banco de dados...");
+    await mongoose.connect(mongoUri);
+    console.log("Conectado com sucesso!");
     
-    // Obter o nome do banco a partir da URI ou default para mimo-chat-prod
-    const dbName = mongoUri.includes('/mimo-chat-desenv') ? 'mimo-chat-desenv' : 'mimo-chat';
-    const db = client.db(dbName);
+    const db = mongoose.connection.db;
+    const dbName = mongoose.connection.name;
     console.log(`Usando banco de dados: ${dbName}`);
 
     // 1. Criar ou Atualizar o Criador de Conteúdo Modelo (Profissional)
@@ -57,14 +54,14 @@ async function run() {
     };
 
     await db.collection("users").findOneAndUpdate(
-      { clerkId: creatorClerkId },
+      { username: creatorUsername }, // Busca por username para evitar duplicados
       { $set: creatorUser },
       { upsert: true }
     );
     console.log(`✅ Criador modelo pronto: @${creatorUsername}`);
 
-    // 2. Criar ou Atualizar o Usuário Fã do Asaas
-    console.log("Criando usuário fã de homologação do Asaas...");
+    // 2. Criar ou Atualizar o Usuário Fã do Asaas (Busca por e-mail para evitar erro 11000)
+    console.log("Criando/atualizando usuário fã de homologação do Asaas...");
     const asaasUser = {
       clerkId: clerkIdAsaas,
       username: "homologacao_asaas",
@@ -81,7 +78,7 @@ async function run() {
     };
 
     await db.collection("users").findOneAndUpdate(
-      { clerkId: clerkIdAsaas },
+      { email: asaasUser.email }, // Busca por e-mail garante que atualizaremos o registro existente!
       { $set: asaasUser },
       { upsert: true }
     );
@@ -171,7 +168,7 @@ async function run() {
   } catch (error) {
     console.error("Erro durante a execução do script:", error);
   } finally {
-    await client.close();
+    await mongoose.disconnect();
   }
 }
 
