@@ -4,6 +4,7 @@ const isPublicRoute = createRouteMatcher([
     '/login(.*)',
     '/api/webhooks(.*)',
     '/api/notifications/send(.*)', // Permitir notificações disparadas pelo servidor de chat
+    '/api/auth/asaas-bypass(.*)',  // Permitir chamada de bypass de autenticação do Asaas
     '/sso-callback(.*)',
     '/manifest.json',
     '/firebase-messaging-sw.js',
