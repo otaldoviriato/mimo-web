@@ -14,6 +14,8 @@ export const DEFAULT_MARKETING_SCORING_CRITERIA: MarketingScoringCriteria = {
         'Link externo relacionado a conteúdo exclusivo',
         'Perfil aparenta ser de uma mulher adulta',
         'Parece uma pessoa real',
+        'Link externo para Telegram (t.me)',
+        'Bio contém frases sugestivas de conteúdo adulto como "só pra quem sabe aproveitar" ou "acesso exclusivo"',
     ],
     negativeSignals: [
         'Parece marca ou empresa',
@@ -24,6 +26,7 @@ export const DEFAULT_MARKETING_SCORING_CRITERIA: MarketingScoringCriteria = {
         'Perfil privado ou sem dados suficientes',
         'Sinais de spam ou golpe',
         'Pouca atividade',
+        'Bio menciona claramente trabalho com comércios ou serviços tradicionais (ex: salão, maquiadora, laces, moda, estética, unhas) sem venda explícita de conteúdo adulto',
     ],
     weights: {
         realPerson: 5,
