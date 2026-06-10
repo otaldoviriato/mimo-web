@@ -16,6 +16,8 @@ export const DEFAULT_MARKETING_SCORING_CRITERIA: MarketingScoringCriteria = {
         'Parece uma pessoa real',
         'Link externo para Telegram (t.me)',
         'Bio contém frases sugestivas de conteúdo adulto como "só pra quem sabe aproveitar" ou "acesso exclusivo"',
+        'Uso de emojis sugestivos (pimenta 🌶️, fogo 🔥, diabinho 😈, cadeado 🔒)',
+        'Bio contém termos sutis ou com duplo sentido relacionados a conteúdo exclusivo ou privado',
     ],
     negativeSignals: [
         'Parece marca ou empresa',
@@ -26,7 +28,7 @@ export const DEFAULT_MARKETING_SCORING_CRITERIA: MarketingScoringCriteria = {
         'Perfil privado ou sem dados suficientes',
         'Sinais de spam ou golpe',
         'Pouca atividade',
-        'Bio menciona claramente trabalho com comércios ou serviços tradicionais (ex: salão, maquiadora, laces, moda, estética, unhas) sem venda explícita de conteúdo adulto',
+        'Bio menciona claramente trabalho com comércios ou serviços tradicionais (ex: salão, maquiadora, laces, moda, estética, unhas) SEM qualquer indício de conteúdo adulto ou de duplo sentido',
     ],
     weights: {
         realPerson: 5,
