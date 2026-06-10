@@ -25,3 +25,11 @@ export type {
     ICreatorApplication,
     OnlineExperience,
 } from './CreatorApplication';
+
+export {
+    MarketingCampaign,
+    MarketingLead,
+    MarketingRun,
+    MarketingSeedProfile,
+    MarketingSettings,
+} from './Marketing';

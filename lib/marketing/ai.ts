@@ -1,0 +1,203 @@
+import { IMarketingCampaign, MarketingCandidateInput, MarketingRecommendation } from '@/models/Marketing';
+
+export interface ProspectScore {
+    score: number;
+    summary: string;
+    positiveSignals: string[];
+    riskSignals: string[];
+    recommendation: MarketingRecommendation;
+    suggestedMessage: string;
+}
+
+const SCORE_SCHEMA = {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+        score: { type: 'number', minimum: 0, maximum: 100 },
+        summary: { type: 'string' },
+        positiveSignals: { type: 'array', items: { type: 'string' } },
+        riskSignals: { type: 'array', items: { type: 'string' } },
+        recommendation: { type: 'string', enum: ['approve', 'review', 'reject'] },
+        suggestedMessage: { type: 'string' },
+    },
+    required: [
+        'score',
+        'summary',
+        'positiveSignals',
+        'riskSignals',
+        'recommendation',
+        'suggestedMessage',
+    ],
+} as const;
+
+function extractOutputText(payload: Record<string, unknown>) {
+    if (typeof payload.output_text === 'string') return payload.output_text;
+    const output = Array.isArray(payload.output) ? payload.output : [];
+    for (const item of output) {
+        if (!item || typeof item !== 'object') continue;
+        const content = Array.isArray((item as { content?: unknown[] }).content)
+            ? (item as { content: unknown[] }).content
+            : [];
+        for (const part of content) {
+            if (
+                part
+                && typeof part === 'object'
+                && (part as { type?: string }).type === 'output_text'
+                && typeof (part as { text?: unknown }).text === 'string'
+            ) {
+                return (part as { text: string }).text;
+            }
+        }
+    }
+    throw new Error('A OpenAI não retornou texto utilizável.');
+}
+
+export class MarketingAIService {
+    constructor(
+        private readonly apiKey: string,
+        private readonly model: string
+    ) {}
+
+    private async requestJson<T>(
+        name: string,
+        schema: Record<string, unknown>,
+        instructions: string,
+        input: unknown
+    ): Promise<T> {
+        const response = await fetch('https://api.openai.com/v1/responses', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${this.apiKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model: this.model,
+                store: false,
+                instructions,
+                input: JSON.stringify(input),
+                text: {
+                    format: {
+                        type: 'json_schema',
+                        name,
+                        strict: true,
+                        schema,
+                    },
+                },
+            }),
+            signal: AbortSignal.timeout(60_000),
+        });
+
+        const payload = await response.json() as Record<string, unknown>;
+        if (!response.ok) {
+            const error = payload.error as { message?: string } | undefined;
+            throw new Error(error?.message || `Falha na OpenAI (${response.status}).`);
+        }
+        return JSON.parse(extractOutputText(payload)) as T;
+    }
+
+    async prioritizeCandidates(
+        candidates: MarketingCandidateInput[],
+        campaign: IMarketingCampaign,
+        limit: number
+    ) {
+        const schema = {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+                usernames: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    maxItems: limit,
+                },
+            },
+            required: ['usernames'],
+        };
+        const result = await this.requestJson<{ usernames: string[] }>(
+            'marketing_candidate_priority',
+            schema,
+            'Priorize perfis para prospecção ética do MimoChat. Use somente os dados fornecidos. Não presuma idade; perfis com possível menoridade devem ir para o fim. Retorne usernames únicos.',
+            {
+                campaign: {
+                    targetDescription: campaign.targetDescription,
+                    minFollowers: campaign.minFollowers,
+                    maxFollowers: campaign.maxFollowers,
+                    positiveSignals: campaign.positiveSignals,
+                    negativeSignals: campaign.negativeSignals,
+                },
+                candidates,
+                limit,
+            }
+        );
+        const allowed = new Set(candidates.map(item => item.username.toLowerCase()));
+        return result.usernames
+            .map(username => username.toLowerCase().replace(/^@/, ''))
+            .filter(username => allowed.has(username))
+            .slice(0, limit);
+    }
+
+    async scoreProspect(
+        candidate: MarketingCandidateInput,
+        campaign: IMarketingCampaign
+    ): Promise<ProspectScore> {
+        return this.requestJson<ProspectScore>(
+            'marketing_prospect_score',
+            SCORE_SCHEMA,
+            [
+                'Qualifique a potencial criadora para o MimoChat usando somente os dados fornecidos.',
+                'Sinais positivos: pessoa real, audiência própria, perfil ativo, link externo, boa comunicação, provável benefício com o Mimo e estética de criadora digital.',
+                'Sinais negativos: fake, possível menoridade, dados insuficientes, pouca atividade, marca/empresa, golpe ou conteúdo incompatível.',
+                'Se houver sinal de menoridade, recomende reject. Não faça inferências sensíveis sem evidência.',
+                'suggestedMessage deve ficar vazio nesta etapa.',
+            ].join(' '),
+            { campaign, candidate }
+        );
+    }
+
+    async generateOutreachMessage(
+        candidate: MarketingCandidateInput,
+        campaign: IMarketingCampaign,
+        score: ProspectScore
+    ) {
+        const schema = {
+            type: 'object',
+            additionalProperties: false,
+            properties: { suggestedMessage: { type: 'string' } },
+            required: ['suggestedMessage'],
+        };
+        const result = await this.requestJson<{ suggestedMessage: string }>(
+            'marketing_outreach_message',
+            schema,
+            'Escreva uma mensagem curta, humana e respeitosa em português do Brasil para contato manual. Não diga que houve scraping ou monitoramento. Não pressione, não prometa ganhos e não inclua conteúdo sexual. Convide a conhecer o MimoChat.',
+            {
+                campaign: {
+                    name: campaign.name,
+                    targetDescription: campaign.targetDescription,
+                },
+                candidate: {
+                    username: candidate.username,
+                    displayName: candidate.displayName,
+                    bio: candidate.bio,
+                },
+                qualification: score,
+            }
+        );
+        return result.suggestedMessage.trim();
+    }
+
+    async testConnection() {
+        return this.requestJson<{ ok: boolean; message: string }>(
+            'marketing_openai_test',
+            {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                    ok: { type: 'boolean' },
+                    message: { type: 'string' },
+                },
+                required: ['ok', 'message'],
+            },
+            'Responda que a conexão de configuração do CRM MimoChat está funcionando.',
+            { test: true }
+        );
+    }
+}
