@@ -2,6 +2,7 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
 const isPublicRoute = createRouteMatcher([
     '/login(.*)',
+    '/onboarding(.*)',
     '/api/webhooks(.*)',
     '/api/notifications/send(.*)', // Permitir notificações disparadas pelo servidor de chat
     '/api/auth/asaas-bypass(.*)',  // Permitir chamada de bypass de autenticação do Asaas
