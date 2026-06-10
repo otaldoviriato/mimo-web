@@ -17,7 +17,16 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
         }
 
-        // Webhook da Resend envia as informações do e-mail dentro de data
+        // Validar o tipo de evento do webhook se ele estiver presente
+        if (body.type && body.type !== 'email.received') {
+            console.log(`[Webhook Resend] Evento do tipo '${body.type}' ignorado. Apenas 'email.received' é processado.`);
+            return NextResponse.json(
+                { message: `Evento '${body.type}' ignorado.` },
+                { status: 200 }
+            );
+        }
+
+        // Webhook da Resend envia as informações do e-mail dentro de data ou diretamente no body
         const emailData = body.data || body;
 
         const fromString = emailData.from;
@@ -37,6 +46,22 @@ export async function POST(request: NextRequest) {
         if (match) {
             senderName = match[1]?.trim() || '';
             senderEmail = match[2]?.trim() || fromString;
+        }
+
+        // Prevenir loops de e-mail e tickets gerados por e-mails de sistema ou de envio
+        const systemEmails = [
+            'noreply@mimochat.com.br',
+            'suporte@mimochat.com.br',
+            process.env.HELP_EMAIL_FROM?.toLowerCase(),
+            'noreply@resend.dev'
+        ].filter(Boolean) as string[];
+
+        if (systemEmails.includes(senderEmail.toLowerCase())) {
+            console.log(`[Webhook Resend] E-mail do sistema '${senderEmail}' ignorado para evitar loops e tickets falsos.`);
+            return NextResponse.json(
+                { message: 'E-mail do sistema ignorado.' },
+                { status: 200 }
+            );
         }
 
         await connectToDatabase();
