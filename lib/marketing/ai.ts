@@ -9,6 +9,20 @@ export interface ProspectScore {
     suggestedMessage: string;
 }
 
+export interface ScoutProfileInput {
+    platform: string;
+    url: string;
+    pageType: string;
+    username: string;
+    displayName: string;
+    bio: string;
+    followersText: string;
+    followingText: string;
+    postsText: string;
+    externalLink: string;
+    visibleTexts: string[];
+}
+
 const SCORE_SCHEMA = {
     type: 'object',
     additionalProperties: false,
@@ -150,6 +164,22 @@ export class MarketingAIService {
                 'suggestedMessage deve ficar vazio nesta etapa.',
             ].join(' '),
             { campaign, candidate }
+        );
+    }
+
+    async analyzeScoutProfile(profile: ScoutProfileInput): Promise<ProspectScore> {
+        return this.requestJson<ProspectScore>(
+            'mimo_scout_profile_analysis',
+            SCORE_SCHEMA,
+            [
+                'Avalie se o perfil parece uma boa potencial criadora para o MimoChat usando somente os dados visíveis fornecidos.',
+                'Sinais positivos incluem pessoa real, perfil ativo, audiência própria, bio bem montada, link externo, comunicação com seguidores, conteúdo de criadora digital e potencial para receber mensagens e mimos.',
+                'Sinais negativos incluem perfil fake, possível menoridade, dados insuficientes, marca ou empresa, pouca atividade, spam, golpe ou conteúdo incompatível.',
+                'Não infira atributos sensíveis. Se houver evidência de possível menoridade, recomende reject e explique o risco.',
+                'A mensagem sugerida deve ser curta, humana, respeitosa e em português do Brasil. Não mencione scraping, monitoramento, ganhos garantidos ou conteúdo sexual.',
+                'Retorne score de 0 a 100 e use somente approve, review ou reject na recomendação.',
+            ].join(' '),
+            profile
         );
     }
 

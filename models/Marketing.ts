@@ -92,6 +92,11 @@ export interface IMarketingLead extends Document, MarketingCandidateInput {
     followingCount: number;
     postsCount: number;
     externalLink: string;
+    followersText: string;
+    followingText: string;
+    postsText: string;
+    visibleTexts: string[];
+    source: string;
     sourceSeedUsername: string;
     sourceContext: string;
     campaignId?: Types.ObjectId;
@@ -190,6 +195,11 @@ const MarketingLeadSchema = new Schema<IMarketingLead>({
     followingCount: { type: Number, default: 0, min: 0 },
     postsCount: { type: Number, default: 0, min: 0 },
     externalLink: { type: String, default: '', trim: true },
+    followersText: { type: String, default: '', trim: true, maxlength: 200 },
+    followingText: { type: String, default: '', trim: true, maxlength: 200 },
+    postsText: { type: String, default: '', trim: true, maxlength: 200 },
+    visibleTexts: { type: [String], default: [] },
+    source: { type: String, default: '', trim: true, maxlength: 100, index: true },
     sourceSeedUsername: { type: String, default: '', trim: true, lowercase: true },
     sourceContext: { type: String, default: '', trim: true, maxlength: 5000 },
     campaignId: { type: Schema.Types.ObjectId, ref: 'MarketingCampaign', index: true },

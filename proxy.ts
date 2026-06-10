@@ -13,6 +13,7 @@ const isPublicRoute = createRouteMatcher([
     '/institucional(.*)',
     '/creators(.*)',
     '/api/creator-applications(.*)',
+    '/api/marketing/copilot(.*)',
     '/termos-de-uso(.*)',
     '/politica-de-privacidade(.*)'
 ]);
