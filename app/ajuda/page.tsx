@@ -16,6 +16,7 @@ import {
     CreditCard,
     Lock
 } from 'lucide-react';
+import { InstagramIcon } from '@/components/InstagramIcon';
 
 interface FAQItem {
     question: string;
@@ -207,8 +208,8 @@ export default function AjudaPage() {
                 <section className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
                     
                     {/* Informações de Contato à Esquerda */}
-                    <div className="md:col-span-1 space-y-5">
-                        <div className="bg-gradient-to-br from-purple-600 to-indigo-700 text-white rounded-2xl p-6 shadow-sm flex flex-col justify-between h-full min-h-[200px]">
+                    <div className="md:col-span-1 space-y-4">
+                        <div className="bg-gradient-to-br from-purple-600 to-indigo-700 text-white rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[180px]">
                             <div className="space-y-4">
                                 <div className="bg-white/10 p-2.5 rounded-xl border border-white/20 w-fit">
                                     <Mail className="w-5 h-5 text-white" />
@@ -229,6 +230,22 @@ export default function AjudaPage() {
                                 </a>
                             </div>
                         </div>
+
+                        {/* Card Instagram */}
+                        <a
+                            href="https://www.instagram.com/mimochat.oficial/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-br from-[#833ab4] via-[#fd1d1d] to-[#fcb045] text-white shadow-sm hover:opacity-90 transition-opacity"
+                        >
+                            <div className="bg-white/20 p-2.5 rounded-xl border border-white/30 shrink-0">
+                                <InstagramIcon className="w-5 h-5 text-white" />
+                            </div>
+                            <div>
+                                <p className="font-bold text-sm">Siga no Instagram</p>
+                                <p className="text-xs text-white/80">@mimochat.oficial</p>
+                            </div>
+                        </a>
                     </div>
 
                     {/* Formulário de Suporte à Direita */}

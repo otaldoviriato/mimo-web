@@ -12,8 +12,9 @@ import {
     Lock, 
     Users, 
     Zap, 
-    CheckCircle2 
+    CheckCircle2
 } from 'lucide-react';
+import { InstagramIcon } from '@/components/InstagramIcon';
 
 export default function InstitucionalPage() {
     const router = useRouter();
@@ -90,6 +91,15 @@ export default function InstitucionalPage() {
                             className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 text-base font-bold text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50 border border-gray-200 rounded-2xl transition-all duration-300 shadow-xs"
                         >
                             Descobrir Como Funciona
+                        </a>
+                        <a
+                            href="https://www.instagram.com/mimochat.oficial/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 text-base font-bold text-white bg-gradient-to-br from-[#833ab4] via-[#fd1d1d] to-[#fcb045] hover:opacity-90 rounded-2xl transition-all duration-300 shadow-md hover:-translate-y-0.5"
+                        >
+                            <InstagramIcon className="w-5 h-5" />
+                            @mimochat.oficial
                         </a>
                     </div>
                 </div>
@@ -288,6 +298,17 @@ export default function InstitucionalPage() {
                                     E-mail de contato: <br />
                                     <a href="mailto:suporte@mimochat.com.br" className="text-purple-600 hover:underline">
                                         suporte@mimochat.com.br
+                                    </a>
+                                </li>
+                                <li>
+                                    <a
+                                        href="https://www.instagram.com/mimochat.oficial/"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 text-pink-600 hover:text-pink-700 font-semibold transition-colors"
+                                    >
+                                        <InstagramIcon className="w-3.5 h-3.5" />
+                                        @mimochat.oficial
                                     </a>
                                 </li>
                             </ul>

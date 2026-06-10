@@ -565,7 +565,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                     <Link
                                         href="/politica-de-privacidade"
                                         target="_blank"
-                                        className="px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                                        className="px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100"
                                     >
                                         <div className="flex items-center gap-3">
                                             <div className="w-5 h-5 flex items-center justify-center text-xs">
@@ -577,6 +577,24 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                             <polyline points="9 18 15 12 9 6"/>
                                         </svg>
                                     </Link>
+                                    <a
+                                        href="https://www.instagram.com/mimochat.oficial/"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-4 py-3 flex items-center justify-between hover:bg-pink-50 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-5 h-5 flex items-center justify-center">
+                                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-pink-500">
+                                                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+                                                </svg>
+                                            </div>
+                                            <span className="text-xs text-pink-600 font-semibold">@mimochat.oficial</span>
+                                        </div>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-gray-400">
+                                            <polyline points="9 18 15 12 9 6"/>
+                                        </svg>
+                                    </a>
                                 </div>
                             </div>
                         </div>
