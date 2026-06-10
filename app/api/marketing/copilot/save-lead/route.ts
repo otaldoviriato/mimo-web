@@ -7,7 +7,8 @@ import {
     sanitizeScoutPayload,
 } from '@/lib/marketing/copilot';
 import { boundedNumber, cleanString, cleanStringArray } from '@/lib/marketing/security';
-import { MarketingLead, MarketingRecommendation } from '@/models/Marketing';
+import { compatibilityFromScore, MARKETING_COMPATIBILITY_LEVELS } from '@/lib/marketing/compatibility';
+import { MarketingCompatibilityLevel, MarketingLead, MarketingRecommendation } from '@/models/Marketing';
 
 const recommendations: MarketingRecommendation[] = ['approve', 'review', 'reject'];
 
@@ -28,6 +29,10 @@ export async function POST(request: NextRequest) {
             : {};
         const profile = sanitizeScoutPayload(body);
         const recommendation = cleanString(body.aiRecommendation, 20) as MarketingRecommendation;
+        const requestedCompatibility = cleanString(body.aiCompatibility, 30) as MarketingCompatibilityLevel;
+        const compatibility = MARKETING_COMPATIBILITY_LEVELS.includes(requestedCompatibility)
+            ? requestedCompatibility
+            : compatibilityFromScore(boundedNumber(body.aiScore, 0, 0, 100));
 
         if (profile.platform !== 'instagram' || !profile.username || !profile.url) {
             return copilotJson(request, { error: 'Perfil do Instagram incompleto.' }, 400);
@@ -63,6 +68,7 @@ export async function POST(request: NextRequest) {
                         || profile.visibleTexts.join('\n').slice(0, 5000),
                     comments: profile.visibleTexts.join('\n').slice(0, 5000),
                     aiScore: boundedNumber(body.aiScore, 0, 0, 100),
+                    aiCompatibility: compatibility,
                     aiSummary: cleanString(body.aiSummary, 3000),
                     aiPositiveSignals: cleanStringArray(body.aiPositiveSignals, 30, 300),
                     aiRiskSignals: cleanStringArray(body.aiRiskSignals, 30, 300),

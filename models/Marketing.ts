@@ -13,6 +13,18 @@ export type MarketingLeadStatus =
     | 'rejected'
     | 'ignored';
 export type MarketingRecommendation = 'approve' | 'review' | 'reject';
+export type MarketingCompatibilityLevel =
+    | 'excellent'
+    | 'very_promising'
+    | 'promising'
+    | 'low_fit'
+    | 'incompatible';
+export type MarketingContactStatus =
+    | 'not_contacted'
+    | 'contacted_no_reply'
+    | 'replied_interested'
+    | 'replied_not_interested'
+    | 'became_user';
 
 export interface MarketingScoringCriteria {
     targetDescription: string;
@@ -30,11 +42,13 @@ export interface MarketingScoringCriteria {
         externalLink: number;
         followerInteraction: number;
         creatorFit: number;
+        adultContentFit: number;
     };
     penalties: {
         brandOrCompany: number;
         fakeOrBot: number;
         possibleMinor: number;
+        possibleMale: number;
         privateOrInsufficient: number;
         spamOrScam: number;
         inactiveProfile: number;
@@ -131,12 +145,15 @@ export interface IMarketingLead extends Document, MarketingCandidateInput {
     campaignId?: Types.ObjectId;
     runId?: Types.ObjectId;
     aiScore: number;
+    aiCompatibility: MarketingCompatibilityLevel;
     aiSummary: string;
     aiPositiveSignals: string[];
     aiRiskSignals: string[];
     aiRecommendation: MarketingRecommendation;
     suggestedMessage: string;
     status: MarketingLeadStatus;
+    contactStatus: MarketingContactStatus;
+    contactResponse: string;
     notes: string;
     createdAt: Date;
     updatedAt: Date;
@@ -179,7 +196,7 @@ const MarketingSettingsSchema = new Schema<IMarketingSettings>({
     scoringCriteria: {
         targetDescription: {
             type: String,
-            default: 'Criadoras digitais com audiência própria, perfil ativo e potencial para usar o MimoChat.',
+            default: 'Mulheres adultas que aparentam vender ou ter interesse em vender conteúdo adulto ou exclusivo, com sinais claros na bio e potencial para usar o MimoChat.',
             trim: true,
             maxlength: 4000,
         },
@@ -190,12 +207,12 @@ const MarketingSettingsSchema = new Schema<IMarketingSettings>({
             type: [String],
             default: [
                 'Parece uma pessoa real',
-                'Perfil ativo',
-                'Tem audiência própria',
-                'Bio bem montada',
-                'Possui link externo',
-                'Interage com seguidores',
-                'Conteúdo compatível com criadora digital',
+                'Bio menciona conteúdo exclusivo',
+                'Bio menciona Privacy ou plataforma semelhante',
+                'Bio usa frases como o que você quer ou o que você procura',
+                'Bio sugere venda de conteúdo, acesso exclusivo ou atendimento privado',
+                'Link externo relacionado a conteúdo exclusivo',
+                'Perfil aparenta ser de uma mulher adulta',
             ],
         },
         negativeSignals: {
@@ -204,6 +221,8 @@ const MarketingSettingsSchema = new Schema<IMarketingSettings>({
                 'Parece marca ou empresa',
                 'Parece fake ou bot',
                 'Possível menor de idade',
+                'Possível perfil masculino',
+                'Bio sem indícios de venda de conteúdo adulto ou exclusivo',
                 'Perfil privado ou sem dados suficientes',
                 'Sinais de spam ou golpe',
                 'Pouca atividade',
@@ -217,12 +236,14 @@ const MarketingSettingsSchema = new Schema<IMarketingSettings>({
             profileQuality: { type: Number, default: 10, min: 0, max: 100 },
             externalLink: { type: Number, default: 5, min: 0, max: 100 },
             followerInteraction: { type: Number, default: 15, min: 0, max: 100 },
-            creatorFit: { type: Number, default: 15, min: 0, max: 100 },
+            creatorFit: { type: Number, default: 5, min: 0, max: 100 },
+            adultContentFit: { type: Number, default: 70, min: 0, max: 100 },
         },
         penalties: {
             brandOrCompany: { type: Number, default: 35, min: 0, max: 100 },
             fakeOrBot: { type: Number, default: 60, min: 0, max: 100 },
             possibleMinor: { type: Number, default: 100, min: 0, max: 100 },
+            possibleMale: { type: Number, default: 90, min: 0, max: 100 },
             privateOrInsufficient: { type: Number, default: 25, min: 0, max: 100 },
             spamOrScam: { type: Number, default: 80, min: 0, max: 100 },
             inactiveProfile: { type: Number, default: 25, min: 0, max: 100 },
@@ -307,6 +328,12 @@ const MarketingLeadSchema = new Schema<IMarketingLead>({
     campaignId: { type: Schema.Types.ObjectId, ref: 'MarketingCampaign', index: true },
     runId: { type: Schema.Types.ObjectId, ref: 'MarketingRun', index: true },
     aiScore: { type: Number, required: true, min: 0, max: 100, index: true },
+    aiCompatibility: {
+        type: String,
+        enum: ['excellent', 'very_promising', 'promising', 'low_fit', 'incompatible'],
+        default: 'promising',
+        index: true,
+    },
     aiSummary: { type: String, default: '', trim: true, maxlength: 3000 },
     aiPositiveSignals: { type: [String], default: [] },
     aiRiskSignals: { type: [String], default: [] },
@@ -323,6 +350,13 @@ const MarketingLeadSchema = new Schema<IMarketingLead>({
         default: 'new',
         index: true,
     },
+    contactStatus: {
+        type: String,
+        enum: ['not_contacted', 'contacted_no_reply', 'replied_interested', 'replied_not_interested', 'became_user'],
+        default: 'not_contacted',
+        index: true,
+    },
+    contactResponse: { type: String, default: '', trim: true, maxlength: 5000 },
     notes: { type: String, default: '', trim: true, maxlength: 10000 },
 }, { timestamps: true });
 MarketingLeadSchema.index({ platform: 1, username: 1 }, { unique: true });

@@ -30,11 +30,13 @@ interface ScoringCriteria {
         externalLink: number;
         followerInteraction: number;
         creatorFit: number;
+        adultContentFit: number;
     };
     penalties: {
         brandOrCompany: number;
         fakeOrBot: number;
         possibleMinor: number;
+        possibleMale: number;
         privateOrInsufficient: number;
         spamOrScam: number;
         inactiveProfile: number;
@@ -58,12 +60,14 @@ const weightLabels: Array<[keyof ScoringCriteria['weights'], string]> = [
     ['externalLink', 'Link externo'],
     ['followerInteraction', 'Interação com seguidores'],
     ['creatorFit', 'Compatibilidade com criadora digital'],
+    ['adultContentFit', 'Indícios de venda de conteúdo adulto na bio'],
 ];
 
 const penaltyLabels: Array<[keyof ScoringCriteria['penalties'], string]> = [
     ['brandOrCompany', 'Marca ou empresa'],
     ['fakeOrBot', 'Fake ou bot'],
     ['possibleMinor', 'Possível menor de idade'],
+    ['possibleMale', 'Possível perfil masculino'],
     ['privateOrInsufficient', 'Privado ou dados insuficientes'],
     ['spamOrScam', 'Spam ou golpe'],
     ['inactiveProfile', 'Perfil inativo'],
@@ -186,7 +190,6 @@ export default function MarketingSettingsPage() {
                         <NumberField label="Seguidores mínimos" value={settings.scoringCriteria.minFollowers} max={1000000000} onChange={minFollowers => updateCriteria({ minFollowers })} />
                         <NumberField label="Faixa ideal" value={settings.scoringCriteria.idealFollowers} max={1000000000} onChange={idealFollowers => updateCriteria({ idealFollowers })} />
                         <NumberField label="Seguidores máximos" value={settings.scoringCriteria.maxFollowers} max={1000000000} onChange={maxFollowers => updateCriteria({ maxFollowers })} />
-                        <NumberField label="Score de destaque" value={settings.minScoreToHighlight} max={100} onChange={minScoreToHighlight => setSettings({ ...settings, minScoreToHighlight })} />
                     </div>
                     <div className="mt-4 grid gap-4 md:grid-cols-2">
                         <SignalField

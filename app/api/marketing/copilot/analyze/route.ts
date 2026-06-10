@@ -59,7 +59,6 @@ export async function POST(request: NextRequest) {
         );
         return copilotJson(request, {
             ...analysis,
-            score: Math.max(0, Math.min(100, Math.round(analysis.score))),
             leadId: '',
         });
     } catch (error) {

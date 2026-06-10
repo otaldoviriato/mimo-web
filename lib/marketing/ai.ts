@@ -1,6 +1,7 @@
 import {
     IMarketingCampaign,
     MarketingCandidateInput,
+    MarketingCompatibilityLevel,
     MarketingRecommendation,
     MarketingScoringCriteria,
 } from '@/models/Marketing';
@@ -32,6 +33,15 @@ export interface ScoutProfileInput {
     candidateHistory?: unknown[];
 }
 
+export interface ScoutProfileAnalysis {
+    compatibility: MarketingCompatibilityLevel;
+    summary: string;
+    positiveSignals: string[];
+    riskSignals: string[];
+    recommendation: MarketingRecommendation;
+    suggestedMessage: string;
+}
+
 export interface CandidatePriorityResult {
     recommendedCandidates: Array<{
         username: string;
@@ -56,6 +66,30 @@ const SCORE_SCHEMA = {
     },
     required: [
         'score',
+        'summary',
+        'positiveSignals',
+        'riskSignals',
+        'recommendation',
+        'suggestedMessage',
+    ],
+} as const;
+
+const SCOUT_PROFILE_SCHEMA = {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+        compatibility: {
+            type: 'string',
+            enum: ['excellent', 'very_promising', 'promising', 'low_fit', 'incompatible'],
+        },
+        summary: { type: 'string' },
+        positiveSignals: { type: 'array', items: { type: 'string' } },
+        riskSignals: { type: 'array', items: { type: 'string' } },
+        recommendation: { type: 'string', enum: ['approve', 'review', 'reject'] },
+        suggestedMessage: { type: 'string' },
+    },
+    required: [
+        'compatibility',
         'summary',
         'positiveSignals',
         'riskSignals',
@@ -195,17 +229,22 @@ export class MarketingAIService {
     async analyzeScoutProfile(
         profile: ScoutProfileInput,
         criteria: MarketingScoringCriteria
-    ): Promise<ProspectScore> {
-        return this.requestJson<ProspectScore>(
+    ): Promise<ScoutProfileAnalysis> {
+        return this.requestJson<ScoutProfileAnalysis>(
             'mimo_scout_profile_analysis',
-            SCORE_SCHEMA,
+            SCOUT_PROFILE_SCHEMA,
             [
                 'Avalie se o perfil é compatível com o público desejado pelo MimoChat usando somente os dados visíveis fornecidos.',
-                'Aplique os pesos e penalidades configurados de forma proporcional ao calcular a nota de 0 a 100.',
+                'Aplique os pesos e penalidades configurados para escolher um dos cinco níveis de compatibilidade.',
+                'Use excellent para Excelente, very_promising para Muito promissor, promising para Promissor, low_fit para Pouco compatível e incompatible para Incompatível.',
+                'A compatibilidade depende principalmente de sinais claros na bio de que a pessoa vende ou pode vender conteúdo adulto, exclusivo ou privado.',
+                'Exemplos de sinais: Privacy, conteúdo exclusivo, acesso exclusivo, chamadas como o que você quer ou o que você procura, venda de conteúdo, atendimento privado e links relacionados.',
+                'Sem ao menos um indício desse tipo na bio ou no link externo, use incompatible e recomendação reject, mesmo que o perfil seja ativo ou tenha muitos seguidores.',
+                'Se os elementos visíveis indicarem chance relevante de ser um perfil masculino, aplique a penalidade possibleMale de forma forte. Descreva como possibilidade baseada somente nos sinais visíveis, sem afirmar identidade de gênero.',
                 'Considere a faixa de seguidores configurada sem rejeitar automaticamente apenas pela quantidade.',
-                'Não infira atributos sensíveis. Se houver evidência de possível menoridade, recomende reject e explique o risco.',
-                'A mensagem sugerida deve ser curta, humana, respeitosa e em português do Brasil. Não mencione scraping, monitoramento, ganhos garantidos ou conteúdo sexual.',
-                'Retorne score de 0 a 100 e use somente approve, review ou reject na recomendação.',
+                'Se houver evidência de possível menoridade, recomende reject e explique o risco.',
+                'A mensagem sugerida deve ser curta, humana, respeitosa e em português do Brasil. Não mencione scraping, monitoramento ou ganhos garantidos.',
+                'Retorne somente um dos cinco níveis definidos e use somente approve, review ou reject na recomendação.',
             ].join(' '),
             { criteria, profile }
         );

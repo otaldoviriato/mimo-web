@@ -1,6 +1,7 @@
 import { connectToDatabase } from '@/lib/db';
 import { decryptSecret } from '@/lib/marketing/crypto';
 import { MarketingAIService } from '@/lib/marketing/ai';
+import { compatibilityFromScore } from '@/lib/marketing/compatibility';
 import { createMarketingDataProvider } from '@/lib/marketing/providers';
 import {
     MarketingCampaign,
@@ -124,6 +125,7 @@ export async function processMarketingRun(runId: string) {
                         campaignId: campaign._id,
                         runId: run._id,
                         aiScore: score.score,
+                        aiCompatibility: compatibilityFromScore(score.score),
                         aiSummary: score.summary,
                         aiPositiveSignals: score.positiveSignals,
                         aiRiskSignals: score.riskSignals,
