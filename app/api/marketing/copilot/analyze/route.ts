@@ -49,7 +49,10 @@ export async function POST(request: NextRequest) {
 
         const apiKey = decryptSecret(settings.openAiApiKeyEncrypted);
         const service = new MarketingAIService(apiKey, settings.openAiModel || 'gpt-5.4-mini');
-        const analysis = await service.analyzeScoutProfile(profile);
+        const analysis = await service.analyzeScoutProfile({
+            ...profile,
+            candidateHistory: profile.candidateHistory.slice(0, 50),
+        });
         return copilotJson(request, {
             ...analysis,
             score: Math.max(0, Math.min(100, Math.round(analysis.score))),

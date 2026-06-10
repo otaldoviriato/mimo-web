@@ -21,6 +21,21 @@ export interface ScoutProfileInput {
     postsText: string;
     externalLink: string;
     visibleTexts: string[];
+    discoverySessionId?: string;
+    sourceSeedUsername?: string;
+    sourceContext?: string;
+    candidateHistory?: unknown[];
+}
+
+export interface CandidatePriorityResult {
+    recommendedCandidates: Array<{
+        username: string;
+        score: number;
+        reason: string;
+        recommendedNextAction: 'open_profile' | 'ignore' | 'save_for_later';
+    }>;
+    sessionSummary: string;
+    nextSuggestedStep: string;
 }
 
 const SCORE_SCHEMA = {
@@ -180,6 +195,84 @@ export class MarketingAIService {
                 'Retorne score de 0 a 100 e use somente approve, review ou reject na recomendação.',
             ].join(' '),
             profile
+        );
+    }
+
+    async prioritizeScoutCandidates(input: {
+        seedProfile: unknown;
+        analyzedPages: unknown[];
+        candidates: unknown[];
+        targetDescription: string;
+    }): Promise<CandidatePriorityResult> {
+        const schema = {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+                recommendedCandidates: {
+                    type: 'array',
+                    maxItems: 10,
+                    items: {
+                        type: 'object',
+                        additionalProperties: false,
+                        properties: {
+                            username: { type: 'string' },
+                            score: { type: 'number', minimum: 0, maximum: 100 },
+                            reason: { type: 'string' },
+                            recommendedNextAction: {
+                                type: 'string',
+                                enum: ['open_profile', 'ignore', 'save_for_later'],
+                            },
+                        },
+                        required: ['username', 'score', 'reason', 'recommendedNextAction'],
+                    },
+                },
+                sessionSummary: { type: 'string' },
+                nextSuggestedStep: { type: 'string' },
+            },
+            required: ['recommendedCandidates', 'sessionSummary', 'nextSuggestedStep'],
+        };
+        return this.requestJson<CandidatePriorityResult>(
+            'mimo_scout_candidate_priority',
+            schema,
+            [
+                'Priorize candidatos descobertos manualmente para o MimoChat usando somente os dados fornecidos.',
+                'Valorize interação visível, pessoa real, username pessoal, perfil público analisável, audiência própria, comunicação e estética de criadora digital.',
+                'Reduza a prioridade de marcas, fakes, possível menoridade, perfis privados sem dados, spam, bots, inatividade e dados insuficientes.',
+                'Não infira atributos sensíveis. Recomende um próximo passo manual que enriqueça a sessão quando houver poucos dados.',
+                'Retorne no máximo 10 candidatos presentes na entrada e normalize usernames sem arroba.',
+            ].join(' '),
+            input
+        );
+    }
+
+    async summarizeDiscoveryReport(input: {
+        seedProfile: unknown;
+        analyzedPages: unknown[];
+        candidates: unknown[];
+        savedLeads: unknown[];
+        summary: string;
+    }) {
+        const schema = {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+                summary: { type: 'string' },
+                highlights: { type: 'array', items: { type: 'string' }, maxItems: 10 },
+                risks: { type: 'array', items: { type: 'string' }, maxItems: 10 },
+                nextSuggestedStep: { type: 'string' },
+            },
+            required: ['summary', 'highlights', 'risks', 'nextSuggestedStep'],
+        };
+        return this.requestJson<{
+            summary: string;
+            highlights: string[];
+            risks: string[];
+            nextSuggestedStep: string;
+        }>(
+            'mimo_scout_discovery_report',
+            schema,
+            'Resuma a sessão manual de descoberta do MimoChat. Use somente os dados fornecidos, destaque os melhores candidatos e riscos, e proponha um próximo passo manual e ético.',
+            input
         );
     }
 

@@ -57,7 +57,10 @@ export async function POST(request: NextRequest) {
                     externalLink: profile.externalLink,
                     visibleTexts: profile.visibleTexts,
                     source: profile.source,
-                    sourceContext: profile.visibleTexts.join('\n').slice(0, 5000),
+                    discoverySessionId: profile.discoverySessionId,
+                    sourceSeedUsername: profile.sourceSeedUsername,
+                    sourceContext: profile.sourceContext
+                        || profile.visibleTexts.join('\n').slice(0, 5000),
                     comments: profile.visibleTexts.join('\n').slice(0, 5000),
                     aiScore: boundedNumber(body.aiScore, 0, 0, 100),
                     aiSummary: cleanString(body.aiSummary, 3000),

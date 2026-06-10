@@ -76,8 +76,30 @@ export function sanitizeScoutPayload(value: unknown) {
         postsText: cleanString(body.postsText, 200),
         externalLink: cleanString(body.externalLink, 1500),
         visibleTexts: cleanStringArray(body.visibleTexts, 50, 500),
+        discoverySessionId: cleanString(body.discoverySessionId, 100),
+        sourceSeedUsername: cleanString(body.sourceSeedUsername, 100)
+            .toLowerCase()
+            .replace(/^@/, ''),
+        sourceContext: cleanString(body.sourceContext, 5000),
+        candidateHistory: Array.isArray(body.candidateHistory)
+            ? body.candidateHistory.slice(0, 100)
+            : [],
         source: cleanString(body.source, 100) || 'mimo-scout-extension',
     };
+}
+
+export function sanitizeDiscoveryCollection(
+    value: unknown,
+    maxItems: number,
+    maxJsonLength = 20_000
+) {
+    if (!Array.isArray(value)) return [];
+    return value.slice(0, maxItems).map(item => {
+        if (!item || typeof item !== 'object') return {};
+        const json = JSON.stringify(item);
+        if (json.length <= maxJsonLength) return item;
+        return { truncated: true, preview: json.slice(0, maxJsonLength) };
+    });
 }
 
 export function parseVisibleCount(value: string) {

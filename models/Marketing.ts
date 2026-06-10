@@ -97,6 +97,7 @@ export interface IMarketingLead extends Document, MarketingCandidateInput {
     postsText: string;
     visibleTexts: string[];
     source: string;
+    discoverySessionId: string;
     sourceSeedUsername: string;
     sourceContext: string;
     campaignId?: Types.ObjectId;
@@ -109,6 +110,26 @@ export interface IMarketingLead extends Document, MarketingCandidateInput {
     suggestedMessage: string;
     status: MarketingLeadStatus;
     notes: string;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface IMarketingDiscoveryReport extends Document {
+    sessionId: string;
+    seedUsername: string;
+    seedProfileUrl: string;
+    status: 'received' | 'reviewed' | 'archived';
+    summary: string;
+    highlights: string[];
+    risks: string[];
+    nextSuggestedStep: string;
+    analyzedPages: unknown[];
+    candidates: unknown[];
+    savedLeads: unknown[];
+    leadIds: Types.ObjectId[];
+    source: string;
+    submittedBy: string;
+    startedAt?: Date;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -200,6 +221,7 @@ const MarketingLeadSchema = new Schema<IMarketingLead>({
     postsText: { type: String, default: '', trim: true, maxlength: 200 },
     visibleTexts: { type: [String], default: [] },
     source: { type: String, default: '', trim: true, maxlength: 100, index: true },
+    discoverySessionId: { type: String, default: '', trim: true, maxlength: 100, index: true },
     sourceSeedUsername: { type: String, default: '', trim: true, lowercase: true },
     sourceContext: { type: String, default: '', trim: true, maxlength: 5000 },
     campaignId: { type: Schema.Types.ObjectId, ref: 'MarketingCampaign', index: true },
@@ -226,6 +248,25 @@ const MarketingLeadSchema = new Schema<IMarketingLead>({
 MarketingLeadSchema.index({ platform: 1, username: 1 }, { unique: true });
 MarketingLeadSchema.index({ aiScore: -1, createdAt: -1 });
 
+const MarketingDiscoveryReportSchema = new Schema<IMarketingDiscoveryReport>({
+    sessionId: { type: String, required: true, trim: true, maxlength: 100, unique: true, index: true },
+    seedUsername: { type: String, default: '', trim: true, lowercase: true, index: true },
+    seedProfileUrl: { type: String, default: '', trim: true, maxlength: 1500 },
+    status: { type: String, enum: ['received', 'reviewed', 'archived'], default: 'received', index: true },
+    summary: { type: String, default: '', trim: true, maxlength: 5000 },
+    highlights: { type: [String], default: [] },
+    risks: { type: [String], default: [] },
+    nextSuggestedStep: { type: String, default: '', trim: true, maxlength: 2000 },
+    analyzedPages: { type: [Schema.Types.Mixed], default: [] },
+    candidates: { type: [Schema.Types.Mixed], default: [] },
+    savedLeads: { type: [Schema.Types.Mixed], default: [] },
+    leadIds: [{ type: Schema.Types.ObjectId, ref: 'MarketingLead' }],
+    source: { type: String, default: 'mimo-scout-extension', trim: true, maxlength: 100 },
+    submittedBy: { type: String, default: '', trim: true, maxlength: 200 },
+    startedAt: Date,
+}, { timestamps: true });
+MarketingDiscoveryReportSchema.index({ createdAt: -1 });
+
 export const MarketingSettings =
     (mongoose.models.MarketingSettings as mongoose.Model<IMarketingSettings>) ||
     mongoose.model<IMarketingSettings>('MarketingSettings', MarketingSettingsSchema);
@@ -241,3 +282,6 @@ export const MarketingRun =
 export const MarketingLead =
     (mongoose.models.MarketingLead as mongoose.Model<IMarketingLead>) ||
     mongoose.model<IMarketingLead>('MarketingLead', MarketingLeadSchema);
+export const MarketingDiscoveryReport =
+    (mongoose.models.MarketingDiscoveryReport as mongoose.Model<IMarketingDiscoveryReport>) ||
+    mongoose.model<IMarketingDiscoveryReport>('MarketingDiscoveryReport', MarketingDiscoveryReportSchema);

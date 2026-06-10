@@ -28,6 +28,7 @@ export type {
 
 export {
     MarketingCampaign,
+    MarketingDiscoveryReport,
     MarketingLead,
     MarketingRun,
     MarketingSeedProfile,
