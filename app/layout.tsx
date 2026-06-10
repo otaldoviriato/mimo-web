@@ -1,12 +1,7 @@
 import type { Metadata } from 'next';
-import { ClerkProvider } from '@clerk/nextjs';
 import './globals.css';
-import { QueryProvider } from '@/context/QueryProvider';
-import { PaymentProvider } from '@/context/PaymentContext';
-import { PWAProvider } from '@/context/PWAContext';
 import { Viewport } from 'next';
-import { Toaster } from 'react-hot-toast';
-import { CookieBanner } from '@/components/CookieBanner';
+import { AppProviders } from '@/components/AppProviders';
 
 export const metadata: Metadata = {
     title: 'Mimo Chat | Monetize suas Mensagens e Interações com Fãs',
@@ -67,17 +62,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     return (
         <html lang="pt-BR" className="h-full">
             <body className="h-full">
-                <ClerkProvider>
-                    <QueryProvider>
-                        <PWAProvider>
-                            <PaymentProvider>
-                                {children}
-                                <Toaster position="top-center" />
-                                <CookieBanner />
-                            </PaymentProvider>
-                        </PWAProvider>
-                    </QueryProvider>
-                </ClerkProvider>
+                <AppProviders>{children}</AppProviders>
             </body>
         </html>
     );

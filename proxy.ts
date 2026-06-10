@@ -11,6 +11,8 @@ const isPublicRoute = createRouteMatcher([
     '/firebase-messaging-sw.js',
     '/.well-known/(.*)',
     '/institucional(.*)',
+    '/creators(.*)',
+    '/api/creator-applications(.*)',
     '/termos-de-uso(.*)',
     '/politica-de-privacidade(.*)'
 ]);

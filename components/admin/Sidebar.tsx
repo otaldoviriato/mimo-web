@@ -13,6 +13,7 @@ import {
     Wallet,
     Ticket,
     LifeBuoy,
+    ClipboardList,
     X
 } from 'lucide-react';
 import Link from 'next/link';
@@ -34,6 +35,7 @@ export function Sidebar({ activeTab, setActiveTab, isOpen = false, onClose }: Si
         { id: 'withdrawals', label: 'Solicitações de Saque', icon: Wallet },
         { id: 'coupons', label: 'Cupons de Desconto', icon: Ticket },
         { id: 'help-tickets', label: 'Tickets de Ajuda', icon: LifeBuoy },
+        { id: 'creator-applications', label: 'Inscrições de Criadoras', icon: ClipboardList, href: '/admin/creator-applications' },
     ];
 
     const handleTabChange = (tab: string) => {
@@ -88,15 +90,37 @@ export function Sidebar({ activeTab, setActiveTab, isOpen = false, onClose }: Si
                     {menuItems.map((item) => {
                         const Icon = item.icon;
                         const isActive = activeTab === item.id;
+                        const itemClassName = `w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold transition-all duration-200 group ${
+                            isActive
+                                ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/10'
+                                : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100'
+                        }`;
+
+                        if ('href' in item && item.href) {
+                            return (
+                                <Link
+                                    key={item.id}
+                                    href={item.href}
+                                    onClick={onClose}
+                                    className={itemClassName}
+                                >
+                                    <Icon
+                                        size={18}
+                                        className={`transition-transform duration-200 group-hover:scale-110 ${
+                                            isActive ? 'text-white' : 'text-slate-400 group-hover:text-purple-400'
+                                        }`}
+                                    />
+                                    {item.label}
+                                    {isActive && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white" />}
+                                </Link>
+                            );
+                        }
+
                         return (
                             <button
                                 key={item.id}
                                 onClick={() => handleTabChange(item.id)}
-                                className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold transition-all duration-200 group ${
-                                    isActive
-                                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/10'
-                                        : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100'
-                                }`}
+                                className={itemClassName}
                             >
                                 <Icon
                                     size={18}

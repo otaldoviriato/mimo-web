@@ -19,3 +19,9 @@ export type { IAppSettings } from './AppSettings';
 export { HelpTicket } from './HelpTicket';
 export type { IHelpTicket } from './HelpTicket';
 
+export { CreatorApplication } from './CreatorApplication';
+export type {
+    CreatorApplicationStatus,
+    ICreatorApplication,
+    OnlineExperience,
+} from './CreatorApplication';
