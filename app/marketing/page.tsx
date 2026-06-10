@@ -2,7 +2,6 @@
 
 import {
     CheckCircle2,
-    Clock3,
     ContactRound,
     HeartHandshake,
     Sparkles,
@@ -24,13 +23,6 @@ interface DashboardData {
         onboarded: number;
         averageScore: number;
     };
-    recentRuns: Array<{
-        _id: string;
-        status: string;
-        leadsFound: number;
-        createdAt: string;
-        campaignId?: { name?: string };
-    }>;
     topPending: Array<{
         _id: string;
         username: string;
@@ -65,7 +57,7 @@ export default function MarketingDashboardPage() {
         <div className="mx-auto max-w-7xl">
             <PageIntro
                 title="Visão geral da prospecção"
-                description="Acompanhe o funil interno de criadoras, as rodadas recentes e os perfis com maior potencial."
+                description="Acompanhe o funil interno de criadoras e os perfis com maior potencial."
             />
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
                 {cards.map(card => {
@@ -122,34 +114,6 @@ export default function MarketingDashboardPage() {
                     )}
                 </Panel>
             </div>
-
-            <Panel className="mt-4">
-                <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4">
-                    <Clock3 className="h-4 w-4 text-purple-600" />
-                    <h3 className="font-black">Últimas rodadas</h3>
-                </div>
-                {data.recentRuns.length === 0 ? (
-                    <EmptyState title="Nenhuma rodada iniciada" description="Crie uma campanha e comece a primeira rodada." />
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                                <tr><th className="px-5 py-3">Campanha</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Leads</th><th className="px-5 py-3">Data</th></tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {data.recentRuns.map(run => (
-                                    <tr key={run._id}>
-                                        <td className="px-5 py-4 font-bold">{run.campaignId?.name || 'Campanha removida'}</td>
-                                        <td className="px-5 py-4"><StatusBadge tone={run.status === 'completed' ? 'green' : run.status === 'failed' ? 'red' : 'purple'}>{run.status}</StatusBadge></td>
-                                        <td className="px-5 py-4">{run.leadsFound}</td>
-                                        <td className="px-5 py-4 text-slate-500">{new Date(run.createdAt).toLocaleString('pt-BR')}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </Panel>
         </div>
     );
 }

@@ -36,3 +36,15 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     if (!lead) return NextResponse.json({ error: 'Lead não encontrada.' }, { status: 404 });
     return NextResponse.json({ success: true, lead });
 }
+
+export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+    const access = await requireMarketingAdmin(request, { limit: 30 });
+    if (access.error) return access.error;
+    const { id } = await context.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        return NextResponse.json({ error: 'Lead inválida.' }, { status: 400 });
+    }
+    const lead = await MarketingLead.findByIdAndDelete(id).lean();
+    if (!lead) return NextResponse.json({ error: 'Lead não encontrada.' }, { status: 404 });
+    return NextResponse.json({ success: true });
+}

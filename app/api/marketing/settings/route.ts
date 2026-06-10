@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { encryptSecret, maskSecret } from '@/lib/marketing/crypto';
+import { normalizeScoringCriteria } from '@/lib/marketing/criteria';
 import { boundedNumber, cleanString, requireMarketingAdmin } from '@/lib/marketing/security';
 import { MarketingProviderType, MarketingSettings } from '@/models/Marketing';
 
@@ -14,6 +15,7 @@ function serializeSettings(settings: {
     minDelaySeconds: number;
     maxDelaySeconds: number;
     providerType: MarketingProviderType;
+    scoringCriteria?: unknown;
     createdAt?: Date;
     updatedAt?: Date;
 }) {
@@ -27,6 +29,7 @@ function serializeSettings(settings: {
         minDelaySeconds: settings.minDelaySeconds,
         maxDelaySeconds: settings.maxDelaySeconds,
         providerType: settings.providerType,
+        scoringCriteria: normalizeScoringCriteria(settings.scoringCriteria),
         createdAt: settings.createdAt,
         updatedAt: settings.updatedAt,
     };
@@ -83,7 +86,19 @@ export async function PATCH(request: NextRequest) {
             minDelaySeconds,
             maxDelaySeconds,
             providerType,
+            scoringCriteria: normalizeScoringCriteria(body.scoringCriteria || current?.scoringCriteria),
         };
+
+        const scoringCriteria = update.scoringCriteria as ReturnType<typeof normalizeScoringCriteria>;
+        if (
+            scoringCriteria.minFollowers > scoringCriteria.idealFollowers
+            || scoringCriteria.idealFollowers > scoringCriteria.maxFollowers
+        ) {
+            return NextResponse.json(
+                { error: 'A faixa de seguidores deve seguir: mínimo, ideal e máximo.' },
+                { status: 400 }
+            );
+        }
 
         const apiKey = cleanString(body.openAiApiKey, 500);
         if (apiKey) {

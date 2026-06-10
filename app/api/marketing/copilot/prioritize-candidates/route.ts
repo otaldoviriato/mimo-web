@@ -6,6 +6,7 @@ import {
     requireCopilotAccess,
     sanitizeDiscoveryCollection,
 } from '@/lib/marketing/copilot';
+import { normalizeScoringCriteria } from '@/lib/marketing/criteria';
 import { decryptSecret } from '@/lib/marketing/crypto';
 import { cleanString } from '@/lib/marketing/security';
 import { MarketingSettings } from '@/models/Marketing';
@@ -24,7 +25,11 @@ export async function POST(request: NextRequest) {
         const body = await request.json().catch(() => ({})) as Record<string, unknown>;
         const candidates = sanitizeDiscoveryCollection(body.candidates, 150, 10_000);
         if (!candidates.length) {
-            return copilotJson(request, { error: 'Nenhum candidato foi encontrado na sessão.' }, 400);
+            return copilotJson(request, {
+                recommendedCandidates: [],
+                sessionSummary: 'A coleta foi concluída, mas não encontrou candidatos visíveis suficientes.',
+                nextSuggestedStep: 'Inicie uma nova análise a partir de outro perfil.',
+            });
         }
 
         const settings = await MarketingSettings.findOne({ key: 'global' })
@@ -42,11 +47,13 @@ export async function POST(request: NextRequest) {
             decryptSecret(settings.openAiApiKeyEncrypted),
             settings.openAiModel || 'gpt-5.4-mini'
         );
+        const criteria = normalizeScoringCriteria(settings.scoringCriteria);
         const result = await service.prioritizeScoutCandidates({
             seedProfile: body.seedProfile || {},
             analyzedPages: sanitizeDiscoveryCollection(body.analyzedPages, 40, 10_000),
             candidates,
-            targetDescription: cleanString(body.targetDescription, 2000),
+            targetDescription: criteria.targetDescription || cleanString(body.targetDescription, 2000),
+            criteria,
         });
 
         const allowed = new Set(candidates.map(item => {

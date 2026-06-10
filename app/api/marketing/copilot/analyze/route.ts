@@ -7,6 +7,7 @@ import {
     sanitizeScoutPayload,
 } from '@/lib/marketing/copilot';
 import { decryptSecret } from '@/lib/marketing/crypto';
+import { normalizeScoringCriteria } from '@/lib/marketing/criteria';
 import { MarketingSettings } from '@/models/Marketing';
 
 export function OPTIONS(request: NextRequest) {
@@ -49,10 +50,13 @@ export async function POST(request: NextRequest) {
 
         const apiKey = decryptSecret(settings.openAiApiKeyEncrypted);
         const service = new MarketingAIService(apiKey, settings.openAiModel || 'gpt-5.4-mini');
-        const analysis = await service.analyzeScoutProfile({
-            ...profile,
-            candidateHistory: profile.candidateHistory.slice(0, 50),
-        });
+        const analysis = await service.analyzeScoutProfile(
+            {
+                ...profile,
+                candidateHistory: profile.candidateHistory.slice(0, 50),
+            },
+            normalizeScoringCriteria(settings.scoringCriteria)
+        );
         return copilotJson(request, {
             ...analysis,
             score: Math.max(0, Math.min(100, Math.round(analysis.score))),

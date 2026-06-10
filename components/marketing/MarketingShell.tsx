@@ -3,12 +3,9 @@
 import {
     BarChart3,
     ClipboardList,
-    FlaskConical,
     LayoutDashboard,
     Menu,
-    Megaphone,
     Settings,
-    Sprout,
     UsersRound,
     X,
 } from 'lucide-react';
@@ -18,9 +15,6 @@ import { useState } from 'react';
 
 const navigation = [
     { href: '/marketing', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/marketing/campaigns', label: 'Campanhas', icon: Megaphone },
-    { href: '/marketing/seeds', label: 'Perfis-semente', icon: Sprout },
-    { href: '/marketing/runs', label: 'Rodadas', icon: FlaskConical },
     { href: '/marketing/leads', label: 'Leads', icon: UsersRound },
     { href: '/marketing/applications', label: 'Inscrições', icon: ClipboardList },
     { href: '/marketing/settings', label: 'Configurações', icon: Settings },

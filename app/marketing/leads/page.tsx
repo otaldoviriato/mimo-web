@@ -1,6 +1,6 @@
 'use client';
 
-import { Copy, ExternalLink, Save, Search, X } from 'lucide-react';
+import { Copy, ExternalLink, Save, Search, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -72,6 +72,7 @@ export default function LeadsPage() {
     const [notes, setNotes] = useState('');
     const [detailStatus, setDetailStatus] = useState<LeadStatus>('new');
     const [saving, setSaving] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
     const load = useCallback(async () => {
         try {
@@ -126,6 +127,23 @@ export default function LeadsPage() {
         if (!selected?.suggestedMessage) return;
         await navigator.clipboard.writeText(selected.suggestedMessage);
         toast.success('Mensagem copiada.');
+    }
+
+    async function removeLead() {
+        if (!selected) return;
+        const confirmed = window.confirm(`Remover definitivamente a lead @${selected.username}?`);
+        if (!confirmed) return;
+        setDeleting(true);
+        try {
+            await marketingFetch(`/api/marketing/leads/${selected._id}`, { method: 'DELETE' });
+            setLeads(current => current?.filter(item => item._id !== selected._id) || []);
+            setSelected(null);
+            toast.success('Lead removida.');
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Erro ao remover lead.');
+        } finally {
+            setDeleting(false);
+        }
     }
 
     if (!leads) return <LoadingState text="Carregando leads..." />;
@@ -209,7 +227,16 @@ export default function LeadsPage() {
                             </Panel>
                             <label><span className={labelClass}>Status</span><select className={fieldClass} value={detailStatus} onChange={event => setDetailStatus(event.target.value as LeadStatus)}>{statuses.filter(item => item.value).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
                             <label><span className={labelClass}>Notas internas</span><textarea rows={5} className={fieldClass} value={notes} onChange={event => setNotes(event.target.value)} /></label>
-                            <button disabled={saving} className={`${primaryButtonClass} w-full`} onClick={save}><Save className="h-4 w-4" />{saving ? 'Salvando...' : 'Salvar status e notas'}</button>
+                            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                                <button disabled={saving || deleting} className={`${primaryButtonClass} w-full`} onClick={save}><Save className="h-4 w-4" />{saving ? 'Salvando...' : 'Salvar status e notas'}</button>
+                                <button
+                                    disabled={saving || deleting}
+                                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-bold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
+                                    onClick={removeLead}
+                                >
+                                    <Trash2 className="h-4 w-4" />{deleting ? 'Removendo...' : 'Remover lead'}
+                                </button>
+                            </div>
                         </div>
                     </aside>
                 </>

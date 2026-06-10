@@ -14,6 +14,33 @@ export type MarketingLeadStatus =
     | 'ignored';
 export type MarketingRecommendation = 'approve' | 'review' | 'reject';
 
+export interface MarketingScoringCriteria {
+    targetDescription: string;
+    minFollowers: number;
+    idealFollowers: number;
+    maxFollowers: number;
+    positiveSignals: string[];
+    negativeSignals: string[];
+    weights: {
+        realPerson: number;
+        personalIdentity: number;
+        profileActivity: number;
+        ownAudience: number;
+        profileQuality: number;
+        externalLink: number;
+        followerInteraction: number;
+        creatorFit: number;
+    };
+    penalties: {
+        brandOrCompany: number;
+        fakeOrBot: number;
+        possibleMinor: number;
+        privateOrInsufficient: number;
+        spamOrScam: number;
+        inactiveProfile: number;
+    };
+}
+
 export interface MarketingCandidateInput {
     username: string;
     displayName?: string;
@@ -38,6 +65,7 @@ export interface IMarketingSettings extends Document {
     minDelaySeconds: number;
     maxDelaySeconds: number;
     providerType: MarketingProviderType;
+    scoringCriteria: MarketingScoringCriteria;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -147,6 +175,58 @@ const MarketingSettingsSchema = new Schema<IMarketingSettings>({
         type: String,
         enum: ['manual', 'mock', 'import', 'external'],
         default: 'mock',
+    },
+    scoringCriteria: {
+        targetDescription: {
+            type: String,
+            default: 'Criadoras digitais com audiência própria, perfil ativo e potencial para usar o MimoChat.',
+            trim: true,
+            maxlength: 4000,
+        },
+        minFollowers: { type: Number, default: 1000, min: 0 },
+        idealFollowers: { type: Number, default: 10000, min: 0 },
+        maxFollowers: { type: Number, default: 1000000, min: 0 },
+        positiveSignals: {
+            type: [String],
+            default: [
+                'Parece uma pessoa real',
+                'Perfil ativo',
+                'Tem audiência própria',
+                'Bio bem montada',
+                'Possui link externo',
+                'Interage com seguidores',
+                'Conteúdo compatível com criadora digital',
+            ],
+        },
+        negativeSignals: {
+            type: [String],
+            default: [
+                'Parece marca ou empresa',
+                'Parece fake ou bot',
+                'Possível menor de idade',
+                'Perfil privado ou sem dados suficientes',
+                'Sinais de spam ou golpe',
+                'Pouca atividade',
+            ],
+        },
+        weights: {
+            realPerson: { type: Number, default: 20, min: 0, max: 100 },
+            personalIdentity: { type: Number, default: 10, min: 0, max: 100 },
+            profileActivity: { type: Number, default: 15, min: 0, max: 100 },
+            ownAudience: { type: Number, default: 20, min: 0, max: 100 },
+            profileQuality: { type: Number, default: 10, min: 0, max: 100 },
+            externalLink: { type: Number, default: 5, min: 0, max: 100 },
+            followerInteraction: { type: Number, default: 15, min: 0, max: 100 },
+            creatorFit: { type: Number, default: 15, min: 0, max: 100 },
+        },
+        penalties: {
+            brandOrCompany: { type: Number, default: 35, min: 0, max: 100 },
+            fakeOrBot: { type: Number, default: 60, min: 0, max: 100 },
+            possibleMinor: { type: Number, default: 100, min: 0, max: 100 },
+            privateOrInsufficient: { type: Number, default: 25, min: 0, max: 100 },
+            spamOrScam: { type: Number, default: 80, min: 0, max: 100 },
+            inactiveProfile: { type: Number, default: 25, min: 0, max: 100 },
+        },
     },
 }, { timestamps: true });
 

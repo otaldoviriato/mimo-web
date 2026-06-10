@@ -1,4 +1,9 @@
-import { IMarketingCampaign, MarketingCandidateInput, MarketingRecommendation } from '@/models/Marketing';
+import {
+    IMarketingCampaign,
+    MarketingCandidateInput,
+    MarketingRecommendation,
+    MarketingScoringCriteria,
+} from '@/models/Marketing';
 
 export interface ProspectScore {
     score: number;
@@ -118,8 +123,13 @@ export class MarketingAIService {
 
         const payload = await response.json() as Record<string, unknown>;
         if (!response.ok) {
-            const error = payload.error as { message?: string } | undefined;
-            throw new Error(error?.message || `Falha na OpenAI (${response.status}).`);
+            const error = payload.error as { message?: unknown } | undefined;
+            const message = typeof error?.message === 'string'
+                ? error.message
+                : error?.message
+                    ? JSON.stringify(error.message)
+                    : `Falha na OpenAI (${response.status}).`;
+            throw new Error(message);
         }
         return JSON.parse(extractOutputText(payload)) as T;
     }
@@ -182,19 +192,22 @@ export class MarketingAIService {
         );
     }
 
-    async analyzeScoutProfile(profile: ScoutProfileInput): Promise<ProspectScore> {
+    async analyzeScoutProfile(
+        profile: ScoutProfileInput,
+        criteria: MarketingScoringCriteria
+    ): Promise<ProspectScore> {
         return this.requestJson<ProspectScore>(
             'mimo_scout_profile_analysis',
             SCORE_SCHEMA,
             [
-                'Avalie se o perfil parece uma boa potencial criadora para o MimoChat usando somente os dados visíveis fornecidos.',
-                'Sinais positivos incluem pessoa real, perfil ativo, audiência própria, bio bem montada, link externo, comunicação com seguidores, conteúdo de criadora digital e potencial para receber mensagens e mimos.',
-                'Sinais negativos incluem perfil fake, possível menoridade, dados insuficientes, marca ou empresa, pouca atividade, spam, golpe ou conteúdo incompatível.',
+                'Avalie se o perfil é compatível com o público desejado pelo MimoChat usando somente os dados visíveis fornecidos.',
+                'Aplique os pesos e penalidades configurados de forma proporcional ao calcular a nota de 0 a 100.',
+                'Considere a faixa de seguidores configurada sem rejeitar automaticamente apenas pela quantidade.',
                 'Não infira atributos sensíveis. Se houver evidência de possível menoridade, recomende reject e explique o risco.',
                 'A mensagem sugerida deve ser curta, humana, respeitosa e em português do Brasil. Não mencione scraping, monitoramento, ganhos garantidos ou conteúdo sexual.',
                 'Retorne score de 0 a 100 e use somente approve, review ou reject na recomendação.',
             ].join(' '),
-            profile
+            { criteria, profile }
         );
     }
 
@@ -203,6 +216,7 @@ export class MarketingAIService {
         analyzedPages: unknown[];
         candidates: unknown[];
         targetDescription: string;
+        criteria: MarketingScoringCriteria;
     }): Promise<CandidatePriorityResult> {
         const schema = {
             type: 'object',
@@ -235,9 +249,8 @@ export class MarketingAIService {
             'mimo_scout_candidate_priority',
             schema,
             [
-                'Priorize candidatos descobertos manualmente para o MimoChat usando somente os dados fornecidos.',
-                'Valorize interação visível, pessoa real, username pessoal, perfil público analisável, audiência própria, comunicação e estética de criadora digital.',
-                'Reduza a prioridade de marcas, fakes, possível menoridade, perfis privados sem dados, spam, bots, inatividade e dados insuficientes.',
+                'Priorize candidatos descobertos manualmente usando somente os dados fornecidos.',
+                'Use a descrição, os pesos, as penalidades, a faixa de seguidores e os sinais configurados em criteria.',
                 'Não infira atributos sensíveis. Recomende um próximo passo manual que enriqueça a sessão quando houver poucos dados.',
                 'Retorne no máximo 10 candidatos presentes na entrada e normalize usernames sem arroba.',
             ].join(' '),

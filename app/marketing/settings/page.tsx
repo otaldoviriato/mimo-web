@@ -1,6 +1,6 @@
 'use client';
 
-import { Eye, EyeOff, KeyRound, Save, TestTube2 } from 'lucide-react';
+import { Eye, EyeOff, KeyRound, Save, SlidersHorizontal, TestTube2 } from 'lucide-react';
 import { FormEvent, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
@@ -14,17 +14,60 @@ import {
 } from '@/components/marketing/MarketingUI';
 import { marketingFetch } from '@/lib/marketing/client';
 
+interface ScoringCriteria {
+    targetDescription: string;
+    minFollowers: number;
+    idealFollowers: number;
+    maxFollowers: number;
+    positiveSignals: string[];
+    negativeSignals: string[];
+    weights: {
+        realPerson: number;
+        personalIdentity: number;
+        profileActivity: number;
+        ownAudience: number;
+        profileQuality: number;
+        externalLink: number;
+        followerInteraction: number;
+        creatorFit: number;
+    };
+    penalties: {
+        brandOrCompany: number;
+        fakeOrBot: number;
+        possibleMinor: number;
+        privateOrInsufficient: number;
+        spamOrScam: number;
+        inactiveProfile: number;
+    };
+}
+
 interface Settings {
     openAiApiKeyMasked: string;
     hasOpenAiApiKey: boolean;
     openAiModel: string;
-    maxLeadsPerRun: number;
-    maxSeedsPerRun: number;
     minScoreToHighlight: number;
-    minDelaySeconds: number;
-    maxDelaySeconds: number;
-    providerType: 'manual' | 'mock' | 'import' | 'external';
+    scoringCriteria: ScoringCriteria;
 }
+
+const weightLabels: Array<[keyof ScoringCriteria['weights'], string]> = [
+    ['realPerson', 'Pessoa real'],
+    ['personalIdentity', 'Nome e username pessoais'],
+    ['profileActivity', 'Atividade do perfil'],
+    ['ownAudience', 'Audiência própria'],
+    ['profileQuality', 'Qualidade da bio e perfil'],
+    ['externalLink', 'Link externo'],
+    ['followerInteraction', 'Interação com seguidores'],
+    ['creatorFit', 'Compatibilidade com criadora digital'],
+];
+
+const penaltyLabels: Array<[keyof ScoringCriteria['penalties'], string]> = [
+    ['brandOrCompany', 'Marca ou empresa'],
+    ['fakeOrBot', 'Fake ou bot'],
+    ['possibleMinor', 'Possível menor de idade'],
+    ['privateOrInsufficient', 'Privado ou dados insuficientes'],
+    ['spamOrScam', 'Spam ou golpe'],
+    ['inactiveProfile', 'Perfil inativo'],
+];
 
 export default function MarketingSettingsPage() {
     const [settings, setSettings] = useState<Settings | null>(null);
@@ -76,22 +119,30 @@ export default function MarketingSettingsPage() {
         }
     }
 
+    function updateCriteria(patch: Partial<ScoringCriteria>) {
+        if (!settings) return;
+        setSettings({
+            ...settings,
+            scoringCriteria: { ...settings.scoringCriteria, ...patch },
+        });
+    }
+
     if (!settings) return <LoadingState text="Carregando configurações..." />;
 
     return (
-        <div className="mx-auto max-w-5xl">
+        <div className="mx-auto max-w-6xl">
             <PageIntro
-                title="Configurações do growth"
-                description="Defina o provider, os limites operacionais e a conexão usada exclusivamente pelo backend."
+                title="Configurações do Mimo Growth"
+                description="Configure a conexão com a OpenAI e tudo que deve aumentar ou reduzir a nota dos perfis."
             />
             <form onSubmit={save} className="space-y-5">
                 <Panel className="p-5 md:p-6">
                     <div className="mb-5 flex items-center gap-3">
                         <div className="rounded-xl bg-purple-100 p-2.5 text-purple-700"><KeyRound className="h-5 w-5" /></div>
-                        <div><h3 className="font-black">OpenAI</h3><p className="text-xs text-slate-500">A chave é criptografada e nunca retorna completa.</p></div>
+                        <div><h3 className="font-black">OpenAI</h3><p className="text-xs text-slate-500">A chave permanece criptografada no backend.</p></div>
                     </div>
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <label>
+                    <div className="grid gap-4 md:grid-cols-3">
+                        <label className="md:col-span-2">
                             <span className={labelClass}>OpenAI API Key</span>
                             <div className="relative">
                                 <input
@@ -118,29 +169,75 @@ export default function MarketingSettingsPage() {
                 </Panel>
 
                 <Panel className="p-5 md:p-6">
-                    <h3 className="font-black">Operação das rodadas</h3>
-                    <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        <NumberField label="Leads por rodada" value={settings.maxLeadsPerRun} min={1} max={200} onChange={maxLeadsPerRun => setSettings({ ...settings, maxLeadsPerRun })} />
-                        <NumberField label="Seeds por rodada" value={settings.maxSeedsPerRun} min={1} max={50} onChange={maxSeedsPerRun => setSettings({ ...settings, maxSeedsPerRun })} />
-                        <NumberField label="Score mínimo de destaque" value={settings.minScoreToHighlight} min={0} max={100} onChange={minScoreToHighlight => setSettings({ ...settings, minScoreToHighlight })} />
-                        <NumberField label="Delay mínimo (segundos)" value={settings.minDelaySeconds} min={0} max={300} onChange={minDelaySeconds => setSettings({ ...settings, minDelaySeconds })} />
-                        <NumberField label="Delay máximo (segundos)" value={settings.maxDelaySeconds} min={0} max={600} onChange={maxDelaySeconds => setSettings({ ...settings, maxDelaySeconds })} />
-                        <label>
-                            <span className={labelClass}>Provider de dados</span>
-                            <select className={fieldClass} value={settings.providerType} onChange={event => setSettings({ ...settings, providerType: event.target.value as Settings['providerType'] })}>
-                                <option value="mock">Mock</option>
-                                <option value="manual">Manual</option>
-                                <option value="import">Importação CSV/JSON</option>
-                                <option value="external">Externo autorizado</option>
-                            </select>
-                        </label>
+                    <div className="mb-5 flex items-center gap-3">
+                        <div className="rounded-xl bg-purple-100 p-2.5 text-purple-700"><SlidersHorizontal className="h-5 w-5" /></div>
+                        <div><h3 className="font-black">Perfil desejado</h3><p className="text-xs text-slate-500">Estas regras são enviadas à IA em toda análise e priorização.</p></div>
                     </div>
-                    {settings.providerType === 'external' && (
-                        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
-                            Estrutura reservada para um serviço externo autorizado. Nenhum scraping ou sessão do Instagram é utilizado.
-                        </p>
-                    )}
+                    <label>
+                        <span className={labelClass}>Descrição do lead ideal</span>
+                        <textarea
+                            rows={4}
+                            className={fieldClass}
+                            value={settings.scoringCriteria.targetDescription}
+                            onChange={event => updateCriteria({ targetDescription: event.target.value })}
+                        />
+                    </label>
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <NumberField label="Seguidores mínimos" value={settings.scoringCriteria.minFollowers} max={1000000000} onChange={minFollowers => updateCriteria({ minFollowers })} />
+                        <NumberField label="Faixa ideal" value={settings.scoringCriteria.idealFollowers} max={1000000000} onChange={idealFollowers => updateCriteria({ idealFollowers })} />
+                        <NumberField label="Seguidores máximos" value={settings.scoringCriteria.maxFollowers} max={1000000000} onChange={maxFollowers => updateCriteria({ maxFollowers })} />
+                        <NumberField label="Score de destaque" value={settings.minScoreToHighlight} max={100} onChange={minScoreToHighlight => setSettings({ ...settings, minScoreToHighlight })} />
+                    </div>
+                    <div className="mt-4 grid gap-4 md:grid-cols-2">
+                        <SignalField
+                            label="Sinais positivos"
+                            value={settings.scoringCriteria.positiveSignals}
+                            onChange={positiveSignals => updateCriteria({ positiveSignals })}
+                        />
+                        <SignalField
+                            label="Sinais negativos"
+                            value={settings.scoringCriteria.negativeSignals}
+                            onChange={negativeSignals => updateCriteria({ negativeSignals })}
+                        />
+                    </div>
                 </Panel>
+
+                <div className="grid gap-5 lg:grid-cols-2">
+                    <Panel className="p-5 md:p-6">
+                        <h3 className="font-black">Pesos positivos</h3>
+                        <p className="mt-1 text-xs text-slate-500">Quanto cada evidência pode influenciar positivamente a nota.</p>
+                        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                            {weightLabels.map(([key, label]) => (
+                                <NumberField
+                                    key={key}
+                                    label={label}
+                                    value={settings.scoringCriteria.weights[key]}
+                                    max={100}
+                                    onChange={value => updateCriteria({
+                                        weights: { ...settings.scoringCriteria.weights, [key]: value },
+                                    })}
+                                />
+                            ))}
+                        </div>
+                    </Panel>
+                    <Panel className="p-5 md:p-6">
+                        <h3 className="font-black">Penalidades</h3>
+                        <p className="mt-1 text-xs text-slate-500">Quanto cada risco deve reduzir a compatibilidade do perfil.</p>
+                        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                            {penaltyLabels.map(([key, label]) => (
+                                <NumberField
+                                    key={key}
+                                    label={label}
+                                    value={settings.scoringCriteria.penalties[key]}
+                                    max={100}
+                                    onChange={value => updateCriteria({
+                                        penalties: { ...settings.scoringCriteria.penalties, [key]: value },
+                                    })}
+                                />
+                            ))}
+                        </div>
+                    </Panel>
+                </div>
 
                 <div className="flex justify-end">
                     <button disabled={saving} className={primaryButtonClass}>
@@ -152,17 +249,35 @@ export default function MarketingSettingsPage() {
     );
 }
 
-function NumberField({ label, value, min, max, onChange }: {
+function NumberField({ label, value, max, onChange }: {
     label: string;
     value: number;
-    min: number;
     max: number;
     onChange: (value: number) => void;
 }) {
     return (
         <label>
             <span className={labelClass}>{label}</span>
-            <input type="number" min={min} max={max} className={fieldClass} value={value} onChange={event => onChange(Number(event.target.value))} />
+            <input type="number" min={0} max={max} className={fieldClass} value={value} onChange={event => onChange(Number(event.target.value))} />
+        </label>
+    );
+}
+
+function SignalField({ label, value, onChange }: {
+    label: string;
+    value: string[];
+    onChange: (value: string[]) => void;
+}) {
+    return (
+        <label>
+            <span className={labelClass}>{label}</span>
+            <textarea
+                rows={7}
+                className={fieldClass}
+                value={value.join('\n')}
+                onChange={event => onChange(event.target.value.split('\n').map(item => item.trim()).filter(Boolean))}
+                placeholder="Um sinal por linha"
+            />
         </label>
     );
 }
