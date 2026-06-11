@@ -110,7 +110,7 @@ interface WithdrawRequest {
     userPhotoUrl: string | null;
     amount: number;
     pixKey: string;
-    status: 'pendente' | 'concluido' | 'rejeitado';
+    status: 'pendente' | 'processando' | 'concluido' | 'rejeitado';
     createdAt: string;
     updatedAt: string;
 }
@@ -1424,14 +1424,17 @@ export default function AdminPage() {
                                                     <td className="py-4 px-6">
                                                         <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${
                                                             withdraw.status === 'concluido' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                                            withdraw.status === 'processando' ? 'bg-blue-50 text-blue-700 border-blue-100 animate-pulse' :
                                                             withdraw.status === 'pendente' ? 'bg-amber-50 text-amber-700 border-amber-100 animate-pulse' :
                                                             'bg-rose-50 text-rose-700 border-rose-100'
                                                         }`}>
                                                             <span className={`w-1.5 h-1.5 rounded-full ${
                                                                 withdraw.status === 'concluido' ? 'bg-emerald-500' :
+                                                                withdraw.status === 'processando' ? 'bg-blue-500' :
                                                                 withdraw.status === 'pendente' ? 'bg-amber-500' : 'bg-rose-500'
                                                             }`} />
                                                             {withdraw.status === 'concluido' ? 'Pago' :
+                                                             withdraw.status === 'processando' ? 'Processando (Asaas)' :
                                                              withdraw.status === 'pendente' ? 'Pendente' : 'Rejeitado'}
                                                         </span>
                                                     </td>
@@ -1442,10 +1445,10 @@ export default function AdminPage() {
                                                                 <button
                                                                     onClick={() => handleApproveWithdrawal(withdraw.id)}
                                                                     className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 text-xs font-bold rounded-lg transition-all border border-emerald-100 cursor-pointer shadow-sm active:scale-95"
-                                                                    title="Confirmar que o Pix foi pago"
+                                                                    title="Aprovar e enviar Pix via API Asaas"
                                                                 >
                                                                     <Check size={12} />
-                                                                    Pago (Pix Feito)
+                                                                    Aprovar Saque (Pix)
                                                                 </button>
                                                                 <button
                                                                     onClick={() => handleRejectWithdrawal(withdraw.id)}
@@ -1456,6 +1459,10 @@ export default function AdminPage() {
                                                                     Rejeitar
                                                                 </button>
                                                             </div>
+                                                        ) : withdraw.status === 'processando' ? (
+                                                            <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wider animate-pulse">
+                                                                Aguardando Asaas...
+                                                            </span>
                                                         ) : (
                                                             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                                                                 Resolvido

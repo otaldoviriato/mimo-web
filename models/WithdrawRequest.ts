@@ -4,7 +4,8 @@ export interface IWithdrawRequest extends Document {
     userId: string; // clerkId do usuário
     amount: number;
     pixKey: string;
-    status: 'pendente' | 'concluido' | 'rejeitado';
+    status: 'pendente' | 'processando' | 'concluido' | 'rejeitado';
+    asaasTransferId?: string;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -25,8 +26,13 @@ const WithdrawRequestSchema = new Schema<IWithdrawRequest>({
     },
     status: {
         type: String,
-        enum: ['pendente', 'concluido', 'rejeitado'],
+        enum: ['pendente', 'processando', 'concluido', 'rejeitado'],
         default: 'pendente',
+    },
+    asaasTransferId: {
+        type: String,
+        required: false,
+        index: true,
     },
 }, {
     timestamps: true,

@@ -49,20 +49,24 @@ export async function POST(request: NextRequest) {
 
         // 3. Envia e-mail de notificação para viriatoceo@gmail.com
         try {
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.mimochat.com.br';
             await resend.emails.send({
                 from: 'Mimo Financeiro <onboarding@resend.dev>', // Ou use um domínio próprio verificado se tiver (ex: financeiro@mimo.app)
                 to: 'viriatoceo@gmail.com',
                 subject: `Novo Pedido de Saque - ${user.username}`,
                 html: `
-                    <h2>Novo Pedido de Saque</h2>
-                    <p>O usuário <strong>${user.name || user.username}</strong> (@${user.username}) solicitou um saque.</p>
-                    <ul>
-                        <li><strong>Valor:</strong> ${(amountToWithdraw / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</li>
-                        <li><strong>Chave PIX:</strong> ${user.pixKey}</li>
-                        <li><strong>ID do Pedido:</strong> ${withdrawRequest._id}</li>
-                        <li><strong>Data:</strong> ${new Date().toLocaleString('pt-BR')}</li>
-                    </ul>
-                    <p>O saldo na carteira do usuário foi zerado e o pedido consta como <strong>pendente</strong>.</p>
+                    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <h2 style="color: #1e293b; margin-top: 0;">Novo Pedido de Saque</h2>
+                        <p style="color: #475569; font-size: 16px;">O usuário <strong>${user.name || user.username}</strong> (@${user.username}) solicitou um saque.</p>
+                        <ul style="background-color: #f8fafc; padding: 15px 25px; border-radius: 6px; list-style-type: none; margin: 20px 0;">
+                            <li style="margin-bottom: 8px;"><strong>Valor:</strong> ${(amountToWithdraw / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</li>
+                            <li style="margin-bottom: 8px;"><strong>Chave PIX:</strong> ${user.pixKey}</li>
+                            <li style="margin-bottom: 8px;"><strong>ID do Pedido:</strong> ${withdrawRequest._id}</li>
+                            <li style="margin-bottom: 0;"><strong>Data:</strong> ${new Date().toLocaleString('pt-BR')}</li>
+                        </ul>
+                        <p style="color: #475569; margin-bottom: 25px;">O saldo na carteira do usuário foi zerado e o pedido consta como <strong>pendente</strong> de aprovação.</p>
+                        <a href="${appUrl}/admin?tab=withdrawals" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; text-align: center;">Aprovar ou Rejeitar Saque</a>
+                    </div>
                 `,
             });
         } catch (emailError) {

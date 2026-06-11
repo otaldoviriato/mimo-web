@@ -5,6 +5,7 @@ import { WithdrawRequest } from '@/models/WithdrawRequest';
 import { User } from '@/models/User';
 import { Transaction } from '@/models/Transaction';
 import { AppSettings } from '@/models/AppSettings';
+import { createAsaasPixTransfer } from '@/lib/asaas';
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
@@ -53,25 +54,25 @@ export async function PATCH(
         }
 
         if (action === 'approve') {
-            // APROVAR SAQUE:
-            // 1. Atualiza status no banco para 'concluido'
-            withdraw.status = 'concluido';
-            await withdraw.save();
-
-            // 2. Cria registro na tabela macro de Transaction
-            // Salvamos amount em REAIS para unificar a tabela de transações macro
-            await Transaction.create({
-                userId: withdraw.userId,
-                amount: withdraw.amount / 100, // em reais
-                status: 'COMPLETED',
-                type: 'debit',
-                source: 'withdrawal',
-                timestamp: new Date(),
-                metadata: {
-                    withdrawRequestId: withdraw._id.toString(),
-                    pixKey: withdraw.pixKey
+            // APROVAR SAQUE VIA PIX AUTOMÁTICO DO ASAAS:
+            try {
+                const transfer = await createAsaasPixTransfer(withdraw.amount, withdraw.pixKey);
+                
+                withdraw.status = 'processando';
+                withdraw.asaasTransferId = transfer.id;
+                await withdraw.save();
+            } catch (apiError: any) {
+                console.error('Erro ao chamar API do Asaas para transferência:', apiError);
+                
+                let message = 'Falha ao iniciar transferência no Asaas';
+                if (apiError.payload?.errors && apiError.payload.errors.length > 0) {
+                    message = apiError.payload.errors.map((e: any) => e.description).join(', ');
                 }
-            });
+                
+                return NextResponse.json({ 
+                    error: `Erro na API do Asaas: ${message}` 
+                }, { status: 400 });
+            }
 
         } else if (action === 'reject') {
             // REJEITAR SAQUE:

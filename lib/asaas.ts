@@ -224,3 +224,81 @@ export function mapAsaasPaymentStatus(status: string) {
     }
     return 'PENDING';
 }
+
+export type AsaasTransfer = {
+    id: string;
+    dateCreated: string;
+    status: string;
+    value: number;
+    netValue: number;
+    transferFee: number;
+    scheduleDate: string;
+    authorized: boolean;
+    failReason: string | null;
+    transactionReceiptUrl: string | null;
+};
+
+export function detectPixKeyType(pixKey: string): 'CPF' | 'CNPJ' | 'EMAIL' | 'PHONE' | 'EVP' {
+    const cleanKey = pixKey.trim();
+
+    // Chave EVP (Aleatória)
+    const evpRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (evpRegex.test(cleanKey)) {
+        return 'EVP';
+    }
+
+    if (cleanKey.includes('@')) {
+        return 'EMAIL';
+    }
+
+    const digitsOnly = cleanKey.replace(/\D/g, '');
+
+    if (digitsOnly.length === 11) {
+        return 'CPF';
+    }
+
+    if (digitsOnly.length === 14) {
+        return 'CNPJ';
+    }
+
+    if (cleanKey.startsWith('+') || digitsOnly.length === 10 || digitsOnly.length === 11 || digitsOnly.length === 12 || digitsOnly.length === 13) {
+        return 'PHONE';
+    }
+
+    return 'EVP';
+}
+
+export function normalizePixKey(pixKey: string, type: 'CPF' | 'CNPJ' | 'EMAIL' | 'PHONE' | 'EVP'): string {
+    const cleanKey = pixKey.trim();
+    if (type === 'PHONE') {
+        const digitsOnly = cleanKey.replace(/\D/g, '');
+        if (cleanKey.startsWith('+')) {
+            return `+${digitsOnly}`;
+        }
+        if (digitsOnly.length === 10 || digitsOnly.length === 11) {
+            return `+55${digitsOnly}`;
+        }
+        return `+${digitsOnly}`;
+    }
+    if (type === 'CPF' || type === 'CNPJ') {
+        return cleanKey.replace(/\D/g, '');
+    }
+    return cleanKey;
+}
+
+export async function createAsaasPixTransfer(amountInCents: number, pixKey: string) {
+    const value = amountInCents / 100;
+    const type = detectPixKeyType(pixKey);
+    const normalizedKey = normalizePixKey(pixKey, type);
+
+    return asaasRequest<AsaasTransfer>('/transfers', {
+        method: 'POST',
+        body: JSON.stringify({
+            value,
+            pixAddressKey: normalizedKey,
+            pixAddressKeyType: type,
+            description: 'Saque MimoChat',
+        }),
+    });
+}
+
