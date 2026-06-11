@@ -1,24 +1,16 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { CLERK_PUBLIC_ROUTES } from '@/lib/routes';
 
 const isPublicRoute = createRouteMatcher([
-    '/login(.*)',
-    '/onboarding(.*)',
+    ...CLERK_PUBLIC_ROUTES.map(route => `${route}(.*)`),
     '/api/webhooks(.*)',
     '/api/notifications/send(.*)', // Permitir notificações disparadas pelo servidor de chat
     '/api/auth/asaas-bypass(.*)',  // Permitir chamada de bypass de autenticação do Asaas
-    '/sso-callback(.*)',
     '/manifest.json',
     '/firebase-messaging-sw.js',
     '/.well-known/(.*)',
-    '/institucional(.*)',
-    '/creators(.*)',
-    '/founders(.*)',
-    '/para-criadoras2(.*)',
-    '/para-criadoras(.*)',
     '/api/creator-applications(.*)',
-    '/api/marketing/copilot(.*)',
-    '/termos-de-uso(.*)',
-    '/politica-de-privacidade(.*)'
+    '/api/marketing/copilot(.*)'
 ]);
 
 export default clerkMiddleware(async (auth, req) => {

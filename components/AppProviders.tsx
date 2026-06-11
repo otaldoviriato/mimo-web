@@ -7,23 +7,12 @@ import { CookieBanner } from '@/components/CookieBanner';
 import { QueryProvider } from '@/context/QueryProvider';
 import { PaymentProvider } from '@/context/PaymentContext';
 import { PWAProvider } from '@/context/PWAContext';
-
-const PUBLIC_ROUTES = [
-    '/creators',
-    '/institucional',
-    '/termos-de-uso',
-    '/politica-de-privacidade',
-    '/ajuda',
-    '/founders',
-    '/para-criadoras2',
-    '/para-criadoras3',
-    '/para-criadoras'
-];
+import { PUBLIC_CONTENT_ROUTES } from '@/lib/routes';
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
 
-    const isPublicRoute = pathname && PUBLIC_ROUTES.some(route => pathname === route || pathname.startsWith(route + '/'));
+    const isPublicRoute = pathname && PUBLIC_CONTENT_ROUTES.some(route => pathname === route || pathname.startsWith(route + '/'));
 
     if (isPublicRoute) {
         return (

@@ -2,15 +2,9 @@
 
 import { useRouter as useNextRouter } from 'next/navigation';
 import { useStackNavigation } from '@/context/StackNavigationContext';
+import { isReservedRoute } from '@/lib/routes';
 
-export const reservedRoutes = ['chats', 'search', 'profile', 'settings', 'login', 'sso-callback', 'api', 'admin', 'termos-de-uso', 'politica-de-privacidade', 'institucional', 'onboarding', 'ajuda', 'founders', 'para-criadoras', 'creators', 'para-criadoras2'];
-
-export const isReservedRoute = (path: string) => {
-    const cleaned = path.replace(/^\//, ''); // Remove leading slash
-    const parts = cleaned.split('/');
-    const base = parts[0];
-    return reservedRoutes.includes(base) || base === '';
-};
+export { isReservedRoute } from '@/lib/routes';
 
 export function useTransitionRouter() {
     const router = useNextRouter();
@@ -145,4 +139,3 @@ export function useTransitionRouter() {
         back,
     };
 }
-
