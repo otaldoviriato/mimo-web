@@ -14,7 +14,8 @@ const PUBLIC_ROUTES = [
     '/termos-de-uso',
     '/politica-de-privacidade',
     '/ajuda',
-    '/founders'
+    '/founders',
+    '/para-criadoras2'
 ];
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
