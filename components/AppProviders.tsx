@@ -16,6 +16,7 @@ const PUBLIC_ROUTES = [
     '/ajuda',
     '/founders',
     '/para-criadoras2',
+    '/para-criadoras3',
     '/para-criadoras'
 ];
 
