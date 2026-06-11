@@ -8,10 +8,20 @@ import { QueryProvider } from '@/context/QueryProvider';
 import { PaymentProvider } from '@/context/PaymentContext';
 import { PWAProvider } from '@/context/PWAContext';
 
+const PUBLIC_ROUTES = [
+    '/creators',
+    '/institucional',
+    '/termos-de-uso',
+    '/politica-de-privacidade',
+    '/ajuda'
+];
+
 export function AppProviders({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
 
-    if (pathname === '/creators') {
+    const isPublicRoute = pathname && PUBLIC_ROUTES.some(route => pathname === route || pathname.startsWith(route + '/'));
+
+    if (isPublicRoute) {
         return (
             <>
                 {children}
