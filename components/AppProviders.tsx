@@ -13,7 +13,8 @@ const PUBLIC_ROUTES = [
     '/institucional',
     '/termos-de-uso',
     '/politica-de-privacidade',
-    '/ajuda'
+    '/ajuda',
+    '/founders'
 ];
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
