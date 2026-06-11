@@ -92,15 +92,7 @@ export default function InstitucionalPage() {
                         >
                             Descobrir Como Funciona
                         </a>
-                        <a
-                            href="https://www.instagram.com/mimochat.oficial/"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 text-base font-bold text-white bg-gradient-to-br from-[#833ab4] via-[#fd1d1d] to-[#fcb045] hover:opacity-90 rounded-2xl transition-all duration-300 shadow-md hover:-translate-y-0.5"
-                        >
-                            <InstagramIcon className="w-5 h-5" />
-                            @mimochat.oficial
-                        </a>
+
                     </div>
                 </div>
 
