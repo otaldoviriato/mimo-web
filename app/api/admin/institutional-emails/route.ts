@@ -14,7 +14,7 @@ async function checkIsAdmin(userId: string) {
     return settings.adminClerkIds.includes(userId) || userId === FALLBACK_ADMIN;
 }
 
-// GET /api/admin/institutional-emails - Obtém e-mails cadastrados e mensagens recebidas
+// GET /api/admin/institutional-emails - Obtém e-mails cadastrados
 export async function GET(request: NextRequest) {
     try {
         const { userId } = await auth();
@@ -32,72 +32,10 @@ export async function GET(request: NextRequest) {
         const settings = await AppSettings.findOne({ key: 'global' });
         const institutionalEmails = settings?.institutionalEmails || ['viriatoceo@mimochat.com.br'];
 
-        // Buscar parâmetros de filtro
-        const { searchParams } = new URL(request.url);
-        const filterEmail = searchParams.get('email') || '';
-        const search = searchParams.get('q') || '';
-        const status = searchParams.get('status') || '';
-
-        // Construir a query
-        const query: any = {
-            recipientEmail: { $ne: 'suporte@mimochat.com.br' }, // Excluir tickets de suporte
-            parentId: { $exists: false } // Apenas mensagens raiz (não são respostas proxy)
-        };
-
-        // Filtrar por um e-mail institucional específico cadastrado
-        if (filterEmail.trim()) {
-            query.recipientEmail = filterEmail.trim().toLowerCase();
-        }
-
-        // Filtro de status
-        if (status && ['novo', 'em_atendimento', 'lido', 'resolvido', 'arquivado'].includes(status)) {
-            query.status = status;
-        }
-
-        // Filtro de texto (busca no remetente, assunto ou mensagem)
-        if (search.trim()) {
-            const searchRegex = new RegExp(search.trim(), 'i');
-            query.$or = [
-                { senderEmail: searchRegex },
-                { senderName: searchRegex },
-                { subject: searchRegex },
-                { message: searchRegex }
-            ];
-        }
-
-        // Buscar as mensagens recebidas ordenadas pelas mais recentes
-        const messages = await HelpTicket.find(query).sort({ createdAt: -1 }).lean();
-
-        // Buscar as respostas para essas mensagens raiz
-        let messagesWithReplies: any[] = messages;
-        if (messages.length > 0) {
-            const messageIds = messages.map(m => m._id);
-            const replies = await HelpTicket.find({ parentId: { $in: messageIds } }).sort({ createdAt: 1 }).lean();
-
-            // Agrupar respostas por parentId
-            const repliesMap: { [key: string]: any[] } = {};
-            replies.forEach(reply => {
-                if (reply.parentId) {
-                    const pId = reply.parentId.toString();
-                    if (!repliesMap[pId]) {
-                        repliesMap[pId] = [];
-                    }
-                    repliesMap[pId].push(reply);
-                }
-            });
-
-            // Acoplar respostas
-            messagesWithReplies = messages.map(m => ({
-                ...m,
-                replies: repliesMap[m._id.toString()] || []
-            }));
-        }
-
         return NextResponse.json({
             success: true,
             emails: institutionalEmails,
-            redirections: settings?.emailRedirections || [],
-            messages: messagesWithReplies
+            redirections: settings?.emailRedirections || []
         });
     } catch (error: any) {
         console.error('Erro na API de e-mails institucionais (GET):', error);
@@ -121,13 +59,23 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { email } = body;
+        const { email, displayName, forwardingEmail } = body;
 
         if (!email || !email.trim()) {
-            return NextResponse.json({ error: 'O e-mail é obrigatório.' }, { status: 400 });
+            return NextResponse.json({ error: 'O e-mail institucional é obrigatório.' }, { status: 400 });
+        }
+
+        if (!displayName || !displayName.trim()) {
+            return NextResponse.json({ error: 'O nome do remetente é obrigatório.' }, { status: 400 });
+        }
+
+        if (!forwardingEmail || !forwardingEmail.trim()) {
+            return NextResponse.json({ error: 'O e-mail privado de redirecionamento é obrigatório.' }, { status: 400 });
         }
 
         const cleanEmail = email.trim().toLowerCase();
+        const cleanForwarding = forwardingEmail.trim().toLowerCase();
+        const cleanDisplayName = displayName.trim();
 
         // Validar se o e-mail pertence ao domínio da Mimo
         if (!cleanEmail.endsWith('@mimochat.com.br') && !cleanEmail.endsWith('@mimochat.com')) {
@@ -144,20 +92,17 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Configurações globais não encontradas.' }, { status: 500 });
         }
 
-        const forwardingEmail = body.forwardingEmail;
-
         if (!settings.institutionalEmails.includes(cleanEmail)) {
             settings.institutionalEmails.push(cleanEmail);
         }
 
         // Atualizar redirecionamento correspondente
         settings.emailRedirections = settings.emailRedirections.filter(r => r.sourceEmail !== cleanEmail);
-        if (forwardingEmail && forwardingEmail.trim()) {
-            settings.emailRedirections.push({
-                sourceEmail: cleanEmail,
-                targetEmail: forwardingEmail.trim().toLowerCase()
-            });
-        }
+        settings.emailRedirections.push({
+            sourceEmail: cleanEmail,
+            targetEmail: cleanForwarding,
+            displayName: cleanDisplayName
+        });
 
         await settings.save();
 

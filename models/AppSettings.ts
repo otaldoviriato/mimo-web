@@ -21,7 +21,7 @@ export interface IAppSettings extends Document {
     couponsEnabled: boolean;
     chatSessionTimeoutMinutes: number;
     institutionalEmails: string[];
-    emailRedirections: { sourceEmail: string; targetEmail: string }[];
+    emailRedirections: { sourceEmail: string; targetEmail: string; displayName?: string }[];
     createdAt: Date;
     updatedAt: Date;
 }
@@ -41,7 +41,8 @@ const AppSettingsSchema = new Schema<IAppSettings>({
     emailRedirections: {
         type: [{
             sourceEmail: { type: String, required: true },
-            targetEmail: { type: String, required: true }
+            targetEmail: { type: String, required: true },
+            displayName: { type: String }
         }],
         default: []
     },

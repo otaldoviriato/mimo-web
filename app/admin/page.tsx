@@ -217,7 +217,7 @@ export default function AdminPage() {
 
     // Estados dos E-mails Institucionais
     const [institutionalEmails, setInstitutionalEmails] = useState<string[]>([]);
-    const [emailRedirections, setEmailRedirections] = useState<{ sourceEmail: string; targetEmail: string }[]>([]);
+    const [emailRedirections, setEmailRedirections] = useState<{ sourceEmail: string; targetEmail: string; displayName?: string }[]>([]);
     const [loadingInstitutional, setLoadingInstitutional] = useState(true);
     const [instMessages, setInstMessages] = useState<HelpTicketData[]>([]);
     const [selectedInstMessage, setSelectedInstMessage] = useState<HelpTicketData | null>(null);
@@ -234,8 +234,8 @@ export default function AdminPage() {
     // Estados para gerenciar o cadastro de e-mails institucionais
     const [newInstEmailPrefix, setNewInstEmailPrefix] = useState('');
     const [newInstEmailForwarding, setNewInstEmailForwarding] = useState('');
+    const [newInstEmailDisplayName, setNewInstEmailDisplayName] = useState('');
     const [addingInstEmail, setAddingInstEmail] = useState(false);
-    const [showInstEmailsModal, setShowInstEmailsModal] = useState(false);
 
     // Mapeamento de títulos para o Header
     const tabTitles: { [key: string]: string } = {
@@ -855,6 +855,14 @@ export default function AdminPage() {
             toast.error('Escreva o prefixo do e-mail (ex: contato).');
             return;
         }
+        if (!newInstEmailDisplayName.trim()) {
+            toast.error('Informe o nome de exibição do remetente.');
+            return;
+        }
+        if (!newInstEmailForwarding.trim()) {
+            toast.error('Informe o e-mail privado de redirecionamento.');
+            return;
+        }
         setAddingInstEmail(true);
         try {
             const cleanPrefix = newInstEmailPrefix.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
@@ -864,6 +872,7 @@ export default function AdminPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     email: fullEmail, 
+                    displayName: newInstEmailDisplayName.trim(),
                     forwardingEmail: newInstEmailForwarding.trim() 
                 })
             });
@@ -872,6 +881,7 @@ export default function AdminPage() {
                 setInstitutionalEmails(data.emails || []);
                 setEmailRedirections(data.redirections || []);
                 setNewInstEmailPrefix('');
+                setNewInstEmailDisplayName('');
                 setNewInstEmailForwarding('');
                 toast.success(`E-mail ${fullEmail} configurado com sucesso!`, {
                     style: { borderRadius: '12px', background: '#1E293B', color: '#FFF', fontWeight: 600 }
@@ -2649,431 +2659,150 @@ export default function AdminPage() {
                         </div>
                     )}
 
-                    {/* TAB: INSTITUTIONAL EMAILS */}
+                                        {/* TAB: INSTITUTIONAL EMAILS */}
                     {activeTab === 'institutional-emails' && (
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-190px)] animate-fade-in-up">
-                            {/* LISTA DE MENSAGENS (Coluna Esquerda) */}
-                            <div className="lg:col-span-5 xl:col-span-4 bg-white border border-slate-200/80 rounded-2xl flex flex-col overflow-hidden h-full shadow-sm">
-                                {/* Barra de busca, filtros e botões de ação */}
-                                <div className="p-4 border-b border-slate-100 space-y-3 shrink-0">
-                                    <div className="flex gap-2 items-center">
-                                        <div className="relative flex-1">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
-                                            <input
-                                                type="text"
-                                                placeholder="Pesquisar e-mails..."
-                                                value={instSearch}
-                                                onChange={(e) => setInstSearch(e.target.value)}
-                                                className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-medium text-slate-700 placeholder-slate-400 transition-all"
-                                            />
-                                        </div>
-                                        <button
-                                            onClick={() => setShowInstEmailsModal(true)}
-                                            className="p-2 border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-700 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 shadow-sm"
-                                            title="Gerenciar Contas de E-mail"
-                                        >
-                                            <Settings size={14} />
-                                        </button>
-                                    </div>
-
-                                    {/* Select para filtrar por conta institucional */}
-                                    <div className="flex gap-1.5 items-center">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase shrink-0">Conta:</span>
-                                        <select
-                                            value={instEmailFilter}
-                                            onChange={(e) => setInstEmailFilter(e.target.value)}
-                                            className="w-full p-1.5 text-[11px] bg-slate-50 border border-slate-200 rounded-lg focus:outline-none font-bold text-slate-650 cursor-pointer"
-                                        >
-                                            <option value="all">Todas as Contas</option>
-                                            {institutionalEmails.map(email => (
-                                                <option key={email} value={email}>{email}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    {/* Abas horizontais de Status */}
-                                    <div className="flex gap-1 overflow-x-auto pb-1 select-none scrollbar-none">
-                                        {[
-                                            { id: 'all', label: 'Todos' },
-                                            { id: 'novo', label: 'Novos' },
-                                            { id: 'em_atendimento', label: 'Em Fila' },
-                                            { id: 'resolvido', label: 'Resolvidos' },
-                                            { id: 'arquivado', label: 'Arquivados' }
-                                        ].map((pill) => (
-                                            <button
-                                                key={pill.id}
-                                                onClick={() => setInstStatusFilter(pill.id)}
-                                                className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all shrink-0 cursor-pointer ${
-                                                    instStatusFilter === pill.id
-                                                        ? 'bg-purple-600 text-white shadow-sm'
-                                                        : 'bg-slate-50 border border-slate-150 text-slate-500 hover:bg-slate-100 hover:text-slate-750'
-                                                }`}
-                                            >
-                                                {pill.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Lista com scroll interno */}
-                                <div className="flex-1 overflow-y-auto divide-y divide-slate-100 bg-slate-50/20">
-                                    {loadingInstitutional ? (
-                                        <div className="py-20 flex flex-col items-center justify-center gap-2">
-                                            <Loader2 className="h-7 w-7 text-purple-600 animate-spin" />
-                                            <span className="text-xs font-semibold text-slate-400">Carregando mensagens...</span>
-                                        </div>
-                                    ) : (() => {
-                                        if (instMessages.length === 0) {
-                                            return (
-                                                <div className="py-20 text-center text-xs font-semibold text-slate-400">
-                                                    Nenhum e-mail institucional recebido.
-                                                </div>
-                                            );
-                                        }
-
-                                        return (
-                                            <div>
-                                                {instMessages.map((msg) => {
-                                                    const initials = getInitials(msg.senderName || msg.senderEmail);
-                                                    const isSelected = selectedInstMessage?._id === msg._id;
-                                                    
-                                                    // Status colors
-                                                    const statusColors: { [key: string]: string } = {
-                                                        novo: 'bg-purple-50 text-purple-700 border-purple-100',
-                                                        em_atendimento: 'bg-blue-50 text-blue-700 border-blue-100',
-                                                        lido: 'bg-slate-50 text-slate-600 border-slate-100',
-                                                        resolvido: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-                                                        arquivado: 'bg-slate-100 text-slate-500 border-slate-200'
-                                                    };
-
-                                                    return (
-                                                        <div
-                                                            key={msg._id}
-                                                            onClick={() => {
-                                                                setSelectedInstMessage(msg);
-                                                                setInstNotes(msg.notes || '');
-                                                                setReplyInstText('');
-                                                                // Marcar como lido se estiver não lido
-                                                                if (!msg.isRead) {
-                                                                    handleToggleInstRead(msg);
-                                                                }
-                                                            }}
-                                                            className={`p-4 flex gap-3 cursor-pointer transition-all border-l-3 ${
-                                                                isSelected 
-                                                                    ? 'bg-purple-50/30 border-purple-600 shadow-xs' 
-                                                                    : 'hover:bg-slate-50/50 border-transparent bg-white'
-                                                            }`}
-                                                        >
-                                                            {/* Avatar */}
-                                                            <div className="relative shrink-0 select-none">
-                                                                <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shadow-xs text-purple-700 border border-purple-100 ${
-                                                                    isSelected ? 'bg-purple-100' : 'bg-purple-50/70'
-                                                                }`}>
-                                                                    {initials}
-                                                                </div>
-                                                                {!msg.isRead && (
-                                                                    <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white animate-pulse" />
-                                                                )}
-                                                            </div>
-
-                                                            {/* Info Texto */}
-                                                            <div className="flex-1 min-w-0 space-y-1">
-                                                                <div className="flex items-center justify-between gap-2">
-                                                                    <span className="text-[10px] text-slate-400 font-bold tracking-tight">
-                                                                        {new Date(msg.createdAt).toLocaleDateString('pt-BR')}
-                                                                    </span>
-                                                                    {msg.isFavorite && (
-                                                                        <Star size={11} className="fill-amber-400 text-amber-500 shrink-0" />
-                                                                    )}
-                                                                </div>
-                                                                <h4 className={`text-xs truncate ${!msg.isRead ? 'font-extrabold text-slate-900' : 'font-semibold text-slate-700'}`}>
-                                                                    {msg.subject}
-                                                                </h4>
-                                                                <p className="text-[10px] text-slate-500 truncate leading-relaxed">
-                                                                    De: {msg.senderName ? `${msg.senderName} · ` : ''}{msg.senderEmail}
-                                                                </p>
-                                                                <p className="text-[9px] text-purple-600/85 font-bold truncate">
-                                                                    Para: {msg.recipientEmail}
-                                                                </p>
-                                                                
-                                                                {/* Status badge */}
-                                                                <div className="pt-1.5 flex items-center justify-between">
-                                                                    <span className={`inline-flex items-center text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${statusColors[msg.status] || statusColors.novo}`}>
-                                                                        {msg.status === 'novo' ? 'Novo' :
-                                                                         msg.status === 'em_atendimento' ? 'Fila' :
-                                                                         msg.status === 'resolvido' ? 'Resolvido' :
-                                                                         msg.status === 'arquivado' ? 'Arquivado' : 'Lido'}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        );
-                                    })()}
-                                </div>
-                            </div>
-
-                            {/* DETALHES E RESPOSTA (Coluna Direita) */}
-                            <div className="lg:col-span-7 xl:col-span-8 bg-white border border-slate-200/80 rounded-2xl flex flex-col overflow-hidden h-full shadow-sm">
-                                {selectedInstMessage ? (
-                                    <div className="flex-1 flex flex-col overflow-hidden">
-                                        {/* Header do Visualizador */}
-                                        <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shrink-0 bg-slate-50/50">
-                                            <div className="space-y-1">
-                                                <h3 className="text-slate-800 text-sm font-extrabold leading-tight">
-                                                    {selectedInstMessage.subject}
-                                                </h3>
-                                                <p className="text-[11px] text-slate-500 font-semibold leading-none">
-                                                    De: <strong className="text-slate-700">{selectedInstMessage.senderName || 'Não informado'}</strong> ({selectedInstMessage.senderEmail})
-                                                </p>
-                                                <p className="text-[10px] text-slate-400 font-medium">
-                                                    Para: <strong className="text-purple-600">{selectedInstMessage.recipientEmail}</strong> · Recebido em: {new Date(selectedInstMessage.createdAt).toLocaleString('pt-BR')}
-                                                </p>
-                                            </div>
-
-                                            {/* Painel de Ações Rápidas */}
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                {/* Favorito */}
-                                                <button
-                                                    onClick={() => handleToggleInstFavorite(selectedInstMessage)}
-                                                    className={`p-2 rounded-xl border transition-all cursor-pointer ${
-                                                        selectedInstMessage.isFavorite 
-                                                            ? 'bg-amber-50 border-amber-250 text-amber-500' 
-                                                            : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50'
-                                                    }`}
-                                                    title={selectedInstMessage.isFavorite ? 'Remover dos favoritos' : 'Marcar como favorito'}
-                                                >
-                                                    <Star size={14} className={selectedInstMessage.isFavorite ? 'fill-amber-400' : ''} />
-                                                </button>
-
-                                                {/* Marcar como lido/não lido */}
-                                                <button
-                                                    onClick={() => handleToggleInstRead(selectedInstMessage)}
-                                                    className={`p-2 rounded-xl border transition-all cursor-pointer ${
-                                                        selectedInstMessage.isRead 
-                                                            ? 'bg-slate-50 border-slate-250 text-slate-500 hover:text-slate-700' 
-                                                            : 'bg-purple-50 border-purple-250 text-purple-600 hover:text-purple-700'
-                                                    }`}
-                                                    title={selectedInstMessage.isRead ? 'Marcar como não lido' : 'Marcar como lido'}
-                                                >
-                                                    <MailOpen size={14} />
-                                                </button>
-
-                                                {/* Dropdown Status */}
-                                                <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-2 py-1.5 rounded-xl text-xs font-semibold">
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase select-none">Status:</span>
-                                                    <select
-                                                        value={selectedInstMessage.status}
-                                                        onChange={(e) => handleUpdateInstStatus(selectedInstMessage._id, e.target.value)}
-                                                        className="bg-transparent focus:outline-none text-slate-700 font-bold cursor-pointer"
-                                                    >
-                                                        <option value="novo">Novo</option>
-                                                        <option value="em_atendimento">Em Atendimento</option>
-                                                        <option value="resolvido">Resolvido</option>
-                                                        <option value="arquivado">Arquivado</option>
-                                                    </select>
-                                                </div>
-
-                                                {/* Excluir e-mail */}
-                                                <button
-                                                    onClick={() => handleDeleteInstMessage(selectedInstMessage._id)}
-                                                    className="p-2 bg-white border border-slate-250 text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100 rounded-xl transition-all cursor-pointer"
-                                                    title="Excluir e-mail permanentemente"
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {/* Conteúdo do E-mail */}
-                                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                                            {/* Mensagem Original */}
-                                            <div className="space-y-2">
-                                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Mensagem Original (Cliente)</h4>
-                                                <div className="bg-slate-50 border border-slate-100 p-5 rounded-2xl text-slate-700 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-medium shadow-xs max-h-[300px] overflow-y-auto">
-                                                    {selectedInstMessage.message}
-                                                </div>
-                                            </div>
-
-                                            {/* Histórico de Respostas Proxy */}
-                                            {selectedInstMessage.replies && selectedInstMessage.replies.length > 0 && (
-                                                <div className="space-y-4 pt-4 border-t border-slate-100 animate-fade-in">
-                                                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Histórico de Respostas (Via Proxy)</h4>
-                                                    <div className="space-y-3">
-                                                        {selectedInstMessage.replies.map((reply: any) => (
-                                                            <div key={reply._id} className="bg-purple-50/30 border border-purple-100/50 p-4 rounded-2xl space-y-2">
-                                                                <div className="flex items-center justify-between text-[10px] font-bold text-purple-600 uppercase tracking-wider">
-                                                                    <span>Resposta de {selectedInstMessage.recipientEmail}</span>
-                                                                    <span className="text-slate-400 font-medium normal-case font-mono">
-                                                                        {new Date(reply.createdAt).toLocaleString('pt-BR')}
-                                                                    </span>
-                                                                </div>
-                                                                <div className="text-slate-700 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-medium">
-                                                                    {reply.message}
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Anotações Internas */}
-                                            <div className="space-y-2 flex flex-col pt-2 border-t border-slate-100">
-                                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Anotações Internas (Controle)</h4>
-                                                <textarea
-                                                    value={instNotes}
-                                                    onChange={(e) => setInstNotes(e.target.value)}
-                                                    placeholder="Digite anotações ou observações para controle interno..."
-                                                    rows={4}
-                                                    className="w-full p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-medium text-slate-700 placeholder-slate-400 resize-none min-h-[100px]"
-                                                />
-                                                <button
-                                                    onClick={() => handleSaveInstNotes(selectedInstMessage._id)}
-                                                    disabled={savingInstNotes}
-                                                    className="w-fit px-4 py-2 bg-slate-800 hover:bg-slate-750 active:bg-slate-900 disabled:opacity-60 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
-                                                >
-                                                    {savingInstNotes ? 'Salvando...' : 'Salvar Anotações'}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-400 animate-fade-in">
-                                        <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center border border-slate-100 text-slate-350 mb-4 shadow-inner">
-                                            <Mail size={28} className="animate-spin" style={{ animationDuration: '6s' }} />
-                                        </div>
-                                        <h4 className="text-slate-800 text-sm font-bold">Nenhuma Mensagem Selecionada</h4>
-                                        <p className="text-xs text-slate-400 font-medium max-w-xs leading-relaxed mt-1">
-                                            Selecione uma mensagem da caixa de entrada institucional para responder, salvar anotações ou alterar o status.
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* MODAL DE GERENCIAMENTO DE E-MAILS INSTITUCIONAIS */}
-                    {showInstEmailsModal && (
-                        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-                            <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md flex flex-col shadow-2xl overflow-hidden animate-fade-in-up">
-                                {/* Header */}
-                                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                            {/* Formulário de Configuração (Coluna Esquerda) */}
+                            <div className="lg:col-span-4 bg-white border border-slate-200/80 rounded-2xl p-6 flex flex-col justify-between h-full shadow-sm overflow-y-auto">
+                                <div className="space-y-6">
                                     <div>
-                                        <h3 className="text-slate-800 text-base font-extrabold tracking-tight">Contas de E-mail Institucionais</h3>
-                                        <p className="text-slate-400 text-[10px] font-bold mt-0.5 uppercase tracking-wider">Gerenciamento de Remetentes e Caixas de Entrada</p>
+                                        <h3 className="text-slate-800 text-base font-extrabold tracking-tight">Configurar Roteamento ("De-Para")</h3>
+                                        <p className="text-slate-400 text-[10px] font-bold mt-0.5 uppercase tracking-wider">Associe um e-mail institucional a uma conta privada</p>
                                     </div>
-                                    <button
-                                        onClick={() => setShowInstEmailsModal(false)}
-                                        className="p-1 text-slate-400 hover:text-slate-650 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
-                                    >
-                                        <X size={18} />
-                                    </button>
-                                </div>
 
-                                {/* Corpo do Modal */}
-                                <div className="p-6 space-y-5 flex-1 overflow-y-auto">
-                                    {/* Formulário de Adicionar E-mail */}
-                                    <div className="space-y-3 p-4 bg-slate-50 border border-slate-100 rounded-2xl">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Cadastrar/Atualizar E-mail</label>
-                                        
-                                        <div className="space-y-1">
-                                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Conta Institucional</span>
+                                    <div className="space-y-4">
+                                        {/* Conta Institucional */}
+                                        <div className="space-y-1.5">
+                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Prefixo do E-mail Institucional</span>
                                             <div className="relative flex items-center">
                                                 <input
                                                     type="text"
                                                     value={newInstEmailPrefix}
                                                     onChange={(e) => setNewInstEmailPrefix(e.target.value)}
-                                                    placeholder="ex: contato"
-                                                    className="w-full text-right pr-2 pl-3 py-2 text-xs bg-white border border-slate-200 rounded-l-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700 placeholder-slate-400 transition-all"
+                                                    placeholder="ex: viriatoceo"
+                                                    className="w-full text-right pr-2 pl-3 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-l-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700 placeholder-slate-400 transition-all"
                                                 />
-                                                <span className="bg-slate-100 border-y border-r border-slate-200 text-slate-500 px-3 py-2 text-xs font-bold rounded-r-xl select-none">
+                                                <span className="bg-slate-100 border-y border-r border-slate-200 text-slate-500 px-3 py-2.5 text-xs font-bold rounded-r-xl select-none">
                                                     @mimochat.com.br
                                                 </span>
                                             </div>
                                         </div>
 
-                                        <div className="space-y-1">
-                                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Redirecionar para (E-mail Externo)</span>
+                                        {/* Nome de Exibição */}
+                                        <div className="space-y-1.5">
+                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Nome do Remetente (Exibição)</span>
+                                            <input
+                                                type="text"
+                                                value={newInstEmailDisplayName}
+                                                onChange={(e) => setNewInstEmailDisplayName(e.target.value)}
+                                                placeholder="ex: Edmilson Viriato"
+                                                className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-semibold text-slate-700 placeholder-slate-400 transition-all"
+                                            />
+                                        </div>
+
+                                        {/* Redirecionar para */}
+                                        <div className="space-y-1.5">
+                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Redirecionar para (E-mail Privado)</span>
                                             <input
                                                 type="email"
                                                 value={newInstEmailForwarding}
                                                 onChange={(e) => setNewInstEmailForwarding(e.target.value)}
-                                                placeholder="ex: pessoal@gmail.com (opcional)"
-                                                className="w-full p-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-semibold text-slate-700 placeholder-slate-400 transition-all"
+                                                placeholder="ex: pessoal@gmail.com"
+                                                className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-semibold text-slate-700 placeholder-slate-400 transition-all"
                                             />
-                                        </div>
-
-                                        <button
-                                            onClick={handleAddInstitutionalEmail}
-                                            disabled={addingInstEmail || !newInstEmailPrefix.trim()}
-                                            className="w-full mt-1 py-2 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 disabled:opacity-60 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm shadow-purple-600/15"
-                                        >
-                                            {addingInstEmail ? (
-                                                <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                                            ) : (
-                                                <Check size={12} />
-                                            )}
-                                            Salvar Configuração
-                                        </button>
-                                    </div>
-
-                                    {/* Lista de E-mails Cadastrados */}
-                                    <div className="space-y-3.5">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Contas Cadastradas ({institutionalEmails.length})</label>
-                                        <div className="divide-y divide-slate-100 border border-slate-200/80 rounded-2xl overflow-hidden bg-slate-50/20 max-h-[220px] overflow-y-auto">
-                                            {institutionalEmails.length === 0 ? (
-                                                <p className="p-4 text-center text-xs font-semibold text-slate-400">Nenhum e-mail institucional cadastrado.</p>
-                                            ) : (
-                                                institutionalEmails.map(email => {
-                                                    const redir = emailRedirections.find(r => r.sourceEmail.toLowerCase() === email.toLowerCase());
-                                                    return (
-                                                        <div key={email} className="flex justify-between items-center p-3 bg-white hover:bg-slate-50/50 transition-colors">
-                                                            <div className="flex flex-col">
-                                                                <span className="text-xs font-bold text-slate-700">{email}</span>
-                                                                {redir?.targetEmail && (
-                                                                    <span className="text-[10px] font-bold text-purple-600/85 mt-0.5">
-                                                                        → Redireciona para: {redir.targetEmail}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <div className="flex gap-1">
-                                                                <button
-                                                                    onClick={() => {
-                                                                        const prefix = email.split('@')[0];
-                                                                        setNewInstEmailPrefix(prefix);
-                                                                        setNewInstEmailForwarding(redir?.targetEmail || '');
-                                                                    }}
-                                                                    className="p-1 text-slate-450 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer"
-                                                                    title="Editar redirecionamento"
-                                                                >
-                                                                    <Sliders size={12} />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleDeleteInstitutionalEmail(email)}
-                                                                    className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                                                                    title="Excluir conta de e-mail"
-                                                                >
-                                                                    <Trash2 size={12} />
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })
-                                            )}
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Footer */}
-                                <div className="p-4 bg-slate-50/60 border-t border-slate-100 flex justify-end shrink-0">
+                                <div className="pt-6 border-t border-slate-100 mt-6 bg-white shrink-0">
                                     <button
-                                        onClick={() => setShowInstEmailsModal(false)}
-                                        className="px-4 py-2 bg-slate-800 hover:bg-slate-750 text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
+                                        onClick={handleAddInstitutionalEmail}
+                                        disabled={addingInstEmail || !newInstEmailPrefix.trim() || !newInstEmailDisplayName.trim() || !newInstEmailForwarding.trim()}
+                                        className="w-full py-3 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 disabled:opacity-60 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-purple-600/15"
                                     >
-                                        Fechar
+                                        {addingInstEmail ? (
+                                            <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                                        ) : (
+                                            <Check size={13} />
+                                        )}
+                                        Salvar Configuração
                                     </button>
+                                </div>
+                            </div>
+
+                            {/* Tabela de Roteamentos Ativos (Coluna Direita) */}
+                            <div className="lg:col-span-8 bg-white border border-slate-200/80 rounded-2xl flex flex-col overflow-hidden h-full shadow-sm">
+                                <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
+                                    <div>
+                                        <h3 className="text-slate-800 text-sm font-extrabold leading-tight">Configurações de E-mail Ativas</h3>
+                                        <p className="text-slate-400 text-[10px] font-bold mt-0.5 uppercase tracking-wider">Lista de e-mails mapeados e nomes correspondentes</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto">
+                                    {institutionalEmails.length === 0 ? (
+                                        <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
+                                            <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center border border-slate-100 text-slate-350 mb-4 shadow-inner">
+                                                <Mail size={28} className="text-slate-300" />
+                                            </div>
+                                            <h4 className="text-slate-800 text-sm font-bold">Nenhum Roteamento Cadastrado</h4>
+                                            <p className="text-xs text-slate-400 font-medium max-w-xs leading-relaxed mt-1">
+                                                Cadastre um prefixo de e-mail ao lado para iniciar a mecânica de redirecionamento proxy.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="p-6">
+                                            <div className="overflow-x-auto border border-slate-150 rounded-2xl bg-white shadow-xs">
+                                                <table className="w-full text-left border-collapse">
+                                                    <thead>
+                                                        <tr className="bg-slate-50/75 border-b border-slate-150 text-[10px] font-bold text-slate-450 uppercase tracking-widest select-none">
+                                                            <th className="p-4">E-mail Institucional</th>
+                                                            <th className="p-4">Nome de Exibição</th>
+                                                            <th className="p-4">Redireciona Para</th>
+                                                            <th className="p-4 text-center">Ações</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100 text-xs">
+                                                        {institutionalEmails.map((email) => {
+                                                            const redir = emailRedirections.find(
+                                                                (r) => r.sourceEmail.toLowerCase() === email.toLowerCase()
+                                                            );
+                                                            return (
+                                                                <tr key={email} className="hover:bg-slate-50/40 transition-colors">
+                                                                    <td className="p-4 font-bold text-slate-800">{email}</td>
+                                                                    <td className="p-4 text-slate-600 font-medium">{redir?.displayName || 'Não configurado'}</td>
+                                                                    <td className="p-4 font-bold text-purple-650">{redir?.targetEmail || 'Não configurado'}</td>
+                                                                    <td className="p-4 text-center">
+                                                                        <div className="flex justify-center items-center gap-2">
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    const prefix = email.split('@')[0];
+                                                                                    setNewInstEmailPrefix(prefix);
+                                                                                    setNewInstEmailDisplayName(redir?.displayName || '');
+                                                                                    setNewInstEmailForwarding(redir?.targetEmail || '');
+                                                                                }}
+                                                                                className="p-2 border border-slate-200 hover:border-purple-200 text-slate-450 hover:text-purple-600 hover:bg-purple-50 rounded-xl transition-all cursor-pointer shadow-xs"
+                                                                                title="Editar configuração"
+                                                                            >
+                                                                                <Sliders size={13} />
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => handleDeleteInstitutionalEmail(email)}
+                                                                                className="p-2 border border-slate-200 hover:border-rose-150 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer shadow-xs"
+                                                                                title="Remover configuração"
+                                                                            >
+                                                                                <Trash2 size={13} />
+                                                                            </button>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

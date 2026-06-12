@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
             }
 
             // Buscar as regras de redirecionamento global para verificar permissões de envio
-            let emailRedirections: { sourceEmail: string; targetEmail: string }[] = [];
+            let emailRedirections: { sourceEmail: string; targetEmail: string; displayName?: string }[] = [];
             try {
                 const settings = await AppSettings.findOne({ key: 'global' });
                 if (settings) {
@@ -180,8 +180,12 @@ export async function POST(request: NextRequest) {
                         replySubject = `Re: ${replySubject}`;
                     }
 
+                    const fromSender = redirection.displayName
+                        ? `${redirection.displayName} <${parentTicket.recipientEmail}>`
+                        : parentTicket.recipientEmail;
+
                     await resend.emails.send({
-                        from: parentTicket.recipientEmail,
+                        from: fromSender,
                         to: parentTicket.senderEmail.trim().toLowerCase(),
                         subject: replySubject,
                         html: htmlContent || `<p style="white-space: pre-wrap;">${message.trim()}</p>`
@@ -209,7 +213,7 @@ export async function POST(request: NextRequest) {
 
         // Buscar administradores cadastrados para notificação e redirecionamentos
         let adminEmails: string[] = [];
-        let emailRedirections: { sourceEmail: string; targetEmail: string }[] = [];
+        let emailRedirections: { sourceEmail: string; targetEmail: string; displayName?: string }[] = [];
         try {
             const settings = await AppSettings.findOne({ key: 'global' });
             if (settings) {
