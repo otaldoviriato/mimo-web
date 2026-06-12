@@ -35,15 +35,8 @@ export async function GET(request: NextRequest) {
         
         const ourEmails = ['suporte@mimochat.com.br', ...institutionalEmails.map(e => e.toLowerCase().trim())];
 
-        // Buscar e-mails cujo remetente (senderEmail) pertença à nossa organização
-        const query = {
-            $or: [
-                { senderEmail: { $in: ourEmails } },
-                { senderEmail: { $regex: /@(mimochat\.com\.br|mimochat\.com)$/i } }
-            ]
-        };
-
-        const messages = await HelpTicket.find(query).sort({ createdAt: -1 }).lean();
+        // Buscar apenas e-mails explicitamente salvos como caixa de saída (marcados com notes='__outbox__')
+        const messages = await HelpTicket.find({ notes: '__outbox__' }).sort({ createdAt: -1 }).lean();
 
         return NextResponse.json({ success: true, messages });
     } catch (error: any) {

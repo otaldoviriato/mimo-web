@@ -432,6 +432,7 @@ export default function AdminPage() {
     const [sendingInstReply, setSendingInstReply] = useState(false);
     const [instNotes, setInstNotes] = useState('');
     const [savingInstNotes, setSavingInstNotes] = useState(false);
+    const [showInstReplyBox, setShowInstReplyBox] = useState(false);
 
     // Estados para gerenciar o cadastro de e-mails institucionais
     const [newInstEmailPrefix, setNewInstEmailPrefix] = useState('');
@@ -3240,6 +3241,7 @@ export default function AdminPage() {
                                                                 setSelectedInstMessage(msg);
                                                                 setInstNotes(msg.notes || '');
                                                                 setReplyInstText('');
+                                                                setShowInstReplyBox(false);
                                                                 if (!msg.isRead) {
                                                                     handleToggleInstRead(msg);
                                                                 }
@@ -3302,27 +3304,54 @@ export default function AdminPage() {
                                     {selectedInstMessage ? (
                                         <div className="flex-1 flex flex-col h-full overflow-hidden">
                                             {/* Header do e-mail selecionado */}
-                                            <div className="p-5 border-b border-slate-150 flex items-center justify-between bg-slate-50/20 shrink-0">
+                                            <div className="p-5 border-b border-slate-150 flex items-start justify-between bg-slate-50/20 shrink-0 gap-4">
                                                 <div className="min-w-0 flex-1">
-                                                    <h3 className="text-slate-800 text-sm font-extrabold leading-tight truncate">{selectedInstMessage.subject}</h3>
+                                                    <h3 className="text-slate-800 text-sm font-extrabold leading-tight">{selectedInstMessage.subject}</h3>
                                                     <div className="flex items-center gap-1.5 flex-wrap mt-1 text-[11px] text-slate-500 font-medium">
-                                                        <span>Remetente:</span>
-                                                        <span className="font-bold text-slate-700 truncate">{selectedInstMessage.senderName ? `${selectedInstMessage.senderName} <${selectedInstMessage.senderEmail}>` : selectedInstMessage.senderEmail}</span>
+                                                        <span>{selectedInstMessage.senderEmail?.includes('@mimochat.com.br') ? 'Para:' : 'De:'}</span>
+                                                        <span className="font-bold text-slate-700">{selectedInstMessage.senderName ? `${selectedInstMessage.senderName} <${selectedInstMessage.senderEmail}>` : selectedInstMessage.senderEmail}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 mt-1.5">
+                                                        <span className={`px-2 py-0.5 text-[9px] font-bold rounded-md border ${
+                                                            selectedInstMessage.senderEmail?.includes('@mimochat.com.br')
+                                                                ? 'bg-blue-50 text-blue-600 border-blue-100'
+                                                                : 'bg-purple-50 text-purple-700 border-purple-100'
+                                                        }`}>
+                                                            {selectedInstMessage.senderEmail?.includes('@mimochat.com.br') ? 'Enviado' : 'Recebido'}
+                                                        </span>
+                                                        <span className="text-[9px] font-medium text-slate-400">
+                                                            {new Date(selectedInstMessage.createdAt).toLocaleString('pt-BR')}
+                                                        </span>
                                                     </div>
                                                 </div>
 
-                                                <div className="flex items-center gap-2 select-none shrink-0 ml-4">
-                                                    {/* Botão marcar lido/não lido */}
-                                                    <span className={`px-2.5 py-1 text-[9px] font-bold rounded-lg border ${
-                                                        selectedInstMessage.senderEmail?.includes('@mimochat.com.br')
-                                                            ? 'bg-blue-50 text-blue-600 border-blue-100'
-                                                            : 'bg-purple-50 text-purple-700 border-purple-100'
-                                                    }`}>
-                                                        {selectedInstMessage.senderEmail?.includes('@mimochat.com.br') ? 'Enviado' : 'Recebido'}
-                                                    </span>
-                                                    <span className="text-[9px] font-bold text-slate-400">
-                                                        {new Date(selectedInstMessage.createdAt).toLocaleString('pt-BR')}
-                                                    </span>
+                                                {/* Ações do canto superior direito */}
+                                                <div className="flex items-center gap-1.5 select-none shrink-0">
+                                                    <button
+                                                        onClick={() => handleToggleInstFavorite(selectedInstMessage)}
+                                                        className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                                                            selectedInstMessage.isFavorite
+                                                                ? 'bg-amber-50 border-amber-200 text-amber-500'
+                                                                : 'border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+                                                        }`}
+                                                        title={selectedInstMessage.isFavorite ? 'Remover dos favoritos' : 'Favoritar'}
+                                                    >
+                                                        <Star size={13} className={selectedInstMessage.isFavorite ? 'fill-amber-400' : ''} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleToggleInstRead(selectedInstMessage)}
+                                                        className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition-all cursor-pointer"
+                                                        title={selectedInstMessage.isRead ? 'Marcar como não lido' : 'Marcar como lido'}
+                                                    >
+                                                        <MailOpen size={13} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteInstMessage(selectedInstMessage._id)}
+                                                        className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100 transition-all cursor-pointer"
+                                                        title="Excluir conversa permanentemente"
+                                                    >
+                                                        <Trash2 size={13} />
+                                                    </button>
                                                 </div>
                                             </div>
 
@@ -3372,68 +3401,59 @@ export default function AdminPage() {
                                                 </div>
                                             </div>
 
-                                            {/* Área de Resposta Rápida – Estilo Caixa de E-mail */}
-                                            <div className="p-4 border-t border-slate-100 bg-slate-50/40 shrink-0">
-                                                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-                                                    {/* Cabeçalho da composição */}
-                                                    <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
-                                                        <div className="flex items-center gap-2 text-[10px] font-semibold text-slate-500">
-                                                            <span className="font-bold text-slate-400 uppercase tracking-wider">Para:</span>
-                                                            <span className="font-bold text-slate-700">{selectedInstMessage.senderEmail}</span>
-                                                        </div>
+                                            {/* Rodapé: botão Responder colapsável */}
+                                            <div className="border-t border-slate-100 shrink-0">
+                                                {!showInstReplyBox ? (
+                                                    <div className="px-4 py-3 bg-slate-50/40 flex items-center gap-2">
                                                         <button
-                                                            onClick={() => handleDeleteInstMessage(selectedInstMessage._id)}
-                                                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
-                                                            title="Excluir conversa permanentemente"
+                                                            onClick={() => setShowInstReplyBox(true)}
+                                                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-extrabold rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1.5"
                                                         >
-                                                            <Trash2 size={12} />
-                                                        </button>
-                                                    </div>
-                                                    {/* Editor de resposta */}
-                                                    <div className="p-1">
-                                                        <RichTextEditor
-                                                            value={replyInstText}
-                                                            onChange={setReplyInstText}
-                                                            placeholder="Escreva sua resposta aqui..."
-                                                            minHeight="90px"
-                                                        />
-                                                    </div>
-                                                    {/* Barra de ações de envio */}
-                                                    <div className="px-4 py-2.5 border-t border-slate-100 flex items-center justify-between bg-slate-50/60">
-                                                        <button
-                                                            onClick={() => handleSendInstReply(selectedInstMessage._id)}
-                                                            disabled={sendingInstReply || !replyInstText.trim()}
-                                                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-[10px] font-extrabold rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1.5"
-                                                        >
-                                                            {sendingInstReply ? (
-                                                                <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                            ) : (
-                                                                <Send size={11} />
-                                                            )}
+                                                            <Send size={11} />
                                                             Responder
                                                         </button>
-                                                        <div className="flex items-center gap-1.5">
-                                                            <button
-                                                                onClick={() => handleToggleInstFavorite(selectedInstMessage)}
-                                                                className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
-                                                                    selectedInstMessage.isFavorite
-                                                                        ? 'bg-amber-50 border-amber-200 text-amber-500'
-                                                                        : 'border-slate-200 text-slate-400 hover:text-slate-600'
-                                                                }`}
-                                                                title={selectedInstMessage.isFavorite ? 'Remover dos favoritos' : 'Favoritar'}
-                                                            >
-                                                                <Star size={12} className={selectedInstMessage.isFavorite ? 'fill-amber-400' : ''} />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleToggleInstRead(selectedInstMessage)}
-                                                                className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition-all cursor-pointer"
-                                                                title={selectedInstMessage.isRead ? 'Marcar como não lido' : 'Marcar como lido'}
-                                                            >
-                                                                <MailOpen size={12} />
-                                                            </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="p-4 bg-slate-50/40">
+                                                        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                                                            <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
+                                                                <div className="flex items-center gap-2 text-[10px] font-semibold text-slate-500">
+                                                                    <span className="font-bold text-slate-400 uppercase tracking-wider">Para:</span>
+                                                                    <span className="font-bold text-slate-700">{selectedInstMessage.senderEmail}</span>
+                                                                </div>
+                                                                <button
+                                                                    onClick={() => { setShowInstReplyBox(false); setReplyInstText(''); }}
+                                                                    className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-all cursor-pointer"
+                                                                    title="Fechar"
+                                                                >
+                                                                    <X size={13} />
+                                                                </button>
+                                                            </div>
+                                                            <div className="p-1">
+                                                                <RichTextEditor
+                                                                    value={replyInstText}
+                                                                    onChange={setReplyInstText}
+                                                                    placeholder="Escreva sua resposta aqui..."
+                                                                    minHeight="90px"
+                                                                />
+                                                            </div>
+                                                            <div className="px-4 py-2.5 border-t border-slate-100 flex items-center justify-between bg-slate-50/60">
+                                                                <button
+                                                                    onClick={() => handleSendInstReply(selectedInstMessage._id)}
+                                                                    disabled={sendingInstReply || !replyInstText.trim()}
+                                                                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-[10px] font-extrabold rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                                                                >
+                                                                    {sendingInstReply ? (
+                                                                        <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                                    ) : (
+                                                                        <Send size={11} />
+                                                                    )}
+                                                                    Enviar
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
+                                                )}
                                             </div>
                                         </div>
                                     ) : (

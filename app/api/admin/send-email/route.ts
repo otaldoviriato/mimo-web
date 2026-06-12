@@ -83,6 +83,7 @@ export async function POST(request: NextRequest) {
                 status: 'resolvido',
                 isFavorite: false,
                 isRead: true,
+                notes: '__outbox__',
             });
 
             return NextResponse.json({
@@ -128,6 +129,7 @@ export async function POST(request: NextRequest) {
                 status: 'resolvido',
                 isFavorite: false,
                 isRead: true,
+                notes: '__outbox__',
             });
 
             return NextResponse.json({ success: true, data: result.data });
