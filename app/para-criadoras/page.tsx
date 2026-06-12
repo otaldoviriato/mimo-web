@@ -911,7 +911,7 @@ export default function ParaCriadorasPage() {
                         {!success ? (
                             <form 
                                 onSubmit={handleSubmit} 
-                                className={`space-y-3 mt-3 max-w-xl overflow-y-auto max-h-[62vh] lg:max-h-[none] pb-5 pr-1.5 scrollbar-none ${
+                                className={`space-y-3 mt-3 max-w-xl overflow-y-auto max-h-[62vh] lg:max-h-[calc(100vh-300px)] pb-5 pr-1.5 scrollbar-none ${
                                     isExiting ? 'animate-slide-out-subtitle' : 'animate-subtitle-elastic'
                                 }`}
                             >
@@ -1299,7 +1299,7 @@ export default function ParaCriadorasPage() {
             </header>
 
             {/* ÁREA PRINCIPAL DO ONBOARDING */}
-            <div className="flex-1 flex flex-col px-4 sm:px-6 pt-20 pb-3 lg:py-8 lg:justify-center max-w-7xl mx-auto w-full relative z-20">
+            <div className="flex-1 flex flex-col px-4 sm:px-6 pt-20 pb-3 lg:pt-24 lg:pb-8 lg:justify-center max-w-7xl mx-auto w-full relative z-20">
                 
                 {/* CONTEÚDO CENTRALIZADO (SEM ROLAGEM) */}
                 <div className="flex-1 flex flex-col lg:grid lg:grid-cols-12 lg:gap-12 lg:items-center lg:my-auto min-h-0 w-full">
