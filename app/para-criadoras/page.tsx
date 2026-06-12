@@ -21,9 +21,7 @@ import {
     LockKeyholeOpen
 } from 'lucide-react';
 import { InstagramIcon } from '@/components/InstagramIcon';
-import dynamic from 'next/dynamic';
-
-const Phone3D = dynamic(() => import('./components/Phone3D'), { ssr: false });
+import Phone3D from './components/Phone3D';
 
 const initialForm = {
     fullName: '',
@@ -67,6 +65,42 @@ export default function ParaCriadorasPage() {
     const [isExiting, setIsExiting] = useState(false); // Indica que a tela atual está saindo
     const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
     const [isMobileDevice, setIsMobileDevice] = useState(false);
+
+    // ─── ESTADOS DE CARREGAMENTO DO CELULAR 3D E IMAGENS ───
+    const [isImagesLoaded, setIsImagesLoaded] = useState(false);
+    const [isPhoneMounted, setIsPhoneMounted] = useState(false);
+    const isFullyLoaded = isImagesLoaded && isPhoneMounted;
+
+    useEffect(() => {
+        const imageUrls = [
+            '/assets/carlos.png',
+            '/assets/rafael.png',
+            '/assets/bruno.png',
+            '/assets/diego.png',
+            '/assets/mateus.png',
+            '/assets/laura.png'
+        ];
+
+        let loadedCount = 0;
+        const totalImages = imageUrls.length;
+
+        imageUrls.forEach(url => {
+            const img = new window.Image();
+            img.src = url;
+            img.onload = () => {
+                loadedCount++;
+                if (loadedCount === totalImages) {
+                    setIsImagesLoaded(true);
+                }
+            };
+            img.onerror = () => {
+                loadedCount++;
+                if (loadedCount === totalImages) {
+                    setIsImagesLoaded(true);
+                }
+            };
+        });
+    }, []);
 
     useEffect(() => {
         const handleResize = () => {
@@ -1249,6 +1283,18 @@ export default function ParaCriadorasPage() {
                 .animate-exit-widget {
                     animation: widgetExitOut 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
                 }
+
+                /* Animação de Slide-in do Celular 3D ao Carregar */
+                .phone-slide-enter {
+                    transform: translateX(120vw);
+                    opacity: 0;
+                    pointer-events: none;
+                }
+                .phone-slide-active {
+                    transform: translateX(0);
+                    opacity: 1;
+                    transition: transform 1.2s cubic-bezier(0.19, 1, 0.22, 1), opacity 1.2s cubic-bezier(0.19, 1, 0.22, 1);
+                }
             `}</style>
 
             {/* Efeito de Fundo Aurora do Perfil Público (Esferas Desfocadas Modernas) */}
@@ -1326,7 +1372,9 @@ export default function ParaCriadorasPage() {
                     } lg:col-span-5 flex justify-center lg:justify-end relative w-full lg:row-span-2 lg:self-center`}>
                         <div className="absolute inset-0 bg-gradient-to-tr from-purple-400/5 to-fuchsia-400/5 rounded-[3rem] blur-xl opacity-40 pointer-events-none z-0"></div>
                         
-                        <div className="z-10 w-full flex justify-center lg:justify-end relative">
+                        <div className={`z-10 w-full flex justify-center lg:justify-end relative ${
+                            isFullyLoaded ? 'phone-slide-active' : 'phone-slide-enter'
+                        }`}>
                             {/* Div envolvente com tamanho fixo que alinha celular e carteira flutuante */}
                             <div className="relative flex items-center justify-center w-[320px] h-[340px] lg:w-[350px] lg:h-[560px]">
                                 
@@ -1373,7 +1421,11 @@ export default function ParaCriadorasPage() {
                                 </div>
 
                                 {/* Celular 3D Unificado (Persistente) */}
-                                <Phone3D isMobile={isMobileDevice} isFacingFront={activeStep > 0}>
+                                <Phone3D 
+                                    isMobile={isMobileDevice} 
+                                    isFacingFront={activeStep > 0}
+                                    onLoad={() => setIsPhoneMounted(true)}
+                                >
                                     {renderPhoneDisplay(isMobileDevice)}
                                 </Phone3D>
                             </div>
@@ -1387,6 +1439,8 @@ export default function ParaCriadorasPage() {
                         key={`actions-${activeStep}`} 
                         className={`lg:col-span-7 shrink-0 flex flex-col justify-center text-center lg:text-left ${
                             isExiting ? 'animate-exit-content' : ''
+                        } transition-all duration-700 ease-out ${
+                            isFullyLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
                         }`}
                     >
                         {renderStepActions()}

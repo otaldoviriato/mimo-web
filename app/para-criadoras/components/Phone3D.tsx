@@ -7,11 +7,22 @@ interface Phone3DProps {
     isMobile?: boolean;
     distanceFactor?: number; // Mantido por compatibilidade de assinatura
     isFacingFront?: boolean;
+    onLoad?: () => void;
 }
 
-export default function Phone3D({ children, isMobile = false, isFacingFront = false }: Phone3DProps) {
+export default function Phone3D({ children, isMobile = false, isFacingFront = false, onLoad }: Phone3DProps) {
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
     const containerRef = useRef<HTMLDivElement>(null);
+
+    // Efeito para disparar onLoad após a montagem
+    useEffect(() => {
+        if (onLoad) {
+            const timer = setTimeout(() => {
+                onLoad();
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [onLoad]);
 
     // Efeito de Parallax suave baseado na posição do mouse na tela
     useEffect(() => {
