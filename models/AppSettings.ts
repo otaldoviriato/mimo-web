@@ -21,6 +21,7 @@ export interface IAppSettings extends Document {
     couponsEnabled: boolean;
     chatSessionTimeoutMinutes: number;
     institutionalEmails: string[];
+    emailRedirections: { sourceEmail: string; targetEmail: string }[];
     createdAt: Date;
     updatedAt: Date;
 }
@@ -36,6 +37,13 @@ const AppSettingsSchema = new Schema<IAppSettings>({
     institutionalEmails: {
         type: [String],
         default: ['viriatoceo@mimochat.com.br']
+    },
+    emailRedirections: {
+        type: [{
+            sourceEmail: { type: String, required: true },
+            targetEmail: { type: String, required: true }
+        }],
+        default: []
     },
     platformFeePercentage: {
         type: Number,

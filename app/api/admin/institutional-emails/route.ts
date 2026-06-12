@@ -70,6 +70,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
             success: true,
             emails: institutionalEmails,
+            redirections: settings?.emailRedirections || [],
             messages
         });
     } catch (error: any) {
@@ -117,17 +118,27 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Configurações globais não encontradas.' }, { status: 500 });
         }
 
-        // Evitar duplicados
-        if (settings.institutionalEmails.includes(cleanEmail)) {
-            return NextResponse.json({ error: 'Este e-mail institucional já está cadastrado.' }, { status: 400 });
+        const forwardingEmail = body.forwardingEmail;
+
+        if (!settings.institutionalEmails.includes(cleanEmail)) {
+            settings.institutionalEmails.push(cleanEmail);
         }
 
-        settings.institutionalEmails.push(cleanEmail);
+        // Atualizar redirecionamento correspondente
+        settings.emailRedirections = settings.emailRedirections.filter(r => r.sourceEmail !== cleanEmail);
+        if (forwardingEmail && forwardingEmail.trim()) {
+            settings.emailRedirections.push({
+                sourceEmail: cleanEmail,
+                targetEmail: forwardingEmail.trim().toLowerCase()
+            });
+        }
+
         await settings.save();
 
         return NextResponse.json({
             success: true,
-            emails: settings.institutionalEmails
+            emails: settings.institutionalEmails,
+            redirections: settings.emailRedirections
         });
     } catch (error: any) {
         console.error('Erro na API de e-mails institucionais (POST):', error);
@@ -166,11 +177,13 @@ export async function DELETE(request: NextRequest) {
 
         // Remover do array
         settings.institutionalEmails = settings.institutionalEmails.filter(e => e !== cleanEmail);
+        settings.emailRedirections = settings.emailRedirections.filter(r => r.sourceEmail !== cleanEmail);
         await settings.save();
 
         return NextResponse.json({
             success: true,
-            emails: settings.institutionalEmails
+            emails: settings.institutionalEmails,
+            redirections: settings.emailRedirections
         });
     } catch (error: any) {
         console.error('Erro na API de e-mails institucionais (DELETE):', error);

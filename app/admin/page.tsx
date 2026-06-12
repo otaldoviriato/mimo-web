@@ -216,6 +216,7 @@ export default function AdminPage() {
 
     // Estados dos E-mails Institucionais
     const [institutionalEmails, setInstitutionalEmails] = useState<string[]>([]);
+    const [emailRedirections, setEmailRedirections] = useState<{ sourceEmail: string; targetEmail: string }[]>([]);
     const [loadingInstitutional, setLoadingInstitutional] = useState(true);
     const [instMessages, setInstMessages] = useState<HelpTicketData[]>([]);
     const [selectedInstMessage, setSelectedInstMessage] = useState<HelpTicketData | null>(null);
@@ -231,6 +232,7 @@ export default function AdminPage() {
 
     // Estados para gerenciar o cadastro de e-mails institucionais
     const [newInstEmailPrefix, setNewInstEmailPrefix] = useState('');
+    const [newInstEmailForwarding, setNewInstEmailForwarding] = useState('');
     const [addingInstEmail, setAddingInstEmail] = useState(false);
     const [showInstEmailsModal, setShowInstEmailsModal] = useState(false);
 
@@ -831,6 +833,7 @@ export default function AdminPage() {
             if (response.ok) {
                 const data = await response.json();
                 setInstitutionalEmails(data.emails || []);
+                setEmailRedirections(data.redirections || []);
                 setInstMessages(data.messages || []);
                 if (data.emails && data.emails.length > 0 && !newEmailSender) {
                     setNewEmailSender(data.emails[0]);
@@ -858,13 +861,18 @@ export default function AdminPage() {
             const response = await fetch('/api/admin/institutional-emails', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: fullEmail })
+                body: JSON.stringify({ 
+                    email: fullEmail, 
+                    forwardingEmail: newInstEmailForwarding.trim() 
+                })
             });
             if (response.ok) {
                 const data = await response.json();
                 setInstitutionalEmails(data.emails || []);
+                setEmailRedirections(data.redirections || []);
                 setNewInstEmailPrefix('');
-                toast.success(`E-mail ${fullEmail} cadastrado com sucesso!`, {
+                setNewInstEmailForwarding('');
+                toast.success(`E-mail ${fullEmail} configurado com sucesso!`, {
                     style: { borderRadius: '12px', background: '#1E293B', color: '#FFF', fontWeight: 600 }
                 });
             } else {
@@ -889,6 +897,7 @@ export default function AdminPage() {
             if (response.ok) {
                 const data = await response.json();
                 setInstitutionalEmails(data.emails || []);
+                setEmailRedirections(data.redirections || []);
                 if (instEmailFilter === email) {
                     setInstEmailFilter('all');
                 }
@@ -3096,29 +3105,48 @@ export default function AdminPage() {
                                 {/* Corpo do Modal */}
                                 <div className="p-6 space-y-5 flex-1 overflow-y-auto">
                                     {/* Formulário de Adicionar E-mail */}
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Cadastrar Novo E-mail</label>
-                                        <div className="flex gap-2">
-                                            <div className="relative flex-1 flex items-center">
+                                    <div className="space-y-3 p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Cadastrar/Atualizar E-mail</label>
+                                        
+                                        <div className="space-y-1">
+                                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Conta Institucional</span>
+                                            <div className="relative flex items-center">
                                                 <input
                                                     type="text"
                                                     value={newInstEmailPrefix}
                                                     onChange={(e) => setNewInstEmailPrefix(e.target.value)}
                                                     placeholder="ex: contato"
-                                                    className="w-full text-right pr-2 pl-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-l-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700 placeholder-slate-400 transition-all"
+                                                    className="w-full text-right pr-2 pl-3 py-2 text-xs bg-white border border-slate-200 rounded-l-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700 placeholder-slate-400 transition-all"
                                                 />
                                                 <span className="bg-slate-100 border-y border-r border-slate-200 text-slate-500 px-3 py-2 text-xs font-bold rounded-r-xl select-none">
                                                     @mimochat.com.br
                                                 </span>
                                             </div>
-                                            <button
-                                                onClick={handleAddInstitutionalEmail}
-                                                disabled={addingInstEmail || !newInstEmailPrefix.trim()}
-                                                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 disabled:opacity-60 text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
-                                            >
-                                                {addingInstEmail ? '...' : 'Salvar'}
-                                            </button>
                                         </div>
+
+                                        <div className="space-y-1">
+                                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Redirecionar para (E-mail Externo)</span>
+                                            <input
+                                                type="email"
+                                                value={newInstEmailForwarding}
+                                                onChange={(e) => setNewInstEmailForwarding(e.target.value)}
+                                                placeholder="ex: pessoal@gmail.com (opcional)"
+                                                className="w-full p-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-semibold text-slate-700 placeholder-slate-400 transition-all"
+                                            />
+                                        </div>
+
+                                        <button
+                                            onClick={handleAddInstitutionalEmail}
+                                            disabled={addingInstEmail || !newInstEmailPrefix.trim()}
+                                            className="w-full mt-1 py-2 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 disabled:opacity-60 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm shadow-purple-600/15"
+                                        >
+                                            {addingInstEmail ? (
+                                                <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                                            ) : (
+                                                <Check size={12} />
+                                            )}
+                                            Salvar Configuração
+                                        </button>
                                     </div>
 
                                     {/* Lista de E-mails Cadastrados */}
@@ -3128,18 +3156,41 @@ export default function AdminPage() {
                                             {institutionalEmails.length === 0 ? (
                                                 <p className="p-4 text-center text-xs font-semibold text-slate-400">Nenhum e-mail institucional cadastrado.</p>
                                             ) : (
-                                                institutionalEmails.map(email => (
-                                                    <div key={email} className="flex justify-between items-center p-3 bg-white hover:bg-slate-50/50 transition-colors">
-                                                        <span className="text-xs font-bold text-slate-700">{email}</span>
-                                                        <button
-                                                            onClick={() => handleDeleteInstitutionalEmail(email)}
-                                                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                                                            title="Excluir conta de e-mail"
-                                                        >
-                                                            <Trash2 size={13} />
-                                                        </button>
-                                                    </div>
-                                                ))
+                                                institutionalEmails.map(email => {
+                                                    const redir = emailRedirections.find(r => r.sourceEmail.toLowerCase() === email.toLowerCase());
+                                                    return (
+                                                        <div key={email} className="flex justify-between items-center p-3 bg-white hover:bg-slate-50/50 transition-colors">
+                                                            <div className="flex flex-col">
+                                                                <span className="text-xs font-bold text-slate-700">{email}</span>
+                                                                {redir?.targetEmail && (
+                                                                    <span className="text-[10px] font-bold text-purple-600/85 mt-0.5">
+                                                                        → Redireciona para: {redir.targetEmail}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex gap-1">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const prefix = email.split('@')[0];
+                                                                        setNewInstEmailPrefix(prefix);
+                                                                        setNewInstEmailForwarding(redir?.targetEmail || '');
+                                                                    }}
+                                                                    className="p-1 text-slate-450 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer"
+                                                                    title="Editar redirecionamento"
+                                                                >
+                                                                    <Sliders size={12} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDeleteInstitutionalEmail(email)}
+                                                                    className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                                                    title="Excluir conta de e-mail"
+                                                                >
+                                                                    <Trash2 size={12} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })
                                             )}
                                         </div>
                                     </div>

@@ -31,7 +31,35 @@ export async function POST(request: NextRequest) {
 
         const fromString = emailData.from;
         const subject = emailData.subject || 'Sem assunto';
-        const message = emailData.text || emailData.html || 'Sem conteúdo de mensagem';
+
+        // Buscar o corpo do e-mail completo a partir do ID do e-mail
+        const emailId = body.data?.email_id || body.email_id || emailData.id || emailData.email_id;
+        let textContent = '';
+        let htmlContent = '';
+        if (emailId && process.env.RESEND_API_KEY) {
+            try {
+                const resendReceiving = (resend.emails as any).receiving;
+                if (resendReceiving && typeof resendReceiving.get === 'function') {
+                    const result = await resendReceiving.get(emailId);
+                    const fullEmail = (result?.data || result) as any;
+                    if (fullEmail) {
+                        textContent = fullEmail.text || '';
+                        htmlContent = fullEmail.html || '';
+                    }
+                } else {
+                    const result = await resend.emails.get(emailId);
+                    const fullEmail = (result?.data || result) as any;
+                    if (fullEmail) {
+                        textContent = fullEmail.text || '';
+                        htmlContent = fullEmail.html || '';
+                    }
+                }
+            } catch (apiErr) {
+                console.error(`[Webhook Resend] Erro ao buscar e-mail recebido pelo id ${emailId}:`, apiErr);
+            }
+        }
+
+        const message = textContent || htmlContent || emailData.text || emailData.html || 'Sem conteúdo de mensagem';
 
         if (!fromString) {
             return NextResponse.json({ error: 'Campo "from" é obrigatório no payload' }, { status: 400 });
@@ -97,15 +125,19 @@ export async function POST(request: NextRequest) {
             isRead: false,
         });
 
-        // Buscar administradores cadastrados para notificação
+        // Buscar administradores cadastrados para notificação e redirecionamentos
         let adminEmails: string[] = [];
+        let emailRedirections: { sourceEmail: string; targetEmail: string }[] = [];
         try {
             const settings = await AppSettings.findOne({ key: 'global' });
-            if (settings && settings.adminClerkIds && settings.adminClerkIds.length > 0) {
-                const admins = await User.find({ clerkId: { $in: settings.adminClerkIds } })
-                    .select('email')
-                    .lean();
-                adminEmails = admins.map(admin => admin.email).filter(Boolean);
+            if (settings) {
+                emailRedirections = settings.emailRedirections || [];
+                if (settings.adminClerkIds && settings.adminClerkIds.length > 0) {
+                    const admins = await User.find({ clerkId: { $in: settings.adminClerkIds } })
+                        .select('email')
+                        .lean();
+                    adminEmails = admins.map(admin => admin.email).filter(Boolean);
+                }
             }
         } catch (dbErr) {
             console.error('Erro ao buscar administradores para notificação de webhook:', dbErr);
@@ -115,6 +147,35 @@ export async function POST(request: NextRequest) {
         const emailTo = process.env.HELP_EMAIL_TO 
             ? process.env.HELP_EMAIL_TO.split(',').map(e => e.trim()) 
             : (adminEmails.length > 0 ? adminEmails : [FALLBACK_ADMIN_EMAIL]);
+
+        // Redirecionar/encaminhar e-mail institucional automaticamente se cadastrado
+        const redirection = emailRedirections.find(
+            r => r.sourceEmail.toLowerCase() === recipientEmail.toLowerCase()
+        );
+        if (redirection && redirection.targetEmail && process.env.RESEND_API_KEY) {
+            try {
+                const forwardHeader = `
+                    <div style="font-family: sans-serif; font-size: 13px; color: #475569; background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; padding: 15px; margin-bottom: 20px; border-radius: 6px;">
+                        <strong>E-mail original encaminhado pelo MimoChat</strong><br/>
+                        <strong>Remetente original:</strong> ${ticket.senderName ? `${ticket.senderName} &lt;${ticket.senderEmail}&gt;` : ticket.senderEmail}<br/>
+                        <strong>Destinatário original:</strong> ${recipientEmail}<br/>
+                        <strong>Assunto:</strong> ${ticket.subject}<br/>
+                        <strong>Data:</strong> ${new Date(ticket.createdAt).toLocaleString('pt-BR')}
+                    </div>
+                `;
+                const mainHtml = htmlContent || `<p style="white-space: pre-wrap;">${ticket.message}</p>`;
+
+                await resend.emails.send({
+                    from: recipientEmail, // Remetente institucional verificado
+                    to: redirection.targetEmail.trim().toLowerCase(),
+                    subject: `[Redirecionado] ${ticket.subject}`,
+                    html: forwardHeader + mainHtml
+                });
+                console.log(`[Webhook Resend] E-mail de ${recipientEmail} encaminhado com sucesso para ${redirection.targetEmail}`);
+            } catch (forwardErr) {
+                console.error(`[Webhook Resend] Erro ao processar redirecionamento para ${redirection.targetEmail}:`, forwardErr);
+            }
+        }
 
         // Enviar notificação aos administradores via Resend apenas se for e-mail de suporte
         if (process.env.RESEND_API_KEY && recipientEmail === 'suporte@mimochat.com.br') {
