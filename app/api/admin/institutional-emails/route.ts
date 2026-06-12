@@ -40,7 +40,8 @@ export async function GET(request: NextRequest) {
 
         // Construir a query
         const query: any = {
-            recipientEmail: { $ne: 'suporte@mimochat.com.br' } // Excluir tickets de suporte
+            recipientEmail: { $ne: 'suporte@mimochat.com.br' }, // Excluir tickets de suporte
+            parentId: { $exists: false } // Apenas mensagens raiz (não são respostas proxy)
         };
 
         // Filtrar por um e-mail institucional específico cadastrado
@@ -67,11 +68,36 @@ export async function GET(request: NextRequest) {
         // Buscar as mensagens recebidas ordenadas pelas mais recentes
         const messages = await HelpTicket.find(query).sort({ createdAt: -1 }).lean();
 
+        // Buscar as respostas para essas mensagens raiz
+        let messagesWithReplies: any[] = messages;
+        if (messages.length > 0) {
+            const messageIds = messages.map(m => m._id);
+            const replies = await HelpTicket.find({ parentId: { $in: messageIds } }).sort({ createdAt: 1 }).lean();
+
+            // Agrupar respostas por parentId
+            const repliesMap: { [key: string]: any[] } = {};
+            replies.forEach(reply => {
+                if (reply.parentId) {
+                    const pId = reply.parentId.toString();
+                    if (!repliesMap[pId]) {
+                        repliesMap[pId] = [];
+                    }
+                    repliesMap[pId].push(reply);
+                }
+            });
+
+            // Acoplar respostas
+            messagesWithReplies = messages.map(m => ({
+                ...m,
+                replies: repliesMap[m._id.toString()] || []
+            }));
+        }
+
         return NextResponse.json({
             success: true,
             emails: institutionalEmails,
             redirections: settings?.emailRedirections || [],
-            messages
+            messages: messagesWithReplies
         });
     } catch (error: any) {
         console.error('Erro na API de e-mails institucionais (GET):', error);

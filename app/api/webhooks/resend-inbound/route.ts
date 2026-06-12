@@ -113,7 +113,89 @@ export async function POST(request: NextRequest) {
 
         await connectToDatabase();
 
-        // Salvar ticket no banco de dados
+        // 1. Detectar se é uma resposta para o proxy de-para (reply-TICKETID@dominio)
+        const proxyMatch = recipientEmail.match(/^reply-([a-f\d]{24})@(.+)$/i);
+        if (proxyMatch) {
+            const ticketId = proxyMatch[1];
+            const domain = proxyMatch[2];
+
+            // Buscar o ticket original
+            const parentTicket = await HelpTicket.findById(ticketId);
+            if (!parentTicket) {
+                console.error(`[Webhook Resend Proxy] Ticket original com ID ${ticketId} não encontrado.`);
+                return NextResponse.json({ message: 'Ticket original não encontrado.' }, { status: 200 });
+            }
+
+            // Buscar as regras de redirecionamento global para verificar permissões de envio
+            let emailRedirections: { sourceEmail: string; targetEmail: string }[] = [];
+            try {
+                const settings = await AppSettings.findOne({ key: 'global' });
+                if (settings) {
+                    emailRedirections = settings.emailRedirections || [];
+                }
+            } catch (dbErr) {
+                console.error('[Webhook Resend Proxy] Erro ao carregar configurações globais:', dbErr);
+            }
+
+            // Achar o redirecionamento correspondente ao e-mail institucional original
+            const redirection = emailRedirections.find(
+                r => r.sourceEmail.toLowerCase() === parentTicket.recipientEmail.toLowerCase()
+            );
+
+            if (!redirection) {
+                console.error(`[Webhook Resend Proxy] Nenhuma regra de redirecionamento de e-mail cadastrada para ${parentTicket.recipientEmail}.`);
+                return NextResponse.json({ message: 'Regra de redirecionamento não configurada.' }, { status: 200 });
+            }
+
+            // Garantir que quem está respondendo é o e-mail privado correto (segurança)
+            if (redirection.targetEmail.toLowerCase() !== senderEmail.toLowerCase()) {
+                console.error(`[Webhook Resend Proxy] Tentativa de envio rejeitada. E-mail privado '${senderEmail}' não corresponde ao e-mail cadastrado '${redirection.targetEmail}' para o institucional '${parentTicket.recipientEmail}'.`);
+                return NextResponse.json({ message: 'Envio não autorizado para esta conversa.' }, { status: 200 });
+            }
+
+            // Salvar a resposta no banco de dados como um registro filho
+            const replyTicket = await HelpTicket.create({
+                senderEmail: parentTicket.recipientEmail.toLowerCase(), // Do institucional
+                senderName: senderName || undefined,
+                recipientEmail: parentTicket.senderEmail.toLowerCase(), // Para o cliente original
+                subject: subject.trim(),
+                message: message.trim(),
+                status: 'lido',
+                isFavorite: false,
+                isRead: true,
+                parentId: parentTicket._id
+            });
+
+            // Atualizar status do ticket original
+            parentTicket.status = 'em_atendimento';
+            parentTicket.isRead = true;
+            await parentTicket.save();
+
+            // Disparar resposta para o cliente original usando o remetente institucional oficial
+            if (process.env.RESEND_API_KEY) {
+                try {
+                    // Garantir que o assunto tenha prefixo "Re:"
+                    let replySubject = subject.trim();
+                    if (!replySubject.toLowerCase().startsWith('re:')) {
+                        replySubject = `Re: ${replySubject}`;
+                    }
+
+                    await resend.emails.send({
+                        from: parentTicket.recipientEmail,
+                        to: parentTicket.senderEmail.trim().toLowerCase(),
+                        subject: replySubject,
+                        html: htmlContent || `<p style="white-space: pre-wrap;">${message.trim()}</p>`
+                    });
+                    console.log(`[Webhook Resend Proxy] Resposta do ticket ${ticketId} encaminhada com sucesso para o cliente ${parentTicket.senderEmail}`);
+                } catch (sendErr) {
+                    console.error(`[Webhook Resend Proxy] Erro ao disparar e-mail de resposta para o cliente:`, sendErr);
+                }
+            }
+
+            return NextResponse.json({ success: true, replyTicketId: replyTicket._id });
+        }
+
+        // Salvar ticket original no banco de dados
         const ticket = await HelpTicket.create({
             senderEmail: senderEmail.toLowerCase(),
             senderName: senderName || undefined,
@@ -165,13 +247,22 @@ export async function POST(request: NextRequest) {
                 `;
                 const mainHtml = htmlContent || `<p style="white-space: pre-wrap;">${ticket.message}</p>`;
 
+                // Determinar o domínio e-mail
+                const domainMatch = recipientEmail.match(/@(.+)$/);
+                const domain = domainMatch ? domainMatch[1] : 'mimochat.com.br';
+                const replyToAddress = `reply-${ticket._id}@${domain}`;
+
+                // Formatar remetente amigável contanto que termine com o domínio verificado
+                const friendlySenderName = ticket.senderName ? `${ticket.senderName} [via MimoChat]` : 'Cliente [via MimoChat]';
+
                 await resend.emails.send({
-                    from: recipientEmail, // Remetente institucional verificado
+                    from: `${friendlySenderName} <${recipientEmail}>`,
                     to: redirection.targetEmail.trim().toLowerCase(),
-                    subject: `[Redirecionado] ${ticket.subject}`,
+                    replyTo: replyToAddress,
+                    subject: ticket.subject,
                     html: forwardHeader + mainHtml
                 });
-                console.log(`[Webhook Resend] E-mail de ${recipientEmail} encaminhado com sucesso para ${redirection.targetEmail}`);
+                console.log(`[Webhook Resend] E-mail de ${recipientEmail} encaminhado com sucesso para ${redirection.targetEmail} com replyTo ${replyToAddress}`);
             } catch (forwardErr) {
                 console.error(`[Webhook Resend] Erro ao processar redirecionamento para ${redirection.targetEmail}:`, forwardErr);
             }

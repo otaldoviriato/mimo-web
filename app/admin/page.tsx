@@ -101,6 +101,7 @@ interface HelpTicketData {
     isFavorite: boolean;
     isRead: boolean;
     notes?: string;
+    replies?: HelpTicketData[];
     createdAt: string;
     updatedAt: string;
 }
@@ -2673,32 +2674,6 @@ export default function AdminPage() {
                                         >
                                             <Settings size={14} />
                                         </button>
-                                        <button
-                                            onClick={() => {
-                                                setSelectedInstMessage({
-                                                    _id: 'new-email-inst',
-                                                    senderEmail: '',
-                                                    recipientEmail: institutionalEmails[0] || 'viriatoceo@mimochat.com.br',
-                                                    subject: '',
-                                                    message: '',
-                                                    status: 'novo',
-                                                    isFavorite: false,
-                                                    isRead: true,
-                                                    createdAt: new Date().toISOString() as any,
-                                                    updatedAt: new Date().toISOString() as any,
-                                                } as any);
-                                                if (institutionalEmails.length > 0) {
-                                                    setNewEmailSender(institutionalEmails[0]);
-                                                }
-                                                setNewEmailTo('');
-                                                setNewEmailSubject('');
-                                                setNewEmailMessage('');
-                                            }}
-                                            className="p-2 border border-purple-200 bg-purple-50 hover:bg-purple-100 active:bg-purple-200 text-purple-600 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 shadow-sm"
-                                            title="Escrever Novo E-mail"
-                                        >
-                                            <Plus size={14} />
-                                        </button>
                                     </div>
 
                                     {/* Select para filtrar por conta institucional */}
@@ -2843,232 +2818,127 @@ export default function AdminPage() {
                             {/* DETALHES E RESPOSTA (Coluna Direita) */}
                             <div className="lg:col-span-7 xl:col-span-8 bg-white border border-slate-200/80 rounded-2xl flex flex-col overflow-hidden h-full shadow-sm">
                                 {selectedInstMessage ? (
-                                    selectedInstMessage._id === 'new-email-inst' ? (
-                                        <div className="flex-1 flex flex-col overflow-hidden animate-fade-in">
-                                            {/* Header do Editor */}
-                                            <div className="p-5 border-b border-slate-100 flex justify-between items-center shrink-0 bg-slate-50/50">
-                                                <div className="space-y-1">
-                                                    <h3 className="text-slate-800 text-sm font-extrabold leading-tight flex items-center gap-2">
-                                                        <Plus size={14} className="text-purple-600" />
-                                                        Escrever Novo E-mail Corporativo
-                                                    </h3>
-                                                    <p className="text-[11px] text-slate-500 font-semibold leading-none">
-                                                        Selecione o remetente oficial cadastrado na sua dashboard
-                                                    </p>
-                                                </div>
+                                    <div className="flex-1 flex flex-col overflow-hidden">
+                                        {/* Header do Visualizador */}
+                                        <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shrink-0 bg-slate-50/50">
+                                            <div className="space-y-1">
+                                                <h3 className="text-slate-800 text-sm font-extrabold leading-tight">
+                                                    {selectedInstMessage.subject}
+                                                </h3>
+                                                <p className="text-[11px] text-slate-500 font-semibold leading-none">
+                                                    De: <strong className="text-slate-700">{selectedInstMessage.senderName || 'Não informado'}</strong> ({selectedInstMessage.senderEmail})
+                                                </p>
+                                                <p className="text-[10px] text-slate-400 font-medium">
+                                                    Para: <strong className="text-purple-600">{selectedInstMessage.recipientEmail}</strong> · Recebido em: {new Date(selectedInstMessage.createdAt).toLocaleString('pt-BR')}
+                                                </p>
+                                            </div>
+
+                                            {/* Painel de Ações Rápidas */}
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                {/* Favorito */}
                                                 <button
-                                                    onClick={() => setSelectedInstMessage(null)}
-                                                    className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
+                                                    onClick={() => handleToggleInstFavorite(selectedInstMessage)}
+                                                    className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                                                        selectedInstMessage.isFavorite 
+                                                            ? 'bg-amber-50 border-amber-250 text-amber-500' 
+                                                            : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+                                                    }`}
+                                                    title={selectedInstMessage.isFavorite ? 'Remover dos favoritos' : 'Marcar como favorito'}
                                                 >
-                                                    <X size={14} />
+                                                    <Star size={14} className={selectedInstMessage.isFavorite ? 'fill-amber-400' : ''} />
+                                                </button>
+
+                                                {/* Marcar como lido/não lido */}
+                                                <button
+                                                    onClick={() => handleToggleInstRead(selectedInstMessage)}
+                                                    className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                                                        selectedInstMessage.isRead 
+                                                            ? 'bg-slate-50 border-slate-250 text-slate-500 hover:text-slate-700' 
+                                                            : 'bg-purple-50 border-purple-250 text-purple-600 hover:text-purple-700'
+                                                    }`}
+                                                    title={selectedInstMessage.isRead ? 'Marcar como não lido' : 'Marcar como lido'}
+                                                >
+                                                    <MailOpen size={14} />
+                                                </button>
+
+                                                {/* Dropdown Status */}
+                                                <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-2 py-1.5 rounded-xl text-xs font-semibold">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase select-none">Status:</span>
+                                                    <select
+                                                        value={selectedInstMessage.status}
+                                                        onChange={(e) => handleUpdateInstStatus(selectedInstMessage._id, e.target.value)}
+                                                        className="bg-transparent focus:outline-none text-slate-700 font-bold cursor-pointer"
+                                                    >
+                                                        <option value="novo">Novo</option>
+                                                        <option value="em_atendimento">Em Atendimento</option>
+                                                        <option value="resolvido">Resolvido</option>
+                                                        <option value="arquivado">Arquivado</option>
+                                                    </select>
+                                                </div>
+
+                                                {/* Excluir e-mail */}
+                                                <button
+                                                    onClick={() => handleDeleteInstMessage(selectedInstMessage._id)}
+                                                    className="p-2 bg-white border border-slate-250 text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100 rounded-xl transition-all cursor-pointer"
+                                                    title="Excluir e-mail permanentemente"
+                                                >
+                                                    <Trash2 size={14} />
                                                 </button>
                                             </div>
+                                        </div>
 
-                                            {/* Área de Redação */}
-                                            <div className="flex-1 overflow-y-auto p-6 space-y-5">
-                                                {/* Remetente Select */}
-                                                <div className="space-y-1.5">
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Remetente Oficial</label>
-                                                    <select
-                                                        value={newEmailSender}
-                                                        onChange={(e) => setNewEmailSender(e.target.value)}
-                                                        className="w-full max-w-xl p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700 cursor-pointer"
-                                                    >
-                                                        <option value="">Selecione o remetente oficial...</option>
-                                                        {institutionalEmails.map(email => (
-                                                            <option key={email} value={email}>{email}</option>
+                                        {/* Conteúdo do E-mail */}
+                                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                                            {/* Mensagem Original */}
+                                            <div className="space-y-2">
+                                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Mensagem Original (Cliente)</h4>
+                                                <div className="bg-slate-50 border border-slate-100 p-5 rounded-2xl text-slate-700 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-medium shadow-xs max-h-[300px] overflow-y-auto">
+                                                    {selectedInstMessage.message}
+                                                </div>
+                                            </div>
+
+                                            {/* Histórico de Respostas Proxy */}
+                                            {selectedInstMessage.replies && selectedInstMessage.replies.length > 0 && (
+                                                <div className="space-y-4 pt-4 border-t border-slate-100 animate-fade-in">
+                                                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Histórico de Respostas (Via Proxy)</h4>
+                                                    <div className="space-y-3">
+                                                        {selectedInstMessage.replies.map((reply: any) => (
+                                                            <div key={reply._id} className="bg-purple-50/30 border border-purple-100/50 p-4 rounded-2xl space-y-2">
+                                                                <div className="flex items-center justify-between text-[10px] font-bold text-purple-600 uppercase tracking-wider">
+                                                                    <span>Resposta de {selectedInstMessage.recipientEmail}</span>
+                                                                    <span className="text-slate-400 font-medium normal-case font-mono">
+                                                                        {new Date(reply.createdAt).toLocaleString('pt-BR')}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="text-slate-700 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-medium">
+                                                                    {reply.message}
+                                                                </div>
+                                                            </div>
                                                         ))}
-                                                    </select>
-                                                    <p className="text-[10px] text-slate-400 font-medium">Os e-mails devem ser cadastrados no gerenciador de contas.</p>
+                                                    </div>
                                                 </div>
+                                            )}
 
-                                                {/* Destinatário */}
-                                                <div className="space-y-1.5">
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Para (Destinatário)</label>
-                                                    <input
-                                                        type="email"
-                                                        value={newEmailTo}
-                                                        onChange={(e) => setNewEmailTo(e.target.value)}
-                                                        placeholder="exemplo@gmail.com"
-                                                        className="w-full max-w-xl p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-semibold text-slate-700 placeholder-slate-400 transition-all"
-                                                    />
-                                                </div>
-
-                                                {/* Assunto */}
-                                                <div className="space-y-1.5">
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Assunto</label>
-                                                    <input
-                                                        type="text"
-                                                        value={newEmailSubject}
-                                                        onChange={(e) => setNewEmailSubject(e.target.value)}
-                                                        placeholder="Digite o assunto do e-mail..."
-                                                        className="w-full max-w-xl p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-semibold text-slate-700 placeholder-slate-400 transition-all"
-                                                    />
-                                                </div>
-
-                                                {/* Mensagem */}
-                                                <div className="space-y-1.5 flex flex-col h-[280px]">
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Mensagem (Corpo do E-mail)</label>
-                                                    <textarea
-                                                        value={newEmailMessage}
-                                                        onChange={(e) => setNewEmailMessage(e.target.value)}
-                                                        placeholder="Escreva a mensagem do e-mail aqui..."
-                                                        className="w-full flex-1 p-4 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-medium text-slate-700 placeholder-slate-400 resize-none min-h-[180px] leading-relaxed"
-                                                    />
-                                                </div>
-
-                                                {/* Ações */}
-                                                <div className="pt-2 flex items-center gap-3">
-                                                    <button
-                                                        onClick={handleSendNewEmail}
-                                                        disabled={sendingNewEmail || !newEmailSender || !newEmailTo.trim() || !newEmailSubject.trim() || !newEmailMessage.trim()}
-                                                        className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 disabled:opacity-60 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-purple-600/15 cursor-pointer flex items-center gap-2"
-                                                    >
-                                                        {sendingNewEmail ? (
-                                                            <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                                                        ) : (
-                                                            <Send size={13} />
-                                                        )}
-                                                        {sendingNewEmail ? 'Enviando...' : 'Enviar E-mail'}
-                                                    </button>
-                                                    
-                                                    <button
-                                                        onClick={() => setSelectedInstMessage(null)}
-                                                        disabled={sendingNewEmail}
-                                                        className="px-5 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
-                                                    >
-                                                        Cancelar
-                                                    </button>
-                                                </div>
+                                            {/* Anotações Internas */}
+                                            <div className="space-y-2 flex flex-col pt-2 border-t border-slate-100">
+                                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Anotações Internas (Controle)</h4>
+                                                <textarea
+                                                    value={instNotes}
+                                                    onChange={(e) => setInstNotes(e.target.value)}
+                                                    placeholder="Digite anotações ou observações para controle interno..."
+                                                    rows={4}
+                                                    className="w-full p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-medium text-slate-700 placeholder-slate-400 resize-none min-h-[100px]"
+                                                />
+                                                <button
+                                                    onClick={() => handleSaveInstNotes(selectedInstMessage._id)}
+                                                    disabled={savingInstNotes}
+                                                    className="w-fit px-4 py-2 bg-slate-800 hover:bg-slate-750 active:bg-slate-900 disabled:opacity-60 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
+                                                >
+                                                    {savingInstNotes ? 'Salvando...' : 'Salvar Anotações'}
+                                                </button>
                                             </div>
                                         </div>
-                                    ) : (
-                                        <div className="flex-1 flex flex-col overflow-hidden">
-                                            {/* Header do Visualizador */}
-                                            <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shrink-0 bg-slate-50/50">
-                                                <div className="space-y-1">
-                                                    <h3 className="text-slate-800 text-sm font-extrabold leading-tight">
-                                                        {selectedInstMessage.subject}
-                                                    </h3>
-                                                    <p className="text-[11px] text-slate-500 font-semibold leading-none">
-                                                        De: <strong className="text-slate-700">{selectedInstMessage.senderName || 'Não informado'}</strong> ({selectedInstMessage.senderEmail})
-                                                    </p>
-                                                    <p className="text-[10px] text-slate-400 font-medium">
-                                                        Para: <strong className="text-purple-600">{selectedInstMessage.recipientEmail}</strong> · Recebido em: {new Date(selectedInstMessage.createdAt).toLocaleString('pt-BR')}
-                                                    </p>
-                                                </div>
-
-                                                {/* Painel de Ações Rápidas */}
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    {/* Favorito */}
-                                                    <button
-                                                        onClick={() => handleToggleInstFavorite(selectedInstMessage)}
-                                                        className={`p-2 rounded-xl border transition-all cursor-pointer ${
-                                                            selectedInstMessage.isFavorite 
-                                                                ? 'bg-amber-50 border-amber-250 text-amber-500' 
-                                                                : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50'
-                                                        }`}
-                                                        title={selectedInstMessage.isFavorite ? 'Remover dos favoritos' : 'Marcar como favorito'}
-                                                    >
-                                                        <Star size={14} className={selectedInstMessage.isFavorite ? 'fill-amber-400' : ''} />
-                                                    </button>
-
-                                                    {/* Marcar como lido/não lido */}
-                                                    <button
-                                                        onClick={() => handleToggleInstRead(selectedInstMessage)}
-                                                        className={`p-2 rounded-xl border transition-all cursor-pointer ${
-                                                            selectedInstMessage.isRead 
-                                                                ? 'bg-slate-50 border-slate-250 text-slate-500 hover:text-slate-700' 
-                                                                : 'bg-purple-50 border-purple-250 text-purple-600 hover:text-purple-700'
-                                                        }`}
-                                                        title={selectedInstMessage.isRead ? 'Marcar como não lido' : 'Marcar como lido'}
-                                                    >
-                                                        <MailOpen size={14} />
-                                                    </button>
-
-                                                    {/* Dropdown Status */}
-                                                    <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-2 py-1.5 rounded-xl text-xs font-semibold">
-                                                        <span className="text-[10px] font-bold text-slate-400 uppercase select-none">Status:</span>
-                                                        <select
-                                                            value={selectedInstMessage.status}
-                                                            onChange={(e) => handleUpdateInstStatus(selectedInstMessage._id, e.target.value)}
-                                                            className="bg-transparent focus:outline-none text-slate-700 font-bold cursor-pointer"
-                                                        >
-                                                            <option value="novo">Novo</option>
-                                                            <option value="em_atendimento">Em Atendimento</option>
-                                                            <option value="resolvido">Resolvido</option>
-                                                            <option value="arquivado">Arquivado</option>
-                                                        </select>
-                                                    </div>
-
-                                                    {/* Excluir e-mail */}
-                                                    <button
-                                                        onClick={() => handleDeleteInstMessage(selectedInstMessage._id)}
-                                                        className="p-2 bg-white border border-slate-250 text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100 rounded-xl transition-all cursor-pointer"
-                                                        title="Excluir e-mail permanentemente"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </div>
-                                            </div>
-
-                                            {/* Conteúdo do E-mail */}
-                                            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                                                {/* Mensagem Original */}
-                                                <div className="space-y-2">
-                                                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Mensagem Original</h4>
-                                                    <div className="bg-slate-50 border border-slate-100 p-5 rounded-2xl text-slate-700 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-medium shadow-xs max-h-[300px] overflow-y-auto">
-                                                        {selectedInstMessage.message}
-                                                    </div>
-                                                </div>
-
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                                                    {/* Anotações Internas */}
-                                                    <div className="space-y-2 flex flex-col">
-                                                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Anotações Internas (Controle)</h4>
-                                                        <textarea
-                                                            value={instNotes}
-                                                            onChange={(e) => setInstNotes(e.target.value)}
-                                                            placeholder="Digite anotações ou observações para controle interno..."
-                                                            rows={4}
-                                                            className="w-full flex-1 p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-medium text-slate-700 placeholder-slate-400 resize-none min-h-[120px]"
-                                                        />
-                                                        <button
-                                                            onClick={() => handleSaveInstNotes(selectedInstMessage._id)}
-                                                            disabled={savingInstNotes}
-                                                            className="mt-2 w-fit px-4 py-2 bg-slate-800 hover:bg-slate-750 active:bg-slate-900 disabled:opacity-60 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
-                                                        >
-                                                            {savingInstNotes ? 'Salvando...' : 'Salvar Anotações'}
-                                                        </button>
-                                                    </div>
-
-                                                    {/* Responder ao e-mail */}
-                                                    <div className="space-y-2 flex flex-col">
-                                                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Responder (via {selectedInstMessage.recipientEmail})</h4>
-                                                        <textarea
-                                                            value={replyInstText}
-                                                            onChange={(e) => setReplyInstText(e.target.value)}
-                                                            placeholder={`Escreva uma resposta direta para o e-mail: ${selectedInstMessage.senderEmail}...`}
-                                                            rows={4}
-                                                            className="w-full flex-1 p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-medium text-slate-700 placeholder-slate-400 resize-none min-h-[120px]"
-                                                        />
-                                                        <button
-                                                            onClick={() => handleSendInstReply(selectedInstMessage._id)}
-                                                            disabled={sendingInstReply || !replyInstText.trim()}
-                                                            className="mt-2 w-fit px-5 py-2 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 disabled:opacity-60 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-purple-600/15 cursor-pointer flex items-center gap-1.5"
-                                                        >
-                                                            {sendingInstReply ? (
-                                                                <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                                                            ) : (
-                                                                <Send size={12} />
-                                                            )}
-                                                            Enviar Resposta
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )
+                                    </div>
                                 ) : (
                                     <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-400 animate-fade-in">
                                         <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center border border-slate-100 text-slate-350 mb-4 shadow-inner">
