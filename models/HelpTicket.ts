@@ -10,6 +10,7 @@ export interface IHelpTicket extends Document {
     isFavorite: boolean;
     isRead: boolean;
     notes?: string;
+    isOutbox?: boolean;
     parentId?: mongoose.Types.ObjectId | string;
     createdAt: Date;
     updatedAt: Date;
@@ -61,6 +62,11 @@ const HelpTicketSchema = new Schema<IHelpTicket>({
     parentId: {
         type: Schema.Types.ObjectId,
         ref: 'HelpTicket',
+        index: true
+    },
+    isOutbox: {
+        type: Boolean,
+        default: false,
         index: true
     },
 }, {

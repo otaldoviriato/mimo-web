@@ -8,6 +8,29 @@ import { Resend } from 'resend';
 const resend = new Resend(process.env.RESEND_API_KEY);
 const FALLBACK_ADMIN_EMAIL = 'suporte@mimochat.com.br';
 
+function cleanEmailBody(bodyText: string): string {
+    if (!bodyText) return '';
+    const splitMarkers = [
+        /^\s*On\s+.*wrote:\s*$/mi,
+        /^\s*Em\s+.*escreveu:\s*$/mi,
+        /^\s*De:\s+.*\s*$/mi,
+        /^\s*From:\s+.*\s*$/mi,
+        /^\s*-----\s*Original Message\s*-----\s*$/mi,
+        /^\s*-----\s*Mensagem Original\s*-----\s*$/mi,
+        /^\s*Para:\s+.*\s*$/mi,
+        /^\s*To:\s+.*\s*$/mi,
+        /^\s*_+\s*$/m
+    ];
+    let cleanText = bodyText;
+    for (const marker of splitMarkers) {
+        const match = cleanText.match(marker);
+        if (match && match.index !== undefined) {
+            cleanText = cleanText.substring(0, match.index);
+        }
+    }
+    return cleanText.trim();
+}
+
 export async function POST(request: NextRequest) {
     try {
         let body;
@@ -59,7 +82,29 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        const message = textContent || htmlContent || emailData.text || emailData.html || 'Sem conteúdo de mensagem';
+        let message = 'Sem conteúdo de mensagem';
+        if (textContent) {
+            const cleanText = cleanEmailBody(textContent);
+            message = cleanText.replace(/\r?\n/g, '<br>');
+        } else if (htmlContent) {
+            let cleanHtml = htmlContent;
+            const gmailQuoteIndex = cleanHtml.indexOf('<div class="gmail_quote"');
+            if (gmailQuoteIndex !== -1) {
+                cleanHtml = cleanHtml.substring(0, gmailQuoteIndex);
+            }
+            const blockquoteIndex = cleanHtml.indexOf('<blockquote');
+            if (blockquoteIndex !== -1) {
+                cleanHtml = cleanHtml.substring(0, blockquoteIndex);
+            }
+            message = cleanHtml.trim();
+        } else {
+            const fallbackText = emailData.text || '';
+            if (fallbackText) {
+                message = cleanEmailBody(fallbackText).replace(/\r?\n/g, '<br>');
+            } else if (emailData.html) {
+                message = emailData.html;
+            }
+        }
 
         if (!fromString) {
             return NextResponse.json({ error: 'Campo "from" é obrigatório no payload' }, { status: 400 });
@@ -163,7 +208,8 @@ export async function POST(request: NextRequest) {
                 status: 'lido',
                 isFavorite: false,
                 isRead: true,
-                parentId: parentTicket._id
+                parentId: parentTicket._id,
+                isOutbox: true
             });
 
             // Atualizar status do ticket original
@@ -205,16 +251,44 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ success: true, replyTicketId: replyTicket._id });
         }
 
-        // Salvar ticket original no banco de dados
+        // Limpar assunto para remover prefixos comuns de resposta (Re:, Res:, Fwd:, etc.)
+        const cleanSubject = subject.replace(/^(re|fwd|res|enc|resposta):\s*/i, '').trim();
+        
+        // Buscar se existe um ticket raiz compatível (mesmo assunto e participantes correspondentes)
+        let parentId: string | undefined = undefined;
+        try {
+            const possibleParent = await HelpTicket.findOne({
+                subject: { $regex: new RegExp('^' + cleanSubject.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i') },
+                $or: [
+                    { senderEmail: senderEmail.toLowerCase(), recipientEmail: recipientEmail.toLowerCase() },
+                    { senderEmail: recipientEmail.toLowerCase(), recipientEmail: senderEmail.toLowerCase() }
+                ],
+                parentId: { $exists: false }
+            }).sort({ createdAt: -1 });
+
+            if (possibleParent) {
+                parentId = possibleParent._id.toString();
+                
+                // Se o pai for reaberto, mudar status e marcar como não lido
+                possibleParent.status = 'novo';
+                possibleParent.isRead = false;
+                await possibleParent.save();
+            }
+        } catch (threadErr) {
+            console.error('[Webhook Resend Threading] Erro ao tentar associar resposta a um ticket existente:', threadErr);
+        }
+
+        // Salvar ticket no banco de dados (vinculando com parentId se encontrado)
         const ticket = await HelpTicket.create({
             senderEmail: senderEmail.toLowerCase(),
             senderName: senderName || undefined,
             recipientEmail: recipientEmail,
             subject: subject.trim(),
             message: message.trim(),
-            status: 'novo',
+            status: parentId ? 'em_atendimento' : 'novo',
             isFavorite: false,
             isRead: false,
+            parentId: parentId || undefined
         });
 
         // Buscar administradores cadastrados para notificação e redirecionamentos

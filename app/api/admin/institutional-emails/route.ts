@@ -42,8 +42,12 @@ export async function GET(request: NextRequest) {
 
         // Só faz a busca de mensagens no banco se houver um e-mail institucional selecionado
         if (filterEmail.trim()) {
+            const cleanEmail = filterEmail.trim().toLowerCase();
             const query: any = {
-                recipientEmail: filterEmail.trim().toLowerCase(),
+                $or: [
+                    { recipientEmail: cleanEmail, isOutbox: { $ne: true } },
+                    { senderEmail: cleanEmail, isOutbox: true }
+                ],
                 parentId: { $exists: false } // Apenas mensagens raiz
             };
 

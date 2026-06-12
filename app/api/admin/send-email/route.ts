@@ -83,6 +83,7 @@ export async function POST(request: NextRequest) {
                 status: 'resolvido',
                 isFavorite: false,
                 isRead: true,
+                isOutbox: true,
                 notes: '__outbox__',
             });
 
@@ -129,6 +130,7 @@ export async function POST(request: NextRequest) {
                 status: 'resolvido',
                 isFavorite: false,
                 isRead: true,
+                isOutbox: true,
                 notes: '__outbox__',
             });
 

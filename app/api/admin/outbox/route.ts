@@ -35,8 +35,13 @@ export async function GET(request: NextRequest) {
         
         const ourEmails = ['suporte@mimochat.com.br', ...institutionalEmails.map(e => e.toLowerCase().trim())];
 
-        // Buscar apenas e-mails explicitamente salvos como caixa de saída (marcados com notes='__outbox__')
-        const messages = await HelpTicket.find({ notes: '__outbox__' }).sort({ createdAt: -1 }).lean();
+        // Buscar e-mails salvos como caixa de saída (marcados com isOutbox: true ou pelo legado notes='__outbox__')
+        const messages = await HelpTicket.find({
+            $or: [
+                { isOutbox: true },
+                { notes: '__outbox__' }
+            ]
+        }).sort({ createdAt: -1 }).lean();
 
         return NextResponse.json({ success: true, messages });
     } catch (error: any) {

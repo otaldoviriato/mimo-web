@@ -106,6 +106,7 @@ interface HelpTicketData {
     isFavorite: boolean;
     isRead: boolean;
     notes?: string;
+    isOutbox?: boolean;
     replies?: HelpTicketData[];
     createdAt: string;
     updatedAt: string;
@@ -3219,8 +3220,8 @@ export default function AdminPage() {
                                         ) : (
                                             <div className="p-0">
                                                 {instMessages.filter((msg) => {
-                                                    if (instStatusFilter === 'recebido') return !msg.senderEmail?.includes('@mimochat.com.br');
-                                                    if (instStatusFilter === 'enviado') return !!msg.senderEmail?.includes('@mimochat.com.br');
+                                                    if (instStatusFilter === 'recebido') return !msg.isOutbox;
+                                                    if (instStatusFilter === 'enviado') return !!msg.isOutbox;
                                                     return true;
                                                 }).map((msg) => {
                                                     const initials = getInitials(msg.senderName || msg.senderEmail);
@@ -3277,7 +3278,7 @@ export default function AdminPage() {
                                                                 </h4>
                                                                 <div className="pt-1 flex items-center justify-between">
                                                                     {/* Indicador visual recebido/enviado */}
-                                                                    {msg.senderEmail?.includes('@mimochat.com.br') ? (
+                                                                    {msg.isOutbox ? (
                                                                         <span className="px-2 py-0.5 text-[9px] font-bold rounded-md border bg-blue-50 text-blue-600 border-blue-100 flex items-center gap-1">
                                                                             <Send size={8} /> Enviado
                                                                         </span>
@@ -3308,16 +3309,16 @@ export default function AdminPage() {
                                                 <div className="min-w-0 flex-1">
                                                     <h3 className="text-slate-800 text-sm font-extrabold leading-tight">{selectedInstMessage.subject}</h3>
                                                     <div className="flex items-center gap-1.5 flex-wrap mt-1 text-[11px] text-slate-500 font-medium">
-                                                        <span>{selectedInstMessage.senderEmail?.includes('@mimochat.com.br') ? 'Para:' : 'De:'}</span>
+                                                        <span>{selectedInstMessage.isOutbox ? 'Para:' : 'De:'}</span>
                                                         <span className="font-bold text-slate-700">{selectedInstMessage.senderName ? `${selectedInstMessage.senderName} <${selectedInstMessage.senderEmail}>` : selectedInstMessage.senderEmail}</span>
                                                     </div>
                                                     <div className="flex items-center gap-2 mt-1.5">
                                                         <span className={`px-2 py-0.5 text-[9px] font-bold rounded-md border ${
-                                                            selectedInstMessage.senderEmail?.includes('@mimochat.com.br')
+                                                            selectedInstMessage.isOutbox
                                                                 ? 'bg-blue-50 text-blue-600 border-blue-100'
                                                                 : 'bg-purple-50 text-purple-700 border-purple-100'
                                                         }`}>
-                                                            {selectedInstMessage.senderEmail?.includes('@mimochat.com.br') ? 'Enviado' : 'Recebido'}
+                                                            {selectedInstMessage.isOutbox ? 'Enviado' : 'Recebido'}
                                                         </span>
                                                         <span className="text-[9px] font-medium text-slate-400">
                                                             {new Date(selectedInstMessage.createdAt).toLocaleString('pt-BR')}
@@ -3363,8 +3364,10 @@ export default function AdminPage() {
                                                     <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs relative">
                                                         <div className="flex justify-between items-start gap-4 mb-3">
                                                             <div className="flex items-center gap-2">
-                                                                <span className="w-2.5 h-2.5 rounded-full bg-purple-600 shrink-0" />
-                                                                <span className="text-[10px] font-extrabold text-purple-650 uppercase tracking-widest">E-mail Recebido</span>
+                                                                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${selectedInstMessage.isOutbox ? 'bg-blue-500' : 'bg-purple-600'}`} />
+                                                                <span className={`text-[10px] font-extrabold uppercase tracking-widest ${selectedInstMessage.isOutbox ? 'text-blue-650' : 'text-purple-650'}`}>
+                                                                    {selectedInstMessage.isOutbox ? 'E-mail Enviado' : 'E-mail Recebido'}
+                                                                </span>
                                                             </div>
                                                             <span className="text-[10px] text-slate-400 font-bold">
                                                                 {new Date(selectedInstMessage.createdAt).toLocaleString('pt-BR')}
@@ -3376,15 +3379,21 @@ export default function AdminPage() {
                                                         />
                                                     </div>
 
-                                                    {/* Respostas do Proxy */}
+                                                    {/* Respostas / Timeline */}
                                                     {selectedInstMessage.replies && selectedInstMessage.replies.length > 0 && (
                                                         <div className="space-y-4 pt-2 relative before:absolute before:left-6 before:top-0 before:bottom-0 before:w-0.5 before:bg-slate-100">
                                                             {selectedInstMessage.replies.map((reply: any, idx: number) => (
-                                                                <div key={reply._id || idx} className="ml-12 bg-purple-50/20 border border-purple-100 rounded-2xl p-5 shadow-xs relative">
+                                                                <div key={reply._id || idx} className={`ml-12 border rounded-2xl p-5 shadow-xs relative ${
+                                                                    reply.isOutbox 
+                                                                        ? 'bg-emerald-50/20 border-emerald-100' 
+                                                                        : 'bg-purple-50/20 border-purple-100'
+                                                                }`}>
                                                                     <div className="flex justify-between items-start gap-4 mb-3">
                                                                         <div className="flex items-center gap-2">
-                                                                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                                                                            <span className="text-[10px] font-extrabold text-emerald-650 uppercase tracking-widest">Resposta Enviada pelo Proxy</span>
+                                                                            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${reply.isOutbox ? 'bg-emerald-500' : 'bg-purple-600'}`} />
+                                                                            <span className={`text-[10px] font-extrabold uppercase tracking-widest ${reply.isOutbox ? 'text-emerald-650' : 'text-purple-650'}`}>
+                                                                                {reply.isOutbox ? 'Resposta Enviada' : 'Resposta Recebida'}
+                                                                            </span>
                                                                         </div>
                                                                         <span className="text-[10px] text-slate-400 font-bold">
                                                                             {new Date(reply.createdAt).toLocaleString('pt-BR')}

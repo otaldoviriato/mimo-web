@@ -158,13 +158,13 @@ export async function POST(
             fromSender = `"Suporte MimoChat" <suporte@mimochat.com.br>`;
         }
 
+        const mailSubject = ticket.subject.toLowerCase().startsWith('re:') 
+            ? ticket.subject 
+            : `Re: ${ticket.subject}`;
+
         // Enviar e-mail de resposta usando Resend
         if (process.env.RESEND_API_KEY) {
             try {
-                const mailSubject = ticket.subject.toLowerCase().startsWith('re:') 
-                    ? ticket.subject 
-                    : `Re: ${ticket.subject}`;
-
                 await resend.emails.send({
                     from: fromSender,
                     to: ticket.senderEmail,
@@ -212,6 +212,24 @@ export async function POST(
         ticket.isRead = true;
 
         await ticket.save();
+
+        // Criar registro filho de e-mail enviado (Caixa de Saída / Timeline)
+        try {
+            await HelpTicket.create({
+                senderEmail: emailFrom,
+                senderName: displayName || undefined,
+                recipientEmail: ticket.senderEmail.toLowerCase(),
+                subject: mailSubject,
+                message: replyMessage.trim(),
+                status: 'resolvido',
+                isFavorite: false,
+                isRead: true,
+                parentId: ticket._id,
+                isOutbox: true
+            });
+        } catch (createErr) {
+            console.error('Erro ao registrar resposta enviada no banco de dados:', createErr);
+        }
 
         return NextResponse.json({ success: true, ticket });
     } catch (error: any) {
