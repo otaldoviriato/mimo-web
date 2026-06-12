@@ -90,6 +90,119 @@ function formatLastSeen(isOnline?: boolean, lastSeenDateStr?: string | Date) {
     }
 }
 
+interface EarningsIndicatorProps {
+    messageId: string;
+    receiverEarnings?: number;
+    cost: number;
+    isSelected: boolean;
+    isNew: boolean;
+}
+
+function EarningsIndicator({ messageId, receiverEarnings, cost, isSelected, isNew }: EarningsIndicatorProps) {
+    const [active, setActive] = useState(false);
+    const [shouldRender, setShouldRender] = useState(false);
+
+    useEffect(() => {
+        if (isSelected) {
+            setActive(true);
+            setShouldRender(true);
+        } else {
+            setActive(false);
+        }
+    }, [isSelected]);
+
+    useEffect(() => {
+        if (isNew) {
+            setActive(true);
+            setShouldRender(true);
+            
+            const timer = setTimeout(() => {
+                setActive(false);
+            }, 3000);
+            
+            return () => clearTimeout(timer);
+        }
+    }, [isNew]);
+
+    useEffect(() => {
+        if (active) {
+            setShouldRender(true);
+        } else {
+            const timer = setTimeout(() => {
+                setShouldRender(false);
+            }, 350);
+            return () => clearTimeout(timer);
+        }
+    }, [active]);
+
+    if (!shouldRender) return null;
+
+    const amount = (((receiverEarnings ?? cost * 0.9)) / 100).toFixed(2);
+
+    return (
+        <span className={`relative z-0 ${active ? 'animate-earnings-in' : 'animate-earnings-out'} text-[9px] font-semibold text-emerald-500/90 ml-1.5 select-none whitespace-nowrap`}>
+            + R$ {amount}
+        </span>
+    );
+}
+
+interface MediaEarningsIndicatorProps {
+    messageId: string;
+    receiverEarnings?: number;
+    cost: number;
+    isSelected: boolean;
+    isNew: boolean;
+}
+
+function MediaEarningsIndicator({ messageId, receiverEarnings, cost, isSelected, isNew }: MediaEarningsIndicatorProps) {
+    const [active, setActive] = useState(false);
+    const [shouldRender, setShouldRender] = useState(false);
+
+    useEffect(() => {
+        if (isSelected) {
+            setActive(true);
+            setShouldRender(true);
+        } else {
+            setActive(false);
+        }
+    }, [isSelected]);
+
+    useEffect(() => {
+        if (isNew) {
+            setActive(true);
+            setShouldRender(true);
+            
+            const timer = setTimeout(() => {
+                setActive(false);
+            }, 3000);
+            
+            return () => clearTimeout(timer);
+        }
+    }, [isNew]);
+
+    useEffect(() => {
+        if (active) {
+            setShouldRender(true);
+        } else {
+            const timer = setTimeout(() => {
+                setShouldRender(false);
+            }, 350);
+            return () => clearTimeout(timer);
+        }
+    }, [active]);
+
+    if (!shouldRender) return null;
+
+    const amount = (((receiverEarnings || cost)) / 100).toFixed(2);
+
+    return (
+        <span className={`relative z-0 ${active ? 'animate-media-earnings-in' : 'animate-media-earnings-out'} text-[9px] font-semibold text-emerald-500/90 mr-1.5 select-none whitespace-nowrap align-bottom self-end mb-[32px]`}>
+            + R$ {amount}
+        </span>
+    );
+}
+
+
 export default function ChatPage({ params, userId: propUserId, giftCode: propGiftCode, onBack, isSubPage = false, isClosing = false }: ChatPageProps) {
     const resolvedParams = params ? use(params) : null;
     const otherUserId = propUserId || resolvedParams?.userId || '';
@@ -103,6 +216,8 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const [loadingMessages, setLoadingMessages] = useState(true);
     const [messageText, setMessageText] = useState('');
     const [sending, setSending] = useState(false);
+    const [newIncomingMessageIds, setNewIncomingMessageIds] = useState<Set<string>>(new Set());
+    const [newUnlockedMediaIds, setNewUnlockedMediaIds] = useState<Set<string>>(new Set());
     const [isTyping, setIsTyping] = useState(false);
     const [menuVisible, setMenuVisible] = useState(false);
     const [giftModalVisible, setGiftModalVisible] = useState(false);
@@ -123,6 +238,12 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const [galleryVisible, setGalleryVisible] = useState(false);
     const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
     const swipeTouchStartX = useRef<number | null>(null);
+    const swipeTouchStartY = useRef<number | null>(null);
+    const [touchOffset, setTouchOffset] = useState(0);
+    const touchOffsetRef = useRef(0);
+    const [isDragging, setIsDragging] = useState(false);
+    const swipeLockedRef = useRef<'horizontal' | 'vertical' | null>(null);
+    const [controlsVisible, setControlsVisible] = useState(true);
     const [detailsModalVisible, setDetailsModalVisible] = useState(false);
     const [unlockModalVisible, setUnlockModalVisible] = useState(false);
     const [unlockData, setUnlockData] = useState<{ id: string; price: number; isVideo: boolean } | null>(null);
@@ -130,6 +251,52 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const [isLeaving, setIsLeaving] = useState(false);
     const [useNativeTransition, setUseNativeTransition] = useState(false);
     const [viewportStyle, setViewportStyle] = useState<React.CSSProperties>({});
+
+    useEffect(() => {
+        if (fullscreenIndex === null || typeof window === 'undefined') return;
+
+        window.history.pushState({ mimoViewerOpen: true }, '');
+
+        const handlePopState = () => {
+            setFullscreenIndex(null);
+        };
+
+        window.addEventListener('popstate', handlePopState);
+
+        return () => {
+            window.removeEventListener('popstate', handlePopState);
+            
+            // Se o fechamento foi disparado manualmente (ex: botão X) e o histórico 
+            // ainda estiver no estado da galeria, voltamos no histórico para limpá-lo.
+            if (window.history.state?.mimoViewerOpen) {
+                window.history.back();
+            }
+        };
+    }, [fullscreenIndex]);
+
+    const isSelectionActive = selectedMessageIds.size > 0;
+
+    useEffect(() => {
+        if (!isSelectionActive || typeof window === 'undefined') return;
+
+        window.history.pushState({ mimoMessageSelectionOpen: true }, '');
+
+        const handlePopState = () => {
+            setSelectedMessageIds(new Set());
+        };
+
+        window.addEventListener('popstate', handlePopState);
+
+        return () => {
+            window.removeEventListener('popstate', handlePopState);
+            
+            // Se a seleção foi limpa manualmente (ex: clicando em "X" ou limpando os IDs) 
+            // e o histórico ainda estiver no estado de seleção, voltamos no histórico para limpá-lo.
+            if (window.history.state?.mimoMessageSelectionOpen) {
+                window.history.back();
+            }
+        };
+    }, [isSelectionActive]);
 
     useEffect(() => {
         if (typeof window === 'undefined' || !window.visualViewport) return;
@@ -430,6 +597,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 const newMessages = [...prev, { ...data.message, status: 'sent' as const }];
                 if (data.message.receiverId === user?.id) {
                     socket.emit('mark_as_read', { roomId });
+                    setNewIncomingMessageIds((prevIds) => {
+                        const nextIds = new Set(prevIds);
+                        nextIds.add(data.message._id);
+                        return nextIds;
+                    });
                 }
                 return newMessages;
             });
@@ -495,7 +667,21 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         });
 
         socket.on('message_updated', (data: { message: Message }) => {
-            setMessages((prev) => prev.map(m => m._id === data.message._id ? data.message : m));
+            setMessages((prev) => {
+                const oldMsg = prev.find(m => m._id === data.message._id);
+                if (oldMsg) {
+                    const wasLocked = oldMsg.isLockedImage;
+                    const isLockedNow = data.message.isLockedImage;
+                    if (wasLocked && !isLockedNow && oldMsg.senderId === user?.id && (data.message.lockedImagePrice || 0) > 0) {
+                        setNewUnlockedMediaIds((prevIds) => {
+                            const nextIds = new Set(prevIds);
+                            nextIds.add(data.message._id);
+                            return nextIds;
+                        });
+                    }
+                }
+                return prev.map(m => m._id === data.message._id ? data.message : m);
+            });
         });
 
         socket.on('message_deleted', (data: { messageId: string }) => {
@@ -705,6 +891,8 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             formData.append('receiverId', otherUserId);
             formData.append('lockedPrice', (priceInCents / 100).toString());
             formData.append('isVideo', isVideoFile.toString());
+            formData.append('tempId', tempId);
+
             
             if (isVideoFile) {
                 let thumbUrl = localPreviewUrl;
@@ -1346,7 +1534,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     return (
                         <div
                             key={item._id}
-                            className={`flex ${isMine ? 'justify-end' : 'justify-start'} ${isText ? 'mb-0.5' : 'mb-2'} -mx-4 px-4 py-0.5 transition-colors duration-300 ${selectedMessageIds.has(item._id) ? 'bg-purple-100/50' : ''} select-none no-select`}
+                            className={`flex ${isMine ? 'justify-end' : 'justify-start'} items-end ${isText ? 'mb-0.5' : 'mb-2'} -mx-4 px-4 py-0.5 transition-colors duration-300 ${selectedMessageIds.has(item._id) ? 'bg-purple-100/50' : ''} select-none no-select`}
                             onMouseDown={(e) => handleStartPress(item._id, e)}
                             onMouseMove={handleMovePress}
                             onMouseUp={handleEndPress}
@@ -1430,8 +1618,18 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                     </div>
                                 </div>
                             ) : (
-                                <div
-                                    className={`max-w-[75%] ${isLocked || item.originalImageUrl || item.isVideo ? 'p-1 bg-transparent' : 'px-3 py-1.5'} rounded-2xl ${
+                                <>
+                                    {isMine && userData?.isProfessional && item.lockedImagePrice! > 0 && !isLocked && (
+                                        <MediaEarningsIndicator
+                                            messageId={item._id}
+                                            receiverEarnings={item.receiverEarnings}
+                                            cost={item.lockedImagePrice || 0}
+                                            isSelected={selectedMessageIds.has(item._id)}
+                                            isNew={newUnlockedMediaIds.has(item._id)}
+                                        />
+                                    )}
+                                    <div
+                                        className={`relative z-10 max-w-[75%] ${isLocked || item.originalImageUrl || item.isVideo ? 'p-1 bg-transparent' : 'px-3 py-1.5'} rounded-2xl ${
                                         (!isLocked && !item.originalImageUrl && !item.isVideo) 
                                     ? (isMine ? 'bg-purple-600 text-white rounded-br-sm' : 'bg-white text-gray-900 shadow-sm rounded-bl-sm')
                                             : (isMine ? 'rounded-br-sm' : 'rounded-bl-sm')
@@ -1455,7 +1653,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                     {(item.isVideo ? item.thumbnailUrl : item.originalImageUrl) ? (
                                                         <img 
                                                             src={(isMine ? (item.isVideo ? item.thumbnailUrl : item.originalImageUrl) : item.blurredImageUrl) || ''} 
-                                                            className="w-full h-full object-cover" 
+                                                            className={`w-full h-full object-cover ${isMine ? 'blur-sm scale-102' : ''}`}
                                                             alt="Locked Media" 
                                                         />
                                                     ) : (
@@ -1620,18 +1818,6 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                             </div>
                                                         </div>
                                                     )}
-                                                    {isMine && item.lockedImagePrice! > 0 && (!item.tempId || !uploadTasks[item.tempId]) && (
-                                                        <div className="absolute top-2 right-2">
-                                                            <div className="bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 flex items-center gap-1 shadow-md">
-                                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" className="text-white">
-                                                                    <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                                                                </svg>
-                                                                <span className="text-[8px] font-bold text-white uppercase tracking-wider">
-                                                                    {item.isVideo ? 'Vídeo aberto' : 'Foto aberta'} • R$ {((item.lockedImagePrice || 0) / 100).toFixed(2)}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    )}
                                                 </div>
                                             )}
                                             <div className="flex items-end justify-between mt-1.5 gap-3 px-2 pb-2">
@@ -1709,6 +1895,16 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                         </div>
                                     )}
                                 </div>
+                                    {!isMine && userData?.isProfessional && (
+                                        <EarningsIndicator
+                                            messageId={item._id}
+                                            receiverEarnings={item.receiverEarnings}
+                                            cost={item.cost}
+                                            isSelected={selectedMessageIds.has(item._id)}
+                                            isNew={newIncomingMessageIds.has(item._id)}
+                                        />
+                                    )}
+                                </>
                             )}
                         </div>
                     );
@@ -1838,9 +2034,13 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                         <div className="w-full relative rounded-2xl overflow-hidden mb-5 aspect-square bg-gray-100 flex items-center justify-center border border-gray-100 shadow-inner">
                             {previewUrl ? (
                                 <div className="relative w-full h-full">
-                                    <img src={previewUrl} className="w-full h-full object-cover" alt="Preview" />
+                                    <img 
+                                        src={previewUrl} 
+                                        className={`w-full h-full object-cover transition-all duration-300 ${mediaPriceType === 'paid' ? 'blur scale-105' : ''}`} 
+                                        alt="Preview" 
+                                    />
                                     {isVideo && (
-                                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                        <div className={`absolute inset-0 flex items-center justify-center bg-black/20 transition-all duration-300 ${mediaPriceType === 'paid' ? 'blur' : ''}`}>
                                             <div className="w-12 h-12 rounded-full bg-white/30 backdrop-blur-md flex items-center justify-center text-white border border-white/40">
                                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                                                     <path d="M8 5v14l11-7z" />
@@ -1885,17 +2085,16 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                     setMediaPriceType('paid');
                                 }}
                             >
-                                Pago (Bloqueado)
+                                Pago
                             </button>
                         </div>
 
                         {/* Input do Valor */}
                         {mediaPriceType === 'paid' && (
                             <div className="w-full relative mb-5 animate-in slide-in-from-top-2 duration-200">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-gray-400">R$</span>
                                 <input
                                     type="text"
-                                    className="bg-gray-50 border border-gray-200 rounded-2xl p-4 pl-10 w-full text-center text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-gray-900"
+                                    className="bg-gray-50 border border-gray-200 rounded-2xl p-4 w-full text-center text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-gray-900"
                                     placeholder="R$ 0,00"
                                     value={mediaPriceFormatted}
                                     onChange={handlePriceChange}
@@ -2115,47 +2314,158 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
             {/* ===== VIEWER FULLSCREEN COM SWIPE ===== */}
             {fullscreenIndex !== null && mediaItems.length > 0 && (() => {
-                const current = mediaItems[fullscreenIndex];
                 const goPrev = () => setFullscreenIndex(i => (i !== null && i > 0 ? i - 1 : i));
                 const goNext = () => setFullscreenIndex(i => (i !== null && i < mediaItems.length - 1 ? i + 1 : i));
                 const canPrev = fullscreenIndex > 0;
                 const canNext = fullscreenIndex < mediaItems.length - 1;
 
+                const handleTouchStart = (e: React.TouchEvent) => {
+                    swipeTouchStartX.current = e.touches[0].clientX;
+                    swipeTouchStartY.current = e.touches[0].clientY;
+                    swipeLockedRef.current = null;
+                    touchOffsetRef.current = 0;
+                    setTouchOffset(0);
+                    setIsDragging(true);
+                };
+
+                const handleTouchMove = (e: React.TouchEvent) => {
+                    if (swipeTouchStartX.current === null || swipeTouchStartY.current === null) return;
+                    
+                    const deltaX = e.touches[0].clientX - swipeTouchStartX.current;
+                    const deltaY = e.touches[0].clientY - swipeTouchStartY.current;
+                    
+                    // Determina a direção bloqueada na primeira movimentação significativa
+                    if (swipeLockedRef.current === null && (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5)) {
+                        swipeLockedRef.current = Math.abs(deltaX) >= Math.abs(deltaY) ? 'horizontal' : 'vertical';
+                    }
+                    
+                    // Só processa movimento horizontal bloqueado
+                    if (swipeLockedRef.current !== 'horizontal') return;
+                    
+                    let offset = deltaX;
+                    if (!canPrev && deltaX > 0) {
+                        offset = deltaX * 0.3;
+                    } else if (!canNext && deltaX < 0) {
+                        offset = deltaX * 0.3;
+                    }
+                    
+                    touchOffsetRef.current = offset;
+                    setTouchOffset(offset);
+                };
+
+                const handleTouchEnd = () => {
+                    setIsDragging(false);
+                    const threshold = window.innerWidth * 0.08;
+                    const finalOffset = touchOffsetRef.current;
+
+                    touchOffsetRef.current = 0;
+                    setTouchOffset(0);
+                    swipeTouchStartX.current = null;
+                    swipeTouchStartY.current = null;
+                    swipeLockedRef.current = null;
+
+                    if (finalOffset < -threshold && canNext) {
+                        goNext();
+                    } else if (finalOffset > threshold && canPrev) {
+                        goPrev();
+                    }
+                };
+
+                // Toque simples: 3 zonas de 33% cada
+                const handleSlideClick = (e: React.MouseEvent) => {
+                    if (Math.abs(touchOffsetRef.current) > 5) return;
+                    const x = e.clientX;
+                    const w = window.innerWidth;
+                    if (x < w * 0.33) {
+                        if (canPrev) goPrev();
+                    } else if (x > w * 0.67) {
+                        if (canNext) goNext();
+                    } else {
+                        setControlsVisible(v => !v);
+                    }
+                };
+
                 return (
                     <div
-                        className="fixed inset-0 z-[100] bg-black flex flex-col select-none"
-                        onTouchStart={e => { swipeTouchStartX.current = e.touches[0].clientX; }}
-                        onTouchEnd={e => {
-                            if (swipeTouchStartX.current === null) return;
-                            const delta = e.changedTouches[0].clientX - swipeTouchStartX.current;
-                            swipeTouchStartX.current = null;
-                            if (delta < -50) goNext();
-                            else if (delta > 50) goPrev();
-                        }}
+                        className="fixed inset-0 z-[100] bg-black flex flex-col select-none overflow-hidden"
                     >
-                        {/* Topo */}
-                        <div className="flex items-center justify-between px-4 pt-6 pb-2 shrink-0" style={{ paddingTop: 'max(24px, env(safe-area-inset-top))' }}>
-                            <button
-                                className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 active:scale-95 transition-all"
-                                onClick={() => setFullscreenIndex(null)}
+                        {/* Container dos Slides que preenche tudo */}
+                        <div 
+                            className="absolute inset-0 z-0 overflow-hidden"
+                            onTouchStart={handleTouchStart}
+                            onTouchMove={handleTouchMove}
+                            onTouchEnd={handleTouchEnd}
+                        >
+                            <div 
+                                className="flex h-full absolute top-0 left-0"
+                                style={{
+                                    transform: `translateX(calc(${-fullscreenIndex * 100}vw + ${touchOffset}px))`,
+                                    transition: isDragging ? 'none' : 'transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+                                    width: `${mediaItems.length * 100}vw`
+                                }}
                             >
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <line x1="18" y1="6" x2="6" y2="18"/>
-                                    <line x1="6" y1="6" x2="18" y2="18"/>
-                                </svg>
-                            </button>
-                            <span className="text-white/70 text-sm font-semibold tracking-wide">
-                                {fullscreenIndex + 1} / {mediaItems.length}
-                            </span>
-                            <div className="w-10" />{/* spacer */}
+                                {mediaItems.map((item, idx) => (
+                                    <div 
+                                        key={idx} 
+                                        className="h-full flex-shrink-0 flex items-center justify-center"
+                                        style={{ width: '100vw' }}
+                                        onClick={handleSlideClick}
+                                    >
+                                        {item.isVideo ? (
+                                            <video
+                                                key={item.url}
+                                                src={item.url}
+                                                controls
+                                                autoPlay={idx === fullscreenIndex}
+                                                playsInline
+                                                className="max-w-full max-h-full object-contain"
+                                                onClick={e => e.stopPropagation()}
+                                            />
+                                        ) : (
+                                            <img
+                                                key={item.url}
+                                                src={item.url}
+                                                className="max-w-full max-h-full object-contain"
+                                                alt={`Mídia ${idx + 1}`}
+                                            />
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
                         </div>
 
-                        {/* Área central: conteúdo + setas */}
-                        <div className="flex-1 flex items-center justify-center relative min-h-0 px-2">
+                        {/* Controles flutuantes — somem após 1s de inatividade */}
+                        <div
+                            className="absolute inset-0 z-20 pointer-events-none"
+                            style={{
+                                opacity: controlsVisible ? 1 : 0,
+                                transition: 'opacity 400ms ease'
+                            }}
+                        >
+                            {/* Topo flutuante */}
+                            <div 
+                                className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pb-2 bg-gradient-to-b from-black/60 to-transparent" 
+                                style={{ paddingTop: 'max(24px, env(safe-area-inset-top))' }}
+                            >
+                                <button
+                                    className="w-10 h-10 rounded-full bg-black/45 flex items-center justify-center text-white hover:bg-black/60 active:scale-95 transition-all pointer-events-auto backdrop-blur-sm"
+                                    onClick={() => setFullscreenIndex(null)}
+                                >
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18"/>
+                                        <line x1="6" y1="6" x2="18" y2="18"/>
+                                    </svg>
+                                </button>
+                                <span className="text-white/80 text-sm font-semibold tracking-wide bg-black/45 px-3 py-1.5 rounded-full backdrop-blur-sm">
+                                    {fullscreenIndex + 1} / {mediaItems.length}
+                                </span>
+                                <div className="w-10" />{/* spacer */}
+                            </div>
+
                             {/* Seta esquerda */}
                             {canPrev && (
                                 <button
-                                    className="absolute left-2 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition-all flex items-center justify-center text-white"
+                                    className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/45 hover:bg-black/60 active:scale-95 transition-all flex items-center justify-center text-white backdrop-blur-sm pointer-events-auto"
                                     onClick={e => { e.stopPropagation(); goPrev(); }}
                                 >
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -2164,33 +2474,10 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                 </button>
                             )}
 
-                            {/* Mídia */}
-                            <div className="flex items-center justify-center w-full h-full" onClick={() => setFullscreenIndex(null)}>
-                                {current.isVideo ? (
-                                    <video
-                                        key={current.url}
-                                        src={current.url}
-                                        controls
-                                        autoPlay
-                                        playsInline
-                                        className="max-w-full max-h-full rounded-xl shadow-2xl"
-                                        onClick={e => e.stopPropagation()}
-                                    />
-                                ) : (
-                                    <img
-                                        key={current.url}
-                                        src={current.url}
-                                        className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
-                                        alt={`Mídia ${fullscreenIndex + 1}`}
-                                        onClick={e => e.stopPropagation()}
-                                    />
-                                )}
-                            </div>
-
                             {/* Seta direita */}
                             {canNext && (
                                 <button
-                                    className="absolute right-2 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition-all flex items-center justify-center text-white"
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/45 hover:bg-black/60 active:scale-95 transition-all flex items-center justify-center text-white backdrop-blur-sm pointer-events-auto"
                                     onClick={e => { e.stopPropagation(); goNext(); }}
                                 >
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -2198,24 +2485,24 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                     </svg>
                                 </button>
                             )}
-                        </div>
 
-                        {/* Dots de paginação */}
-                        {mediaItems.length > 1 && mediaItems.length <= 20 && (
-                            <div className="flex items-center justify-center gap-1.5 py-4 shrink-0">
-                                {mediaItems.map((_, i) => (
-                                    <button
-                                        key={i}
-                                        onClick={() => setFullscreenIndex(i)}
-                                        className={`rounded-full transition-all ${
-                                            i === fullscreenIndex
-                                                ? 'w-5 h-2 bg-white'
-                                                : 'w-2 h-2 bg-white/30 hover:bg-white/50'
-                                        }`}
-                                    />
-                                ))}
-                            </div>
-                        )}
+                            {/* Dots de paginação */}
+                            {mediaItems.length > 1 && mediaItems.length <= 20 && (
+                                <div className="absolute bottom-6 left-0 right-0 flex items-center justify-center gap-1.5 py-2">
+                                    {mediaItems.map((_, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => setFullscreenIndex(i)}
+                                            className={`rounded-full transition-all pointer-events-auto ${
+                                                i === fullscreenIndex
+                                                    ? 'w-5 h-2 bg-white'
+                                                    : 'w-2 h-2 bg-white/30 hover:bg-white/50'
+                                            }`}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 );
             })()}

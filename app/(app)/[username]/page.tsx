@@ -5,6 +5,7 @@ import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { useUserByUsername, usePublicGallery, useSubscribe, useMyProfile } from '@/hooks/useQueries';
+import { UserX, Briefcase, Camera, Lock } from 'lucide-react';
 
 interface UserProfilePageProps {
     params?: Promise<{ username: string }>;
@@ -87,8 +88,8 @@ export default function UserProfilePage({ params, username: propUsername, onBack
     if (isError || !user) {
         return (
             <div className={`flex flex-col items-center justify-center p-8 text-center bg-white ${layoutClass} ${animationClass}`}>
-                <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mb-6">
-                    <span className="text-4xl text-gray-300">👻</span>
+                <div className="w-24 h-24 bg-purple-50/50 rounded-full flex items-center justify-center mb-6 border border-purple-100/50">
+                    <UserX className="w-10 h-10 text-purple-300" />
                 </div>
                 <h1 className="text-2xl font-black text-gray-900 mb-2">Pessoa não encontrada</h1>
                 <p className="text-gray-400 text-sm mb-8 leading-relaxed px-4">O perfil que você está tentando acessar não existe,<br/>é do mesmo modo que o seu ou foi removido.</p>
@@ -103,7 +104,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
     }
 
     return (
-        <div className={`flex flex-col bg-slate-50 overflow-y-auto pb-28 no-scrollbar relative ${layoutClass} ${animationClass}`}>
+        <div className={`flex flex-col bg-slate-50 overflow-y-auto overflow-x-hidden pb-28 no-scrollbar relative ${layoutClass} ${animationClass}`}>
             {/* Efeito de Fundo Aurora (Esferas Desfocadas Modernas) */}
             <div className="absolute top-[-10%] left-[-20%] w-[350px] h-[350px] rounded-full bg-purple-400/15 blur-[100px] pointer-events-none select-none z-0" />
             <div className="absolute top-[35%] right-[-15%] w-[300px] h-[300px] rounded-full bg-pink-400/12 blur-[90px] pointer-events-none select-none z-0" />
@@ -163,7 +164,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                     <div className="w-full max-w-md mt-6 bg-white/85 backdrop-blur-md border border-purple-100 rounded-2xl p-5 shadow-lg shadow-purple-950/5 z-10 animate-in fade-in slide-in-from-bottom-3 duration-500">
                         <div className="flex items-center justify-between border-b border-purple-50 pb-3 mb-4">
                             <div className="flex items-center gap-2">
-                                <span className="text-lg">💼</span>
+                                <Briefcase className="w-4 h-4 text-purple-600 shrink-0" />
                                 <h3 className="font-black text-slate-800 text-sm tracking-tight uppercase">Informações do Cliente</h3>
                             </div>
                             <span className="text-[10px] bg-purple-100 text-purple-700 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
@@ -326,9 +327,9 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                         </div>
                     ) : activeGalleryTab === 'public' ? (
                         (galleryData?.items?.length ?? 0) === 0 ? (
-                            <div className="bg-gray-50 rounded-2xl p-8 border border-dashed border-gray-200 flex flex-col items-center justify-center text-center mx-6 mt-4">
-                                <span className="text-2xl mb-1">📸</span>
-                                <p className="text-sm text-gray-400 font-medium">Nenhuma foto na galeria ainda</p>
+                            <div className="bg-white/50 rounded-2xl p-8 border border-dashed border-gray-200 flex flex-col items-center justify-center text-center mx-6 mt-4 gap-1.5">
+                                <Camera className="w-6 h-6 text-gray-300" />
+                                <p className="text-xs text-gray-400 font-medium">Nenhuma foto na galeria ainda</p>
                             </div>
                         ) : (
                             <div className="grid grid-cols-3 gap-0.5 px-0.5">
@@ -380,9 +381,9 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                         )
                     ) : (
                         (galleryData?.privateItems?.length ?? 0) === 0 ? (
-                            <div className="bg-gray-50 rounded-2xl p-8 border border-dashed border-gray-200 flex flex-col items-center justify-center text-center mx-6 mt-4">
-                                <span className="text-2xl mb-1">🔒</span>
-                                <p className="text-sm text-gray-400 font-medium">Nenhuma mídia privada ainda</p>
+                            <div className="bg-white/50 rounded-2xl p-8 border border-dashed border-gray-200 flex flex-col items-center justify-center text-center mx-6 mt-4 gap-1.5">
+                                <Lock className="w-6 h-6 text-gray-300" />
+                                <p className="text-xs text-gray-400 font-medium">Nenhuma mídia privada ainda</p>
                             </div>
                         ) : (
                             <div className="grid grid-cols-3 gap-0.5 px-0.5">

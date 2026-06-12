@@ -80,7 +80,7 @@ export function StackNavigationProvider({ children }: { children: React.ReactNod
 
     // Escuta o evento de voltar do navegador (gesto ou botão de voltar do Android/iOS)
     useEffect(() => {
-        const handlePopState = (e: PopStateEvent) => {
+        const handlePopState = () => {
             // Pop foi iniciado programaticamente pelo nosso popVirtual — ignoramos para evitar duplo-pop
             if (isManualPopRef.current) {
                 isManualPopRef.current = false;
@@ -88,6 +88,16 @@ export function StackNavigationProvider({ children }: { children: React.ReactNod
             }
             const currentScreens = screensRef.current;
             if (currentScreens.length > 0) {
+                const topScreen = currentScreens[currentScreens.length - 1];
+                const historyState = window.history.state;
+                
+                // Se o estado atual do histórico pós-popstate corresponder à chave da tela virtual do topo,
+                // significa que o usuário voltou a navegar dentro dela (ex: fechando galeria ou modal interno).
+                // Não devemos desempilhar a tela virtual.
+                if (historyState && historyState.isVirtual && historyState.key === topScreen.key) {
+                    return;
+                }
+
                 // Se o popstate disparou e tínhamos telas virtuais, removemos a tela do topo
                 // Não precisamos fazer pushState na URL pois o navegador já voltou a URL anterior
                 popVirtual();

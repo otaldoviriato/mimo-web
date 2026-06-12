@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
         const priceStr = formData.get('lockedPrice') as string;
         const isVideo = formData.get('isVideo') === 'true';
         const preUploadedVideoUrl = formData.get('videoUrl') as string | null;
+        const tempId = formData.get('tempId') as string | null;
 
         if ((!file && !preUploadedVideoUrl) || !roomId || !receiverId || !priceStr) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -91,7 +92,8 @@ export async function POST(request: NextRequest) {
                 lockedImagePriceInCents: lockedPriceInCents,
                 isVideo,
                 videoUrl,
-                thumbnailUrl
+                thumbnailUrl,
+                tempId,
             })
         });
 

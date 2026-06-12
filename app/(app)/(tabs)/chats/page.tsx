@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Avatar, TouchableRipple } from '@/components';
 import { useChatRooms, useMyProfile, QueryKeys } from '@/hooks/useQueries';
 import { useSocket } from '@/hooks/useSocket';
-import { CheckCircle2, X, WalletCards } from 'lucide-react';
+import { CheckCircle2, X, WalletCards, Crown } from 'lucide-react';
 
 interface Room {
     _id: string;
@@ -377,13 +377,6 @@ export default function ChatsPage() {
                                     >
                                         <div className="relative shrink-0">
                                             <Avatar size={52} uri={room.otherUser?.photoUrl} />
-                                            {myProfile?.isProfessional && (
-                                                <div className="absolute -bottom-1 -right-1 bg-white text-purple-700 rounded-full px-1.5 py-0.5 border border-purple-200 flex items-center justify-center shadow-sm">
-                                                    <span className="text-[9px] font-bold leading-none whitespace-nowrap">
-                                                        R$ {((room.otherUser?.balance || 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                    </span>
-                                                </div>
-                                            )}
                                         </div>
                                         <div className="flex-1 ml-3 min-w-0">
                                             <div className="flex items-center justify-between mb-1">
@@ -392,7 +385,9 @@ export default function ChatsPage() {
                                                         {room.otherUser?.name || room.otherUser?.username || `Usuário ${otherUserId?.substring(0, 8)}`}
                                                     </span>
                                                     {myProfile?.isProfessional && room.otherUser?.isHighSpender && (
-                                                        <span className="text-sm leading-none drop-shadow-sm" title="Cliente VIP">💎</span>
+                                                        <span title="Cliente VIP" className="shrink-0 flex items-center justify-center">
+                                                            <Crown className="w-4 h-4 text-amber-500" />
+                                                        </span>
                                                     )}
                                                 </div>
                                                 <span className={`text-xs ml-2 shrink-0 ${hasUnread ? 'font-semibold text-purple-600' : 'text-gray-400'}`}>

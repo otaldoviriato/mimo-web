@@ -8,45 +8,59 @@ import { BalanceDisplay } from '@/components/BalanceDisplay';
 import { Avatar } from '@/components/Avatar';
 import { useUser } from '@clerk/nextjs';
 
-const tabs = [
-    {
-        href: '/chats',
-        label: 'Conversas',
-        icon: (active: boolean) => (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} className="transition-all">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
-                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-        ),
-    },
-    {
-        href: '/search',
-        label: 'Buscar',
-        icon: (active: boolean) => (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth={active ? 2.5 : 2} />
-                <path d="m21 21-4.35-4.35" stroke="currentColor" strokeWidth={active ? 2.5 : 2} strokeLinecap="round" />
-            </svg>
-        ),
-    },
-    {
-        href: '/profile',
-        label: 'Perfil',
-        icon: (active: boolean) => (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"
-                    stroke="currentColor" strokeWidth={active ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth={active ? 2.5 : 2} />
-            </svg>
-        ),
-    },
-];
+// As abas são geradas dinamicamente dentro do componente com base no tipo de perfil (profissional ou não)
 
 export default function TabsLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const { data: userData } = useMyProfile();
     const { user } = useUser();
     const balance = userData?.balance ?? 0;
+
+    const isProfessional = !!userData?.isProfessional;
+
+    const resolvedTabs = [
+        {
+            href: '/chats',
+            label: 'Conversas',
+            icon: (active: boolean) => (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} className="transition-all">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+                        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            ),
+        },
+        isProfessional ? {
+            href: '/wallet',
+            label: 'Carteira',
+            icon: (active: boolean) => (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <rect x="2" y="5" width="20" height="14" rx="2" ry="2" stroke="currentColor" strokeWidth={active ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round" />
+                    <line x1="2" y1="10" x2="22" y2="10" stroke="currentColor" strokeWidth={active ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M16 14h2" stroke="currentColor" strokeWidth={active ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            ),
+        } : {
+            href: '/search',
+            label: 'Buscar',
+            icon: (active: boolean) => (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth={active ? 2.5 : 2} />
+                    <path d="m21 21-4.35-4.35" stroke="currentColor" strokeWidth={active ? 2.5 : 2} strokeLinecap="round" />
+                </svg>
+            ),
+        },
+        {
+            href: '/profile',
+            label: 'Perfil',
+            icon: (active: boolean) => (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"
+                        stroke="currentColor" strokeWidth={active ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth={active ? 2.5 : 2} />
+                </svg>
+            ),
+        },
+    ];
 
     return (
         <div className="flex h-screen bg-gray-50">
@@ -66,7 +80,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
 
                 {/* Nav */}
                 <nav className="flex-1 px-3 py-4">
-                    {tabs.map((tab) => {
+                    {resolvedTabs.map((tab) => {
                         const isActive = pathname === tab.href || (tab.href === '/chats' && pathname === '/');
                         return (
                             <Link
@@ -112,7 +126,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
 
             {/* Bottom nav (mobile) */}
             <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex items-center z-40">
-                {tabs.map((tab) => {
+                {resolvedTabs.map((tab) => {
                     const isActive = pathname === tab.href || (tab.href === '/chats' && pathname === '/');
                     return (
                         <Link

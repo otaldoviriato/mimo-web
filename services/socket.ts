@@ -5,6 +5,7 @@ const CHAT_SERVER_URL = process.env.NEXT_PUBLIC_CHAT_SERVER_URL || 'http://local
 class SocketService {
     public socket: Socket | null = null;
     private _currentUserId: string | null = null;
+    private _newMessageCallback: ((data: any) => void) | null = null;
 
     connect(userId?: string) {
         const newUserId = userId ?? this._currentUserId;
@@ -87,6 +88,12 @@ class SocketService {
 
     onNewMessage(callback: (message: any) => void) {
         if (!this.socket) return;
+        // Remove o listener anterior antes de registrar um novo
+        // para evitar acúmulo de callbacks quando o useEffect re-executa
+        if (this._newMessageCallback) {
+            this.socket.off('new_message', this._newMessageCallback);
+        }
+        this._newMessageCallback = callback;
         this.socket.on('new_message', callback);
     }
 
@@ -97,7 +104,12 @@ class SocketService {
 
     offNewMessage() {
         if (!this.socket) return;
-        this.socket.off('new_message');
+        if (this._newMessageCallback) {
+            this.socket.off('new_message', this._newMessageCallback);
+            this._newMessageCallback = null;
+        } else {
+            this.socket.off('new_message');
+        }
     }
 
     offError() {

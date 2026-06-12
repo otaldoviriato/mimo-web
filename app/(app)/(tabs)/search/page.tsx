@@ -6,6 +6,7 @@ import { Input } from '@/components/Input';
 import { Button } from '@/components/Button';
 import { Avatar } from '@/components/Avatar';
 import { userApi } from '@/services/api';
+import { Crown } from 'lucide-react';
 
 export default function SearchPage() {
     const router = useRouter();
@@ -173,7 +174,7 @@ export default function SearchPage() {
                                         </div>
                                         {user.isProfessional && user.chargePerCharSubscribers !== undefined && (
                                             <p className="text-[10px] font-semibold text-purple-500 mt-0.5 flex items-center gap-1">
-                                                <span>💎</span>
+                                                <Crown className="w-3 h-3 text-amber-500 shrink-0" />
                                                 <span>R$ {(user.chargePerCharSubscribers).toFixed(4)} para assinantes</span>
                                             </p>
                                         )}

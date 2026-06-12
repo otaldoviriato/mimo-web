@@ -171,3 +171,65 @@ html.transition-forward, html.transition-backward {
 .shared-header {
   view-transition-name: main-header;
 }
+
+/* Animações de entrada e saída para o indicador de ganho */
+@keyframes earningsSlideIn {
+  from {
+    transform: translate3d(-100%, 0, 0);
+    opacity: 0;
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+}
+
+@keyframes earningsSlideOut {
+  from {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+  to {
+    transform: translate3d(-100%, 0, 0);
+    opacity: 0;
+  }
+}
+
+.animate-earnings-in {
+  animation: earningsSlideIn 350ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-earnings-out {
+  animation: earningsSlideOut 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Animações de entrada e saída para o indicador de ganho de mídias enviadas pela profissional (lado esquerdo) */
+@keyframes mediaEarningsSlideIn {
+  from {
+    transform: translate3d(100%, 0, 0);
+    opacity: 0;
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+}
+
+@keyframes mediaEarningsSlideOut {
+  from {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+  to {
+    transform: translate3d(100%, 0, 0);
+    opacity: 0;
+  }
+}
+
+.animate-media-earnings-in {
+  animation: mediaEarningsSlideIn 350ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-media-earnings-out {
+  animation: mediaEarningsSlideOut 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
