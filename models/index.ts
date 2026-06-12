@@ -25,3 +25,7 @@ export type {
     ICreatorApplication,
     OnlineExperience,
 } from './CreatorApplication';
+
+export { ProfessionalEmail } from './ProfessionalEmail';
+export type { IProfessionalEmail } from './ProfessionalEmail';
+

@@ -12,6 +12,108 @@ export function ProfessionalsTable() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedUserMenu, setSelectedUserMenu] = useState<string | null>(null);
 
+    const [showAddEmailModal, setShowAddEmailModal] = useState(false);
+    const [preAddedEmails, setPreAddedEmails] = useState<any[]>([]);
+    const [newEmail, setNewEmail] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isLoadingPreAdded, setIsLoadingPreAdded] = useState(false);
+
+    // Busca a lista de e-mails pré-adicionados do banco
+    const fetchPreAddedEmails = async () => {
+        setIsLoadingPreAdded(true);
+        try {
+            const res = await fetch('/api/admin/professional-emails');
+            if (res.ok) {
+                const data = await res.json();
+                setPreAddedEmails(data.emails || []);
+            } else {
+                toast.error('Erro ao buscar lista de e-mails autorizados.');
+            }
+        } catch (err) {
+            console.error('Erro ao carregar e-mails autorizados:', err);
+            toast.error('Falha de conexão ao carregar e-mails.');
+        } finally {
+            setIsLoadingPreAdded(false);
+        }
+    };
+
+    // Efeito para carregar e-mails pré-adicionados quando o modal abre
+    useEffect(() => {
+        if (showAddEmailModal) {
+            fetchPreAddedEmails();
+        }
+    }, [showAddEmailModal]);
+
+    // Ação: Adicionar e-mail de profissional
+    const handleAddEmail = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newEmail.trim()) return;
+
+        setIsSubmitting(true);
+        try {
+            const res = await fetch('/api/admin/professional-emails', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: newEmail })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                if (data.status === 'promoted') {
+                    toast.success(data.message, {
+                        duration: 5000,
+                        style: { borderRadius: '12px', background: '#1E293B', color: '#FFF' }
+                    });
+                    // Recarrega a lista de profissionais da tabela principal
+                    fetchUsers(searchQuery);
+                    setShowAddEmailModal(false);
+                } else if (data.status === 'already_professional') {
+                    toast.error(data.message);
+                } else {
+                    toast.success(data.message || 'E-mail adicionado com sucesso!', {
+                        style: { borderRadius: '12px', background: '#1E293B', color: '#FFF' }
+                    });
+                    setNewEmail('');
+                    fetchPreAddedEmails();
+                }
+            } else {
+                toast.error(data.error || 'Erro ao adicionar e-mail.');
+            }
+        } catch (err) {
+            console.error('Erro ao adicionar e-mail:', err);
+            toast.error('Erro de conexão ao tentar adicionar.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    // Ação: Deletar e-mail da lista de pré-adicionados
+    const handleDeletePreAddedEmail = async (email: string) => {
+        if (!confirm(`Remover o e-mail "${email}" da lista de autorizados?`)) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/admin/professional-emails?email=${encodeURIComponent(email)}`, {
+                method: 'DELETE'
+            });
+
+            if (res.ok) {
+                toast.success('E-mail removido com sucesso!', {
+                    style: { borderRadius: '12px', background: '#1E293B', color: '#FFF' }
+                });
+                setPreAddedEmails(prev => prev.filter(item => item.email !== email));
+            } else {
+                const data = await res.json();
+                toast.error(data.error || 'Erro ao remover e-mail.');
+            }
+        } catch (err) {
+            console.error('Erro ao deletar e-mail:', err);
+            toast.error('Erro de conexão ao tentar remover e-mail.');
+        }
+    };
+
     // Busca os usuários da API
     const fetchUsers = async (query: string = '') => {
         setLoading(true);
@@ -143,6 +245,14 @@ export function ProfessionalsTable() {
                             className="w-full pl-10 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 transition-all font-medium placeholder-slate-400 text-slate-700"
                         />
                     </div>
+                    {/* Botão de Adicionar Profissional */}
+                    <button
+                        onClick={() => setShowAddEmailModal(true)}
+                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-xl shadow-md shadow-purple-500/15 active:scale-[0.98] transition-all cursor-pointer"
+                    >
+                        <UserCheck size={16} />
+                        Adicionar Profissional
+                    </button>
                 </div>
             </div>
 
@@ -337,6 +447,106 @@ export function ProfessionalsTable() {
                 <span>Total de profissionais mostradas: {users.length}</span>
                 <span className="text-[10px] text-purple-500 uppercase tracking-widest font-black">MimoAdmin Profissionais</span>
             </div>
+
+            {/* Modal de Adicionar Profissional por E-mail */}
+            {showAddEmailModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-fade-in">
+                    {/* Background click to close */}
+                    <div className="absolute inset-0" onClick={() => setShowAddEmailModal(false)} />
+                    
+                    <div className="bg-white border border-slate-100 rounded-3xl shadow-2xl p-6 w-full max-w-lg relative z-10 animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[85vh] text-slate-700">
+                        {/* Header do Modal */}
+                        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                            <div>
+                                <h4 className="text-base font-bold text-slate-800">
+                                    Adicionar Nova Profissional
+                                </h4>
+                                <p className="text-xs text-slate-400 font-medium mt-0.5">
+                                    Cadastre o e-mail da profissional que será ativada automaticamente no cadastro.
+                                </p>
+                            </div>
+                            <button 
+                                onClick={() => setShowAddEmailModal(false)}
+                                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Formulário */}
+                        <form onSubmit={handleAddEmail} className="py-4 border-b border-slate-100">
+                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                                E-mail da Profissional
+                            </label>
+                            <div className="flex gap-2">
+                                <input
+                                    type="email"
+                                    required
+                                    placeholder="exemplo@mimo.com"
+                                    value={newEmail}
+                                    onChange={(e) => setNewEmail(e.target.value)}
+                                    className="flex-1 px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 transition-all font-medium text-slate-700 placeholder:text-slate-400"
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={isSubmitting}
+                                    className="px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-xl shadow-md shadow-purple-500/15 active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center min-w-[100px]"
+                                >
+                                    {isSubmitting ? (
+                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                    ) : (
+                                        'Adicionar'
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+
+                        {/* Lista de E-mails Pendentes */}
+                        <div className="pt-4 flex flex-col flex-1 overflow-hidden">
+                            <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+                                E-mails Pendentes de Cadastro ({preAddedEmails.length})
+                            </h5>
+                            
+                            <div className="flex-1 overflow-y-auto pr-1 space-y-2 max-h-[300px]">
+                                {isLoadingPreAdded ? (
+                                    <div className="py-8 flex flex-col items-center justify-center gap-2">
+                                        <div className="animate-spin h-5 w-5 text-purple-600 rounded-full border-2 border-slate-200 border-t-purple-600" />
+                                        <span className="text-xs font-semibold text-slate-400">Carregando lista...</span>
+                                    </div>
+                                ) : preAddedEmails.length > 0 ? (
+                                    preAddedEmails.map((item: any) => (
+                                        <div 
+                                            key={item._id}
+                                            className="flex items-center justify-between p-3 bg-slate-50/70 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors"
+                                        >
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-semibold text-slate-700">{item.email}</span>
+                                                <span className="text-[10px] text-slate-400 font-medium mt-0.5">
+                                                    Adicionado em {new Date(item.createdAt).toLocaleDateString('pt-BR')} às {new Date(item.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            </div>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeletePreAddedEmail(item.email);
+                                                }}
+                                                className="p-1.5 hover:bg-rose-50 rounded-lg text-slate-400 hover:text-rose-500 transition-all cursor-pointer"
+                                                title="Remover autorização"
+                                            >
+                                                <Trash2 size={15} />
+                                            </button>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="py-8 text-center text-xs font-semibold text-slate-400 italic">
+                                        Nenhum e-mail pendente de cadastro.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

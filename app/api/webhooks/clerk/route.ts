@@ -3,6 +3,8 @@ import { Webhook } from 'svix';
 import { headers } from 'next/headers';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
+import { ProfessionalEmail } from '@/models/ProfessionalEmail';
+
 
 const webhookSecret = process.env.CLERK_WEBHOOK_SECRET || '';
 
@@ -51,6 +53,18 @@ export async function POST(req: Request) {
         const generatedUsername = username || email_addresses[0]?.email_address.split('@')[0];
         const name = [first_name, last_name].filter(Boolean).join(' ') || generatedUsername;
 
+        const email = email_addresses[0]?.email_address?.toLowerCase()?.trim();
+        let isProfessional = false;
+
+        if (email) {
+            const hasPreAddedEmail = await ProfessionalEmail.findOne({ email });
+            if (hasPreAddedEmail) {
+                isProfessional = true;
+                await ProfessionalEmail.deleteOne({ email });
+                console.log(`✉️ Professional email matched! Automatically promoting user ${email} to professional.`);
+            }
+        }
+
         await User.findOneAndUpdate(
             { clerkId: id },
             {
@@ -62,7 +76,7 @@ export async function POST(req: Request) {
                 },
                 $setOnInsert: {
                     balance: 0, 
-                    isProfessional: false,
+                    isProfessional,
                     chargePerCharSubscribers: 0.002,
                     chargePerCharNonSubscribers: 0.005,
                 }
@@ -70,7 +84,7 @@ export async function POST(req: Request) {
             { upsert: true, new: true }
         );
 
-        console.log(`✅ Clerk Webhook: User created: ${generatedUsername}`);
+        console.log(`✅ Clerk Webhook: User created: ${generatedUsername} (Professional: ${isProfessional})`);
     }
 
     if (eventType === 'user.updated') {
