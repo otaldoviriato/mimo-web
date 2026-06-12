@@ -14,7 +14,7 @@ async function checkIsAdmin(userId: string) {
     return settings.adminClerkIds.includes(userId) || userId === FALLBACK_ADMIN;
 }
 
-// GET /api/admin/institutional-emails - Obtém e-mails cadastrados
+// GET /api/admin/institutional-emails - Obtém e-mails cadastrados e mensagens recebidas
 export async function GET(request: NextRequest) {
     try {
         const { userId } = await auth();
@@ -32,10 +32,70 @@ export async function GET(request: NextRequest) {
         const settings = await AppSettings.findOne({ key: 'global' });
         const institutionalEmails = settings?.institutionalEmails || ['viriatoceo@mimochat.com.br'];
 
+        // Buscar parâmetros de filtro
+        const { searchParams } = new URL(request.url);
+        const filterEmail = searchParams.get('email') || '';
+        const search = searchParams.get('q') || '';
+        const status = searchParams.get('status') || '';
+
+        let messagesWithReplies: any[] = [];
+
+        // Só faz a busca de mensagens no banco se houver um e-mail institucional selecionado
+        if (filterEmail.trim()) {
+            const query: any = {
+                recipientEmail: filterEmail.trim().toLowerCase(),
+                parentId: { $exists: false } // Apenas mensagens raiz
+            };
+
+            // Filtro de status
+            if (status && ['novo', 'em_atendimento', 'lido', 'resolvido', 'arquivado'].includes(status)) {
+                query.status = status;
+            }
+
+            // Filtro de texto (busca no remetente, assunto ou mensagem)
+            if (search.trim()) {
+                const searchRegex = new RegExp(search.trim(), 'i');
+                query.$or = [
+                    { senderEmail: searchRegex },
+                    { senderName: searchRegex },
+                    { subject: searchRegex },
+                    { message: searchRegex }
+                ];
+            }
+
+            // Buscar as mensagens recebidas ordenadas pelas mais recentes
+            const messages = await HelpTicket.find(query).sort({ createdAt: -1 }).lean();
+
+            // Buscar as respostas para essas mensagens raiz
+            if (messages.length > 0) {
+                const messageIds = messages.map(m => m._id);
+                const replies = await HelpTicket.find({ parentId: { $in: messageIds } }).sort({ createdAt: 1 }).lean();
+
+                // Agrupar respostas por parentId
+                const repliesMap: { [key: string]: any[] } = {};
+                replies.forEach(reply => {
+                    if (reply.parentId) {
+                        const pId = reply.parentId.toString();
+                        if (!repliesMap[pId]) {
+                            repliesMap[pId] = [];
+                        }
+                        repliesMap[pId].push(reply);
+                    }
+                });
+
+                // Acoplar respostas
+                messagesWithReplies = messages.map(m => ({
+                    ...m,
+                    replies: repliesMap[m._id.toString()] || []
+                }));
+            }
+        }
+
         return NextResponse.json({
             success: true,
             emails: institutionalEmails,
-            redirections: settings?.emailRedirections || []
+            redirections: settings?.emailRedirections || [],
+            messages: messagesWithReplies
         });
     } catch (error: any) {
         console.error('Erro na API de e-mails institucionais (GET):', error);
