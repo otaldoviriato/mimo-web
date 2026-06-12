@@ -180,8 +180,14 @@ export async function POST(request: NextRequest) {
                         replySubject = `Re: ${replySubject}`;
                     }
 
-                    const fromSender = redirection.displayName
-                        ? `"${redirection.displayName}" <${parentTicket.recipientEmail}>`
+                    let displayName = redirection.displayName;
+                    if (displayName) {
+                        if (!displayName.toLowerCase().includes('mimo')) {
+                            displayName = `${displayName} (Mimo Chat)`;
+                        }
+                    }
+                    const fromSender = displayName
+                        ? `"${displayName}" <${parentTicket.recipientEmail}>`
                         : parentTicket.recipientEmail;
 
                     await resend.emails.send({

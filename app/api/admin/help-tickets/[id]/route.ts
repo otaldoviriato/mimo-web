@@ -143,7 +143,12 @@ export async function POST(
         const redirection = emailRedirections.find(
             (r: any) => r.sourceEmail.toLowerCase() === emailFrom
         );
-        const displayName = redirection?.displayName;
+        let displayName = redirection?.displayName;
+        if (displayName) {
+            if (!displayName.toLowerCase().includes('mimo')) {
+                displayName = `${displayName} (Mimo Chat)`;
+            }
+        }
 
         // Montar o remetente oficial formatado com aspas duplas
         let fromSender = emailFrom;

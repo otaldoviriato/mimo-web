@@ -134,6 +134,9 @@ interface RichTextEditorProps {
 
 const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeholder, minHeight = '120px' }) => {
     const editorRef = React.useRef<HTMLDivElement>(null);
+    const [showLinkInput, setShowLinkInput] = useState(false);
+    const [linkUrl, setLinkUrl] = useState('');
+    const [savedSelection, setSavedSelection] = useState<Range | null>(null);
 
     React.useEffect(() => {
         if (editorRef.current && editorRef.current.innerHTML !== value) {
@@ -152,10 +155,59 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeh
         }
     };
 
-    const addLink = () => {
-        const url = prompt('Digite a URL do link:');
-        if (url) {
+    const saveSelection = () => {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+            return sel.getRangeAt(0);
+        }
+        return null;
+    };
+
+    const restoreSelection = (range: Range | null) => {
+        if (range) {
+            const sel = window.getSelection();
+            if (sel) {
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
+        }
+    };
+
+    const handleLinkButtonClick = () => {
+        const selection = saveSelection();
+        setSavedSelection(selection);
+        setShowLinkInput(prev => !prev);
+        setLinkUrl('');
+    };
+
+    const confirmLink = (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        
+        restoreSelection(savedSelection);
+        
+        if (linkUrl.trim()) {
+            let url = linkUrl.trim();
+            if (!/^https?:\/\//i.test(url) && !url.startsWith('#') && !url.startsWith('/')) {
+                url = 'https://' + url;
+            }
             execCmd('createLink', url);
+        }
+        
+        setShowLinkInput(false);
+        setLinkUrl('');
+        setSavedSelection(null);
+        
+        if (editorRef.current) {
+            editorRef.current.focus();
+        }
+    };
+
+    const cancelLink = () => {
+        setShowLinkInput(false);
+        setLinkUrl('');
+        setSavedSelection(null);
+        if (editorRef.current) {
+            editorRef.current.focus();
         }
     };
 
@@ -166,6 +218,15 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeh
                     content: attr(data-placeholder);
                     color: #94a3b8;
                     font-weight: 505;
+                }
+                .editor-content {
+                    line-height: 1.6;
+                }
+                .editor-content p, .editor-content div {
+                    margin-bottom: 12px;
+                }
+                .editor-content p:last-child, .editor-content div:last-child {
+                    margin-bottom: 0;
                 }
             `}} />
             <div className="flex items-center gap-1 p-1.5 bg-slate-100/80 border-b border-slate-200 select-none">
@@ -187,8 +248,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeh
                 </button>
                 <button
                     type="button"
-                    onClick={addLink}
-                    className="p-1.5 text-slate-555 hover:text-slate-800 hover:bg-slate-200/80 rounded-lg transition-all text-xs font-bold flex items-center justify-center shrink-0 cursor-pointer"
+                    onClick={handleLinkButtonClick}
+                    className={`p-1.5 hover:bg-slate-200/80 rounded-lg transition-all text-xs font-bold flex items-center justify-center shrink-0 cursor-pointer ${showLinkInput ? 'text-purple-650 bg-slate-200/80' : 'text-slate-555 hover:text-slate-800'}`}
                     title="Inserir Link"
                 >
                     <Link size={12} />
@@ -202,6 +263,33 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeh
                     <Trash2 size={12} />
                 </button>
             </div>
+
+            {showLinkInput && (
+                <form onSubmit={confirmLink} className="flex items-center gap-2 p-2 bg-purple-50/50 border-b border-slate-200 select-none animate-fade-in">
+                    <span className="text-[10px] font-bold text-purple-750 uppercase tracking-wider shrink-0">Inserir Link:</span>
+                    <input
+                        type="text"
+                        value={linkUrl}
+                        onChange={(e) => setLinkUrl(e.target.value)}
+                        placeholder="Ex: www.mimochat.com.br"
+                        className="flex-1 px-2.5 py-1 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500/50 focus:border-purple-500 text-slate-700 font-medium"
+                        autoFocus
+                    />
+                    <button
+                        type="submit"
+                        className="px-2.5 py-1 bg-purple-650 hover:bg-purple-700 text-white text-[10px] font-bold rounded-lg transition-all shrink-0 cursor-pointer"
+                    >
+                        Confirmar
+                    </button>
+                    <button
+                        type="button"
+                        onClick={cancelLink}
+                        className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/80 transition-all shrink-0 cursor-pointer"
+                    >
+                        <X size={12} />
+                    </button>
+                </form>
+            )}
 
             <div
                 ref={editorRef}

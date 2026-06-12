@@ -61,7 +61,12 @@ export async function POST(request: NextRequest) {
 
         // Buscar displayName nas configurações
         const redirection = emailRedirections.find(r => r.sourceEmail.toLowerCase() === emailFrom);
-        const displayName = redirection?.displayName;
+        let displayName = redirection?.displayName;
+        if (displayName) {
+            if (!displayName.toLowerCase().includes('mimo')) {
+                displayName = `${displayName} (Mimo Chat)`;
+            }
+        }
         const fromSender = displayName ? `"${displayName}" <${emailFrom}>` : emailFrom;
 
         if (!process.env.RESEND_API_KEY) {
