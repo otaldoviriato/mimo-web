@@ -447,9 +447,9 @@ export default function ProfilePage() {
             <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between z-10 sticky top-0 shadow-md">
                 <div className="flex items-center gap-3">
                     <img
-                        src="/icon-192x192.png"
+                        src="/Logo.svg"
                         alt="MimoChat"
-                        className="w-8 h-8 rounded-lg object-cover border border-white/20 shrink-0"
+                        className="w-8 h-8 object-contain shrink-0"
                     />
                     <h1 className="text-2xl font-black text-white tracking-tighter">Mimo</h1>
                     <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">Perfil</span>

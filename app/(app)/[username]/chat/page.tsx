@@ -56,7 +56,7 @@ export default function UsernameChatPage({ params }: UsernameChatPageProps) {
             <div className="flex flex-col items-center animate-pulse">
                 <div className="relative w-24 h-24 mb-6 rounded-3xl overflow-hidden shadow-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20">
                     <img 
-                        src="/icon-192x192.png" 
+                        src="/Logo.svg" 
                         alt="MimoChat Logo" 
                         className="w-16 h-16 object-contain"
                     />

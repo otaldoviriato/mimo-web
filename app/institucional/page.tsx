@@ -41,11 +41,13 @@ export default function InstitucionalPage() {
             <header className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 relative z-10">
                 <nav className="flex items-center justify-between bg-white/70 backdrop-blur-md border border-gray-200/50 rounded-2xl px-6 py-4 shadow-xs">
                     <div className="flex items-center gap-3">
-                        <img
-                            src="/icon-192x192.png"
-                            alt="MimoChat"
-                            className="w-10 h-10 rounded-xl object-cover shadow-xs border border-gray-100"
-                        />
+                        <div className="flex w-10 h-10 items-center justify-center bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl shadow-xs shrink-0">
+                            <img
+                                src="/Logo.svg"
+                                alt="MimoChat"
+                                className="w-6.5 h-6.5 object-contain"
+                            />
+                        </div>
                         <span className="text-xl font-bold text-gray-900 tracking-tight">
                             MimoChat
                         </span>
@@ -253,11 +255,13 @@ export default function InstitucionalPage() {
                         {/* Logo e Missão */}
                         <div className="space-y-4 md:col-span-2">
                             <div className="flex items-center gap-2">
-                                <img
-                                    src="/icon-192x192.png"
-                                    alt="MimoChat"
-                                    className="w-8 h-8 rounded-lg object-cover"
-                                />
+                                <div className="flex w-8 h-8 items-center justify-center bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg shrink-0">
+                                    <img
+                                        src="/Logo.svg"
+                                        alt="MimoChat"
+                                        className="w-5 h-5 object-contain"
+                                    />
+                                </div>
                                 <span className="text-lg font-bold text-gray-900">MimoChat</span>
                             </div>
                             <p className="text-xs text-gray-500 max-w-sm leading-relaxed">

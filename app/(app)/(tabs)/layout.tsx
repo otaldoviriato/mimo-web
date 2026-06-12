@@ -54,11 +54,13 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
             <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 shrink-0">
                 {/* Brand */}
                 <div className="flex items-center gap-3 px-5 py-5 border-b border-gray-100">
-                    <img
-                        src="/icon-192x192.png"
-                        alt="MimoChat"
-                        className="w-9 h-9 rounded-xl object-cover shrink-0"
-                    />
+                    <div className="flex w-9 h-9 items-center justify-center bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl shrink-0">
+                        <img
+                            src="/Logo.svg"
+                            alt="MimoChat"
+                            className="w-6 h-6 object-contain"
+                        />
+                    </div>
                     <span className="text-lg font-bold text-gray-900">MimoChat</span>
                 </div>
 

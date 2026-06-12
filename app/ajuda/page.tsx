@@ -129,11 +129,13 @@ export default function AjudaPage() {
             <header className="max-w-4xl mx-auto px-4 sm:px-6 pt-6 relative z-10">
                 <div className="flex items-center justify-between bg-white/70 backdrop-blur-md border border-gray-200/50 rounded-2xl px-5 py-4.5 shadow-sm">
                     <div className="flex items-center gap-2.5">
-                        <img
-                            src="/icon-192x192.png"
-                            alt="MimoChat"
-                            className="w-8 h-8 rounded-lg object-cover border border-gray-100"
-                        />
+                        <div className="flex w-8 h-8 items-center justify-center bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg shrink-0">
+                            <img
+                                src="/Logo.svg"
+                                alt="MimoChat"
+                                className="w-5 h-5 object-contain"
+                            />
+                        </div>
                         <span className="font-bold text-gray-900 tracking-tight">
                             MimoChat <span className="text-purple-600 font-semibold text-xs ml-1">Ajuda</span>
                         </span>

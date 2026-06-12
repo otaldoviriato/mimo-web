@@ -239,7 +239,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                     {/* Logo do MimoChat */}
                     <div className="relative w-28 h-28 md:w-32 md:h-32 mb-6 rounded-3xl overflow-hidden shadow-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 animate-pulse">
                         <img 
-                            src="/icon-192x192.png" 
+                            src="/Logo.svg" 
                             alt="MimoChat Logo" 
                             className="w-20 h-20 md:w-24 md:h-24 object-contain"
                         />

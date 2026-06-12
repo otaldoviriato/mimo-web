@@ -76,11 +76,13 @@ export default function SSOCallbackPage() {
                 {/* Logo / App Icon com brilho sutil */}
                 <div className="relative mb-8 flex justify-center">
                     <div className="absolute inset-0 bg-purple-500 rounded-3xl blur-xl opacity-30 animate-pulse" />
-                    <img
-                        src="/icon-192x192.png"
-                        alt="MimoChat"
-                        className="relative w-20 h-20 rounded-3xl shadow-lg object-cover border border-white"
-                    />
+                    <div className="relative w-20 h-20 bg-gradient-to-br from-purple-600 to-purple-700 rounded-3xl shadow-lg flex items-center justify-center border border-white/20">
+                        <img
+                            src="/Logo.svg"
+                            alt="MimoChat"
+                            className="w-12 h-12 object-contain"
+                        />
+                    </div>
                 </div>
 
                 {/* Card de Carregamento Isolado - Seus re-renders rápidos não afetam o componente do Clerk */}
