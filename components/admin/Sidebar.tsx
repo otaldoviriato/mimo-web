@@ -16,6 +16,7 @@ import {
     ClipboardList,
     TrendingUp,
     Mail,
+    Send,
     X
 } from 'lucide-react';
 import Link from 'next/link';
@@ -38,6 +39,7 @@ export function Sidebar({ activeTab, setActiveTab, isOpen = false, onClose }: Si
         { id: 'coupons', label: 'Cupons de Desconto', icon: Ticket },
         { id: 'help-tickets', label: 'Tickets de Ajuda', icon: LifeBuoy },
         { id: 'institutional-emails', label: 'E-mails Institucionais', icon: Mail },
+        { id: 'outbox', label: 'Caixa de Saída', icon: Send },
         { id: 'creator-applications', label: 'Inscrições de Criadoras', icon: ClipboardList, href: '/admin/creator-applications' },
     ];
 

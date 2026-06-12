@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { AppSettings } from '@/models/AppSettings';
+import { HelpTicket } from '@/models/HelpTicket';
 import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -71,6 +72,19 @@ export async function POST(request: NextRequest) {
 
         if (!process.env.RESEND_API_KEY) {
             console.warn('RESEND_API_KEY não configurada. Simulando envio de e-mail com sucesso no ambiente local.');
+            
+            // Salvar no histórico de e-mails (Caixa de Saída)
+            await HelpTicket.create({
+                senderEmail: emailFrom,
+                senderName: displayName || undefined,
+                recipientEmail: to.trim().toLowerCase(),
+                subject: subject.trim(),
+                message: message.trim(),
+                status: 'resolvido',
+                isFavorite: false,
+                isRead: true,
+            });
+
             return NextResponse.json({
                 success: true,
                 simulated: true,
@@ -103,6 +117,18 @@ export async function POST(request: NextRequest) {
                 console.error('Erro retornado pela API da Resend:', result.error);
                 return NextResponse.json({ error: `Erro no provedor de e-mail: ${result.error.message}` }, { status: 500 });
             }
+
+            // Salvar no histórico de e-mails (Caixa de Saída)
+            await HelpTicket.create({
+                senderEmail: emailFrom,
+                senderName: displayName || undefined,
+                recipientEmail: to.trim().toLowerCase(),
+                subject: subject.trim(),
+                message: message.trim(),
+                status: 'resolvido',
+                isFavorite: false,
+                isRead: true,
+            });
 
             return NextResponse.json({ success: true, data: result.data });
         } catch (resendErr: any) {
