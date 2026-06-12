@@ -9,7 +9,6 @@ export const PUBLIC_CONTENT_ROUTES = [
 export const CLERK_PUBLIC_ROUTES = [
     ...PUBLIC_CONTENT_ROUTES,
     '/login',
-    '/onboarding',
     '/sso-callback',
 ] as const;
 

@@ -211,8 +211,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                     window.location.pathname &&
                     window.location.pathname !== '/login' &&
                     window.location.pathname !== '/' &&
-                    window.location.pathname !== '/settings' &&
-                    window.location.pathname !== '/onboarding'
+                    window.location.pathname !== '/settings'
                 ) {
                     localStorage.setItem('mimo_redirect_after_login', currentPath);
                 }
