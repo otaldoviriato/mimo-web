@@ -37,7 +37,6 @@ export function Sidebar({ activeTab, setActiveTab, isOpen = false, onClose }: Si
         { id: 'coupons', label: 'Cupons de Desconto', icon: Ticket },
         { id: 'help-tickets', label: 'Tickets de Ajuda', icon: LifeBuoy },
         { id: 'creator-applications', label: 'Inscrições de Criadoras', icon: ClipboardList, href: '/admin/creator-applications' },
-        { id: 'marketing', label: 'Growth e Prospecção', icon: TrendingUp, href: '/marketing' },
     ];
 
     const handleTabChange = (tab: string) => {

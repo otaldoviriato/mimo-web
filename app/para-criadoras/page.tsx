@@ -5,35 +5,25 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { 
     ArrowRight, 
+    ArrowLeft,
     ShieldCheck, 
-    Sparkles, 
     Check, 
     CheckCircle2, 
     MessageCircle, 
     Zap, 
     Lock, 
-    Users, 
-    Wallet, 
-    FileText, 
-    Eye, 
     Send, 
     BadgeCheck, 
     Flame,
-    ArrowUpRight,
-    HelpCircle,
     User,
     LockKeyhole,
-    DollarSign
+    DollarSign,
+    LockKeyholeOpen
 } from 'lucide-react';
 import { InstagramIcon } from '@/components/InstagramIcon';
+import dynamic from 'next/dynamic';
 
-// Mockup de Chat Interativo
-const chatDemoMessages = [
-    { id: 1, sender: 'fan', text: 'Oi! Adoro seus conteúdos no Instagram! Tem alguma prévia exclusiva do ensaio de hoje por aqui?', delay: 1000 },
-    { id: 2, sender: 'creator', text: 'Oi, tudo bem? Que bom te ter aqui! Fico super feliz com o carinho. 💜', delay: 2000 },
-    { id: 3, sender: 'creator', text: 'Tenho sim! Acabei de mandar o vídeo de bastidores exclusivo e algumas fotos especiais do ensaio. É só clicar para ver:', delay: 1500 },
-    { id: 4, sender: 'media', mediaType: 'video', isLocked: true, price: 'R$ 29,90', title: 'Bastidores Ensaio Outfit.mp4', delay: 1000 },
-];
+const Phone3D = dynamic(() => import('./components/Phone3D'), { ssr: false });
 
 const initialForm = {
     fullName: '',
@@ -53,83 +43,320 @@ const initialForm = {
 
 type FormState = typeof initialForm;
 
-const inputClass = 'mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100';
+const inputClass = 'mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-purple-600 focus:ring-2 focus:ring-purple-100';
+
+const formatWhatsApp = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    const truncated = numbers.slice(0, 11);
+    if (truncated.length <= 2) {
+        return truncated.length > 0 ? `(${truncated}` : '';
+    }
+    if (truncated.length <= 6) {
+        return `(${truncated.slice(0, 2)}) ${truncated.slice(2)}`;
+    }
+    if (truncated.length <= 10) {
+        return `(${truncated.slice(0, 2)}) ${truncated.slice(2, 6)}-${truncated.slice(6)}`;
+    }
+    return `(${truncated.slice(0, 2)}) ${truncated.slice(2, 7)}-${truncated.slice(7)}`;
+};
 
 export default function ParaCriadorasPage() {
+    // Máquina de estados dos passos (0 a 4)
+    const [step, setStep] = useState(0);
+    const [activeStep, setActiveStep] = useState(0); // Passo realmente visível
+    const [isExiting, setIsExiting] = useState(false); // Indica que a tela atual está saindo
+    const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
+    const [isMobileDevice, setIsMobileDevice] = useState(false);
+
+    useEffect(() => {
+        const handleResize = () => {
+            setIsMobileDevice(window.innerWidth < 1024);
+        };
+        handleResize();
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+    
+    // Estados do Formulário
     const [form, setForm] = useState<FormState>(initialForm);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
 
-    // Estado para o Mockup de Chat Interativo
-    const [visibleMessages, setVisibleMessages] = useState<typeof chatDemoMessages>([]);
-    const [isMediaLocked, setIsMediaLocked] = useState(true);
-    const [isTyping, setIsTyping] = useState(false);
-    const [typingText, setTypingText] = useState('');
+    // ─── ESTADOS DO SIMULADOR DE CHAT (PASSO 1) ───
+    const [chatMessages, setChatMessages] = useState<Array<{ sender: 'fan' | 'creator'; text: string; time: string; gain?: number }>>([]);
+    const [chatStep, setChatStep] = useState(0);
+    const [chatTyping, setChatTyping] = useState(false);
+    const [simulatedEarnings, setSimulatedEarnings] = useState(0.00);
 
+    // ─── ESTADOS DO SIMULADOR DE MÍDIAS EM CHAT (PASSO 2) ───
+    const [mediaChatMessages, setMediaChatMessages] = useState<Array<{ sender: 'fan' | 'creator'; text?: string; isMedia?: boolean; time: string; gain?: number }>>([]);
+    const [mediaChatStep, setMediaChatStep] = useState(0);
+    const [mediaChatTyping, setMediaChatTyping] = useState(false);
+    const [mediaPrice, setMediaPrice] = useState(29.90);
+    const [mediaUnlocked, setMediaUnlocked] = useState(false);
+    const [mediaLoading, setMediaLoading] = useState(false);
+    const [mediaEarnings, setMediaEarnings] = useState(0.00);
+
+    // ─── ESTADOS DO SIMULADOR DE MIMOS EM CHAT (PASSO 3) ───
+    const [mimoChatMessages, setMimoChatMessages] = useState<Array<{ sender: 'fan' | 'creator' | 'system'; text?: string; isMimoBanner?: boolean; time: string; gain?: number }>>([]);
+    const [mimoChatStep, setMimoChatStep] = useState(0);
+    const [mimoChatTyping, setMimoChatTyping] = useState(false);
+    const [mimoEarnings, setMimoEarnings] = useState(0.00);
+
+    // Lógica do Simulador de Chat (Passo 1)
     useEffect(() => {
-        let index = 0;
-        const showNextMessage = () => {
-            if (index < chatDemoMessages.length) {
-                setIsTyping(true);
-                const nextMsg = chatDemoMessages[index];
+        if (activeStep !== 1) {
+            setChatMessages([]);
+            setChatStep(0);
+            setChatTyping(false);
+            setSimulatedEarnings(0.00);
+            return;
+        }
+
+        const script = [
+            { sender: 'fan', text: 'Oi! Vi seu Insta... Queria conversar com você!', delay: 800, gain: 4.50 },
+            { sender: 'creator', text: 'Oi! Tudo bem? Aqui no Mimo a gente conversa no privado 💜', delay: 1400 },
+            { sender: 'fan', text: 'Legal! E como você responde tão rápido?', delay: 1100, gain: 5.50 },
+            { sender: 'creator', text: 'O app me notifica na hora! Respondo no meu tempo.', delay: 1600 }
+        ];
+
+        if (chatStep < script.length) {
+            const currentMsg = script[chatStep];
+            setChatTyping(true);
+
+            const timer = setTimeout(() => {
+                setChatTyping(false);
+                setChatMessages(prev => [...prev, { 
+                    sender: currentMsg.sender as 'fan' | 'creator', 
+                    text: currentMsg.text, 
+                    time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                    gain: currentMsg.gain
+                }]);
                 
-                setTimeout(() => {
-                    setIsTyping(false);
-                    setVisibleMessages(prev => [...prev, nextMsg]);
-                    index++;
-                    if (index < chatDemoMessages.length) {
-                        setTimeout(showNextMessage, chatDemoMessages[index].delay);
-                    }
-                }, 1200); // Simulando digitação
+                if (currentMsg.gain) {
+                    let start = simulatedEarnings;
+                    const end = start + currentMsg.gain;
+                    const duration = 400;
+                    const startTime = performance.now();
+                    const animate = (now: number) => {
+                        const progress = Math.min((now - startTime) / duration, 1);
+                        setSimulatedEarnings(start + progress * (end - start));
+                        if (progress < 1) requestAnimationFrame(animate);
+                    };
+                    requestAnimationFrame(animate);
+                }
+
+                setChatStep(prev => prev + 1);
+            }, currentMsg.delay);
+
+            return () => clearTimeout(timer);
+        }
+    }, [activeStep, chatStep]);
+
+    // Lógica do Simulador de Mídias em Chat (Passo 2)
+    useEffect(() => {
+        if (activeStep !== 2) {
+            setMediaChatMessages([]);
+            setMediaChatStep(0);
+            setMediaChatTyping(false);
+            setMediaUnlocked(false);
+            setMediaEarnings(0.00);
+            return;
+        }
+
+        const mediaScript = [
+            { sender: 'fan', text: 'Oi! Manda a prévia do ensaio que você postou nos stories? 🫣', delay: 800 },
+            { sender: 'creator', text: 'Oi! Capaz, acabei de enviar abaixo! Clica para ver 💜', delay: 1500 },
+            { sender: 'creator', isMedia: true, delay: 1000 }
+        ];
+
+        if (mediaChatStep < mediaScript.length) {
+            const currentMsg = mediaScript[mediaChatStep];
+            setMediaChatTyping(true);
+
+            const timer = setTimeout(() => {
+                setMediaChatTyping(false);
+                setMediaChatMessages(prev => [...prev, {
+                    sender: currentMsg.sender as 'fan' | 'creator',
+                    text: currentMsg.text,
+                    isMedia: currentMsg.isMedia,
+                    time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                }]);
+                setMediaChatStep(prev => prev + 1);
+            }, currentMsg.delay);
+
+            return () => clearTimeout(timer);
+        }
+    }, [activeStep, mediaChatStep]);
+
+    // Timer de Auto-Desbloqueio da Mídia (Passo 2)
+    useEffect(() => {
+        if (activeStep === 2 && mediaChatStep === 3 && !mediaUnlocked && !mediaLoading) {
+            // Espera 1.5s após exibir o balão de mídia para iniciar o auto-desbloqueio
+            const autoUnlockTimer = setTimeout(() => {
+                handleSimulateUnlock();
+            }, 1500);
+
+            return () => clearTimeout(autoUnlockTimer);
+        }
+    }, [activeStep, mediaChatStep, mediaUnlocked, mediaLoading]);
+
+    // Lógica do Simulador de Mimos em Chat (Passo 3)
+    useEffect(() => {
+        if (activeStep !== 3) {
+            setMimoChatMessages([]);
+            setMimoChatStep(0);
+            setMimoChatTyping(false);
+            setMimoEarnings(0.00);
+            return;
+        }
+
+        const mimoScript = [
+            { sender: 'fan', text: 'Sua conversa é incrível! Te mandei um mimo para agradecer o papo de hoje 💜', delay: 800 },
+            { sender: 'fan', isMimoBanner: true, gain: 50.00, delay: 1600 },
+            { sender: 'creator', text: 'Nossa, muito obrigada! Fico super feliz com o carinho! 😍', delay: 1500 }
+        ];
+
+        if (mimoChatStep < mimoScript.length) {
+            const currentMsg = mimoScript[mimoChatStep];
+            if (currentMsg.sender !== 'system' && !currentMsg.isMimoBanner) {
+                setMimoChatTyping(true);
             }
-        };
 
-        // Inicia a simulação do chat
-        const startTimeout = setTimeout(showNextMessage, 1000);
-        return () => {
-            clearTimeout(startTimeout);
-        };
-    }, []);
+            const timer = setTimeout(() => {
+                setMimoChatTyping(false);
+                setMimoChatMessages(prev => [...prev, {
+                    sender: currentMsg.sender as 'fan' | 'creator' | 'system',
+                    text: currentMsg.text,
+                    isMimoBanner: currentMsg.isMimoBanner,
+                    time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                    gain: currentMsg.gain
+                }]);
 
-    function handleUnlockMedia() {
-        setIsTyping(true);
+                if (currentMsg.gain) {
+                    let start = mimoEarnings;
+                    const end = start + currentMsg.gain;
+                    const duration = 500;
+                    const startTime = performance.now();
+                    const animate = (now: number) => {
+                        const progress = Math.min((now - startTime) / duration, 1);
+                        setMimoEarnings(start + progress * (end - start));
+                        if (progress < 1) requestAnimationFrame(animate);
+                    };
+                    requestAnimationFrame(animate);
+                }
+
+                setMimoChatStep(prev => prev + 1);
+            }, currentMsg.delay);
+
+            return () => clearTimeout(timer);
+        }
+    }, [activeStep, mimoChatStep]);
+
+    // Reinicia a simulação de mídia
+    function resetMediaSimulation() {
+        setMediaUnlocked(false);
+        setMediaEarnings(0.00);
+        setMediaChatMessages([]);
+        setMediaChatStep(0);
+        setMediaChatTyping(false);
+    }
+
+    // Lógica ao simular a compra da mídia pelo fã
+    function handleSimulateUnlock() {
+        if (mediaUnlocked || mediaLoading) return;
+        setMediaLoading(true);
+        
         setTimeout(() => {
-            setIsTyping(false);
-            setIsMediaLocked(false);
-            // Mensagem de comemoração após desbloqueio
-            setVisibleMessages(prev => [
-                ...prev,
-                { id: 5, sender: 'fan', text: 'Uau! Os bastidores ficaram incríveis! Valeu muito a pena, obrigada! 😍🔥', delay: 500 }
-            ]);
-        }, 1000);
+            setMediaLoading(false);
+            setMediaUnlocked(true);
+            
+            // Animando o saldo ganho
+            let start = 0;
+            const end = mediaPrice;
+            const duration = 600;
+            const startTime = performance.now();
+            const animate = (now: number) => {
+                const progress = Math.min((now - startTime) / duration, 1);
+                setMediaEarnings(progress * end);
+                if (progress < 1) requestAnimationFrame(animate);
+            };
+            requestAnimationFrame(animate);
+
+            // Adiciona mensagem final do fã logo após desbloquear
+            setTimeout(() => {
+                setMediaChatTyping(true);
+                setTimeout(() => {
+                    setMediaChatTyping(false);
+                    setMediaChatMessages(prev => [
+                        ...prev, 
+                        {
+                            sender: 'fan',
+                            text: 'Nossa, ficou perfeito!! Valeu cada centavo, você é linda 😍🔥',
+                            time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                        }
+                    ]);
+                }, 1000);
+            }, 800);
+
+        }, 1200);
     }
 
-    function resetDemoChat() {
-        setVisibleMessages([]);
-        setIsMediaLocked(true);
-        setIsTyping(true);
-        let index = 0;
-        const showNextMessage = () => {
-            if (index < chatDemoMessages.length) {
-                setIsTyping(true);
-                const nextMsg = chatDemoMessages[index];
-                setTimeout(() => {
-                    setIsTyping(false);
-                    setVisibleMessages(prev => [...prev, nextMsg]);
-                    index++;
-                    if (index < chatDemoMessages.length) {
-                        setTimeout(showNextMessage, chatDemoMessages[index].delay);
-                    }
-                }, 1200);
+    function changeStep(nextVal: number) {
+        if (nextVal === activeStep) return;
+        setIsExiting(true);
+        // Aguarda a transição de saída durar 800ms antes de trocar o conteúdo (500ms de saída + 300ms de pausa)
+        setTimeout(() => {
+            setActiveStep(nextVal);
+            setStep(nextVal);
+            setIsExiting(false);
+        }, 800);
+    }
+
+    function nextStep() {
+        if (activeStep < 4) {
+            setDirection('forward');
+            changeStep(activeStep + 1);
+        }
+    }
+
+    function prevStep() {
+        if (activeStep > 0) {
+            setDirection('backward');
+            changeStep(activeStep - 1);
+        }
+    }
+
+    // Atalhos do teclado para avançar/voltar no desktop
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const activeEl = document.activeElement;
+            if (activeEl) {
+                const tagName = activeEl.tagName;
+                const isEditable = activeEl.getAttribute('contenteditable') === 'true';
+                if (
+                    tagName === 'INPUT' || 
+                    tagName === 'TEXTAREA' || 
+                    tagName === 'SELECT' || 
+                    isEditable
+                ) {
+                    return;
+                }
+            }
+
+            if (e.key === 'ArrowRight') {
+                nextStep();
+            } else if (e.key === 'ArrowLeft') {
+                prevStep();
             }
         };
-        showNextMessage();
-    }
 
-    function scrollToForm() {
-        document.getElementById('inscricao-fundadora')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [activeStep]);
 
     function updateField<K extends keyof FormState>(field: K, value: FormState[K]) {
         setForm(current => ({ ...current, [field]: value }));
@@ -140,13 +367,30 @@ export default function ParaCriadorasPage() {
         setError('');
 
         const age = Number(form.age);
-        if (!Number.isInteger(age) || age < 18) {
+        if (!Number.isInteger(age) || age < 18 || age > 100) {
             setError('Você precisa ter 18 anos ou mais para se inscrever.');
             return;
         }
 
-        if (!form.isAdultConfirmed || !form.contactConsent) {
-            setError('Confirme sua idade e autorize o contato da equipe para continuar.');
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(form.email)) {
+            setError('Por favor, insira um e-mail válido.');
+            return;
+        }
+
+        const whatsappDigits = form.whatsapp.replace(/\D/g, '');
+        if (whatsappDigits.length < 10) {
+            setError('Por favor, insira um número de WhatsApp válido com DDD.');
+            return;
+        }
+
+        if (!form.isAdultConfirmed) {
+            setError('Você precisa declarar ter 18 anos ou mais para continuar.');
+            return;
+        }
+
+        if (!form.contactConsent) {
+            setError('Você precisa autorizar o contato do Mimo para continuar.');
             return;
         }
 
@@ -176,626 +420,565 @@ export default function ParaCriadorasPage() {
         }
     }
 
-    return (
-        <div className="min-h-screen bg-[#fafafc] text-gray-700 font-sans selection:bg-purple-100 selection:text-purple-900 relative overflow-hidden">
-            
-            {/* Elementos de Fundo (Glows de Gradiente Premium) */}
-            <div className="absolute top-[-10%] left-[-15%] w-[60%] h-[50%] rounded-full bg-purple-200/40 blur-[130px] pointer-events-none"></div>
-            <div className="absolute top-[30%] right-[-10%] w-[50%] h-[40%] rounded-full bg-fuchsia-200/30 blur-[130px] pointer-events-none"></div>
-            <div className="absolute bottom-[20%] left-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-100/50 blur-[120px] pointer-events-none"></div>
+    // Renderização do Display Interno do Celular (Compartilhado entre Mobile e Desktop)
+    function renderPhoneDisplay(isMobile = false) {
+        return (
+            <div className={`flex flex-col h-full w-full bg-white transition-opacity duration-300 ${isExiting ? 'opacity-0' : 'opacity-100'}`}>
+                {(() => {
+                    switch (activeStep) {
+                        case 0:
+                            return (
+                                <>
+                                    {/* Status Bar */}
+                                    <div className={`${isMobile ? 'py-0.5 px-3 text-[5px]' : 'py-1.5 px-4 text-[9px]'} bg-purple-600 font-bold text-white/95 flex justify-between items-center select-none leading-none shrink-0`}>
+                                        <span>21:39</span>
+                                        <div className="flex items-center gap-0.5">
+                                            <span>4G</span>
+                                            <span className={`${isMobile ? 'w-2 h-1' : 'w-4 h-2'} bg-white/30 rounded-2xs inline-block relative overflow-hidden`}>
+                                                <span className="absolute left-0 top-0 bottom-0 w-2/3 bg-white"></span>
+                                            </span>
+                                        </div>
+                                    </div>
 
-            {/* Cabeçalho / Navegação */}
-            <header className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 relative z-30">
-                <nav className="flex items-center justify-between bg-white/70 backdrop-blur-md border border-gray-200/50 rounded-2xl px-6 py-4 shadow-xs">
-                    <div className="flex items-center gap-3">
-                        <Image
-                            src="/icon-192x192.png"
-                            alt="MimoChat"
-                            width={40}
-                            height={40}
-                            className="w-10 h-10 rounded-xl object-cover shadow-xs border border-gray-100"
-                        />
-                        <div>
-                            <span className="block text-lg font-bold text-gray-900 tracking-tight leading-none">Mimo Chat</span>
-                            <span className="block text-[9px] font-extrabold uppercase tracking-widest text-purple-600 mt-1">Para Criadoras</span>
-                        </div>
-                    </div>
-                    
-                    <div className="hidden md:flex items-center gap-6 text-sm font-semibold text-gray-600">
-                        <a href="#diferenciais" className="hover:text-purple-600 transition-colors">Diferenciais</a>
-                        <a href="#monetizacao" className="hover:text-purple-600 transition-colors">Como Funciona</a>
-                        <a href="#fundadoras" className="hover:text-purple-600 transition-colors">Programa de Fundadoras</a>
-                        <a href="#creators" className="hover:text-purple-600 transition-colors">Apoio Creators</a>
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                        <Link
-                            href="/login"
-                            className="px-4 py-2.5 text-sm font-bold text-gray-600 hover:text-gray-900 transition-colors"
-                        >
-                            Entrar no App
-                        </Link>
-                        <button
-                            onClick={scrollToForm}
-                            className="inline-flex items-center justify-center px-5 py-2.5 text-sm font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md hover:scale-[1.01]"
-                        >
-                            Seja Fundadora
-                        </button>
-                    </div>
-                </nav>
-            </header>
+                                    {/* Header Roxo */}
+                                    <div className={`${isMobile ? 'px-2 py-1' : 'px-3 py-2'} bg-purple-600 flex items-center justify-between border-b border-purple-500/20 select-none shadow-sm shrink-0 leading-none`}>
+                                        <div className="flex items-center gap-1.5">
+                                            <div className={`${isMobile ? 'w-4 h-4' : 'w-6 h-6'} rounded-md bg-purple-900/40 flex items-center justify-center text-white/95`}>
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`${isMobile ? 'w-2 h-2' : 'w-3.5 h-3.5'}`}><polyline points="20 12 20 22 4 22 4 12"></polyline><rect x="2" y="7" width="20" height="5" rx="1"></rect><line x1="12" y1="22" x2="12" y2="7"></line><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg>
+                                            </div>
+                                            <div className="flex items-center gap-1 leading-none">
+                                                <span className={`${isMobile ? 'text-[9px]' : 'text-[13px]'} text-white font-black tracking-tight`}>Mimo</span>
+                                                <span className={`${isMobile ? 'text-[4px] px-0.5' : 'text-[6px] px-1 py-0.5'} font-black tracking-wider text-purple-200 border border-purple-400 bg-purple-950/20 rounded-sm uppercase`}>Conversas</span>
+                                            </div>
+                                        </div>
+                                    </div>
 
-            {/* HERO SECTION */}
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-20 relative z-20">
-                <section className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
-                    {/* Copywriting */}
-                    <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
-                        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-50 border border-purple-100 text-purple-700 text-xs font-semibold uppercase tracking-wider">
-                            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-                            A Nova Era da Monetização
-                        </div>
-                        
-                        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-gray-950 tracking-tight leading-[1.05]">
-                            O aplicativo de mensagens <br />
-                            <span className="bg-gradient-to-r from-purple-600 via-fuchsia-600 to-violet-600 bg-clip-text text-transparent">
-                                feito para monetizar suas conversas.
-                            </span>
-                        </h1>
-                        
-                        <p className="text-base sm:text-lg text-gray-500 max-w-2xl mx-auto lg:mx-0 leading-relaxed font-normal">
-                            Esqueça os feeds estáticos e as curtidas vazias de plataformas como OnlyFans e Privacy. 
-                            O Mimo Chat é um aplicativo de conversas privado onde cada mensagem, foto e vídeo exclusivo 
-                            gera receita direta no seu tempo, com a leveza de um chat de celular.
-                        </p>
+                                    {/* Lista de Chats */}
+                                    <div className="flex-1 overflow-y-auto bg-white scrollbar-none divide-y divide-slate-50 flex flex-col justify-start">
 
-                        <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-2">
-                            <button
-                                onClick={scrollToForm}
-                                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 text-base font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-2xl transition-all duration-300 shadow-md shadow-purple-200 hover:-translate-y-0.5 group"
-                            >
-                                Quero Participar da Fase Inicial
-                                <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-                            </button>
-                            <Link
-                                href="/creators"
-                                className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 text-base font-bold text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50 border border-gray-200 rounded-2xl transition-all duration-300 shadow-xs"
-                            >
-                                Conhecer a Área Creators
-                            </Link>
-                        </div>
+                                        {/* Carlos Mendes */}
+                                        <div className={`${isMobile ? 'px-2 py-1.5 gap-1.5' : 'px-3.5 py-2 gap-2.5'} flex items-center select-none`}>
+                                            <div className={`${isMobile ? 'w-6 h-6' : 'w-7.5 h-7.5'} rounded-full overflow-hidden shrink-0`}>
+                                                <img src="/assets/carlos.png" className="w-full h-full object-cover" alt="Carlos Mendes" />
+                                            </div>
+                                            <div className={`flex-1 min-w-0 flex flex-col ${isMobile ? 'gap-0.5' : 'gap-1'}`}>
+                                                <div className="flex justify-between items-center">
+                                                    <h4 className={`${isMobile ? 'text-[8px]' : 'text-[10.5px]'} font-black text-slate-800 truncate leading-none`}>Carlos Mendes</h4>
+                                                    <span className={`${isMobile ? 'text-[6px]' : 'text-[8px]'} text-slate-400 font-bold shrink-0 ml-1 leading-none`}>agora</span>
+                                                </div>
+                                                <p className={`${isMobile ? 'text-[7px]' : 'text-[8.5px]'} text-slate-400 font-medium truncate leading-none`}>Como foi o seu dia hoje? 😊</p>
+                                            </div>
+                                        </div>
 
-                        <div className="flex flex-wrap items-center justify-center lg:justify-start gap-x-6 gap-y-3 pt-6 border-t border-gray-150 text-xs font-semibold text-gray-400">
-                            <span className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-purple-600" /> Cadastro 100% Protegido</span>
-                            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-purple-600" /> Sem feeds obrigatórios</span>
-                            <span className="flex items-center gap-1.5"><Zap className="w-4 h-4 text-purple-600" /> Conversas que geram valor</span>
-                        </div>
-                    </div>
+                                        {/* Rafael Souza */}
+                                        <div className={`${isMobile ? 'px-2 py-1.5 gap-1.5' : 'px-3.5 py-2 gap-2.5'} flex items-center select-none`}>
+                                            <div className={`${isMobile ? 'w-6 h-6' : 'w-7.5 h-7.5'} rounded-full overflow-hidden shrink-0`}>
+                                                <img src="/assets/rafael.png" className="w-full h-full object-cover" alt="Rafael Souza" />
+                                            </div>
+                                            <div className={`flex-1 min-w-0 flex flex-col ${isMobile ? 'gap-0.5' : 'gap-1'}`}>
+                                                <div className="flex justify-between items-center">
+                                                    <h4 className={`${isMobile ? 'text-[8px]' : 'text-[10.5px]'} font-black text-slate-800 truncate leading-none`}>Rafael Souza</h4>
+                                                    <span className={`${isMobile ? 'text-[6px]' : 'text-[8px]'} text-slate-400 font-bold shrink-0 ml-1 leading-none`}>14:22</span>
+                                                </div>
+                                                <p className={`${isMobile ? 'text-[7px]' : 'text-[8.5px]'} text-slate-400 font-medium truncate leading-none`}>O que você tá fazendo agora?</p>
+                                            </div>
+                                        </div>
 
-                    {/* Mockup de Celular Interativo */}
-                    <div className="lg:col-span-5 relative flex justify-center">
-                        <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/20 to-fuchsia-500/20 rounded-[3rem] blur-xl opacity-80 pointer-events-none scale-90"></div>
-                        <div className="relative w-full max-w-[340px] border-[12px] border-slate-900 bg-slate-950 rounded-[3.2rem] shadow-2xl overflow-hidden aspect-[9/18.5] flex flex-col">
-                            {/* Câmera/Dynamic Island */}
-                            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-slate-900 rounded-b-2xl z-50 flex items-center justify-center">
-                                <div className="w-3 h-3 rounded-full bg-slate-800 mr-2"></div>
-                                <div className="w-10 h-1 bg-slate-800 rounded-full"></div>
-                            </div>
+                                        {/* Bruno Lima */}
+                                        <div className={`${isMobile ? 'px-2 py-1.5 gap-1.5' : 'px-3.5 py-2 gap-2.5'} flex items-center select-none`}>
+                                            <div className={`${isMobile ? 'w-6 h-6' : 'w-7.5 h-7.5'} rounded-full overflow-hidden shrink-0`}>
+                                                <img src="/assets/bruno.png" className="w-full h-full object-cover" alt="Bruno Lima" />
+                                            </div>
+                                            <div className={`flex-1 min-w-0 flex flex-col ${isMobile ? 'gap-0.5' : 'gap-1'}`}>
+                                                <div className="flex justify-between items-center">
+                                                    <h4 className={`${isMobile ? 'text-[8px]' : 'text-[10.5px]'} font-black text-slate-800 truncate leading-none`}>Bruno Lima</h4>
+                                                    <span className={`${isMobile ? 'text-[6px]' : 'text-[8px]'} text-slate-400 font-bold shrink-0 ml-1 leading-none`}>11:58</span>
+                                                </div>
+                                                <p className={`${isMobile ? 'text-[7px]' : 'text-[8.5px]'} text-slate-400 font-medium truncate leading-none`}>Você vai ter tempo pra conversar hoje?</p>
+                                            </div>
+                                        </div>
 
-                            {/* Header do Chat */}
-                            <div className="bg-slate-900 text-white pt-8 pb-3 px-4 flex items-center gap-2 border-b border-white/5">
-                                <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-xs font-extrabold shadow-sm relative">
-                                    M
-                                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-slate-900 rounded-full"></span>
-                                </div>
-                                <div className="flex-1">
-                                    <h4 className="text-xs font-bold leading-tight flex items-center gap-1">
-                                        Mimo Chat
-                                        <BadgeCheck className="w-3.5 h-3.5 text-purple-400 fill-current" />
-                                    </h4>
-                                    <span className="text-[9px] text-gray-400 font-medium">Fã Online</span>
-                                </div>
-                                <button 
-                                    onClick={resetDemoChat} 
-                                    className="text-[10px] font-bold text-purple-400 hover:text-purple-300 px-2 py-1 bg-white/5 rounded-lg transition-all"
-                                >
-                                    Reiniciar
-                                </button>
-                            </div>
+                                        {/* Diego Santos */}
+                                        <div className={`${isMobile ? 'px-2 py-1.5 gap-1.5' : 'px-3.5 py-2 gap-2.5'} flex items-center select-none`}>
+                                            <div className={`${isMobile ? 'w-6 h-6' : 'w-7.5 h-7.5'} rounded-full overflow-hidden shrink-0`}>
+                                                <img src="/assets/diego.png" className="w-full h-full object-cover" alt="Diego Santos" />
+                                            </div>
+                                            <div className={`flex-1 min-w-0 flex flex-col ${isMobile ? 'gap-0.5' : 'gap-1'}`}>
+                                                <div className="flex justify-between items-center">
+                                                    <h4 className={`${isMobile ? 'text-[8px]' : 'text-[10.5px]'} font-black text-slate-800 truncate leading-none`}>Diego Santos</h4>
+                                                    <span className={`${isMobile ? 'text-[6px]' : 'text-[8px]'} text-slate-400 font-bold shrink-0 ml-1 leading-none`}>09/06</span>
+                                                </div>
+                                                <p className={`${isMobile ? 'text-[7px]' : 'text-[8.5px]'} text-slate-400 font-medium truncate leading-none`}>Oi! Tudo bem com você hoje?</p>
+                                            </div>
+                                        </div>
 
-                            {/* Corpo do Chat */}
-                            <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-[#0f0b15] flex flex-col justify-end text-xs scrollbar-none">
-                                {visibleMessages.map((msg) => (
-                                    <div 
-                                        key={msg.id} 
-                                        className={`flex flex-col max-w-[85%] ${msg.sender === 'fan' ? 'self-start' : 'self-end'}`}
-                                    >
-                                        {msg.sender === 'fan' && (
-                                            <span className="text-[9px] text-purple-300 font-medium mb-1 ml-1.5">Apoiador</span>
-                                        )}
-                                        {msg.sender === 'creator' && (
-                                            <span className="text-[9px] text-gray-400 font-medium mb-1 mr-1.5 self-end">Você (Criadora)</span>
-                                        )}
-                                        
-                                        {/* Balão de texto normal */}
-                                        {msg.text && (
-                                            <div className={`p-3 rounded-2xl leading-relaxed shadow-xs ${
-                                                msg.sender === 'fan' 
-                                                    ? 'bg-slate-900 text-white rounded-tl-xs' 
-                                                    : 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white rounded-tr-xs'
-                                            }`}>
-                                                {msg.text}
+                                        {/* Mateus Costa */}
+                                        <div className={`${isMobile ? 'px-2 py-1.5 gap-1.5' : 'px-3.5 py-2 gap-2.5'} flex items-center select-none`}>
+                                            <div className={`${isMobile ? 'w-6 h-6' : 'w-7.5 h-7.5'} rounded-full overflow-hidden shrink-0`}>
+                                                <img src="/assets/mateus.png" className="w-full h-full object-cover" alt="Mateus Costa" />
+                                            </div>
+                                            <div className={`flex-1 min-w-0 flex flex-col ${isMobile ? 'gap-0.5' : 'gap-1'}`}>
+                                                <div className="flex justify-between items-center">
+                                                    <h4 className={`${isMobile ? 'text-[8px]' : 'text-[10.5px]'} font-black text-slate-800 truncate leading-none`}>Mateus Costa</h4>
+                                                    <span className={`${isMobile ? 'text-[6px]' : 'text-[8px]'} text-slate-400 font-bold shrink-0 ml-1 leading-none`}>08/06</span>
+                                                </div>
+                                                <p className={`${isMobile ? 'text-[7px]' : 'text-[8.5px]'} text-slate-400 font-medium truncate leading-none`}>Me conta, como foi o fim de semana?</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Barra de Navegação Inferior */}
+                                    <div className={`${isMobile ? 'px-3 py-0.5' : 'px-3 py-2'} bg-slate-50 flex justify-around items-center select-none shrink-0`}>
+                                        <div className={`flex flex-col items-center text-purple-600 ${isMobile ? 'gap-px' : 'gap-0.5'}`}>
+                                            <MessageCircle className={`${isMobile ? 'w-3 h-3' : 'w-4.5 h-4.5'}`} />
+                                            <span className={`${isMobile ? 'text-[5px]' : 'text-[7px]'} font-black leading-none`}>Conversas</span>
+                                        </div>
+                                        <div className={`flex flex-col items-center text-slate-400 ${isMobile ? 'gap-px' : 'gap-0.5'}`}>
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`${isMobile ? 'w-3 h-3' : 'w-4.5 h-4.5'}`}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                            <span className={`${isMobile ? 'text-[5px]' : 'text-[7px]'} font-bold leading-none`}>Buscar</span>
+                                        </div>
+                                        <div className={`flex flex-col items-center text-slate-400 ${isMobile ? 'gap-px' : 'gap-0.5'}`}>
+                                            <User className={`${isMobile ? 'w-3 h-3' : 'w-4.5 h-4.5'}`} />
+                                            <span className={`${isMobile ? 'text-[5px]' : 'text-[7px]'} font-bold leading-none`}>Perfil</span>
+                                        </div>
+                                    </div>
+                                </>
+                            );
+                        case 1:
+                            return (
+                                <>
+                                    {/* Header do Chat */}
+                                    <div className={`${isMobile ? 'py-2 px-2.5' : 'py-2 px-3'} bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0 select-none`}>
+                                        <div className={`flex items-center ${isMobile ? 'gap-1.5' : 'gap-2'}`}>
+                                            <div className={`${isMobile ? 'w-7 h-7' : 'w-6.5 h-6.5'} rounded-full overflow-hidden shrink-0`}>
+                                                <img src="/assets/carlos.png" className="w-full h-full object-cover" alt="Carlos Mendes" />
+                                            </div>
+                                            <div className="leading-none">
+                                                <h4 className={`${isMobile ? 'text-[11px]' : 'text-[9.5px]'} font-extrabold text-slate-800`}>Carlos Mendes</h4>
+                                                <span className={`${isMobile ? 'text-[7.5px]' : 'text-[6.5px]'} text-emerald-600 font-extrabold`}>Conversa ativa</span>
+                                            </div>
+                                        </div>
+                                        <div className="text-right leading-none">
+                                            <span className={`${isMobile ? 'text-[7.5px]' : 'text-[6.5px]'} text-slate-400 block font-bold`}>Saldo</span>
+                                            <span className={`${isMobile ? 'text-[11px]' : 'text-[9.5px]'} font-black text-emerald-600`}>R$ {simulatedEarnings.toFixed(2)}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Corpo do Chat */}
+                                    <div className={`${isMobile ? 'p-2 space-y-2 text-[10px]' : 'p-2.5 space-y-2.5 text-[10.5px]'} flex-1 overflow-y-auto flex flex-col justify-end scrollbar-none bg-slate-50/50`}>
+                                        {chatMessages.map((msg, i) => (
+                                            <div key={i} className={`flex flex-col max-w-[85%] ${msg.sender === 'fan' ? 'self-start' : 'self-end'}`}>
+                                                <div className={`rounded-xl leading-normal ${isMobile ? 'p-2 px-2.5 shadow-sm' : 'p-2.5 px-3 shadow-3xs'} ${
+                                                    msg.sender === 'fan' 
+                                                        ? 'bg-white border border-slate-100 text-slate-800 rounded-tl-xs shadow-3xs' 
+                                                        : 'bg-purple-600 text-white rounded-tr-xs shadow-3xs'
+                                                }`}>
+                                                    {msg.text}
+                                                </div>
+                                                {msg.gain && (
+                                                    <span className={`${isMobile ? 'text-[8px] mt-1 px-2 py-0.5' : 'text-[8.5px] mt-1 px-2 py-0.5'} font-bold text-emerald-600 ${msg.sender === 'fan' ? 'self-start' : 'self-end'} bg-emerald-50 rounded-full border border-emerald-100`}>
+                                                        + R$ {msg.gain.toFixed(2)}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        ))}
+                                        {chatTyping && (
+                                            <div className="self-start flex items-center gap-1 bg-white border border-slate-100 py-1.5 px-2.5 rounded-full text-slate-400">
+                                                <span className="w-1 h-1 bg-slate-400 rounded-full animate-bounce"></span>
+                                                <span className="w-1 h-1 bg-slate-400 rounded-full animate-bounce [animation-delay:0.15s]"></span>
+                                                <span className="w-1 h-1 bg-slate-400 rounded-full animate-bounce [animation-delay:0.3s]"></span>
                                             </div>
                                         )}
+                                    </div>
 
-                                        {/* Balão de mídia paga */}
-                                        {msg.mediaType === 'video' && (
-                                            <div className="rounded-2xl overflow-hidden bg-slate-900 border border-purple-500/30 text-white rounded-tr-xs">
-                                                {isMediaLocked ? (
-                                                    <div className="p-4 flex flex-col items-center text-center space-y-3 relative">
-                                                        {/* Imagem de Fundo Borrada Fictícia */}
-                                                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-900/60 via-slate-900 to-slate-950 opacity-40 blur-xs"></div>
-                                                        
-                                                        <div className="w-10 h-10 rounded-full bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 z-10">
-                                                            <Lock className="w-4 h-4" />
-                                                        </div>
-                                                        <div className="z-10">
-                                                            <p className="text-[10px] text-gray-400 font-semibold">{msg.title}</p>
-                                                            <p className="text-xs font-bold mt-0.5 text-purple-200">Conteúdo Privado</p>
-                                                        </div>
-                                                        <button 
-                                                            onClick={handleUnlockMedia}
-                                                            className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-[10px] transition-all duration-300 shadow-md shadow-purple-900/50 hover:scale-[1.02] active:scale-95 z-10 cursor-pointer"
-                                                        >
-                                                            Desbloquear por {msg.price}
-                                                        </button>
+                                    {/* Input */}
+                                    <div className={`bg-white border-t border-slate-100 flex items-center shrink-0 select-none ${isMobile ? 'p-2 gap-1' : 'p-2.5 gap-1.5'}`}>
+                                        <div className={`${isMobile ? 'text-[9px] py-1.5' : 'text-[10px] py-1.5 px-3'} flex-1 bg-slate-55 rounded-full px-2.5 text-slate-400`}>
+                                            Escreva uma resposta...
+                                        </div>
+                                        <div className={`${isMobile ? 'w-5.5 h-5.5' : 'w-6.5 h-6.5'} rounded-full bg-purple-600 flex items-center justify-center text-white`}>
+                                            <Send className={`${isMobile ? 'w-3 h-3' : 'w-3 h-3'}`} />
+                                        </div>
+                                    </div>
+                                </>
+                            );
+                        case 2:
+                            return (
+                                <>
+                                    {/* Header do Chat */}
+                                    <div className={`${isMobile ? 'py-2 px-2.5' : 'py-2 px-3'} bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0 select-none`}>
+                                        <div className={`flex items-center ${isMobile ? 'gap-1.5' : 'gap-2'}`}>
+                                            <div className={`${isMobile ? 'w-7 h-7' : 'w-6.5 h-6.5'} rounded-full overflow-hidden shrink-0`}>
+                                                <img src="/assets/carlos.png" className="w-full h-full object-cover" alt="Carlos Mendes" />
+                                            </div>
+                                            <div className="leading-none">
+                                                <h4 className={`${isMobile ? 'text-[11px]' : 'text-[9.5px]'} font-extrabold text-slate-800`}>Carlos Mendes</h4>
+                                                <span className={`${isMobile ? 'text-[7.5px]' : 'text-[6.5px]'} text-slate-400`}>Mensagens & Mídias</span>
+                                            </div>
+                                        </div>
+                                        <div className="text-right leading-none">
+                                            <span className={`${isMobile ? 'text-[7.5px]' : 'text-[6.5px]'} text-slate-400 block font-bold`}>Saldo</span>
+                                            <span className={`${isMobile ? 'text-[11px]' : 'text-[9.5px]'} font-black text-emerald-600`}>R$ {mediaEarnings.toFixed(2)}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Corpo do Chat */}
+                                    <div className={`${isMobile ? 'p-2 space-y-2.5 text-[10px]' : 'p-2.5 space-y-2.5 text-[10.5px]'} flex-1 overflow-y-auto flex flex-col justify-end scrollbar-none bg-slate-50/50`}>
+                                        {mediaChatMessages.map((msg, i) => (
+                                            <div key={i} className={`flex flex-col max-w-[85%] ${msg.sender === 'fan' ? 'self-start' : 'self-end'}`}>
+                                                {msg.text && (
+                                                    <div className={`rounded-xl leading-normal ${isMobile ? 'p-2 px-2.5 shadow-sm' : 'p-2.5 px-3 shadow-3xs'} ${
+                                                        msg.sender === 'fan' 
+                                                            ? 'bg-white border border-slate-100 text-slate-800 rounded-tl-xs shadow-3xs' 
+                                                            : 'bg-purple-600 text-white rounded-tr-xs shadow-3xs'
+                                                    }`}>
+                                                        {msg.text}
                                                     </div>
-                                                ) : (
-                                                    <div>
-                                                        <div className="h-28 bg-purple-900/20 flex flex-col items-center justify-center p-3 text-center relative">
-                                                            <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-1.5 animate-bounce">
-                                                                <Check className="w-4 h-4" />
+                                                )}
+                                                {msg.isMedia && (
+                                                    <div className={`relative aspect-video rounded-2xl overflow-hidden shadow-xs border border-slate-200/30 self-end shrink-0 ${
+                                                        isMobile ? 'w-[150px]' : 'w-[175px]'
+                                                    }`}>
+                                                        <img 
+                                                            src="/assets/laura.png" 
+                                                            alt="Mídia Privada" 
+                                                            className="absolute inset-0 w-full h-full object-cover transition-all duration-[1000ms] ease-out z-0"
+                                                            style={{ filter: mediaUnlocked ? 'blur(0px)' : 'blur(16px)' }}
+                                                        />
+                                                        {!mediaUnlocked && (
+                                                            <div className="absolute inset-0 bg-black/25 flex flex-col items-center justify-center p-1.5 text-center z-10">
+                                                                <button 
+                                                                    onClick={handleSimulateUnlock}
+                                                                    disabled={mediaLoading}
+                                                                    className={`bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-black rounded-lg shadow-md transition active:scale-[0.96] flex items-center gap-1 cursor-pointer select-none ${
+                                                                        isMobile ? 'px-2 py-1 text-[7.5px]' : 'px-3 py-1.5 text-[8.5px]'
+                                                                    }`}
+                                                                >
+                                                                    {mediaLoading ? (
+                                                                        <>
+                                                                            <span className="w-2.5 h-2.5 border border-white border-t-transparent rounded-full animate-spin shrink-0"></span>
+                                                                            <span>Processando...</span>
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <Lock className="w-2.5 h-2.5 shrink-0" />
+                                                                            <span>Desbloquear R$ {mediaPrice.toFixed(2)}</span>
+                                                                        </>
+                                                                    )}
+                                                                </button>
                                                             </div>
-                                                            <span className="text-[9px] text-emerald-400 font-extrabold uppercase tracking-wider">🔓 Mídia Desbloqueada!</span>
-                                                            <span className="text-[8px] text-gray-400 mt-0.5">O valor de {msg.price} foi creditado no seu saldo.</span>
+                                                        )}
+                                                        {mediaUnlocked && (
+                                                            <div className={`absolute z-10 bg-emerald-500/90 text-white font-black tracking-wide rounded-full shadow-md flex items-center gap-0.5 border border-white/20 select-none ${
+                                                                isMobile ? 'top-1.5 left-1.5 px-2 py-0.5 text-[6.5px]' : 'top-2 left-2 px-2.5 py-0.5 text-[8px]'
+                                                            }`}>
+                                                                <LockKeyholeOpen className="w-2 h-2 shrink-0" />
+                                                                <span>Liberado</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                        {mediaChatTyping && (
+                                            <div className="self-start flex items-center gap-1 bg-white border border-slate-100 py-1.5 px-2.5 rounded-full text-slate-400">
+                                                <span className="w-1 h-1 bg-slate-400 rounded-full animate-bounce"></span>
+                                                <span className="w-1 h-1 bg-slate-400 rounded-full animate-bounce [animation-delay:0.15s]"></span>
+                                                <span className="w-1 h-1 bg-slate-400 rounded-full animate-bounce [animation-delay:0.3s]"></span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                </>
+                            );
+                        case 3:
+                            return (
+                                <>
+                                    {/* Header do Chat */}
+                                    <div className={`${isMobile ? 'py-2 px-2.5' : 'py-2 px-3'} bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0 select-none`}>
+                                        <div className={`flex items-center ${isMobile ? 'gap-1.5' : 'gap-2'}`}>
+                                            <div className={`${isMobile ? 'w-7 h-7' : 'w-6.5 h-6.5'} rounded-full overflow-hidden shrink-0`}>
+                                                <img src="/assets/carlos.png" className="w-full h-full object-cover" alt="Carlos Mendes" />
+                                            </div>
+                                            <div className="leading-none">
+                                                <h4 className={`${isMobile ? 'text-[11px]' : 'text-[9.5px]'} font-extrabold text-slate-800`}>Carlos Mendes</h4>
+                                                <span className={`${isMobile ? 'text-[7.5px]' : 'text-[6.5px]'} text-slate-400`}>Mensagens & Mimos</span>
+                                            </div>
+                                        </div>
+                                        <div className="text-right leading-none">
+                                            <span className={`${isMobile ? 'text-[7.5px]' : 'text-[6.5px]'} text-slate-400 block font-bold`}>Saldo</span>
+                                            <span className={`${isMobile ? 'text-[11px]' : 'text-[9.5px]'} font-black text-emerald-600`}>R$ {mimoEarnings.toFixed(2)}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Corpo do Chat com Mimos */}
+                                    <div className={`${isMobile ? 'p-2 space-y-2.5 text-[10px]' : 'p-2.5 space-y-2.5 text-[10.5px]'} flex-1 overflow-y-auto flex flex-col justify-end scrollbar-none bg-slate-50/50`}>
+                                        {mimoChatMessages.map((msg, i) => (
+                                            <div key={i} className={`flex flex-col ${msg.sender === 'system' ? 'items-center' : msg.sender === 'fan' ? 'max-w-[85%] self-start' : 'max-w-[85%] self-end'}`}>
+                                                {msg.text && (
+                                                    <div className={`rounded-xl leading-normal ${isMobile ? 'p-2 px-2.5 shadow-sm' : 'p-2.5 px-3 shadow-3xs'} ${
+                                                        msg.sender === 'fan' 
+                                                            ? 'bg-white border border-slate-100 text-slate-800 rounded-tl-xs shadow-3xs' 
+                                                            : 'bg-purple-600 text-white rounded-tr-xs shadow-3xs'
+                                                    }`}>
+                                                        {msg.text}
+                                                    </div>
+                                                )}
+                                                {msg.isMimoBanner && (
+                                                    <div className={`my-1 border border-slate-100 rounded-2xl shadow-xs flex items-center animate-scale-up border-l-purple-500 border-l-4 bg-white ${
+                                                        isMobile ? 'py-2 px-2.5 max-w-[180px] gap-2' : 'py-2.5 px-3 max-w-[200px] gap-2.5'
+                                                    }`}>
+                                                        <div className={`relative shrink-0 overflow-hidden rounded-lg ${isMobile ? 'w-7 h-7' : 'w-8 h-8'}`}>
+                                                            <img 
+                                                                src="/assets/gift.png" 
+                                                                alt="Mimo Recebido"
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        </div>
+                                                        <div className="leading-tight">
+                                                            <span className={`${isMobile ? 'text-[7.5px]' : 'text-[8.5px]'} font-extrabold text-purple-600 block uppercase`}>Mimo Recebido</span>
+                                                            <span className={`${isMobile ? 'text-[9.5px]' : 'text-[11px]'} font-black text-slate-850 block`}>R$ {msg.gain?.toFixed(2)}</span>
                                                         </div>
                                                     </div>
                                                 )}
                                             </div>
+                                        ))}
+                                        {mimoChatTyping && (
+                                            <div className="self-start flex items-center gap-1 bg-white border border-slate-100 py-1.5 px-2.5 rounded-full text-slate-400">
+                                                <span className="w-1 h-1 bg-slate-400 rounded-full animate-bounce"></span>
+                                                <span className="w-1 h-1 bg-slate-400 rounded-full animate-bounce [animation-delay:0.15s]"></span>
+                                                <span className="w-1 h-1 bg-slate-400 rounded-full animate-bounce [animation-delay:0.3s]"></span>
+                                            </div>
                                         )}
                                     </div>
+
+                                    {/* Input */}
+                                    <div className={`bg-white border-t border-slate-100 flex gap-1 items-center shrink-0 select-none ${isMobile ? 'p-2' : 'p-3'}`}>
+                                        <div className={`${isMobile ? 'text-[9px] py-1.5' : 'text-[10px] py-1.5'} flex-1 bg-slate-55 rounded-full px-2.5 text-slate-400`}>
+                                            Enviar Mimo...
+                                        </div>
+                                    </div>
+                                </>
+                            );
+                    }
+                })()}
+            </div>
+        );
+    }
+
+    // Renderização dos textos (títulos e descrições) de cada passo
+    function renderStepTexts() {
+        switch (activeStep) {
+            case 0:
+                return (
+                    <div className="space-y-4">
+                        <h1 className={`text-3xl sm:text-4xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.05] ${isExiting ? 'animate-slide-out-title' : 'animate-title-elastic'}`}>
+                            O único aplicativo de chat onde você <span className="bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 bg-clip-text text-transparent">ganha por conversar</span>.
+                        </h1>
+                        <p className={`text-sm sm:text-sm lg:text-base text-slate-500 max-w-xl mx-auto lg:mx-0 leading-relaxed ${isExiting ? 'animate-slide-out-subtitle' : 'animate-subtitle-elastic'}`}>
+                            O Mimo é um chat privado onde seu tempo e atenção se transformam em lucros reais.
+                        </p>
+                    </div>
+                );
+            case 1:
+                return (
+                    <div className="space-y-3 lg:space-y-4">
+                        <h2 className={`text-3xl sm:text-4xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.05] ${isExiting ? 'animate-slide-out-title' : 'animate-title-elastic'}`}>
+                            O seu tempo vale <span className="bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 bg-clip-text text-transparent">dinheiro de verdade</span>.
+                        </h2>
+                        <p className={`text-sm sm:text-sm lg:text-base text-slate-500 max-w-xl mx-auto lg:mx-0 leading-relaxed ${isExiting ? 'animate-slide-out-subtitle' : 'animate-subtitle-elastic'}`}>
+                            Defina o preço das suas mensagens e receba proporcionalmente por caractere em cada resposta dada.
+                        </p>
+                    </div>
+                );
+            case 2:
+                return (
+                    <div className="space-y-3 lg:space-y-4">
+                        <h2 className={`text-3xl sm:text-4xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.05] ${isExiting ? 'animate-slide-out-title' : 'animate-title-elastic'}`}>
+                            Cobre pelas suas <span className="bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 bg-clip-text text-transparent">fotos e vídeos</span>.
+                        </h2>
+                        <p className={`text-sm sm:text-sm lg:text-base text-slate-500 max-w-xl mx-auto lg:mx-0 leading-relaxed ${isExiting ? 'animate-slide-out-subtitle' : 'animate-subtitle-elastic'}`}>
+                            Envie mídias privadas e borradas no chat. O fã faz um Pix para desbloquear na hora e assistir.
+                        </p>
+                        <div className={`p-2 bg-slate-50 border border-slate-100 rounded-xl max-w-xs mx-auto lg:mx-0 flex justify-between items-center gap-2 shadow-2xs ${isExiting ? 'animate-slide-out-subtitle' : 'animate-subtitle-elastic'}`}>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase">Preço Simulado:</span>
+                            <div className="flex gap-1">
+                                {[10, 29.90, 49.90].map((val) => (
+                                    <button
+                                        key={val}
+                                        onClick={() => {
+                                            setMediaPrice(val);
+                                            resetMediaSimulation();
+                                        }}
+                                        className={`px-3 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
+                                            mediaPrice === val 
+                                                ? 'bg-purple-600 text-white shadow-xs' 
+                                                : 'bg-white border border-slate-100 text-slate-500'
+                                        }`}
+                                    >
+                                        R$ {val.toFixed(0)}
+                                    </button>
                                 ))}
-
-                                {/* Indicador de Digitação */}
-                                {isTyping && (
-                                    <div className="self-start flex items-center gap-1.5 bg-slate-900 py-2.5 px-4 rounded-full text-gray-400 shadow-xs border border-white/5">
-                                        <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce"></span>
-                                        <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce [animation-delay:0.2s]"></span>
-                                        <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce [animation-delay:0.4s]"></span>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Campo de Entrada de Mensagens */}
-                            <div className="bg-slate-900 p-3 flex items-center gap-2 border-t border-white/5">
-                                <div className="flex-1 bg-slate-950 border border-white/5 rounded-full px-3 py-2 text-[10px] text-gray-500 font-medium">
-                                    Digite uma mensagem...
-                                </div>
-                                <div className="w-7 h-7 rounded-full bg-purple-600 flex items-center justify-center text-white">
-                                    <Send className="w-3.5 h-3.5" />
-                                </div>
                             </div>
                         </div>
                     </div>
-                </section>
-
-                {/* POR QUE O MIMO É DIFERENTE? */}
-                <section id="diferenciais" className="pt-32">
-                    <div className="text-center max-w-3xl mx-auto space-y-4">
-                        <span className="text-xs font-extrabold uppercase tracking-widest text-purple-600 bg-purple-50 px-3 py-1.5 rounded-full border border-purple-100">
-                            Foco total na Experiência
-                        </span>
-                        <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-950 tracking-tight">
-                            Por que o Mimo Chat é totalmente diferente?
+                );
+            case 3:
+                return (
+                    <div className="space-y-3 lg:space-y-4">
+                        <h2 className={`text-3xl sm:text-4xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.05] ${isExiting ? 'animate-slide-out-title' : 'animate-title-elastic'}`}>
+                            Receba <span className="bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 bg-clip-text text-transparent">mimos espontâneos</span> de apoiadores.
                         </h2>
-                        <p className="text-gray-500 text-sm sm:text-base max-w-2xl mx-auto">
-                            Tradicionais feeds estáticos não funcionam para quem quer construir conexão humana de verdade. Veja como nos diferenciamos das velhas plataformas:
+                        <p className={`text-sm sm:text-sm lg:text-base text-slate-500 max-w-xl mx-auto lg:mx-0 leading-relaxed ${isExiting ? 'animate-slide-out-subtitle' : 'animate-subtitle-elastic'}`}>
+                            Seus fãs podem enviar presentes em dinheiro diretamente no chat, como forma de carinho, sem precisar de nada em troca.
                         </p>
                     </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-16 max-w-5xl mx-auto">
-                        {/* OnlyFans / Privacy */}
-                        <div className="bg-white border border-gray-150 rounded-3xl p-8 shadow-xs relative overflow-hidden group hover:border-gray-300 transition-all duration-300">
-                            <div className="absolute top-0 right-0 w-24 h-24 bg-gray-100 rounded-full blur-2xl opacity-40 pointer-events-none"></div>
-                            <div className="flex items-center gap-3 text-gray-400 mb-6">
-                                <Users className="w-6 h-6" />
-                                <span className="font-extrabold text-sm uppercase tracking-wider">OnlyFans & Privacy</span>
-                            </div>
-                            <h3 className="text-xl font-bold text-gray-900 mb-4">Plataformas Baseadas em Feeds</h3>
-                            
-                            <ul className="space-y-4 text-sm text-gray-500">
-                                <li className="flex items-start gap-2.5">
-                                    <span className="w-2 h-2 rounded-full bg-gray-300 shrink-0 mt-2"></span>
-                                    <span>**Foco em Feed e Postagem**: Exige volume de posts públicos para atrair novos fãs, transformando-se em mais uma rede social exaustiva.</span>
-                                </li>
-                                <li className="flex items-start gap-2.5">
-                                    <span className="w-2 h-2 rounded-full bg-gray-300 shrink-0 mt-2"></span>
-                                    <span>**Mensagens como Secundário**: Chats difíceis de usar, lentos e com baixa taxa de conversão e engajamento.</span>
-                                </li>
-                                <li className="flex items-start gap-2.5">
-                                    <span className="w-2 h-2 rounded-full bg-gray-300 shrink-0 mt-2"></span>
-                                    <span>**Falta de Notificações Eficientes**: O fã dificilmente sabe quando você respondeu, fazendo a conversa esfriar.</span>
-                                </li>
-                                <li className="flex items-start gap-2.5">
-                                    <span className="w-2 h-2 rounded-full bg-gray-300 shrink-0 mt-2"></span>
-                                    <span>**Ambiente Impessoal**: A sensação de estar em uma grande vitrine corporativa sem proximidade ou acolhimento.</span>
-                                </li>
-                            </ul>
-                        </div>
-
-                        {/* Mimo Chat */}
-                        <div className="bg-purple-950 border border-purple-800 rounded-3xl p-8 shadow-md relative overflow-hidden group hover:border-purple-600 transition-all duration-300">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-purple-700/20 rounded-full blur-3xl pointer-events-none"></div>
-                            <div className="flex items-center gap-3 text-purple-300 mb-6">
-                                <Flame className="w-6 h-6 text-purple-400 animate-pulse" />
-                                <span className="font-extrabold text-sm uppercase tracking-wider text-purple-300">Mimo Chat</span>
-                            </div>
-                            <h3 className="text-xl font-bold text-white mb-4">O App de Conversa Monetizada</h3>
-                            
-                            <ul className="space-y-4 text-sm text-purple-100/80">
-                                <li className="flex items-start gap-2.5">
-                                    <Check className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
-                                    <span>**Conversas como Elemento Central**: A experiência é um chat fluido, onde o fã entra diretamente para falar com você em particular.</span>
-                                </li>
-                                <li className="flex items-start gap-2.5">
-                                    <Check className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
-                                    <span>**Monetização Nativa e Transparente**: Opções de cobrar por caractere nas conversas, gerando saldo pelo tempo gasto respondendo.</span>
-                                </li>
-                                <li className="flex items-start gap-2.5">
-                                    <Check className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
-                                    <span>**Notificações Instantâneas**: Avisos nativos em tempo real que fazem o fã voltar ao chat na hora e desbloquear mídias.</span>
-                                </li>
-                                <li className="flex items-start gap-2.5">
-                                    <Check className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
-                                    <span>**Experiência de App de Verdade**: Visual moderno e intuitivo no navegador que parece o WhatsApp ou iMessage.</span>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-                </section>
-
-                {/* COMO FUNCIONA A MONETIZAÇÃO */}
-                <section id="monetizacao" className="pt-32">
-                    <div className="bg-white border border-gray-150 rounded-3xl p-8 sm:p-16 shadow-xs relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-purple-50/40 rounded-full blur-3xl pointer-events-none"></div>
-                        
-                        <div className="max-w-4xl mx-auto">
-                            <div className="text-center space-y-4">
-                                <span className="text-purple-600 font-extrabold text-sm uppercase tracking-wider">Monetização de Verdade</span>
-                                <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-950">Como você ganha no Mimo</h2>
-                                <p className="text-gray-500 text-sm sm:text-base max-w-xl mx-auto">
-                                    Três formas de monetização integradas no chat para você gerenciar seus lucros sem complicação.
+                );
+            case 4:
+                return (
+                    <div className="space-y-1.5">
+                        {!success && (
+                            <div className={`text-center lg:text-left space-y-1.5 ${isExiting ? 'animate-slide-out-title' : 'animate-title-elastic'}`}>
+                                <h2 className="text-3xl font-black text-slate-900 tracking-tight leading-none">
+                                    Faça parte do <span className="bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 bg-clip-text text-transparent">Mimo Chat</span>.
+                                </h2>
+                                <p className="text-xs text-slate-500 leading-relaxed max-w-lg">
+                                    Preencha seus dados com segurança. Seu perfil e privacidade são completamente protegidos.
                                 </p>
                             </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16">
-                                {/* Cobrança por caractere */}
-                                <div className="space-y-4">
-                                    <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-purple-50 text-purple-600 border border-purple-100">
-                                        <MessageCircle className="w-6 h-6" />
-                                    </div>
-                                    <h4 className="text-lg font-bold text-gray-950">Cobrança por Caractere</h4>
-                                    <p className="text-sm text-gray-500 leading-relaxed font-normal">
-                                        Seu tempo é valioso. Defina um valor por caractere para que os fãs paguem proporcionalmente pela atenção e respostas completas que você oferece no chat.
-                                    </p>
-                                </div>
-
-                                {/* Fotos e Vídeos Pagos */}
-                                <div className="space-y-4">
-                                    <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-purple-50 text-purple-600 border border-purple-100">
-                                        <LockKeyhole className="w-6 h-6" />
-                                    </div>
-                                    <h4 className="text-lg font-bold text-gray-950">Mídias "Pay-to-Unlock"</h4>
-                                    <p className="text-sm text-gray-500 leading-relaxed font-normal">
-                                        Envie fotos e vídeos borrados e bloqueados diretamente na conversa. O fã decide se quer pagar o valor que você escolheu para revelar a mídia instantaneamente.
-                                    </p>
-                                </div>
-
-                                {/* Mimos Voluntários */}
-                                <div className="space-y-4">
-                                    <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-purple-50 text-purple-600 border border-purple-100">
-                                        <DollarSign className="w-6 h-6" />
-                                    </div>
-                                    <h4 className="text-lg font-bold text-gray-950">Mimos Digitais</h4>
-                                    <p className="text-sm text-gray-500 leading-relaxed font-normal">
-                                        Seus apoiadores podem enviar presentes digitais ou "Mimos" voluntários a qualquer momento como doação por Pix ou cartão de crédito em forma de gratidão.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
+                        )}
                     </div>
-                </section>
+                );
+            default:
+                return null;
+        }
+    }
 
-                {/* QUEM ESTÁ POR TRÁS & VALORES (FOUNDERS) */}
-                <section className="pt-32">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-                        <div className="relative">
-                            <div className="absolute inset-0 bg-gradient-to-tr from-purple-600 to-indigo-600 rounded-3xl blur-md opacity-10 pointer-events-none"></div>
-                            <img
-                                src="/assets/founders_hero.png"
-                                alt="Edmilson e Laura - Fundadores"
-                                className="rounded-3xl shadow-lg border border-white/50 w-full max-h-[380px] object-cover"
-                            />
-                        </div>
-
-                        <div className="space-y-6">
-                            <span className="text-xs font-extrabold uppercase tracking-widest text-purple-600 bg-purple-50 px-3 py-1.5 rounded-full border border-purple-100">
-                                Founders
-                            </span>
-                            <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-950 tracking-tight">
-                                Criado por pessoas de verdade
-                            </h2>
-                            <p className="text-base text-gray-600 leading-relaxed font-normal">
-                                O Mimo é desenvolvido por **Edmilson** (desenvolvedor focado em tecnologia segura) e **Laura** (especialista em comunidade).
-                                Nós acreditamos que a tecnologia deve servir para trazer liberdade financeira, privacidade e respeito à sua rotina como criadora.
-                            </p>
-                            <p className="text-sm text-gray-500">
-                                Queremos nos afastar da impessoalidade das plataformas de fora e oferecer um ambiente de confiança, com suporte ativo e onde sua opinião é ouvida na construção das funcionalidades.
-                            </p>
-                            
-                            <div className="pt-2">
-                                <Link
-                                    href="/founders"
-                                    className="inline-flex items-center gap-2 text-sm font-bold text-purple-600 hover:text-purple-700 transition-colors group"
-                                >
-                                    Conhecer a história completa dos Founders 
-                                    <ArrowUpRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                                </Link>
-                            </div>
-                        </div>
+    // Renderização das ações (botões CTA ou formulário final) de cada passo
+    function renderStepActions() {
+        switch (activeStep) {
+            case 0:
+                return (
+                    <div className={`pt-2 flex justify-center lg:justify-start ${isExiting ? 'animate-slide-out-button' : 'animate-button-elastic'}`}>
+                        <button
+                            onClick={nextStep}
+                            className="w-full md:max-w-md py-4 lg:py-4.5 px-8 sm:px-10 text-sm sm:text-sm lg:text-base font-extrabold text-white bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 rounded-2xl transition shadow-xl shadow-purple-300/30 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] cursor-pointer"
+                        >
+                            Quero ganhar conversando
+                            <ArrowRight className="w-4 h-4 ml-1 inline" />
+                        </button>
                     </div>
-                </section>
-
-                {/* PROGRAMA DE FUNDADORAS */}
-                <section id="fundadoras" className="pt-32">
-                    <div className="bg-purple-950 text-white rounded-3xl p-8 sm:p-16 relative overflow-hidden shadow-xl">
-                        {/* Glows */}
-                        <div className="absolute bottom-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-purple-800/30 blur-[100px] pointer-events-none"></div>
-                        <div className="absolute top-[-20%] right-[-10%] w-[60%] h-[60%] rounded-full bg-indigo-900/40 blur-[100px] pointer-events-none"></div>
-                        
-                        <div className="relative z-10 max-w-4xl mx-auto">
-                            <div className="text-center space-y-4">
-                                <span className="text-purple-300 font-bold text-xs uppercase tracking-wider">Early Access</span>
-                                <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Programa de Criadoras Fundadoras</h2>
-                                <p className="text-purple-100 text-sm sm:text-base max-w-2xl mx-auto">
-                                    Estamos selecionando um grupo exclusivo de criadoras para a fase de pré-lançamento do Mimo. Conheça as vantagens de construir a plataforma conosco:
-                                </p>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-12">
-                                <div className="flex gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0 text-purple-300">
-                                        <Wallet className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <h4 className="font-bold text-white mb-1">Taxas Reduzidas Vitalícias</h4>
-                                        <p className="text-xs text-purple-200 leading-relaxed font-normal">
-                                            As primeiras criadoras aprovadas no programa receberão taxas administrativas reduzidas de forma vitalícia no faturamento de mídias e mensagens.
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0 text-purple-300">
-                                        <MessageCircle className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <h4 className="font-bold text-white mb-1">Suporte e Canal Direto</h4>
-                                        <p className="text-xs text-purple-200 leading-relaxed font-normal">
-                                            Você terá contato de WhatsApp direto com os fundadores para tirar dúvidas, receber feedback prioritário e nos ajudar a testar novos recursos do chat.
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0 text-purple-300">
-                                        <BadgeCheck className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <h4 className="font-bold text-white mb-1">Destaque de Fundadora</h4>
-                                        <p className="text-xs text-purple-200 leading-relaxed font-normal">
-                                            Seu perfil receberá um selo especial de pioneirismo e terá destaque inicial de algoritmo nas seções de recomendações e pesquisas futuras.
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0 text-purple-300">
-                                        <Sparkles className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <h4 className="font-bold text-white mb-1">Co-criação da Plataforma</h4>
-                                        <p className="text-xs text-purple-200 leading-relaxed font-normal">
-                                            Suas sugestões serão transformadas em código. Queremos que a plataforma atenda especificamente aos seus desafios e anseios como criadora.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="mt-12 text-center">
-                                <button
-                                    onClick={scrollToForm}
-                                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-8 py-4 font-extrabold text-purple-700 shadow-lg transition hover:-translate-y-0.5 hover:bg-purple-50 cursor-pointer"
-                                >
-                                    Solicitar Inscrição de Fundadora
-                                    <ArrowRight className="h-5 w-5" />
-                                </button>
-                            </div>
-                        </div>
+                );
+            case 1:
+                return (
+                    <div className={`pt-1 flex items-center justify-center lg:justify-start gap-3 ${isExiting ? 'animate-slide-out-button' : 'animate-button-elastic'}`}>
+                        <button
+                            onClick={nextStep}
+                            className="w-full md:max-w-md py-4 lg:py-4.5 px-8 sm:px-10 text-sm sm:text-sm lg:text-base font-extrabold text-white bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 rounded-2xl transition shadow-xl shadow-purple-300/30 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] cursor-pointer"
+                        >
+                            Entendi! E fotos/vídeos?
+                            <ArrowRight className="w-4 h-4 ml-1 inline" />
+                        </button>
                     </div>
-                </section>
-
-                {/* EDUCAÇÃO / CREATORS */}
-                <section id="creators" className="pt-32">
-                    <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-100 rounded-3xl p-8 sm:p-12 text-center max-w-4xl mx-auto space-y-6 shadow-xs">
-                        <span className="text-purple-600 font-extrabold text-xs uppercase tracking-wider">Área Creators</span>
-                        <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-                            Aprenda a crescer e faturar
-                        </h2>
-                        <p className="text-gray-600 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
-                            No Mimo, você não fica sozinha. Criamos a **Área Creators**, um espaço de apoio completo para você 
-                            aprender as melhores estratégias de divulgação. Acesse scripts prontos para stories, 
-                            ideias de links de bio para Instagram, tutoriais passo a passo de como configurar sua carteira e muito mais.
-                        </p>
-                        
-                        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-                            <Link
-                                href="/creators"
-                                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 text-base font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-2xl transition-all duration-300 shadow-md shadow-purple-200 hover:-translate-y-0.5"
+                );
+            case 2:
+                return (
+                    <div className={`pt-1 flex items-center justify-center lg:justify-start gap-3 ${isExiting ? 'animate-slide-out-button' : 'animate-button-elastic'}`}>
+                        <button
+                            onClick={nextStep}
+                            className="w-full md:max-w-md py-4 lg:py-4.5 px-8 sm:px-10 text-sm sm:text-sm lg:text-base font-extrabold text-white bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 rounded-2xl transition shadow-xl shadow-purple-300/30 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] cursor-pointer"
+                        >
+                            Gostei! Como funcionam os Mimos?
+                            <ArrowRight className="w-4 h-4 ml-1 inline" />
+                        </button>
+                    </div>
+                );
+            case 3:
+                return (
+                    <div className={`pt-1 flex items-center justify-center lg:justify-start gap-3 ${isExiting ? 'animate-slide-out-button' : 'animate-button-elastic'}`}>
+                        <button
+                            onClick={nextStep}
+                            className="w-full md:max-w-md py-4 lg:py-4.5 px-8 sm:px-10 text-sm sm:text-sm lg:text-base font-extrabold text-white bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 rounded-2xl transition shadow-xl shadow-purple-300/30 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] cursor-pointer"
+                        >
+                            Quero fazer parte do Mimo
+                            <ArrowRight className="w-4 h-4 ml-1 inline" />
+                        </button>
+                    </div>
+                );
+            case 4:
+                return (
+                    <div className="w-full">
+                        {!success ? (
+                            <form 
+                                onSubmit={handleSubmit} 
+                                className={`space-y-3 mt-3 max-w-xl overflow-y-auto max-h-[62vh] lg:max-h-[none] pb-5 pr-1.5 scrollbar-none ${
+                                    isExiting ? 'animate-slide-out-subtitle' : 'animate-subtitle-elastic'
+                                }`}
                             >
-                                Acessar Área Creators & Tutoriais
-                                <ArrowRight className="w-4 h-4" />
-                            </Link>
-                        </div>
-                    </div>
-                </section>
-
-                {/* CONFIANÇA, SEGURANÇA E COMPLIANCE */}
-                <section className="pt-32">
-                    <div className="bg-white border border-gray-200 rounded-3xl p-8 sm:p-12 shadow-xs">
-                        <div className="max-w-4xl mx-auto space-y-10">
-                            <div className="text-center space-y-3">
-                                <h2 className="text-2xl sm:text-3xl font-bold text-gray-950">Segurança de Dados, Transparência & LGPD</h2>
-                                <p className="text-xs sm:text-sm text-gray-500 leading-relaxed">
-                                    O Mimo Chat opera em estrito cumprimento das leis brasileiras de segurança e privacidade.
-                                </p>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm text-gray-500 leading-relaxed">
-                                <div className="space-y-4">
-                                    <div className="flex gap-3">
-                                        <CheckCircle2 className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
-                                        <div>
-                                            <h5 className="font-bold text-gray-900 mb-1">Privacidade Total e LGPD</h5>
-                                            <p>Seus dados de cadastro, telefone e faturamento são blindados sob a Lei Geral de Proteção de Dados (LGPD). Seus fãs nunca têm acesso aos seus dados pessoais reais (nome civil, documentos ou contatos).</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex gap-3">
-                                        <CheckCircle2 className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
-                                        <div>
-                                            <h5 className="font-bold text-gray-900 mb-1">Instituições de Pagamento Reguladas</h5>
-                                            <p>Nossas integrações de pagamento (Asaas, AbacatePay e outras) garantem transações criptografadas, transferências Pix instantâneas e cartões de crédito processados com total segurança bancária.</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-4">
-                                    <div className="flex gap-3">
-                                        <CheckCircle2 className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
-                                        <div>
-                                            <h5 className="font-bold text-gray-900 mb-1">Empresa Real e Identificada</h5>
-                                            <p>Diferente de plataformas estrangeiras sem representação no Brasil, o Mimo é administrado por uma empresa legalizada: **LEAD CONTEUDOS DIGITAIS LTDA**, inscrita sob o **CNPJ: 60.312.273/0001-01**.</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex gap-3">
-                                        <CheckCircle2 className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
-                                        <div>
-                                            <h5 className="font-bold text-gray-900 mb-1">Moderação e Proteção Legal</h5>
-                                            <p>Acesso exclusivo para maiores de 18 anos completos. Proibimos estritamente encontros presenciais, serviços físicos ou atividades ilícitas, promovendo uma comunidade saudável e protegida.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                {/* FORMULÁRIO DE INSCRIÇÃO */}
-                <section id="inscricao-fundadora" className="scroll-mt-4 pt-32">
-                    <div className="mx-auto max-w-3xl">
-                        <div className="text-center space-y-4 mb-10">
-                            <span className="text-xs font-extrabold uppercase tracking-widest text-purple-600 bg-purple-50 px-3 py-1.5 rounded-full border border-purple-100">
-                                Inscrição Rápida
-                            </span>
-                            <h2 className="text-3xl font-extrabold text-slate-950 sm:text-4xl">Candidate-se ao Programa de Fundadoras</h2>
-                            <p className="mt-4 leading-relaxed text-slate-600 max-w-xl mx-auto">
-                                Preencha com atenção. Nossa equipe analisa os perfis manualmente e entra em contato via WhatsApp para finalizar a liberação.
-                            </p>
-                        </div>
-
-                        {success ? (
-                            <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-8 text-center sm:p-12 shadow-sm">
-                                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                                    <BadgeCheck className="h-9 w-9" />
-                                </div>
-                                <h3 className="mt-5 text-2xl font-black text-emerald-950">Inscrição de Fundadora Recebida! 💜</h3>
-                                <p className="mx-auto mt-3 max-w-xl leading-relaxed text-emerald-800">
-                                    Obrigada por enviar seus dados. Edmilson ou Laura vão analisar seu Instagram e entrar em contato pelo WhatsApp nos próximos dias.
-                                </p>
-                            </div>
-                        ) : (
-                            <form onSubmit={handleSubmit} className="space-y-8 rounded-3xl border border-slate-200 bg-white/70 backdrop-blur-md p-6 shadow-sm sm:p-10">
-                                <div className="grid gap-6 sm:grid-cols-2">
-                                    <label className="block text-sm font-bold text-slate-800">
-                                        <span>Nome completo <span className="text-purple-600">*</span></span>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                        <span>Nome Completo *</span>
                                         <input
                                             required
                                             value={form.fullName}
                                             onChange={event => updateField('fullName', event.target.value)}
                                             className={inputClass}
-                                            placeholder="Seu nome completo"
+                                            placeholder="Ex: Sofia da Silva"
                                         />
                                     </label>
-                                    
-                                    <label className="block text-sm font-bold text-slate-800">
-                                        <span>Nome artístico/apelido <span className="text-xs font-medium text-slate-400">(Opcional)</span></span>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                        <span>Nome Artístico *</span>
                                         <input
+                                            required
                                             value={form.artisticName}
                                             onChange={event => updateField('artisticName', event.target.value)}
                                             className={inputClass}
-                                            placeholder="Como sua comunidade te conhece"
+                                            placeholder="Ex: Sofia Almeida"
                                         />
                                     </label>
-                                    
-                                    <label className="block text-sm font-bold text-slate-800">
-                                        <span>Instagram <span className="text-purple-600">*</span></span>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                        <span>E-mail *</span>
+                                        <input
+                                            required
+                                            type="email"
+                                            value={form.email}
+                                            onChange={event => updateField('email', event.target.value)}
+                                            className={inputClass}
+                                            placeholder="sofia@provedor.com"
+                                        />
+                                    </label>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                        <span>WhatsApp *</span>
+                                        <input
+                                            required
+                                            type="tel"
+                                            value={form.whatsapp}
+                                            onChange={event => {
+                                                const formatted = formatWhatsApp(event.target.value);
+                                                updateField('whatsapp', formatted);
+                                            }}
+                                            className={inputClass}
+                                            placeholder="(11) 99999-9999"
+                                        />
+                                    </label>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                        <span>Instagram *</span>
                                         <input
                                             required
                                             value={form.instagram}
                                             onChange={event => updateField('instagram', event.target.value)}
                                             className={inputClass}
-                                            placeholder="@seuinstagram"
-                                            autoCapitalize="none"
+                                            placeholder="@sofia_almeida"
                                         />
                                     </label>
-                                    
-                                    <label className="block text-sm font-bold text-slate-800">
-                                        <span>WhatsApp <span className="text-purple-600">*</span></span>
-                                        <input
-                                            required
-                                            value={form.whatsapp}
-                                            onChange={event => updateField('whatsapp', event.target.value)}
-                                            className={inputClass}
-                                            placeholder="(11) 99999-9999"
-                                            inputMode="tel"
-                                        />
-                                    </label>
-                                    
-                                    <label className="block text-sm font-bold text-slate-800">
-                                        <span>E-mail <span className="text-xs font-medium text-slate-400">(Opcional)</span></span>
-                                        <input
-                                            type="email"
-                                            value={form.email}
-                                            onChange={event => updateField('email', event.target.value)}
-                                            className={inputClass}
-                                            placeholder="voce@email.com"
-                                            autoCapitalize="none"
-                                        />
-                                    </label>
-                                    
-                                    <label className="block text-sm font-bold text-slate-800">
-                                        <span>Idade <span className="text-purple-600">*</span></span>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                        <span>Idade *</span>
                                         <input
                                             required
                                             type="number"
@@ -808,58 +991,30 @@ export default function ParaCriadorasPage() {
                                             inputMode="numeric"
                                         />
                                     </label>
-                                    
-                                    <label className="block text-sm font-bold text-slate-800">
-                                        <span>Cidade/Estado <span className="text-purple-600">*</span></span>
-                                        <input
-                                            required
-                                            value={form.cityState}
-                                            onChange={event => updateField('cityState', event.target.value)}
-                                            className={inputClass}
-                                            placeholder="Ex: São Paulo/SP"
-                                        />
-                                    </label>
-                                    
-                                    <label className="block text-sm font-bold text-slate-800">
-                                        <span>Você já cria conteúdo ou atende clientes online? <span className="text-purple-600">*</span></span>
-                                        <select
-                                            required
-                                            value={form.hasOnlineExperience}
-                                            onChange={event => updateField('hasOnlineExperience', event.target.value)}
-                                            className={inputClass}
-                                        >
-                                            <option value="">Selecione uma opção</option>
-                                            <option value="yes">Sim, já tenho experiência</option>
-                                            <option value="no">Não tenho experiência</option>
-                                            <option value="starting">Estou começando agora</option>
-                                        </select>
-                                    </label>
                                 </div>
 
-                                <label className="block text-sm font-bold text-slate-800">
-                                    <span>Como você conheceu o Mimo Chat? <span className="text-purple-600">*</span></span>
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                    <span>Como conheceu o Mimo? *</span>
                                     <input
                                         required
                                         value={form.howFoundMimo}
                                         onChange={event => updateField('howFoundMimo', event.target.value)}
                                         className={inputClass}
-                                        placeholder="Ex: Indicação no Instagram, pesquisa, convite..."
+                                        placeholder="Ex: Indicação, Instagram..."
                                     />
                                 </label>
-
-                                <label className="block text-sm font-bold text-slate-800">
-                                    <span>Por que você quer ser uma Criadora Fundadora do Mimo? <span className="text-purple-600">*</span></span>
-                                    <textarea
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                    <span>Por que quer ser criadora? *</span>
+                                    <input
                                         required
-                                        rows={5}
                                         value={form.reason}
                                         onChange={event => updateField('reason', event.target.value)}
-                                        className={`${inputClass} resize-none`}
-                                        placeholder="Fale um pouco sobre você, seu nicho de atuação e suas expectativas com o app."
+                                        className={inputClass}
+                                        placeholder="Fale brevemente sobre o seu interesse"
                                     />
                                 </label>
 
-                                {/* Honeypot para prevenção de spam de bots */}
+                                {/* Honeypot spam bot */}
                                 <div className="absolute -left-[10000px] h-px w-px overflow-hidden" aria-hidden="true">
                                     <label>
                                         Empresa
@@ -872,139 +1027,375 @@ export default function ParaCriadorasPage() {
                                     </label>
                                 </div>
 
-                                <div className="space-y-4">
-                                    <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-700 cursor-pointer">
+                                <div className="space-y-2 pt-1.5 text-xs text-slate-600 font-bold">
+                                    <label className="flex items-start gap-2 cursor-pointer">
                                         <input
                                             type="checkbox"
                                             required
                                             checked={form.isAdultConfirmed}
                                             onChange={event => updateField('isAdultConfirmed', event.target.checked)}
-                                            className="mt-0.5 h-5 w-5 rounded border-slate-300 accent-purple-600 cursor-pointer"
+                                            className="mt-0.5 h-4 w-4 rounded accent-purple-600 cursor-pointer"
                                         />
-                                        <span>Confirmo que tenho 18 anos ou mais. <span className="text-purple-600">*</span></span>
+                                        <span>Declaro ter 18 anos ou mais. *</span>
                                     </label>
                                     
-                                    <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-700 cursor-pointer">
+                                    <label className="flex items-start gap-2 cursor-pointer">
                                         <input
                                             type="checkbox"
                                             required
                                             checked={form.contactConsent}
                                             onChange={event => updateField('contactConsent', event.target.checked)}
-                                            className="mt-0.5 h-5 w-5 rounded border-slate-300 accent-purple-600 cursor-pointer"
+                                            className="mt-0.5 h-4 w-4 rounded accent-purple-600 cursor-pointer"
                                         />
-                                        <span>Aceito ser contatada pelo time do Mimo Chat via WhatsApp/E-mail. <span className="text-purple-600">*</span></span>
+                                        <span>Autorizo contato do Mimo via WhatsApp/E-mail. *</span>
                                     </label>
                                 </div>
 
                                 {error && (
-                                    <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 animate-shake">
+                                    <div role="alert" className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600 animate-shake">
                                         {error}
                                     </div>
                                 )}
 
-                                <button
-                                    type="submit"
-                                    disabled={submitting}
-                                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-purple-600 px-6 py-4 font-extrabold text-white shadow-lg shadow-purple-200 transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
-                                >
-                                    {submitting ? 'Enviando sua candidatura...' : 'Enviar Candidatura de Fundadora'}
-                                    {!submitting && <Send className="h-5 w-5" />}
-                                </button>
-                                
-                                <p className="text-center text-xs leading-relaxed text-slate-400 font-medium">
-                                    O envio da candidatura não garante aprovação imediata. A seleção é feita de forma responsável pela segurança de todos.
+                                <div className="flex items-center gap-3 pt-2">
+                                    <button
+                                        type="submit"
+                                        disabled={submitting}
+                                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 px-10 py-4.5 text-sm font-extrabold text-white shadow-lg shadow-purple-200/50 hover:scale-[1.01] hover:-translate-y-0.5 cursor-pointer disabled:opacity-60"
+                                    >
+                                        {submitting ? 'Enviando...' : 'Enviar Candidatura'}
+                                    </button>
+                                </div>
+
+                                {/* Mini nota legal sutil no fim do form */}
+                                <p className="text-[8px] text-slate-400 text-center md:text-left pt-2 font-medium leading-relaxed">
+                                    LEAD CONTEUDOS DIGITAIS LTDA • CNPJ: 60.312.273/0001-01 • suporte@mimochat.com.br
                                 </p>
                             </form>
-                        )}
-                    </div>
-                </section>
-            </main>
-
-            {/* RODAPÉ PREMIUM COMPLETO */}
-            <footer className="bg-white border-t border-gray-200/80 relative z-30">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
-                        {/* Logo e Missão */}
-                        <div className="space-y-4 md:col-span-2">
-                            <div className="flex items-center gap-2">
-                                <Image
-                                    src="/icon-192x192.png"
-                                    alt="MimoChat"
-                                    width={32}
-                                    height={32}
-                                    className="w-8 h-8 rounded-lg object-cover"
-                                />
-                                <span className="text-lg font-bold text-gray-900">Mimo Chat</span>
-                            </div>
-                            <p className="text-xs text-gray-500 max-w-sm leading-relaxed">
-                                Infraestrutura inteligente de hospedagem de conteúdo e rede social privada para criadores e fãs, focada na segurança operacional e privacidade de dados.
-                            </p>
-                        </div>
-
-                        {/* Links Legais */}
-                        <div className="space-y-3">
-                            <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Políticas e Termos</h4>
-                            <ul className="space-y-2 text-xs">
-                                <li>
-                                    <Link href="/termos-de-uso" target="_blank" className="text-gray-500 hover:text-purple-600 transition-colors">
-                                        Termos de Uso
-                                    </Link>
-                                </li>
-                                <li>
-                                    <Link href="/politica-de-privacidade" target="_blank" className="text-gray-500 hover:text-purple-600 transition-colors">
-                                        Política de Privacidade
-                                    </Link>
-                                </li>
-                                <li>
-                                    <Link href="/institucional" className="text-purple-600 hover:text-purple-700 transition-colors font-semibold">
-                                        Sobre o MimoChat
-                                    </Link>
-                                </li>
-                            </ul>
-                        </div>
-
-                        {/* Suporte e Contato */}
-                        <div className="space-y-3">
-                            <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Suporte</h4>
-                            <ul className="space-y-2 text-xs">
-                                <li>
-                                    <Link href="/ajuda" className="text-purple-600 hover:text-purple-700 font-semibold transition-colors">
-                                        Central de Ajuda & FAQ
-                                    </Link>
-                                </li>
-                                <li className="text-gray-500">
-                                    E-mail de contato: <br />
-                                    <a href="mailto:suporte@mimochat.com.br" className="text-purple-600 hover:underline">
-                                        suporte@mimochat.com.br
-                                    </a>
-                                </li>
-                                <li>
-                                    <a
+                        ) : (
+                            /* SUCESSO COMPACTO */
+                            <div className="text-center lg:text-left py-6 space-y-4 max-w-md animate-title-elastic">
+                                <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 mx-auto lg:mx-0 animate-bounce">
+                                    <Check className="w-6 h-6" />
+                                </div>
+                                <h2 className="text-2xl font-black text-slate-900 leading-none">Inscrição Enviada! 💜</h2>
+                                <p className="text-xs text-slate-500 leading-relaxed">
+                                    A equipe do Mimo analisará sua inscrição. Entraremos em contato pelo WhatsApp cadastrado nas próximas 24 horas.
+                                </p>
+                                <div className="flex flex-col sm:flex-row items-center gap-3 justify-center lg:justify-start pt-2">
+                                    <a 
                                         href="https://www.instagram.com/mimochat.oficial/"
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1.5 text-pink-600 hover:text-pink-700 font-semibold transition-colors"
+                                        className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-6 py-3 bg-gradient-to-r from-pink-600 to-fuchsia-600 text-white font-extrabold text-[10px] rounded-lg shadow-sm cursor-pointer hover:scale-[1.01] transition"
                                     >
                                         <InstagramIcon className="w-3.5 h-3.5" />
-                                        @mimochat.oficial
+                                        Seguir @mimochat.oficial
                                     </a>
-                                </li>
-                            </ul>
-                        </div>
+                                    <button
+                                        onClick={() => {
+                                            setSuccess(false);
+                                            setStep(0);
+                                        }}
+                                        className="text-xs text-slate-400 hover:text-slate-600 font-bold transition cursor-pointer"
+                                    >
+                                        Recomeçar
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
+                );
+            default:
+                return null;
+        }
+    }
 
-                    {/* Dados Corporativos */}
-                    <div className="border-t border-gray-150 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-[10px] text-gray-500">
-                        <div className="space-y-1 text-center md:text-left">
-                            <p className="font-semibold text-gray-600">LEAD CONTEUDOS DIGITAIS LTDA</p>
-                            <p>CNPJ: 60.312.273/0001-01 | EEL CONTEUDOS DIGITAIS</p>
+    return (
+        <div className="h-[100dvh] w-full bg-[#fafafc] text-slate-800 font-sans selection:bg-purple-100 selection:text-purple-900 relative overflow-hidden flex flex-col justify-between z-10">
+            
+            {/* ─── ESTILOS CSS E ANIMAÇÕES EXPO MAIS LENTAS ─── */}
+            <style>{`
+                @keyframes float {
+                    0% { transform: translateY(0px) rotate(0deg); }
+                    50% { transform: translateY(-6px) rotate(1.5deg); }
+                    100% { transform: translateY(0px) rotate(0deg); }
+                }
+                .animate-float {
+                    animation: float 4s ease-in-out infinite;
+                }
+                @keyframes pulseGlow {
+                    0% { opacity: 0.4; transform: scale(0.99); }
+                    50% { opacity: 0.7; transform: scale(1.01); }
+                    100% { opacity: 0.4; transform: scale(0.99); }
+                }
+                .animate-pulse-glow {
+                    animation: pulseGlow 3s ease-in-out infinite;
+                }
+                @keyframes shake {
+                    0%, 100% { transform: translateX(0); }
+                    25% { transform: translateX(-3px); }
+                    75% { transform: translateX(3px); }
+                }
+                .animate-shake {
+                    animation: shake 0.25s ease-in-out;
+                }
+                
+                /* Animações Expo de Entrada Coordenadas (Slide In Right / Bottom Up) */
+                @keyframes slideTitleIn {
+                    from { transform: translateX(80px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes slideSubtitleIn {
+                    from { transform: translateX(60px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes slideWidgetIn {
+                    from { transform: scale(0.85) translateY(40px); opacity: 0; }
+                    to { transform: scale(1) translateY(0); opacity: 1; }
+                }
+                @keyframes slideButtonIn {
+                    from { transform: translateY(55px) scale(0.95); opacity: 0; }
+                    to { transform: translateY(0) scale(1); opacity: 1; }
+                }
+                @keyframes scaleUp {
+                    from { transform: scale(0.9); opacity: 0; }
+                    to { transform: scale(1); opacity: 1; }
+                }
+                
+                .animate-title-elastic {
+                    animation: slideTitleIn 0.85s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+                }
+                .animate-subtitle-elastic {
+                    animation: slideSubtitleIn 0.85s cubic-bezier(0.19, 1, 0.22, 1) 0.12s forwards;
+                    opacity: 0;
+                }
+                .animate-widget-elastic {
+                    animation: slideWidgetIn 0.95s cubic-bezier(0.19, 1, 0.22, 1) 0.08s forwards;
+                    opacity: 0;
+                }
+                .animate-button-elastic {
+                    animation: slideButtonIn 0.85s cubic-bezier(0.19, 1, 0.22, 1) 0.2s forwards;
+                    opacity: 0;
+                }
+                .animate-scale-up {
+                    animation: scaleUp 0.5s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+                }
+
+                .scrollbar-none::-webkit-scrollbar {
+                    display: none;
+                }
+                .scrollbar-none {
+                    -ms-overflow-style: none;
+                    scrollbar-width: none;
+                }
+
+                /* Efeitos 3D para Celular na Diagonal e Carteira Flutuante */
+                .perspective-3d {
+                    perspective: 1200px;
+                    transform-style: preserve-3d;
+                }
+                .rotate-diagonal-phone {
+                    transform: rotateX(12deg) rotateY(-18deg) rotateZ(6deg);
+                    transform-style: preserve-3d;
+                    /* Lateral sutil em degradê 3D e sombras ultra-suaves de fundo */
+                    box-shadow: 
+                        -1px 1px 2px rgba(15, 23, 42, 0.35),
+                        -3px 3px 6px rgba(15, 23, 42, 0.15),
+                        -12px 24px 45px rgba(139, 92, 246, 0.15), 
+                        -4px 8px 16px rgba(15, 23, 42, 0.05);
+                    transition: transform 0.85s cubic-bezier(0.19, 1, 0.22, 1);
+                }
+                .rotate-diagonal-phone:hover {
+                    transform: rotateX(8deg) rotateY(-12deg) rotateZ(4deg) scale(1.03);
+                }
+
+                @keyframes floatWallet {
+                    0% { transform: translateY(0px) translateZ(30px); }
+                    50% { transform: translateY(-8px) translateZ(40px); }
+                    100% { transform: translateY(0px) translateZ(30px); }
+                }
+                .animate-float-wallet {
+                    animation: floatWallet 5s ease-in-out infinite;
+                }
+                
+                /* Animações de Saída Escalonadas (Slide Out Left / Bottom Down) */
+                @keyframes slideOutTitle {
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(-80px); opacity: 0; }
+                }
+                @keyframes slideOutSubtitle {
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(-60px); opacity: 0; }
+                }
+                @keyframes slideOutButton {
+                    from { transform: translateY(0); opacity: 1; }
+                    to { transform: translateY(40px); opacity: 0; }
+                }
+                @keyframes widgetExitOut {
+                    from { transform: scale(1) rotate(0deg) translateY(0); opacity: 1; }
+                    to { transform: scale(0.85) rotate(5deg) translateY(20px); opacity: 0; }
+                }
+                
+                .animate-slide-out-title {
+                    animation: slideOutTitle 0.45s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
+                }
+                .animate-slide-out-subtitle {
+                    animation: slideOutSubtitle 0.45s cubic-bezier(0.25, 1, 0.5, 1) 0.08s forwards !important;
+                }
+                .animate-slide-out-button {
+                    animation: slideOutButton 0.45s cubic-bezier(0.25, 1, 0.5, 1) 0.15s forwards !important;
+                }
+                .animate-exit-widget {
+                    animation: widgetExitOut 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
+                }
+            `}</style>
+
+            {/* Efeito de Fundo Aurora do Perfil Público (Esferas Desfocadas Modernas) */}
+            <div className="absolute top-[-10%] left-[-20%] w-[350px] h-[350px] rounded-full bg-purple-400/15 blur-[100px] pointer-events-none select-none z-0" />
+            <div className="absolute top-[35%] right-[-15%] w-[300px] h-[300px] rounded-full bg-pink-400/12 blur-[90px] pointer-events-none select-none z-0" />
+            <div className="absolute bottom-[15%] left-[-15%] w-[280px] h-[280px] rounded-full bg-indigo-400/10 blur-[100px] pointer-events-none select-none z-0" />
+            
+            {/* Textura Geométrica Discreta (Bolinhas Lavanda) */}
+            <div 
+                className="absolute inset-0 pointer-events-none select-none z-0" 
+                style={{ 
+                    backgroundImage: 'radial-gradient(#E9D5FF 1.5px, transparent 1.5px)', 
+                    backgroundSize: '20px 20px',
+                    opacity: 0.4
+                }} 
+            />
+
+            {/* HEADER DA PÁGINA (ESTILO PREMIUM E MINIMALISTA) */}
+            <header className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-6 py-4 h-20 w-full pointer-events-none select-none">
+                <div className="flex items-center gap-3 pointer-events-auto">
+                    {step > 0 && (
+                        <button 
+                            onClick={prevStep} 
+                            className="p-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-500 hover:text-slate-800 shadow-2xs transition cursor-pointer flex items-center justify-center"
+                            aria-label="Voltar"
+                        >
+                            <ArrowLeft className="w-4 h-4" />
+                        </button>
+                    )}
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-purple-600 via-fuchsia-600 to-indigo-600 flex items-center justify-center text-white font-black text-sm shadow-sm">
+                            M
                         </div>
-                        <p className="text-center md:text-right">
-                            © {new Date().getFullYear()} MimoChat. Todos os direitos reservados.
-                        </p>
+                        <span className="text-lg font-black tracking-tight text-slate-900">
+                            mimo<span className="text-purple-600 font-extrabold text-[9px] ml-1 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded-md uppercase tracking-wider">Criadoras</span>
+                        </span>
                     </div>
                 </div>
-            </footer>
+
+                <div className="flex items-center gap-3 pointer-events-auto">
+                    <Link 
+                        href="/login" 
+                        className="px-4 py-2 text-xs font-black text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition shadow-2xs cursor-pointer"
+                    >
+                        Entrar
+                    </Link>
+                </div>
+            </header>
+
+            {/* ÁREA PRINCIPAL DO ONBOARDING */}
+            <div className="flex-1 flex flex-col px-4 sm:px-6 pt-20 pb-3 lg:py-8 lg:justify-center max-w-7xl mx-auto w-full relative z-20">
+                
+                {/* CONTEÚDO CENTRALIZADO (SEM ROLAGEM) */}
+                <div className="flex-1 flex flex-col lg:grid lg:grid-cols-12 lg:gap-12 lg:items-center lg:my-auto min-h-0 w-full">
+                    
+                    {/* Wrapper de conteúdo: no mobile ocupa flex-1 (entre header e botão),
+                         no desktop usa contents para participar diretamente no grid de 12 colunas */}
+                    <div className="flex-1 flex flex-col items-center gap-3 min-h-0 overflow-hidden lg:contents">
+
+                    {/* 1. TEXTOS DO PASSO */}
+                    <div 
+                        key={`text-${activeStep}`} 
+                        className={`lg:col-span-7 flex flex-col justify-center text-center lg:text-left shrink-0 ${
+                            isExiting ? 'animate-exit-content' : ''
+                        }`}
+                    >
+                        {renderStepTexts()}
+                    </div>
+
+                    {/* 2. CELULAR PERSISTENTE (UNIFICADO MOBILE & DESKTOP) */}
+                    <div className={`transition-all duration-700 ease-out ${
+                        activeStep === 4 
+                            ? 'opacity-0 scale-90 pointer-events-none h-0 overflow-hidden lg:h-auto lg:overflow-visible' 
+                            : 'opacity-100 scale-100 h-auto overflow-visible'
+                    } lg:col-span-5 flex justify-center lg:justify-end relative w-full lg:row-span-2 lg:self-center`}>
+                        <div className="absolute inset-0 bg-gradient-to-tr from-purple-400/5 to-fuchsia-400/5 rounded-[3rem] blur-xl opacity-40 pointer-events-none z-0"></div>
+                        
+                        <div className="z-10 w-full flex justify-center lg:justify-end relative">
+                            {/* Div envolvente com tamanho fixo que alinha celular e carteira flutuante */}
+                            <div className="relative flex items-center justify-center w-[320px] h-[340px] lg:w-[350px] lg:h-[560px]">
+                                
+                                {/* Card de Carteira Flutuante, controlado por visibilidade e animado */}
+                                <div className={`absolute z-30 select-none transition-all duration-[750ms] ease-out ${
+                                    isMobileDevice 
+                                        ? 'left-[25px] top-[26%] w-[95px] rounded-lg border border-white/20 bg-white/80 p-1.5 shadow-[0_8px_20px_rgba(15,23,42,0.06)] backdrop-blur-md'
+                                        : '-left-12 top-[24%] w-[140px] rounded-xl border border-white/20 bg-white/80 p-3 shadow-[0_15px_30px_rgba(15,23,42,0.06)] backdrop-blur-lg'
+                                } ${
+                                    activeStep === 0 && !isExiting
+                                        ? 'opacity-100 scale-100 translate-y-0 pointer-events-auto' 
+                                        : 'opacity-0 scale-75 -translate-y-12 pointer-events-none'
+                                }`}
+                                style={{
+                                    animation: activeStep === 0 && !isExiting ? 'floatWallet 5s ease-in-out infinite' : 'none'
+                                }}>
+                                    {isMobileDevice ? (
+                                        <div className="flex items-center gap-1">
+                                            <div className="w-4 h-4 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                                                <DollarSign className="w-2.5 h-2.5" />
+                                            </div>
+                                            <div className="leading-none">
+                                                <p className="text-[5.5px] text-slate-400 font-bold uppercase tracking-wider">Carteira</p>
+                                                <p className="text-[8.5px] font-black text-slate-800 mt-0.5">+R$ 1.840</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
+                                                    <DollarSign className="w-3.5 h-3.5" />
+                                                </div>
+                                                <div className="leading-none">
+                                                    <p className="text-[7.5px] text-slate-400 font-bold leading-none uppercase tracking-wider">Minha Carteira</p>
+                                                    <p className="text-xs font-black text-slate-800 mt-0.5">+R$ 1.840,00</p>
+                                                </div>
+                                            </div>
+                                            <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[7px] font-bold text-slate-400 leading-none">
+                                                <span>Rendimento de chat</span>
+                                                <span className="text-emerald-600 font-black">+R$ 42,50</span>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+
+                                {/* Celular 3D Unificado (Persistente) */}
+                                <Phone3D isMobile={isMobileDevice} isFacingFront={activeStep > 0}>
+                                    {renderPhoneDisplay(isMobileDevice)}
+                                </Phone3D>
+                            </div>
+                        </div>
+                    </div> {/* fim do celular persistente */}
+
+                    </div> {/* fim do wrapper flex-1 / lg:contents */}
+
+                    {/* 3. AÇÕES DO PASSO - shrink-0 garante posição fixa na base no mobile */}
+                    <div 
+                        key={`actions-${activeStep}`} 
+                        className={`lg:col-span-7 shrink-0 flex flex-col justify-center text-center lg:text-left ${
+                            isExiting ? 'animate-exit-content' : ''
+                        }`}
+                    >
+                        {renderStepActions()}
+                    </div>
+
+                </div>
+
+
+            </div>
         </div>
     );
 }

@@ -22,10 +22,20 @@ export default function InstitucionalPage() {
     return (
         <div className="min-h-screen bg-[#fafafc] text-gray-700 font-sans selection:bg-purple-100 selection:text-purple-900 relative overflow-hidden">
             
-            {/* Elementos de Fundo (Glows de Gradiente Suaves em Tons Claros) */}
-            <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[50%] rounded-full bg-purple-100/50 blur-[130px] pointer-events-none"></div>
-            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-50/50 blur-[130px] pointer-events-none"></div>
-            <div className="absolute top-[30%] right-[10%] w-[300px] h-[300px] rounded-full bg-purple-50/45 blur-[100px] pointer-events-none"></div>
+            {/* Efeito de Fundo Aurora (Esferas Desfocadas Modernas) */}
+            <div className="absolute top-[-10%] left-[-20%] w-[450px] h-[450px] rounded-full bg-purple-400/15 blur-[100px] pointer-events-none select-none z-0" />
+            <div className="absolute top-[35%] right-[-15%] w-[400px] h-[400px] rounded-full bg-pink-400/12 blur-[90px] pointer-events-none select-none z-0" />
+            <div className="absolute bottom-[15%] left-[-15%] w-[380px] h-[380px] rounded-full bg-indigo-400/10 blur-[100px] pointer-events-none select-none z-0" />
+            
+            {/* Textura Geométrica Discreta (Bolinhas Lavanda) */}
+            <div 
+                className="absolute inset-0 pointer-events-none select-none z-0" 
+                style={{ 
+                    backgroundImage: 'radial-gradient(#E9D5FF 1.5px, transparent 1.5px)', 
+                    backgroundSize: '20px 20px',
+                    opacity: 0.4
+                }} 
+            />
 
             {/* Cabeçalho / Navegação */}
             <header className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 relative z-10">
@@ -86,12 +96,12 @@ export default function InstitucionalPage() {
                         >
                             Quero Criar Meu Perfil
                         </Link>
-                        <a
-                            href="#sobre"
+                        <Link
+                            href="/para-criadoras"
                             className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 text-base font-bold text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50 border border-gray-200 rounded-2xl transition-all duration-300 shadow-xs"
                         >
-                            Descobrir Como Funciona
-                        </a>
+                            Descobrir Como Funciona (Criadoras)
+                        </Link>
 
                     </div>
                 </div>
@@ -124,10 +134,10 @@ export default function InstitucionalPage() {
                             </ul>
                         </div>
                         <Link 
-                            href="/login" 
+                            href="/para-criadoras" 
                             className="inline-flex items-center gap-2 text-sm font-bold text-purple-600 hover:text-purple-700 transition-colors"
                         >
-                            Criar minha conta profissional →
+                            Ver como funciona para Criadoras →
                         </Link>
                     </div>
 

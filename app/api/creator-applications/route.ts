@@ -70,14 +70,14 @@ export async function POST(request: NextRequest) {
         const whatsapp = normalizeWhatsapp(body.whatsapp);
         const email = cleanText(body.email, 160).toLowerCase();
         const age = Number(body.age);
-        const cityState = cleanText(body.cityState, 120);
-        const hasOnlineExperience = cleanText(body.hasOnlineExperience, 20) as OnlineExperience;
+        const cityState = body.cityState ? cleanText(body.cityState, 120) : undefined;
+        const hasOnlineExperience = body.hasOnlineExperience ? cleanText(body.hasOnlineExperience, 20) as OnlineExperience : undefined;
         const howFoundMimo = cleanText(body.howFoundMimo, 200);
         const reason = cleanText(body.reason, 1500);
         const isAdultConfirmed = body.isAdultConfirmed === true;
         const contactConsent = body.contactConsent === true;
 
-        if (!fullName || !instagram || !whatsapp || !cityState || !hasOnlineExperience || !howFoundMimo || !reason) {
+        if (!fullName || !instagram || !whatsapp || !howFoundMimo || !reason) {
             return NextResponse.json(
                 { error: 'Preencha todos os campos obrigatórios para enviar sua inscrição.' },
                 { status: 400 }
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        if (!EXPERIENCE_OPTIONS.includes(hasOnlineExperience)) {
+        if (hasOnlineExperience && !EXPERIENCE_OPTIONS.includes(hasOnlineExperience)) {
             return NextResponse.json({ error: 'Selecione uma opção válida de experiência.' }, { status: 400 });
         }
 

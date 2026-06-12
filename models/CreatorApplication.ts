@@ -10,8 +10,8 @@ export interface ICreatorApplication extends Document {
     whatsapp: string;
     email?: string;
     age: number;
-    cityState: string;
-    hasOnlineExperience: OnlineExperience;
+    cityState?: string;
+    hasOnlineExperience?: OnlineExperience;
     howFoundMimo: string;
     reason: string;
     isAdultConfirmed: boolean;
@@ -29,10 +29,9 @@ const CreatorApplicationSchema = new Schema<ICreatorApplication>({
     whatsapp: { type: String, required: true, trim: true, index: true },
     email: { type: String, trim: true, lowercase: true },
     age: { type: Number, required: true, min: 18 },
-    cityState: { type: String, required: true, trim: true },
+    cityState: { type: String, trim: true },
     hasOnlineExperience: {
         type: String,
-        required: true,
         enum: ['yes', 'no', 'starting'],
     },
     howFoundMimo: { type: String, required: true, trim: true },

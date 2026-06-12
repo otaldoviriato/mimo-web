@@ -1,10 +1,6 @@
 export const PUBLIC_CONTENT_ROUTES = [
     '/institucional',
-    '/creators',
-    '/founders',
     '/para-criadoras',
-    '/para-criadoras2',
-    '/para-criadoras3',
     '/ajuda',
     '/termos-de-uso',
     '/politica-de-privacidade',

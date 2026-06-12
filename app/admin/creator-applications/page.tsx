@@ -29,8 +29,8 @@ interface CreatorApplicationData {
     whatsapp: string;
     email?: string;
     age: number;
-    cityState: string;
-    hasOnlineExperience: OnlineExperience;
+    cityState?: string;
+    hasOnlineExperience?: OnlineExperience;
     howFoundMimo: string;
     reason: string;
     isAdultConfirmed: boolean;
@@ -267,9 +267,11 @@ export default function CreatorApplicationsAdminPage() {
                                                     <td className="px-5 py-4 text-xs font-medium text-slate-600">{formatWhatsapp(application.whatsapp)}</td>
                                                     <td className="px-5 py-4">
                                                         <p className="text-xs font-bold text-slate-700">{application.age} anos</p>
-                                                        <p className="mt-0.5 text-xs text-slate-500">{application.cityState}</p>
+                                                        <p className="mt-0.5 text-xs text-slate-500">{application.cityState || 'Não informado'}</p>
                                                     </td>
-                                                    <td className="px-5 py-4 text-xs text-slate-600">{experienceLabels[application.hasOnlineExperience]}</td>
+                                                    <td className="px-5 py-4 text-xs text-slate-600">
+                                                        {application.hasOnlineExperience ? experienceLabels[application.hasOnlineExperience] : 'Não informado'}
+                                                    </td>
                                                     <td className="px-5 py-4"><StatusBadge status={application.status} /></td>
                                                     <td className="px-5 py-4 text-xs text-slate-500">{formatDate(application.createdAt)}</td>
                                                     <td className="px-4 py-4"><ChevronRight className="h-4 w-4 text-slate-400" /></td>
@@ -295,7 +297,7 @@ export default function CreatorApplicationsAdminPage() {
                                                 <StatusBadge status={application.status} />
                                             </div>
                                             <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
-                                                <span>{application.age} anos · {application.cityState}</span>
+                                                <span>{application.age} anos{application.cityState ? ` · ${application.cityState}` : ''}</span>
                                                 <span className="text-right">{formatDate(application.createdAt)}</span>
                                             </div>
                                         </button>
@@ -358,8 +360,8 @@ export default function CreatorApplicationsAdminPage() {
                                         <Detail label="Nome artístico" value={selected.artisticName || 'Não informado'} />
                                         <Detail label="E-mail" value={selected.email || 'Não informado'} />
                                         <Detail label="Idade" value={`${selected.age} anos`} />
-                                        <Detail label="Cidade/Estado" value={selected.cityState} />
-                                        <Detail label="Experiência online" value={experienceLabels[selected.hasOnlineExperience]} />
+                                        <Detail label="Cidade/Estado" value={selected.cityState || 'Não informado'} />
+                                        <Detail label="Experiência online" value={selected.hasOnlineExperience ? experienceLabels[selected.hasOnlineExperience] : 'Não informado'} />
                                         <Detail label="Como conheceu o Mimo" value={selected.howFoundMimo} wide />
                                         <Detail label="Por que quer entrar" value={selected.reason} wide />
                                         <Detail label="Maior de idade" value={selected.isAdultConfirmed ? 'Confirmado' : 'Não confirmado'} />
