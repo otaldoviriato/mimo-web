@@ -82,12 +82,12 @@ export async function POST(request: NextRequest) {
                     <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border-radius: 12px; background-color: #ffffff; color: #334155; border: 1px solid #e2e8f0;">
                         <!-- Conteúdo da Mensagem -->
                         <div style="margin-bottom: 25px;">
-                            <p style="font-size: 15px; line-height: 1.6; white-space: pre-wrap; color: #1e293b;">${message.trim()}</p>
+                            <div style="font-size: 15px; line-height: 1.6; color: #1e293b;">${message.trim()}</div>
                         </div>
                         
                         <!-- Rodapé Corporativo -->
                         <div style="border-top: 1px solid #f1f5f9; padding-top: 15px; margin-top: 30px; font-size: 12px; color: #94a3b8;">
-                            <p style="margin: 0; font-weight: bold;">MimoChat</p>
+                            <p style="margin: 0; font-weight: bold;">${displayName || 'MimoChat'}</p>
                             <p style="margin: 4px 0 0 0;">Este é um e-mail enviado diretamente pela administração do MimoChat.</p>
                         </div>
                     </div>

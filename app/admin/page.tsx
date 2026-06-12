@@ -2690,12 +2690,12 @@ export default function AdminPage() {
                                         </div>
 
                                         {/* Área com Scroll do Conteúdo */}
-                                        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/20" style={{ backgroundImage: 'radial-gradient(#e2e8f0 1.2px, transparent 1.2px)', backgroundSize: '14px 14px' }}>
+                                        <div className="flex-1 overflow-y-auto p-6 space-y-6" style={{ backgroundImage: 'radial-gradient(#E9D5FF 1.5px, transparent 1.5px)', backgroundSize: '20px 20px', backgroundColor: '#fafafc' }}>
                                             {/* Mensagem Original */}
                                             <div className="space-y-2">
                                                 <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Mensagem do Usuário</h4>
                                                 <div 
-                                                    className="bg-slate-50 border border-slate-100 p-5 rounded-2xl text-slate-700 text-xs sm:text-sm leading-relaxed font-medium shadow-xs max-h-[300px] overflow-y-auto"
+                                                    className="bg-slate-50 border border-slate-100 p-5 rounded-2xl text-slate-700 text-xs sm:text-sm leading-relaxed font-medium shadow-xs max-h-[300px] overflow-y-auto [&_a]:text-purple-600 [&_a]:underline [&_a]:hover:text-purple-800 [&_a]:font-semibold"
                                                     dangerouslySetInnerHTML={{ __html: selectedTicket.message }}
                                                 />
                                             </div>
@@ -3079,7 +3079,7 @@ export default function AdminPage() {
                                             </div>
 
                                             {/* Histórico / Corpo da Conversa com Scroll */}
-                                            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/20" style={{ backgroundImage: 'radial-gradient(#e2e8f0 1.2px, transparent 1.2px)', backgroundSize: '14px 14px' }}>
+                                            <div className="flex-1 overflow-y-auto p-6 space-y-6" style={{ backgroundImage: 'radial-gradient(#E9D5FF 1.5px, transparent 1.5px)', backgroundSize: '20px 20px', backgroundColor: '#fafafc' }}>
                                                 {/* Timeline de Mensagens */}
                                                 <div className="space-y-4">
                                                     {/* Mensagem Original */}
@@ -3094,7 +3094,7 @@ export default function AdminPage() {
                                                             </span>
                                                         </div>
                                                         <div 
-                                                            className="text-xs text-slate-700 leading-relaxed font-medium"
+                                                            className="text-xs text-slate-700 leading-relaxed font-medium [&_a]:text-purple-600 [&_a]:underline [&_a]:hover:text-purple-800 [&_a]:font-semibold"
                                                             dangerouslySetInnerHTML={{ __html: selectedInstMessage.message }}
                                                         />
                                                     </div>
@@ -3114,7 +3114,7 @@ export default function AdminPage() {
                                                                         </span>
                                                                     </div>
                                                                     <div 
-                                                                        className="text-xs text-slate-700 leading-relaxed font-medium"
+                                                                        className="text-xs text-slate-700 leading-relaxed font-medium [&_a]:text-purple-600 [&_a]:underline [&_a]:hover:text-purple-800 [&_a]:font-semibold"
                                                                         dangerouslySetInnerHTML={{ __html: reply.message }}
                                                                     />
                                                                 </div>

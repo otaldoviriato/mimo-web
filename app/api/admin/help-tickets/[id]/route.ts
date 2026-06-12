@@ -134,7 +134,24 @@ export async function POST(
             return NextResponse.json({ error: 'Ticket não encontrado.' }, { status: 404 });
         }
 
-        const emailFrom = process.env.HELP_EMAIL_FROM || 'suporte@mimochat.com.br';
+        // Determinar o e-mail de envio com base no recipientEmail do ticket ou fallback
+        const emailFrom = (ticket.recipientEmail || process.env.HELP_EMAIL_FROM || 'suporte@mimochat.com.br').trim().toLowerCase();
+
+        // Buscar configurações para encontrar o displayName correspondente
+        const settings = await AppSettings.findOne({ key: 'global' });
+        const emailRedirections = settings?.emailRedirections || [];
+        const redirection = emailRedirections.find(
+            (r: any) => r.sourceEmail.toLowerCase() === emailFrom
+        );
+        const displayName = redirection?.displayName;
+
+        // Montar o remetente oficial formatado com aspas duplas
+        let fromSender = emailFrom;
+        if (displayName) {
+            fromSender = `"${displayName}" <${emailFrom}>`;
+        } else if (emailFrom === 'suporte@mimochat.com.br') {
+            fromSender = `"Suporte MimoChat" <suporte@mimochat.com.br>`;
+        }
 
         // Enviar e-mail de resposta usando Resend
         if (process.env.RESEND_API_KEY) {
@@ -144,20 +161,20 @@ export async function POST(
                     : `Re: ${ticket.subject}`;
 
                 await resend.emails.send({
-                    from: emailFrom,
+                    from: fromSender,
                     to: ticket.senderEmail,
                     subject: mailSubject,
                     html: `
                         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border-radius: 12px; background-color: #ffffff; color: #334155;">
                             <!-- Cabeçalho de Resposta -->
                             <div style="margin-bottom: 25px;">
-                                <p style="font-size: 15px; line-height: 1.6; white-space: pre-wrap; color: #1e293b;">${replyMessage.trim()}</p>
+                                <div style="font-size: 15px; line-height: 1.6; color: #1e293b;">${replyMessage.trim()}</div>
                             </div>
                             
                             <!-- Rodapé Corporativo -->
                             <div style="border-top: 1px solid #f1f5f9; padding-top: 15px; margin-top: 30px; font-size: 12px; color: #94a3b8;">
-                                <p style="margin: 0; font-weight: bold;">Suporte MimoChat</p>
-                                <p style="margin: 4px 0 0 0;">Esta é uma resposta ao seu ticket de ajuda. Caso precise de mais assistência, responda a este e-mail.</p>
+                                <p style="margin: 0; font-weight: bold;">${displayName || 'Suporte MimoChat'}</p>
+                                <p style="margin: 4px 0 0 0;">Esta é uma mensagem enviada através dos canais de comunicação do MimoChat.</p>
                             </div>
                             
                             <!-- Histórico do Ticket Original -->
@@ -166,7 +183,7 @@ export async function POST(
                                 <p style="margin: 4px 0;"><strong>Enviado por:</strong> ${ticket.senderName ? `${ticket.senderName} (${ticket.senderEmail})` : ticket.senderEmail}</p>
                                 <p style="margin: 4px 0;"><strong>Data:</strong> ${ticket.createdAt.toLocaleString('pt-BR')}</p>
                                 <p style="margin: 4px 0;"><strong>Assunto:</strong> ${ticket.subject}</p>
-                                <div style="margin-top: 10px; line-height: 1.5; white-space: pre-wrap;">${ticket.message}</div>
+                                <div style="margin-top: 10px; line-height: 1.5;">${ticket.message}</div>
                             </div>
                         </div>
                     `

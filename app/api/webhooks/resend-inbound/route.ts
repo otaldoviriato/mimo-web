@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
                     }
 
                     const fromSender = redirection.displayName
-                        ? `${redirection.displayName} <${parentTicket.recipientEmail}>`
+                        ? `"${redirection.displayName}" <${parentTicket.recipientEmail}>`
                         : parentTicket.recipientEmail;
 
                     await resend.emails.send({
