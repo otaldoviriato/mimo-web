@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
 
         const settings = await AppSettings.findOne({ key: 'global' });
         const institutionalEmails = settings?.institutionalEmails || ['viriatoceo@mimochat.com.br'];
+        const emailRedirections = settings?.emailRedirections || [];
 
         const emailFrom = senderEmail.trim().toLowerCase();
 
@@ -58,18 +59,23 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'O remetente selecionado não está cadastrado como e-mail institucional autorizado.' }, { status: 400 });
         }
 
+        // Buscar displayName nas configurações
+        const redirection = emailRedirections.find(r => r.sourceEmail.toLowerCase() === emailFrom);
+        const displayName = redirection?.displayName;
+        const fromSender = displayName ? `"${displayName}" <${emailFrom}>` : emailFrom;
+
         if (!process.env.RESEND_API_KEY) {
             console.warn('RESEND_API_KEY não configurada. Simulando envio de e-mail com sucesso no ambiente local.');
             return NextResponse.json({
                 success: true,
                 simulated: true,
-                message: `[Simulação] E-mail enviado com sucesso de ${emailFrom} para ${to}.`
+                message: `[Simulação] E-mail enviado com sucesso de ${fromSender} para ${to}.`
             });
         }
 
         try {
             const result = await resend.emails.send({
-                from: emailFrom,
+                from: fromSender,
                 to: to.trim().toLowerCase(),
                 subject: subject.trim(),
                 html: `

@@ -41,7 +41,10 @@ import {
     Mail,
     Settings,
     ArrowRight,
-    MailPlus
+    MailPlus,
+    Bold,
+    Italic,
+    Link
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -120,6 +123,97 @@ interface WithdrawRequest {
     createdAt: string;
     updatedAt: string;
 }
+
+// Componente de Editor de Texto Rico (Rich Text Editor) Leve
+interface RichTextEditorProps {
+    value: string;
+    onChange: (val: string) => void;
+    placeholder?: string;
+    minHeight?: string;
+}
+
+const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeholder, minHeight = '120px' }) => {
+    const editorRef = React.useRef<HTMLDivElement>(null);
+
+    React.useEffect(() => {
+        if (editorRef.current && editorRef.current.innerHTML !== value) {
+            editorRef.current.innerHTML = value;
+        }
+    }, [value]);
+
+    const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
+        onChange(e.currentTarget.innerHTML);
+    };
+
+    const execCmd = (cmd: string, val: string = '') => {
+        document.execCommand(cmd, false, val);
+        if (editorRef.current) {
+            onChange(editorRef.current.innerHTML);
+        }
+    };
+
+    const addLink = () => {
+        const url = prompt('Digite a URL do link:');
+        if (url) {
+            execCmd('createLink', url);
+        }
+    };
+
+    return (
+        <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50 flex flex-col focus-within:ring-2 focus-within:ring-purple-500/20 focus-within:border-purple-500 transition-all w-full">
+            <style dangerouslySetInnerHTML={{__html: `
+                .editor-content:empty::before {
+                    content: attr(data-placeholder);
+                    color: #94a3b8;
+                    font-weight: 505;
+                }
+            `}} />
+            <div className="flex items-center gap-1 p-1.5 bg-slate-100/80 border-b border-slate-200 select-none">
+                <button
+                    type="button"
+                    onClick={() => execCmd('bold')}
+                    className="p-1.5 text-slate-555 hover:text-slate-800 hover:bg-slate-200/80 rounded-lg transition-all text-xs font-bold flex items-center justify-center shrink-0 cursor-pointer"
+                    title="Negrito"
+                >
+                    <Bold size={12} />
+                </button>
+                <button
+                    type="button"
+                    onClick={() => execCmd('italic')}
+                    className="p-1.5 text-slate-555 hover:text-slate-800 hover:bg-slate-200/80 rounded-lg transition-all text-xs font-bold flex items-center justify-center shrink-0 cursor-pointer"
+                    title="Itálico"
+                >
+                    <Italic size={12} />
+                </button>
+                <button
+                    type="button"
+                    onClick={addLink}
+                    className="p-1.5 text-slate-555 hover:text-slate-800 hover:bg-slate-200/80 rounded-lg transition-all text-xs font-bold flex items-center justify-center shrink-0 cursor-pointer"
+                    title="Inserir Link"
+                >
+                    <Link size={12} />
+                </button>
+                <button
+                    type="button"
+                    onClick={() => execCmd('removeFormat')}
+                    className="p-1.5 text-slate-555 hover:text-slate-800 hover:bg-slate-200/80 rounded-lg transition-all text-xs font-bold flex items-center justify-center shrink-0 cursor-pointer ml-auto"
+                    title="Limpar Formatação"
+                >
+                    <Trash2 size={12} />
+                </button>
+            </div>
+
+            <div
+                ref={editorRef}
+                contentEditable
+                onInput={handleInput}
+                data-placeholder={placeholder}
+                className="editor-content w-full p-3 text-xs bg-white focus:outline-none overflow-y-auto text-slate-700 font-medium"
+                style={{ minHeight, maxHeight: '250px' }}
+            />
+        </div>
+    );
+};
 
 export default function AdminPage() {
     const { isLoaded, isSignedIn, userId } = useAuth();
@@ -2596,13 +2690,14 @@ export default function AdminPage() {
                                         </div>
 
                                         {/* Área com Scroll do Conteúdo */}
-                                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                                        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/20" style={{ backgroundImage: 'radial-gradient(#e2e8f0 1.2px, transparent 1.2px)', backgroundSize: '14px 14px' }}>
                                             {/* Mensagem Original */}
                                             <div className="space-y-2">
                                                 <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Mensagem do Usuário</h4>
-                                                <div className="bg-slate-50 border border-slate-100 p-5 rounded-2xl text-slate-700 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-medium shadow-xs max-h-[300px] overflow-y-auto">
-                                                    {selectedTicket.message}
-                                                </div>
+                                                <div 
+                                                    className="bg-slate-50 border border-slate-100 p-5 rounded-2xl text-slate-700 text-xs sm:text-sm leading-relaxed font-medium shadow-xs max-h-[300px] overflow-y-auto"
+                                                    dangerouslySetInnerHTML={{ __html: selectedTicket.message }}
+                                                />
                                             </div>
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
@@ -2628,12 +2723,11 @@ export default function AdminPage() {
                                                 {/* Formulário de Resposta */}
                                                 <div className="space-y-2 flex flex-col">
                                                     <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Responder ao Usuário (via E-mail)</h4>
-                                                    <textarea
+                                                    <RichTextEditor
                                                         value={replyText}
-                                                        onChange={(e) => setReplyText(e.target.value)}
+                                                        onChange={setReplyText}
                                                         placeholder={`Escreva uma resposta direta para o e-mail: ${selectedTicket.senderEmail}...`}
-                                                        rows={4}
-                                                        className="w-full flex-1 p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-medium text-slate-700 placeholder-slate-400 resize-none min-h-[120px]"
+                                                        minHeight="120px"
                                                     />
                                                     <button
                                                         onClick={() => handleSendReply(selectedTicket._id)}
@@ -2985,7 +3079,7 @@ export default function AdminPage() {
                                             </div>
 
                                             {/* Histórico / Corpo da Conversa com Scroll */}
-                                            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/10">
+                                            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/20" style={{ backgroundImage: 'radial-gradient(#e2e8f0 1.2px, transparent 1.2px)', backgroundSize: '14px 14px' }}>
                                                 {/* Timeline de Mensagens */}
                                                 <div className="space-y-4">
                                                     {/* Mensagem Original */}
@@ -2999,7 +3093,10 @@ export default function AdminPage() {
                                                                 {new Date(selectedInstMessage.createdAt).toLocaleString('pt-BR')}
                                                             </span>
                                                         </div>
-                                                        <p className="text-xs text-slate-700 leading-relaxed font-medium whitespace-pre-wrap">{selectedInstMessage.message}</p>
+                                                        <div 
+                                                            className="text-xs text-slate-700 leading-relaxed font-medium"
+                                                            dangerouslySetInnerHTML={{ __html: selectedInstMessage.message }}
+                                                        />
                                                     </div>
 
                                                     {/* Respostas do Proxy */}
@@ -3016,7 +3113,10 @@ export default function AdminPage() {
                                                                             {new Date(reply.createdAt).toLocaleString('pt-BR')}
                                                                         </span>
                                                                     </div>
-                                                                    <p className="text-xs text-slate-700 leading-relaxed font-medium whitespace-pre-wrap">{reply.message}</p>
+                                                                    <div 
+                                                                        className="text-xs text-slate-700 leading-relaxed font-medium"
+                                                                        dangerouslySetInnerHTML={{ __html: reply.message }}
+                                                                    />
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -3049,12 +3149,11 @@ export default function AdminPage() {
                                                     {/* Responder ao Cliente */}
                                                     <div className="flex flex-col space-y-1.5">
                                                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Responder para {selectedInstMessage.senderEmail}</span>
-                                                        <textarea
+                                                        <RichTextEditor
                                                             value={replyInstText}
-                                                            onChange={(e) => setReplyInstText(e.target.value)}
+                                                            onChange={setReplyInstText}
                                                             placeholder="Sua resposta será enviada como o e-mail institucional oficial..."
-                                                            rows={3}
-                                                            className="p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-slate-700 font-medium placeholder-slate-455 resize-none flex-1 min-h-[80px]"
+                                                            minHeight="80px"
                                                         />
                                                         <div className="flex justify-between items-center">
                                                             <button
@@ -3322,13 +3421,12 @@ export default function AdminPage() {
                                     {/* Mensagem */}
                                     <div className="space-y-1">
                                         <span className="text-[10px] font-bold text-slate-455 uppercase tracking-widest block">Mensagem</span>
-                                        <textarea
-                                            value={newEmailMessage}
-                                            onChange={(e) => setNewEmailMessage(e.target.value)}
-                                            placeholder="Escreva sua mensagem aqui..."
-                                            rows={5}
-                                            className="w-full p-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-slate-700 font-medium placeholder-slate-450 resize-none min-h-[140px]"
-                                        />
+                                        <RichTextEditor
+                                        value={newEmailMessage}
+                                        onChange={setNewEmailMessage}
+                                        placeholder="Escreva sua mensagem aqui..."
+                                        minHeight="140px"
+                                    />
                                     </div>
                                 </div>
 
