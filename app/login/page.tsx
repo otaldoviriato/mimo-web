@@ -36,6 +36,19 @@ export default function LoginPage() {
     const [googleLoading, setGoogleLoading] = useState(false);
     const [error, setError] = useState('');
     const [ageAccepted, setAgeAccepted] = useState(false);
+    const [showAgeGateTooltip, setShowAgeGateTooltip] = useState(false);
+    const [tooltipTimeoutId, setTooltipTimeoutId] = useState<NodeJS.Timeout | null>(null);
+
+    const triggerAgeGateTooltip = () => {
+        if (tooltipTimeoutId) {
+            clearTimeout(tooltipTimeoutId);
+        }
+        setShowAgeGateTooltip(true);
+        const id = setTimeout(() => {
+            setShowAgeGateTooltip(false);
+        }, 3000);
+        setTooltipTimeoutId(id);
+    };
 
     useEffect(() => {
         if (isSignedIn) {
@@ -54,7 +67,10 @@ export default function LoginPage() {
     const onSendCode = async () => {
         if (!email.trim()) { setError('Por favor, insira seu email'); return; }
         if (!signInLoaded || !signUpLoaded) { setError('Serviço de autenticação não carregado'); return; }
-        if (!ageAccepted) { setError('Você precisa declarar que é maior de 18 anos e concordar com os termos'); return; }
+        if (!ageAccepted) { 
+            triggerAgeGateTooltip(); 
+            return; 
+        }
 
         setEmailLoading(true);
         setError('');
@@ -181,7 +197,7 @@ export default function LoginPage() {
             return;
         }
         if (!ageAccepted) {
-            setError('Você precisa declarar que é maior de 18 anos e concordar com os termos');
+            triggerAgeGateTooltip();
             return;
         }
 
@@ -252,7 +268,7 @@ export default function LoginPage() {
                                 title="Continuar com Email"
                                 onPress={onSendCode}
                                 loading={emailLoading}
-                                disabled={!isReady || !ageAccepted}
+                                disabled={!isReady}
                                 size="lg"
                                 className="w-full"
                             />
@@ -267,7 +283,7 @@ export default function LoginPage() {
                                 title={googleLoading ? 'Aguarde...' : 'Entrar com Google'}
                                 onPress={onSignInWithGoogle}
                                 loading={googleLoading}
-                                disabled={!isReady || !ageAccepted}
+                                disabled={!isReady}
                                 variant="outline"
                                 size="lg"
                                 icon={
@@ -282,7 +298,15 @@ export default function LoginPage() {
                             />
 
                             {/* Checkbox de Maioridade e Consentimento Legal */}
-                            <div className="flex items-start gap-2.5 mt-2 mb-0.5 text-left select-none">
+                            <div className="relative flex items-start gap-2.5 mt-2 mb-0.5 text-left select-none">
+                                {showAgeGateTooltip && (
+                                    <div className="absolute bottom-full left-0 mb-2 w-full max-w-[280px] bg-slate-900 text-white text-[11px] font-bold py-2 px-3 rounded-xl shadow-lg z-20 flex items-center gap-1.5 border border-slate-800 transition-all duration-200 animate-in fade-in slide-in-from-bottom-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0 animate-pulse"></div>
+                                        <span>Marque esta opção para continuar</span>
+                                        {/* Setinha apontando para baixo */}
+                                        <div className="absolute top-full left-4 -mt-1 w-2 h-2 bg-slate-900 rotate-45 border-r border-b border-slate-800"></div>
+                                    </div>
+                                )}
                                 <input
                                     type="checkbox"
                                     id="age-gate-checkbox"
