@@ -36,8 +36,8 @@ export async function GET(request: NextRequest) {
         const isFavorite = searchParams.get('favorite');
         const isRead = searchParams.get('read');
 
-        // Construção do objeto de query do Mongoose
-        const query: any = {};
+        // Construção do objeto de query do Mongoose - Apenas tickets destinados ao suporte
+        const query: any = { recipientEmail: 'suporte@mimochat.com.br' };
 
         // Filtro de status
         if (status && ['novo', 'em_atendimento', 'lido', 'resolvido', 'arquivado'].includes(status)) {

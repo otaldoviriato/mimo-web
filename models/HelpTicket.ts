@@ -3,6 +3,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IHelpTicket extends Document {
     senderEmail: string;
     senderName?: string;
+    recipientEmail: string;
     subject: string;
     message: string;
     status: 'novo' | 'em_atendimento' | 'lido' | 'resolvido' | 'arquivado';
@@ -21,6 +22,12 @@ const HelpTicketSchema = new Schema<IHelpTicket>({
     },
     senderName: { 
         type: String 
+    },
+    recipientEmail: {
+        type: String,
+        required: true,
+        default: 'suporte@mimochat.com.br',
+        index: true
     },
     subject: { 
         type: String, 

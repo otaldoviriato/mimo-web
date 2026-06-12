@@ -15,6 +15,7 @@ import {
     LifeBuoy,
     ClipboardList,
     TrendingUp,
+    Mail,
     X
 } from 'lucide-react';
 import Link from 'next/link';
@@ -36,6 +37,7 @@ export function Sidebar({ activeTab, setActiveTab, isOpen = false, onClose }: Si
         { id: 'withdrawals', label: 'Solicitações de Saque', icon: Wallet },
         { id: 'coupons', label: 'Cupons de Desconto', icon: Ticket },
         { id: 'help-tickets', label: 'Tickets de Ajuda', icon: LifeBuoy },
+        { id: 'institutional-emails', label: 'E-mails Institucionais', icon: Mail },
         { id: 'creator-applications', label: 'Inscrições de Criadoras', icon: ClipboardList, href: '/admin/creator-applications' },
     ];
 

@@ -31,11 +31,11 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { senderPrefix, to, subject, message } = body;
+        const { senderEmail, to, subject, message } = body;
 
         // Validações básicas
-        if (!senderPrefix || !senderPrefix.trim()) {
-            return NextResponse.json({ error: 'O prefixo do remetente é obrigatório.' }, { status: 400 });
+        if (!senderEmail || !senderEmail.trim()) {
+            return NextResponse.json({ error: 'O remetente é obrigatório.' }, { status: 400 });
         }
         if (!to || !to.trim()) {
             return NextResponse.json({ error: 'O destinatário (Para) é obrigatório.' }, { status: 400 });
@@ -47,13 +47,16 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'A mensagem é obrigatória.' }, { status: 400 });
         }
 
-        // Sanitização simples do prefixo do remetente (apenas letras, números, hífen, underline e ponto)
-        const sanitizedPrefix = senderPrefix.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
-        if (!sanitizedPrefix) {
-            return NextResponse.json({ error: 'Prefixo do remetente inválido.' }, { status: 400 });
-        }
+        const settings = await AppSettings.findOne({ key: 'global' });
+        const institutionalEmails = settings?.institutionalEmails || ['viriatoceo@mimochat.com.br'];
 
-        const emailFrom = `${sanitizedPrefix}@mimochat.com.br`;
+        const emailFrom = senderEmail.trim().toLowerCase();
+
+        // Permite suporte@mimochat.com.br ou qualquer e-mail institucional cadastrado
+        const isAllowedSender = emailFrom === 'suporte@mimochat.com.br' || institutionalEmails.includes(emailFrom);
+        if (!isAllowedSender) {
+            return NextResponse.json({ error: 'O remetente selecionado não está cadastrado como e-mail institucional autorizado.' }, { status: 400 });
+        }
 
         if (!process.env.RESEND_API_KEY) {
             console.warn('RESEND_API_KEY não configurada. Simulando envio de e-mail com sucesso no ambiente local.');

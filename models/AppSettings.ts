@@ -20,6 +20,7 @@ export interface IAppSettings extends Document {
     creditCardEnabled: boolean;
     couponsEnabled: boolean;
     chatSessionTimeoutMinutes: number;
+    institutionalEmails: string[];
     createdAt: Date;
     updatedAt: Date;
 }
@@ -31,6 +32,10 @@ const AppSettingsSchema = new Schema<IAppSettings>({
         unique: true,
         default: 'global',
         index: true,
+    },
+    institutionalEmails: {
+        type: [String],
+        default: ['viriatoceo@mimochat.com.br']
     },
     platformFeePercentage: {
         type: Number,

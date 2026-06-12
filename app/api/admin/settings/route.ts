@@ -39,6 +39,7 @@ async function getOrCreateSettings() {
         if (settings.couponsEnabled === undefined) { settings.couponsEnabled = true; updated = true; }
         if (settings.chatSessionTimeoutMinutes === undefined) { settings.chatSessionTimeoutMinutes = 30; updated = true; }
         if (settings.minSubscriptionPrice === undefined) { settings.minSubscriptionPrice = 10; updated = true; }
+        if (settings.institutionalEmails === undefined) { settings.institutionalEmails = ['viriatoceo@mimochat.com.br']; updated = true; }
         if (updated) {
             await settings.save();
         }

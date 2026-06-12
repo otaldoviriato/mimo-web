@@ -48,6 +48,25 @@ export async function POST(request: NextRequest) {
             senderEmail = match[2]?.trim() || fromString;
         }
 
+        // Extrair destinatário (campo "to")
+        const toVal = emailData.to;
+        let recipientEmail = 'suporte@mimochat.com.br';
+        let toString = '';
+        if (Array.isArray(toVal) && toVal.length > 0) {
+            toString = toVal[0];
+        } else if (typeof toVal === 'string') {
+            toString = toVal;
+        }
+
+        if (toString) {
+            const toMatch = toString.match(fromRegex);
+            if (toMatch) {
+                recipientEmail = toMatch[2]?.trim().toLowerCase() || toString.trim().toLowerCase();
+            } else {
+                recipientEmail = toString.trim().toLowerCase();
+            }
+        }
+
         // Prevenir loops de e-mail e tickets gerados por e-mails de sistema ou de envio
         const systemEmails = [
             'noreply@mimochat.com.br',
@@ -70,6 +89,7 @@ export async function POST(request: NextRequest) {
         const ticket = await HelpTicket.create({
             senderEmail: senderEmail.toLowerCase(),
             senderName: senderName || undefined,
+            recipientEmail: recipientEmail,
             subject: subject.trim(),
             message: message.trim(),
             status: 'novo',
@@ -96,8 +116,8 @@ export async function POST(request: NextRequest) {
             ? process.env.HELP_EMAIL_TO.split(',').map(e => e.trim()) 
             : (adminEmails.length > 0 ? adminEmails : [FALLBACK_ADMIN_EMAIL]);
 
-        // Enviar notificação aos administradores via Resend
-        if (process.env.RESEND_API_KEY) {
+        // Enviar notificação aos administradores via Resend apenas se for e-mail de suporte
+        if (process.env.RESEND_API_KEY && recipientEmail === 'suporte@mimochat.com.br') {
             try {
                 const formattedName = ticket.senderName ? `${ticket.senderName} (${ticket.senderEmail})` : ticket.senderEmail;
                 await resend.emails.send({
