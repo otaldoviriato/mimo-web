@@ -204,6 +204,13 @@ export default function AdminPage() {
     const [ticketNotes, setTicketNotes] = useState('');
     const [savingNotes, setSavingNotes] = useState(false);
 
+    // Estados para envio de e-mail avulso
+    const [newEmailSenderPrefix, setNewEmailSenderPrefix] = useState('viriatoceo');
+    const [newEmailTo, setNewEmailTo] = useState('');
+    const [newEmailSubject, setNewEmailSubject] = useState('');
+    const [newEmailMessage, setNewEmailMessage] = useState('');
+    const [sendingNewEmail, setSendingNewEmail] = useState(false);
+
     // Mapeamento de títulos para o Header
     const tabTitles: { [key: string]: string } = {
         dashboard: 'Painel Geral',
@@ -736,6 +743,55 @@ export default function AdminPage() {
             toast.error('Erro de conexão.');
         } finally {
             setSendingReply(false);
+        }
+    };
+
+    const handleSendNewEmail = async () => {
+        if (!newEmailSenderPrefix.trim()) {
+            toast.error('Informe o prefixo do remetente.');
+            return;
+        }
+        if (!newEmailTo.trim()) {
+            toast.error('Informe o destinatário.');
+            return;
+        }
+        if (!newEmailSubject.trim()) {
+            toast.error('Informe o assunto.');
+            return;
+        }
+        if (!newEmailMessage.trim()) {
+            toast.error('Escreva a mensagem do e-mail.');
+            return;
+        }
+        setSendingNewEmail(true);
+        try {
+            const response = await fetch('/api/admin/send-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    senderPrefix: newEmailSenderPrefix,
+                    to: newEmailTo,
+                    subject: newEmailSubject,
+                    message: newEmailMessage,
+                })
+            });
+            if (response.ok) {
+                toast.success('E-mail enviado com sucesso!', {
+                    style: { borderRadius: '12px', background: '#1E293B', color: '#FFF', fontWeight: 600 }
+                });
+                setNewEmailTo('');
+                setNewEmailSubject('');
+                setNewEmailMessage('');
+                setSelectedTicket(null);
+            } else {
+                const errData = await response.json();
+                toast.error(errData.error || 'Erro ao enviar e-mail.');
+            }
+        } catch (error) {
+            console.error('Erro ao enviar e-mail avulso:', error);
+            toast.error('Erro de conexão.');
+        } finally {
+            setSendingNewEmail(false);
         }
     };
 
@@ -2056,6 +2112,29 @@ export default function AdminPage() {
                                         >
                                             <Star size={14} className={ticketFavoriteFilter ? 'fill-amber-400' : ''} />
                                         </button>
+                                        <button
+                                            onClick={() => {
+                                                setSelectedTicket({
+                                                    _id: 'new-email',
+                                                    senderEmail: '',
+                                                    subject: '',
+                                                    message: '',
+                                                    status: 'novo',
+                                                    isFavorite: false,
+                                                    isRead: true,
+                                                    createdAt: new Date().toISOString(),
+                                                    updatedAt: new Date().toISOString(),
+                                                });
+                                                setNewEmailSenderPrefix('viriatoceo');
+                                                setNewEmailTo('');
+                                                setNewEmailSubject('');
+                                                setNewEmailMessage('');
+                                            }}
+                                            className="p-2 border border-purple-200 bg-purple-50 hover:bg-purple-100 active:bg-purple-205 text-purple-600 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 shadow-sm"
+                                            title="Escrever Novo E-mail"
+                                        >
+                                            <Plus size={14} />
+                                        </button>
                                     </div>
 
                                     {/* Abas horizontais de Status */}
@@ -2197,8 +2276,112 @@ export default function AdminPage() {
                             {/* DETALHES E RESPOSTA (Coluna Direita) */}
                             <div className="lg:col-span-7 xl:col-span-8 bg-white border border-slate-200/80 rounded-2xl flex flex-col overflow-hidden h-full shadow-sm">
                                 {selectedTicket ? (
-                                    <div className="flex-1 flex flex-col overflow-hidden">
-                                        {/* Header do Visualizador */}
+                                    selectedTicket._id === 'new-email' ? (
+                                        <div className="flex-1 flex flex-col overflow-hidden animate-fade-in">
+                                            {/* Header do Editor */}
+                                            <div className="p-5 border-b border-slate-100 flex justify-between items-center shrink-0 bg-slate-50/50">
+                                                <div className="space-y-1">
+                                                    <h3 className="text-slate-800 text-sm font-extrabold leading-tight flex items-center gap-2">
+                                                        <Plus size={14} className="text-purple-600" />
+                                                        Escrever Novo E-mail Corporativo
+                                                    </h3>
+                                                    <p className="text-[11px] text-slate-500 font-semibold leading-none">
+                                                        Envie um e-mail oficial utilizando o domínio verificado <strong className="text-purple-600">@mimochat.com.br</strong>
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    onClick={() => setSelectedTicket(null)}
+                                                    className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+
+                                            {/* Área de Redação */}
+                                            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                                                {/* Remetente */}
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Remetente</label>
+                                                    <div className="flex items-center gap-2 max-w-md">
+                                                        <div className="relative flex-1 flex items-center">
+                                                            <input
+                                                                type="text"
+                                                                value={newEmailSenderPrefix}
+                                                                onChange={(e) => setNewEmailSenderPrefix(e.target.value)}
+                                                                placeholder="ex: viriatoceo"
+                                                                className="w-full text-right pr-2 pl-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-l-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700 placeholder-slate-400 transition-all"
+                                                            />
+                                                            <span className="bg-slate-100 border-y border-r border-slate-200 text-slate-500 px-3 py-2 text-xs font-bold rounded-r-xl select-none">
+                                                                @mimochat.com.br
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-400 font-medium">Você pode personalizar o prefixo antes do @ para qualquer e-mail (ex: suporte, financeiro, viriato, etc.)</p>
+                                                </div>
+
+                                                {/* Destinatário */}
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Para (Destinatário)</label>
+                                                    <input
+                                                        type="email"
+                                                        value={newEmailTo}
+                                                        onChange={(e) => setNewEmailTo(e.target.value)}
+                                                        placeholder="exemplo@gmail.com"
+                                                        className="w-full max-w-xl p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-semibold text-slate-700 placeholder-slate-400 transition-all"
+                                                    />
+                                                </div>
+
+                                                {/* Assunto */}
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Assunto</label>
+                                                    <input
+                                                        type="text"
+                                                        value={newEmailSubject}
+                                                        onChange={(e) => setNewEmailSubject(e.target.value)}
+                                                        placeholder="Digite o assunto do e-mail..."
+                                                        className="w-full max-w-xl p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-semibold text-slate-700 placeholder-slate-400 transition-all"
+                                                    />
+                                                </div>
+
+                                                {/* Mensagem */}
+                                                <div className="space-y-1.5 flex flex-col h-[280px]">
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Mensagem (Corpo do E-mail)</label>
+                                                    <textarea
+                                                        value={newEmailMessage}
+                                                        onChange={(e) => setNewEmailMessage(e.target.value)}
+                                                        placeholder="Escreva a mensagem do e-mail aqui..."
+                                                        className="w-full flex-1 p-4 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-medium text-slate-700 placeholder-slate-400 resize-none min-h-[180px] leading-relaxed"
+                                                    />
+                                                </div>
+
+                                                {/* Ações */}
+                                                <div className="pt-2 flex items-center gap-3">
+                                                    <button
+                                                        onClick={handleSendNewEmail}
+                                                        disabled={sendingNewEmail || !newEmailTo.trim() || !newEmailSubject.trim() || !newEmailMessage.trim()}
+                                                        className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 disabled:opacity-60 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-purple-600/15 cursor-pointer flex items-center gap-2"
+                                                    >
+                                                        {sendingNewEmail ? (
+                                                            <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                                                        ) : (
+                                                            <Send size={13} />
+                                                        )}
+                                                        {sendingNewEmail ? 'Enviando...' : 'Enviar E-mail'}
+                                                    </button>
+                                                    
+                                                    <button
+                                                        onClick={() => setSelectedTicket(null)}
+                                                        disabled={sendingNewEmail}
+                                                        className="px-5 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                                                    >
+                                                        Cancelar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex-1 flex flex-col overflow-hidden">
+                                            {/* Header do Visualizador */}
                                         <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shrink-0 bg-slate-50/50">
                                             <div className="space-y-1">
                                                 <h3 className="text-slate-800 text-sm font-extrabold leading-tight">
@@ -2322,6 +2505,7 @@ export default function AdminPage() {
                                             </div>
                                         </div>
                                     </div>
+                                    )
                                 ) : (
                                     <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-400 animate-fade-in">
                                         <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center border border-slate-100 text-slate-350 mb-4 shadow-inner">
