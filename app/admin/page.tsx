@@ -329,7 +329,7 @@ export default function AdminPage() {
         if (typeof window !== 'undefined') {
             const params = new URLSearchParams(window.location.search);
             const tabParam = params.get('tab');
-            if (tabParam && ['dashboard', 'clients', 'professionals', 'rooms', 'financial', 'withdrawals', 'settings', 'coupons', 'help-tickets', 'institutional-emails', 'outbox'].includes(tabParam)) {
+            if (tabParam && ['dashboard', 'clients', 'professionals', 'rooms', 'financial', 'withdrawals', 'settings', 'coupons', 'help-tickets', 'institutional-emails'].includes(tabParam)) {
                 setActiveTab(tabParam);
             }
         }
@@ -441,10 +441,7 @@ export default function AdminPage() {
     const [newInstEmailDisplayName, setNewInstEmailDisplayName] = useState('');
     const [addingInstEmail, setAddingInstEmail] = useState(false);
 
-    // Estados para a Caixa de Saída
-    const [outboxMessages, setOutboxMessages] = useState<HelpTicketData[]>([]);
-    const [loadingOutbox, setLoadingOutbox] = useState(false);
-    const [outboxSearch, setOutboxSearch] = useState('');
+
 
     // Mapeamento de títulos para o Header
     const tabTitles: { [key: string]: string } = {
@@ -458,7 +455,6 @@ export default function AdminPage() {
         coupons: 'Gerenciamento de Cupons de Desconto',
         'help-tickets': 'Tickets de Ajuda',
         'institutional-emails': 'E-mails Institucionais',
-        'outbox': 'Caixa de Saída',
     };
 
     // Período comparativo selecionado na Dashboard
@@ -1308,27 +1304,10 @@ export default function AdminPage() {
             fetchHelpTickets();
         } else if (activeTab === 'institutional-emails') {
             fetchInstitutionalData();
-        } else if (activeTab === 'outbox') {
-            fetchOutbox();
         }
     }, [activeTab, selectedPeriod, isAuthorized, selectedInstEmail, instSearch, instStatusFilter]);
 
-    const fetchOutbox = async () => {
-        setLoadingOutbox(true);
-        try {
-            const response = await fetch('/api/admin/outbox');
-            if (response.ok) {
-                const data = await response.json();
-                setOutboxMessages(data.messages || []);
-            } else {
-                toast.error('Erro ao carregar a caixa de saída.');
-            }
-        } catch (error) {
-            console.error('Erro ao buscar caixa de saída:', error);
-        } finally {
-            setLoadingOutbox(false);
-        }
-    };
+
 
     // Abrir modal de auditoria buscando histórico de mensagens reais
     const handleOpenAuditModal = async (chat: ChatRoom) => {
@@ -2037,128 +2016,6 @@ export default function AdminPage() {
                         </div>
                     )}
 
-                    {/* TAB: OUTBOX - CAIXA DE SAÍDA */}
-                    {activeTab === 'outbox' && (
-                        <div className="space-y-6 animate-fade-in-up">
-                            {/* Header */}
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
-                                <div>
-                                    <h3 className="text-slate-800 text-base font-extrabold tracking-tight flex items-center gap-2">
-                                        <Send size={18} className="text-purple-600" />
-                                        Caixa de Saída
-                                    </h3>
-                                    <p className="text-slate-500 text-xs mt-0.5">Histórico de todos os e-mails enviados pela equipe MimoChat.</p>
-                                </div>
-                                <button
-                                    onClick={fetchOutbox}
-                                    disabled={loadingOutbox}
-                                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
-                                >
-                                    <Loader2 size={13} className={loadingOutbox ? 'animate-spin' : ''} />
-                                    Atualizar
-                                </button>
-                            </div>
-
-                            {/* Search */}
-                            <div className="relative">
-                                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                                <input
-                                    type="text"
-                                    placeholder="Buscar por destinatário, assunto ou remetente..."
-                                    value={outboxSearch}
-                                    onChange={(e) => setOutboxSearch(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-medium text-slate-700 placeholder-slate-400 shadow-xs"
-                                />
-                            </div>
-
-                            {/* Messages Table */}
-                            <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
-                                {loadingOutbox ? (
-                                    <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-400">
-                                        <Loader2 className="h-7 w-7 text-purple-600 animate-spin" />
-                                        <span className="text-xs font-semibold">Buscando e-mails enviados...</span>
-                                    </div>
-                                ) : (() => {
-                                    const filtered = outboxMessages.filter(m => {
-                                        if (!outboxSearch.trim()) return true;
-                                        const q = outboxSearch.toLowerCase();
-                                        return (
-                                            m.recipientEmail?.toLowerCase().includes(q) ||
-                                            m.senderEmail?.toLowerCase().includes(q) ||
-                                            m.subject?.toLowerCase().includes(q) ||
-                                            m.senderName?.toLowerCase().includes(q)
-                                        );
-                                    });
-
-                                    if (filtered.length === 0) {
-                                        return (
-                                            <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-400">
-                                                <div className="w-14 h-14 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center">
-                                                    <Send size={24} className="text-slate-300" />
-                                                </div>
-                                                <div className="text-center">
-                                                    <p className="text-sm font-bold text-slate-600">Nenhum e-mail enviado</p>
-                                                    <p className="text-xs text-slate-400 mt-1 max-w-xs">
-                                                        {outboxSearch ? 'Nenhum resultado para essa busca.' : 'Os e-mails enviados pela Dashboard aparecerão aqui.'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        );
-                                    }
-
-                                    return (
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full text-left border-collapse">
-                                                <thead>
-                                                    <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                                                        <th className="py-3.5 px-5">De</th>
-                                                        <th className="py-3.5 px-5">Para</th>
-                                                        <th className="py-3.5 px-5">Assunto</th>
-                                                        <th className="py-3.5 px-5">Mensagem</th>
-                                                        <th className="py-3.5 px-5">Data</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-slate-100">
-                                                    {filtered.map((msg) => (
-                                                        <tr key={msg._id} className="hover:bg-slate-50/50 transition-colors group">
-                                                            <td className="py-4 px-5">
-                                                                <div className="flex items-center gap-2.5">
-                                                                    <div className="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
-                                                                        <Send size={11} className="text-purple-600" />
-                                                                    </div>
-                                                                    <div>
-                                                                        {msg.senderName && <p className="text-xs font-bold text-slate-700">{msg.senderName}</p>}
-                                                                        <p className="text-[10px] font-medium text-slate-400">{msg.senderEmail}</p>
-                                                                    </div>
-                                                                </div>
-                                                            </td>
-                                                            <td className="py-4 px-5">
-                                                                <p className="text-xs font-semibold text-slate-600">{msg.recipientEmail}</p>
-                                                            </td>
-                                                            <td className="py-4 px-5 max-w-[200px]">
-                                                                <p className="text-xs font-semibold text-slate-700 truncate" title={msg.subject}>{msg.subject}</p>
-                                                            </td>
-                                                            <td className="py-4 px-5 max-w-[300px]">
-                                                                <div
-                                                                    className="text-[10px] text-slate-500 leading-relaxed line-clamp-2 [&_a]:text-purple-600 [&_a]:underline"
-                                                                    dangerouslySetInnerHTML={{ __html: msg.message }}
-                                                                />
-                                                            </td>
-                                                            <td className="py-4 px-5">
-                                                                <p className="text-[10px] font-medium text-slate-400 whitespace-nowrap">
-                                                                    {new Date(msg.createdAt).toLocaleString('pt-BR')}
-                                                                </p>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    );
-                                })()}
-                            </div>
-                        </div>
-                    )}
 
                     {/* TAB: SETTINGS */}
 
