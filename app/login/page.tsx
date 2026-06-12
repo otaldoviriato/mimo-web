@@ -300,11 +300,14 @@ export default function LoginPage() {
                             {/* Checkbox de Maioridade e Consentimento Legal */}
                             <div className="relative flex items-start gap-2.5 mt-2 mb-0.5 text-left select-none">
                                 {showAgeGateTooltip && (
-                                    <div className="absolute bottom-full left-0 mb-2 w-full max-w-[280px] bg-slate-900 text-white text-[11px] font-bold py-2 px-3 rounded-xl shadow-lg z-20 flex items-center gap-1.5 border border-slate-800 transition-all duration-200 animate-in fade-in slide-in-from-bottom-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0 animate-pulse"></div>
-                                        <span>Marque esta opção para continuar</span>
+                                    <div className="absolute bottom-full left-0 mb-3 w-full max-w-[280px] bg-purple-950/95 backdrop-blur-md text-white text-[11px] font-extrabold py-2.5 px-3.5 rounded-xl shadow-lg shadow-purple-500/10 z-20 flex items-center gap-2 border border-purple-500/30 transition-all duration-300 animate-in fade-in slide-in-from-bottom-2">
+                                        <span className="relative flex h-2 w-2 shrink-0">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-fuchsia-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-fuchsia-500"></span>
+                                        </span>
+                                        <span className="tracking-wide text-purple-100">Marque esta opção para continuar</span>
                                         {/* Setinha apontando para baixo */}
-                                        <div className="absolute top-full left-4 -mt-1 w-2 h-2 bg-slate-900 rotate-45 border-r border-b border-slate-800"></div>
+                                        <div className="absolute top-full left-4 -mt-1 w-2 h-2 bg-purple-950/95 rotate-45 border-r border-b border-purple-500/30"></div>
                                     </div>
                                 )}
                                 <input
