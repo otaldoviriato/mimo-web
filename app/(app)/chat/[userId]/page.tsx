@@ -203,6 +203,36 @@ function MediaEarningsIndicator({ messageId, receiverEarnings, cost, isSelected,
 }
 
 
+const VideoPlayer = ({ src, isActive, controlsVisible }: { src: string; isActive: boolean; controlsVisible: boolean }) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        if (isActive) {
+            video.currentTime = 0;
+            video.play().catch(err => {
+                console.log("Autoplay blocked or failed:", err);
+            });
+        } else {
+            video.pause();
+            video.currentTime = 0;
+        }
+    }, [isActive]);
+
+    return (
+        <video
+            ref={videoRef}
+            src={src}
+            controls={controlsVisible}
+            playsInline
+            className="max-w-full max-h-full object-contain animate-in fade-in duration-200"
+            onClick={e => e.stopPropagation()}
+        />
+    );
+};
+
 export default function ChatPage({ params, userId: propUserId, giftCode: propGiftCode, onBack, isSubPage = false, isClosing = false }: ChatPageProps) {
     const resolvedParams = params ? use(params) : null;
     const otherUserId = propUserId || resolvedParams?.userId || '';
@@ -2414,14 +2444,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                         onClick={handleSlideClick}
                                     >
                                         {item.isVideo ? (
-                                            <video
+                                            <VideoPlayer
                                                 key={item.url}
                                                 src={item.url}
-                                                controls
-                                                autoPlay={idx === fullscreenIndex}
-                                                playsInline
-                                                className="max-w-full max-h-full object-contain"
-                                                onClick={e => e.stopPropagation()}
+                                                isActive={idx === fullscreenIndex}
+                                                controlsVisible={controlsVisible}
                                             />
                                         ) : (
                                             <img
