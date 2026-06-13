@@ -25,15 +25,13 @@ export async function GET(request: NextRequest) {
 
         const query: Record<string, any> = {
             isProfessional: true,
-            professionalStatus: { $in: ['pending', 'approved', 'rejected'] }
         };
 
         if (status) {
-            if (status === 'pending' || status === 'approved' || status === 'rejected') {
-                query.professionalStatus = status;
-            } else {
-                query.professionalStatus = status;
-            }
+            query.professionalStatus = status;
+        } else {
+            // Por padrão, não exibe as arquivadas para evitar poluição no painel principal
+            query.professionalStatus = { $in: ['pending', 'approved', 'rejected'] };
         }
 
         if (search) {

@@ -18,7 +18,7 @@ import { DashboardHeader } from '@/components/admin/DashboardHeader';
 import { InstagramIcon } from '@/components/InstagramIcon';
 import { Sidebar } from '@/components/admin/Sidebar';
 
-type ApplicationStatus = 'pending' | 'approved' | 'rejected';
+type ApplicationStatus = 'pending' | 'approved' | 'rejected' | 'archived';
 type OnlineExperience = 'yes' | 'no' | 'starting';
 
 interface CreatorApplicationData {
@@ -46,18 +46,21 @@ const statusOptions: Array<{ value: ApplicationStatus | ''; label: string }> = [
     { value: 'pending', label: 'Pendentes' },
     { value: 'approved', label: 'Aprovadas' },
     { value: 'rejected', label: 'Rejeitadas' },
+    { value: 'archived', label: 'Arquivadas' },
 ];
 
 const statusLabels: Record<ApplicationStatus, string> = {
     pending: 'Pendente',
     approved: 'Aprovada',
     rejected: 'Rejeitada',
+    archived: 'Arquivada',
 };
 
 const statusClasses: Record<ApplicationStatus, string> = {
     pending: 'border-amber-200 bg-amber-50 text-amber-700',
     approved: 'border-emerald-200 bg-emerald-50 text-emerald-700',
     rejected: 'border-rose-200 bg-rose-50 text-rose-700',
+    archived: 'border-slate-200 bg-slate-100 text-slate-700',
 };
 
 const experienceLabels: Record<OnlineExperience, string> = {
@@ -79,6 +82,7 @@ export default function CreatorApplicationsAdminPage() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [notes, setNotes] = useState('');
     const [detailStatus, setDetailStatus] = useState<ApplicationStatus>('pending');
+    const [deleting, setDeleting] = useState(false);
 
     const fetchApplications = useCallback(async () => {
         if (!isSignedIn) return;
@@ -163,6 +167,30 @@ export default function CreatorApplicationsAdminPage() {
         }
     }
 
+    async function handleDelete() {
+        if (!selected) return;
+        if (!window.confirm(`Tem certeza que deseja EXCLUIR permanentemente a inscrição e a conta Clerk da criadora "${selected.fullName}"? Esta ação deleta o registro no MongoDB e a conta do Clerk, permitindo que ela faça uma nova inscrição do zero.`)) {
+            return;
+        }
+        setDeleting(true);
+
+        try {
+            const response = await fetch(`/api/backoffice/creator-applications/${selected._id}`, {
+                method: 'DELETE',
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Erro ao excluir inscrição.');
+
+            setApplications(current => current.filter(item => item._id !== selected._id));
+            setSelected(null);
+            toast.success('Inscrição e conta Clerk excluídas com sucesso.');
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Erro ao excluir inscrição.');
+        } finally {
+            setDeleting(false);
+        }
+    }
+
     if (!isLoaded || loading && !isSignedIn) {
         return <CenteredState icon={<Loader2 className="h-8 w-8 animate-spin text-purple-600" />} text="Carregando backoffice..." />;
     }
@@ -180,7 +208,9 @@ export default function CreatorApplicationsAdminPage() {
         <div className="flex min-h-screen bg-slate-50">
             <Sidebar
                 activeTab="creator-applications"
-                setActiveTab={() => undefined}
+                setActiveTab={(tab) => {
+                    window.location.href = `/admin?tab=${tab}`;
+                }}
                 isOpen={sidebarOpen}
                 onClose={() => setSidebarOpen(false)}
             />
@@ -326,22 +356,17 @@ export default function CreatorApplicationsAdminPage() {
                             </div>
                         ) : (
                             <div className="space-y-6 p-5 sm:p-7">
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <ContactLink
-                                        href={`https://www.instagram.com/${selected.instagram}/`}
-                                        icon={<InstagramIcon className="h-5 w-5" />}
-                                        label="Abrir Instagram"
-                                        value={`@${selected.instagram}`}
-                                        tone="purple"
-                                    />
-                                    <ContactLink
-                                        href={`https://wa.me/${whatsappForLink(selected.whatsapp)}`}
-                                        icon={<MessageCircle className="h-5 w-5" />}
-                                        label="Conversar no WhatsApp"
-                                        value={formatWhatsapp(selected.whatsapp)}
-                                        tone="green"
-                                    />
-                                </div>
+                                {selected.whatsapp && selected.whatsapp !== 'Não informado' && (
+                                    <div className="grid gap-3 sm:grid-cols-1">
+                                        <ContactLink
+                                            href={`https://wa.me/${whatsappForLink(selected.whatsapp)}`}
+                                            icon={<MessageCircle className="h-5 w-5" />}
+                                            label="Conversar no WhatsApp"
+                                            value={formatWhatsapp(selected.whatsapp)}
+                                            tone="green"
+                                        />
+                                    </div>
+                                )}
 
                                 <section className="rounded-2xl border border-slate-200 p-5">
                                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Dados de Cadastro</h3>
@@ -383,10 +408,26 @@ export default function CreatorApplicationsAdminPage() {
                                         type="button"
                                         onClick={saveDetails}
                                         disabled={saving}
-                                        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-purple-200 transition hover:bg-purple-700 disabled:opacity-60"
+                                        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-purple-200 transition hover:bg-purple-700 disabled:opacity-60 cursor-pointer"
                                     >
                                         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                                         {saving ? 'Salvando...' : 'Salvar status e notas'}
+                                    </button>
+                                </section>
+
+                                <section className="rounded-2xl border border-rose-200 bg-rose-50/20 p-5">
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-rose-600">Zona de Perigo</h3>
+                                    <p className="mt-1 text-xs text-slate-500">
+                                        Excluir permanentemente o registro e a conta do Clerk. A criadora poderá realizar uma nova inscrição do zero se desejar.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={handleDelete}
+                                        disabled={deleting}
+                                        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-rose-200 hover:bg-rose-700 transition disabled:opacity-60 cursor-pointer"
+                                    >
+                                        {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
+                                        Excluir Inscrição permanentemente
                                     </button>
                                 </section>
                             </div>
