@@ -14,6 +14,23 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         }
 
+        // Valida se a conta Clerk é nova (criada a menos de 2 minutos)
+        // Isso protege contas antigas de clientes contra a inicialização de perfil profissional
+        try {
+            const client = await clerkClient();
+            const clerkUser = await client.users.getUser(userId);
+            const isNewAccount = clerkUser.createdAt 
+                ? (Date.now() - new Date(clerkUser.createdAt).getTime() < 120000)
+                : false;
+
+            if (!isNewAccount) {
+                console.log(`[init-professional] Tentativa de promover conta antiga de cliente (${userId}) ignorada.`);
+                return NextResponse.json({ success: false, reason: 'existing_account' });
+            }
+        } catch (clerkErr) {
+            console.error('[init-professional] Erro ao obter dados do usuário do Clerk:', clerkErr);
+        }
+
         await connectToDatabase();
 
         let user = await User.findOne({ clerkId: userId });

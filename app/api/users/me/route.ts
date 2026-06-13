@@ -88,7 +88,51 @@ export async function GET() {
                     return NextResponse.json({ error: 'User not found' }, { status: 404 });
                 }
             }
-        } else if (user.email.includes('@placeholder.com')) {
+        } else {
+            // O usuário já existe no MongoDB. Sincroniza o status profissional se houver discrepância com o Clerk
+            try {
+                const client = await clerkClient();
+                const clerkUser = await client.users.getUser(userId);
+                const isProfessionalClerk = clerkUser.unsafeMetadata?.role === 'professional';
+
+                if (isProfessionalClerk && !user.isProfessional) {
+                    user.isProfessional = true;
+                    user.professionalStatus = 'pending';
+                    await user.save();
+                    console.log(`[GET /api/users/me] Sincronizado status profissional pendente para o usuário ${userId} baseado nos metadados do Clerk.`);
+
+                    // Envia email de notificação se for promovido aqui
+                    try {
+                        const appUrl = process.env.NEXT_PUBLIC_API_URL || 'https://www.mimochat.com.br';
+                        await resend.emails.send({
+                            from: 'Mimo Cadastro <onboarding@resend.dev>',
+                            to: 'viriatoceo@gmail.com',
+                            subject: `Nova Inscrição de Criadora (Sync GET) - @${user.username}`,
+                            html: `
+                                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                                    <h2 style="color: #6d28d9; margin-top: 0;">Nova Criadora Cadastrada</h2>
+                                    <p style="color: #475569; font-size: 16px;">Uma nova conta de criadora foi criada e está aguardando aprovação.</p>
+                                    <ul style="background-color: #f8fafc; padding: 15px 25px; border-radius: 6px; list-style-type: none; margin: 20px 0;">
+                                        <li style="margin-bottom: 8px;"><strong>Nome:</strong> ${user.name || user.username}</li>
+                                        <li style="margin-bottom: 8px;"><strong>E-mail:</strong> ${user.email}</li>
+                                        <li style="margin-bottom: 8px;"><strong>Username:</strong> @${user.username}</li>
+                                        <li style="margin-bottom: 0;"><strong>Data de Cadastro:</strong> ${new Date().toLocaleString('pt-BR')}</li>
+                                    </ul>
+                                    <p style="color: #475569; margin-bottom: 25px;">Acesse o painel do backoffice para avaliar o cadastro.</p>
+                                    <a href="${appUrl}/admin/creator-applications" style="background-color: #6d28d9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; text-align: center;">Ver Inscrições no Backoffice</a>
+                                </div>
+                            `
+                        });
+                    } catch (e) {
+                        console.error('Erro ao enviar email de sincronização GET:', e);
+                    }
+                }
+            } catch (syncErr) {
+                console.warn('[GET /api/users/me] Falha ao sincronizar metadados do Clerk:', syncErr);
+            }
+        }
+
+        if (user.email.includes('@placeholder.com')) {
             try {
                 const client = await clerkClient();
                 const clerkUser = await client.users.getUser(userId);
@@ -139,6 +183,7 @@ export async function GET() {
                     createdAt: card.createdAt,
                 })),
                 bio: user.bio || '',
+                isAdmin: user.clerkId === 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM' || Boolean(settings?.adminClerkIds?.includes(user.clerkId)),
                 maxPricePerChar,
                 maxSubscriptionPrice,
                 minSubscriptionPrice,

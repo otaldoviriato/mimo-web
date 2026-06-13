@@ -34,36 +34,29 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
     // Redirecionamento e inicialização para perfil profissional pendente
     useEffect(() => {
-        if (!isLoaded || !isSignedIn || !userData || !user) return;
+        if (!isLoaded || !isSignedIn || !userData) return;
 
         const isProfessionalFlow = typeof window !== 'undefined' && localStorage.getItem('mimo_signup_flow') === 'professional';
         
-        // Uma conta é considerada nova se foi criada nos últimos 2 minutos (120000ms)
-        const isNewAccount = user.createdAt 
-            ? (Date.now() - new Date(user.createdAt).getTime() < 120000)
-            : false;
-
         const handleProfessionalInit = async () => {
-            if (isProfessionalFlow) {
-                if (!isNewAccount) {
-                    // Se não for uma conta recém-criada, limpa a flag do fluxo e não promove o usuário
-                    localStorage.removeItem('mimo_signup_flow');
-                    return;
-                }
-
-                if (!userData.isProfessional) {
-                    try {
+            if (isProfessionalFlow && !userData.isProfessional) {
+                try {
+                    const response = await fetch('/api/users/me/init-professional', { method: 'POST' });
+                    const data = await response.json();
+                    
+                    // Se a API indicar que a conta é antiga ou houver erro, limpa a flag e não faz nada
+                    if (data.reason === 'existing_account' || !response.ok) {
                         localStorage.removeItem('mimo_signup_flow');
-                        const response = await fetch('/api/users/me/init-professional', { method: 'POST' });
-                        if (response.ok) {
-                            await refetchProfile();
-                            router.replace('/aguardando-aprovacao');
-                        }
-                    } catch (err) {
-                        console.error('Erro ao inicializar perfil profissional:', err);
+                        return;
                     }
-                    return;
+
+                    localStorage.removeItem('mimo_signup_flow');
+                    await refetchProfile();
+                    router.replace('/aguardando-aprovacao');
+                } catch (err) {
+                    console.error('Erro ao inicializar perfil profissional:', err);
                 }
+                return;
             }
 
             if (userData.isProfessional && userData.professionalStatus === 'pending') {
@@ -72,7 +65,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         };
 
         handleProfessionalInit();
-    }, [isLoaded, isSignedIn, userData, user, router, refetchProfile]);
+    }, [isLoaded, isSignedIn, userData, router, refetchProfile]);
 
     // Inicialização de roteamento para Deep Links no carregamento inicial da sessão
     useEffect(() => {
