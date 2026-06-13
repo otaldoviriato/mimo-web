@@ -611,7 +611,7 @@ export default function ProfilePage() {
                 </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 pb-24 flex flex-col gap-4 max-w-md w-full mx-auto">
+            <div className="flex-1 overflow-y-auto p-4 pb-24 flex flex-col gap-4 max-w-md w-full mx-auto relative z-10">
                 {/* Informações Básicas */}
                 <div className="bg-white rounded-2xl border border-gray-100 p-5 flex items-center gap-4 shadow-sm">
                     <button
