@@ -3,12 +3,14 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useClerk } from '@clerk/nextjs';
+import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, LogOut, CheckCircle2, AlertTriangle, ShieldAlert, Sparkles, MessageCircle } from 'lucide-react';
 
 export default function AguardandoAprovacaoPage() {
     const { isLoaded, isSignedIn } = useAuth();
     const { signOut } = useClerk();
     const router = useRouter();
+    const queryClient = useQueryClient();
 
     const [status, setStatus] = useState<'pending' | 'approved' | 'rejected' | 'loading'>('loading');
     const [name, setName] = useState('');
@@ -48,6 +50,36 @@ export default function AguardandoAprovacaoPage() {
                         if (interval) {
                             clearInterval(interval);
                             interval = null;
+                        }
+
+                        // Sincroniza o cache do React Query de forma imediata para evitar redirecionamentos reversos no layout
+                        try {
+                            queryClient.setQueryData(['user', 'me'], (oldData: any) => {
+                                if (oldData) {
+                                    return {
+                                        ...oldData,
+                                        professionalStatus: 'approved'
+                                    };
+                                }
+                                return oldData;
+                            });
+                            queryClient.invalidateQueries({ queryKey: ['user', 'me'] });
+                        } catch (e) {
+                            console.error('Erro ao atualizar cache do React Query:', e);
+                        }
+
+                        // Atualiza o localStorage para refletir a aprovação de imediato
+                        if (typeof window !== 'undefined') {
+                            const cachedProfile = localStorage.getItem('mimo_profile');
+                            if (cachedProfile) {
+                                try {
+                                    const profile = JSON.parse(cachedProfile);
+                                    profile.professionalStatus = 'approved';
+                                    localStorage.setItem('mimo_profile', JSON.stringify(profile));
+                                } catch (e) {
+                                    console.error(e);
+                                }
+                            }
                         }
 
                         setStatus('approved');
