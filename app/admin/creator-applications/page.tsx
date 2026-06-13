@@ -200,7 +200,7 @@ export default function CreatorApplicationsAdminPage() {
 
     async function handleDelete() {
         if (!selected) return;
-        if (!window.confirm(`Tem certeza que deseja EXCLUIR permanentemente a inscrição e a conta Clerk da criadora "${selected.fullName}"? Esta ação deleta o registro no MongoDB e a conta do Clerk, permitindo que ela faça uma nova inscrição do zero.`)) {
+        if (!window.confirm(`⚠️ ATENÇÃO: Esta ação irá EXCLUIR permanentemente o usuário correspondente no Clerk e no MongoDB, junto com a sua inscrição! A criadora perderá todo o acesso à conta dela no Mimo.\n\nTem certeza que deseja excluir a criadora "${selected.fullName}" e deletar o seu usuário do sistema definitivamente?`)) {
             return;
         }
         setDeleting(true);
@@ -497,7 +497,7 @@ export default function CreatorApplicationsAdminPage() {
                                 <section className="rounded-2xl border border-rose-200 bg-rose-50/20 p-5">
                                     <h3 className="text-xs font-bold uppercase tracking-wider text-rose-600">Zona de Perigo</h3>
                                     <p className="mt-1 text-xs text-slate-500">
-                                        Excluir permanentemente o registro e a conta do Clerk. A criadora poderá realizar uma nova inscrição do zero se desejar.
+                                        Excluir permanentemente o registro e a conta de usuário correspondente no Clerk e MongoDB. A criadora perderá todo o acesso.
                                     </p>
                                     <button
                                         type="button"
@@ -506,7 +506,7 @@ export default function CreatorApplicationsAdminPage() {
                                         className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-rose-200 hover:bg-rose-700 transition disabled:opacity-60 cursor-pointer"
                                     >
                                         {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
-                                        Excluir Inscrição permanentemente
+                                        Excluir Inscrição e Usuário permanentemente
                                     </button>
                                 </section>
                             </div>
