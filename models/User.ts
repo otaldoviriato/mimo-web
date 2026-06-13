@@ -24,6 +24,8 @@ export interface IUser extends Document {
     coverUrl?: string;
     balance: number;
     isProfessional: boolean;
+    professionalStatus?: 'pending' | 'approved' | 'rejected' | null;
+    notes?: string;
     subscriptionPrice: number;
     isSubscriptionEnabled: boolean;
     chargePerCharSubscribers: number;
@@ -84,6 +86,16 @@ const UserSchema = new Schema<IUser>({
     isProfessional: {
         type: Boolean,
         default: false,
+    },
+    professionalStatus: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected', null],
+        default: null,
+        index: true,
+    },
+    notes: {
+        type: String,
+        default: '',
     },
     subscriptionPrice: {
         type: Number,

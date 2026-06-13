@@ -110,7 +110,17 @@ export default function LoginPage() {
             if (errCode === 'form_identifier_not_found') {
                 // Conta não existe — cria transparentemente sem o usuário perceber
                 try {
-                    await signUp!.create({ emailAddress: email });
+                    const isProfessionalFlow = typeof window !== 'undefined' && (
+                        new URLSearchParams(window.location.search).get('role') === 'professional' ||
+                        localStorage.getItem('mimo_signup_flow') === 'professional'
+                    );
+
+                    const signUpParams: any = { emailAddress: email };
+                    if (isProfessionalFlow) {
+                        signUpParams.unsafeMetadata = { role: 'professional' };
+                    }
+
+                    await signUp!.create(signUpParams);
                     await signUp!.prepareEmailAddressVerification({ strategy: 'email_code' });
                     setFlowType('signUp');
                     setPendingVerification(true);

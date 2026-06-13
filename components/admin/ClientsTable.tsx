@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, MoreVertical, ShieldCheck, Mail, Calendar, Coins, Edit, Trash2, X, Phone, UserCheck } from 'lucide-react';
+import { Search, MoreVertical, ShieldCheck, Mail, Calendar, Coins, Edit, Trash2, X, Phone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 
@@ -69,30 +69,7 @@ export function ClientsTable() {
         }
     };
 
-    // Ação rápida: Alterar tipo de perfil para Profissional
-    const handlePromoteToProfessional = async (clerkId: string) => {
-        try {
-            const res = await fetch(`/api/admin/users/${clerkId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ isProfessional: true })
-            });
 
-            if (res.ok) {
-                toast.success('Cliente promovido a Profissional!', {
-                    style: { borderRadius: '12px', background: '#1E293B', color: '#FFF' }
-                });
-                setUsers(prev => prev.filter(u => u.clerkId !== clerkId));
-                setSelectedUserMenu(null);
-            } else {
-                const data = await res.json();
-                toast.error(data.error || 'Erro ao alterar tipo do usuário.');
-            }
-        } catch (err) {
-            console.error('Erro ao atualizar tipo:', err);
-            toast.error('Erro de conexão ao tentar atualizar.');
-        }
-    };
 
     const getInitials = (name: string) => {
         const parts = name.split(' ');
@@ -276,16 +253,7 @@ export function ClientsTable() {
                                                                 Editar Perfil
                                                             </button>
 
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handlePromoteToProfessional(user.clerkId);
-                                                                }}
-                                                                className="w-full flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer text-left"
-                                                            >
-                                                                <UserCheck size={14} className="text-indigo-500" />
-                                                                Tornar Profissional
-                                                            </button>
+
                                                         </div>
 
                                                         <div className="py-1">

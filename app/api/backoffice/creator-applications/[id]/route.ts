@@ -1,9 +1,12 @@
 import mongoose from 'mongoose';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminAccess } from '@/lib/adminAuth';
-import { CreatorApplication, CreatorApplicationStatus } from '@/models/CreatorApplication';
+import { User } from '@/models/User';
+import { connectToDatabase } from '@/lib/db';
+import { Resend } from 'resend';
 
-const STATUSES: CreatorApplicationStatus[] = ['pending', 'contacted', 'approved', 'rejected'];
+const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
+const STATUSES = ['pending', 'approved', 'rejected'];
 
 async function authorize() {
     const access = await getAdminAccess();
@@ -26,13 +29,30 @@ export async function GET(
 
         const { id } = await context.params;
         if (!mongoose.Types.ObjectId.isValid(id)) {
-            return NextResponse.json({ error: 'Inscrição inválida.' }, { status: 400 });
+            return NextResponse.json({ error: 'ID de usuário inválido.' }, { status: 400 });
         }
 
-        const application = await CreatorApplication.findById(id).lean();
-        if (!application) {
-            return NextResponse.json({ error: 'Inscrição não encontrada.' }, { status: 404 });
+        await connectToDatabase();
+
+        const u = await User.findById(id).lean();
+        if (!u) {
+            return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 });
         }
+
+        const application = {
+            _id: u._id.toString(),
+            fullName: u.name || u.username,
+            artisticName: u.username,
+            instagram: u.username,
+            whatsapp: u.phone || 'Não informado',
+            email: u.email,
+            age: 0,
+            cityState: 'Não informado',
+            status: u.professionalStatus || 'pending',
+            notes: u.notes || '',
+            createdAt: u.createdAt ? u.createdAt.toISOString() : new Date().toISOString(),
+            updatedAt: u.updatedAt ? u.updatedAt.toISOString() : new Date().toISOString(),
+        };
 
         return NextResponse.json({ success: true, application });
     } catch (error) {
@@ -51,17 +71,19 @@ export async function PATCH(
 
         const { id } = await context.params;
         if (!mongoose.Types.ObjectId.isValid(id)) {
-            return NextResponse.json({ error: 'Inscrição inválida.' }, { status: 400 });
+            return NextResponse.json({ error: 'ID de usuário inválido.' }, { status: 400 });
         }
 
+        await connectToDatabase();
+
         const body = await request.json();
-        const update: { status?: CreatorApplicationStatus; notes?: string } = {};
+        const update: { professionalStatus?: string; notes?: string } = {};
 
         if (body.status !== undefined) {
             if (!STATUSES.includes(body.status)) {
                 return NextResponse.json({ error: 'Status inválido.' }, { status: 400 });
             }
-            update.status = body.status;
+            update.professionalStatus = body.status;
         }
 
         if (body.notes !== undefined) {
@@ -75,15 +97,63 @@ export async function PATCH(
             return NextResponse.json({ error: 'Nenhuma alteração válida foi enviada.' }, { status: 400 });
         }
 
-        const application = await CreatorApplication.findByIdAndUpdate(
+        const oldUser = await User.findById(id);
+        if (!oldUser) {
+            return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 });
+        }
+
+        const oldStatus = oldUser.professionalStatus;
+
+        const u = await User.findByIdAndUpdate(
             id,
             { $set: update },
             { new: true, runValidators: true }
         ).lean();
 
-        if (!application) {
-            return NextResponse.json({ error: 'Inscrição não encontrada.' }, { status: 404 });
+        if (!u) {
+            return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 });
         }
+
+        if (update.professionalStatus === 'approved' && oldStatus !== 'approved') {
+            try {
+                const appUrl = process.env.NEXT_PUBLIC_API_URL || 'https://www.mimochat.com.br';
+                await resend.emails.send({
+                    from: 'Mimo Cadastro <onboarding@resend.dev>',
+                    to: u.email,
+                    subject: 'Sua conta de criadora no Mimo foi aprovada! 🎉',
+                    html: `
+                        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                            <h2 style="color: #6d28d9; margin-top: 0;">Sua conta foi aprovada! 🎉</h2>
+                            <p style="color: #475569; font-size: 16px;">Olá, <strong>${u.name || u.username}</strong>.</p>
+                            <p style="color: #475569; font-size: 16px;">Temos ótimas notícias! Sua conta de criadora no Mimo foi analisada e aprovada pela nossa equipe.</p>
+                            <p style="color: #475569; font-size: 16px;">Agora você já pode acessar o aplicativo e começar a interagir com seus fãs.</p>
+                            <div style="text-align: center; margin: 30px 0;">
+                                <a href="${appUrl}" style="background-color: #6d28d9; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Acessar o Mimo</a>
+                            </div>
+                            <p style="color: #94a3b8; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 15px; margin-top: 30px;">Se você tiver alguma dúvida, entre em contato com nosso suporte.</p>
+                        </div>
+                    `
+                });
+                console.log(`✉️ Email de aprovação enviado para criadora: ${u.email}`);
+            } catch (emailErr) {
+                console.error('Erro ao enviar e-mail de aprovação para a criadora:', emailErr);
+            }
+        }
+
+        const application = {
+            _id: u._id.toString(),
+            fullName: u.name || u.username,
+            artisticName: u.username,
+            instagram: u.username,
+            whatsapp: u.phone || 'Não informado',
+            email: u.email,
+            age: 0,
+            cityState: 'Não informado',
+            status: u.professionalStatus || 'pending',
+            notes: u.notes || '',
+            createdAt: u.createdAt ? u.createdAt.toISOString() : new Date().toISOString(),
+            updatedAt: u.updatedAt ? u.updatedAt.toISOString() : new Date().toISOString(),
+        };
 
         return NextResponse.json({ success: true, application });
     } catch (error) {

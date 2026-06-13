@@ -1,0 +1,228 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@clerk/nextjs';
+import { useClerk } from '@clerk/nextjs';
+import { Loader2, LogOut, CheckCircle2, AlertTriangle, ShieldAlert, Sparkles, MessageCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+export default function AguardandoAprovacaoPage() {
+    const { isLoaded, isSignedIn } = useAuth();
+    const { signOut } = useClerk();
+    const router = useRouter();
+
+    const [status, setStatus] = useState<'pending' | 'approved' | 'rejected' | 'loading'>('loading');
+    const [name, setName] = useState('');
+    const [animatingRelease, setAnimatingRelease] = useState(false);
+
+    useEffect(() => {
+        if (!isLoaded) return;
+        if (!isSignedIn) {
+            router.replace('/login');
+            return;
+        }
+
+        // Função para checar o status
+        const checkStatus = async () => {
+            try {
+                const response = await fetch('/api/users/me');
+                if (!response.ok) throw new Error();
+                const data = await response.json();
+                
+                if (data.user) {
+                    setName(data.user.name || data.user.username);
+                    const userStatus = data.user.professionalStatus;
+
+                    if (userStatus === 'approved') {
+                        setStatus('approved');
+                        // Se detectou a aprovação agora, inicia a animação de liberação!
+                        setAnimatingRelease(true);
+                        toast.success('Sua conta foi aprovada! Redirecionando...', {
+                            duration: 3000,
+                            icon: '🎉',
+                            style: {
+                                borderRadius: '12px',
+                                background: '#1E293B',
+                                color: '#FFF',
+                            }
+                        });
+                        setTimeout(() => {
+                            router.replace('/chats');
+                        }, 2500);
+                    } else if (userStatus === 'rejected') {
+                        setStatus('rejected');
+                    } else {
+                        setStatus('pending');
+                    }
+                }
+            } catch (err) {
+                console.error('Erro ao verificar status da conta:', err);
+            }
+        };
+
+        // Roda imediatamente no mount
+        checkStatus();
+
+        // Configura o polling a cada 5 segundos
+        const interval = setInterval(checkStatus, 5000);
+
+        return () => clearInterval(interval);
+    }, [isLoaded, isSignedIn, router]);
+
+    const handleLogout = async () => {
+        await signOut();
+        router.replace('/login');
+    };
+
+    if (!isLoaded || status === 'loading') {
+        return (
+            <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-white relative overflow-hidden">
+                {/* Dotted Background */}
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-60"></div>
+                <Loader2 className="h-10 w-10 animate-spin text-purple-500 relative z-10" />
+                <p className="mt-4 text-sm font-semibold text-slate-400 relative z-10">Carregando seus dados...</p>
+            </div>
+        );
+    }
+
+    if (animatingRelease) {
+        return (
+            <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-white relative overflow-hidden transition-all duration-1000">
+                {/* Efeito de flash e liberação */}
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-fuchsia-900/40 to-slate-950 animate-pulse"></div>
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,#312e81_1px,transparent_1px),linear-gradient(to_bottom,#312e81_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-35"></div>
+                
+                <div className="relative z-10 text-center space-y-6 max-w-md p-6 animate-out fade-out zoom-out-90 duration-[2000ms] delay-500">
+                    <div className="relative mx-auto w-24 h-24 bg-gradient-to-tr from-purple-500 via-fuchsia-500 to-indigo-500 rounded-3xl flex items-center justify-center shadow-2xl shadow-purple-500/35 animate-bounce">
+                        <Sparkles className="h-12 w-12 text-white" />
+                        <span className="absolute inset-0 rounded-3xl border border-white/40 animate-ping"></span>
+                    </div>
+                    <div className="space-y-2">
+                        <h1 className="text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-fuchsia-300 to-indigo-300">
+                            Acesso Liberado!
+                        </h1>
+                        <p className="text-sm font-bold text-purple-200">
+                            Sua conta foi aprovada! Prepare-se para a experiência.
+                        </p>
+                    </div>
+                    <div className="flex space-x-1.5 justify-center items-center pt-2">
+                        <span className="w-2.5 h-2.5 bg-fuchsia-400 rounded-full animate-ping" style={{ animationDelay: '0ms' }}></span>
+                        <span className="w-2.5 h-2.5 bg-purple-400 rounded-full animate-ping" style={{ animationDelay: '150ms' }}></span>
+                        <span className="w-2.5 h-2.5 bg-indigo-400 rounded-full animate-ping" style={{ animationDelay: '300ms' }}></span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-white p-6 relative overflow-hidden select-none">
+            {/* Dotted Background */}
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e1b4b_1px,transparent_1px),linear-gradient(to_bottom,#1e1b4b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_75%,transparent_100%)] opacity-50"></div>
+            
+            {/* Luzes decorativas roxas no background */}
+            <div className="absolute -top-40 -left-40 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl"></div>
+            <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-fuchsia-600/10 rounded-full blur-3xl"></div>
+
+            <div className="relative z-10 max-w-md w-full bg-slate-900/70 border border-slate-800/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl flex flex-col items-center text-center space-y-6">
+                
+                {/* Logo e Status Indicator */}
+                <div className="inline-flex w-20 h-20 items-center justify-center bg-gradient-to-br from-purple-600 to-purple-700 rounded-3xl shadow-lg relative">
+                    <img
+                        src="/Logo.svg"
+                        alt="MimoChat"
+                        className="w-12 h-12 object-contain"
+                    />
+                </div>
+
+                {status === 'pending' && (
+                    <>
+                        <div className="space-y-2">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-extrabold uppercase bg-amber-500/10 text-amber-400 rounded-full border border-amber-500/20">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                Perfil em Análise
+                            </span>
+                            <h1 className="text-2xl font-black tracking-tight mt-3 text-slate-100">
+                                Olá, {name}! 💜
+                            </h1>
+                            <p className="text-sm font-semibold text-slate-400 leading-relaxed px-2">
+                                Recebemos seu cadastro. Sua conta de criadora profissional está pendente de aprovação pela nossa equipe.
+                            </p>
+                        </div>
+
+                        <div className="w-full bg-slate-800/40 border border-slate-800 rounded-2xl p-4.5 text-left text-xs font-semibold text-slate-300 leading-relaxed space-y-3">
+                            <p className="flex items-center gap-2 text-slate-200">
+                                <span className="relative flex h-2 w-2 shrink-0">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
+                                </span>
+                                O que acontece agora?
+                            </p>
+                            <p className="pl-4 text-slate-400">
+                                1. Estamos revisando seu perfil para garantir a segurança da nossa comunidade.
+                            </p>
+                            <p className="pl-4 text-slate-400">
+                                2. Assim que seu cadastro for aprovado, **esta tela atualizará automaticamente** e você será notificada por e-mail.
+                            </p>
+                        </div>
+
+                        <div className="flex flex-col w-full gap-3 pt-2">
+                            <div className="text-xs font-bold text-slate-500 flex items-center justify-center gap-1.5">
+                                <div className="h-1.5 w-1.5 bg-purple-500 rounded-full animate-ping"></div>
+                                Polling ativo. Aguardando liberação...
+                            </div>
+                            
+                            <button
+                                onClick={handleLogout}
+                                className="w-full flex items-center justify-center gap-2 py-3 px-4 text-sm font-extrabold text-slate-400 hover:text-white bg-slate-800/40 hover:bg-slate-800 border border-slate-800/80 rounded-xl transition duration-200 cursor-pointer"
+                            >
+                                <LogOut size={16} />
+                                Sair da Conta
+                            </button>
+                        </div>
+                    </>
+                )}
+
+                {status === 'rejected' && (
+                    <>
+                        <div className="space-y-2">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-extrabold uppercase bg-rose-500/10 text-rose-400 rounded-full border border-rose-500/20">
+                                <ShieldAlert className="h-3 w-3" />
+                                Cadastro Rejeitado
+                            </span>
+                            <h1 className="text-2xl font-black tracking-tight mt-3 text-slate-100">
+                                Inscrição Não Aprovada
+                            </h1>
+                            <p className="text-sm font-semibold text-slate-400 leading-relaxed px-2">
+                                Lamentamos, {name}, mas sua inscrição para perfil profissional não pôde ser aprovada no momento.
+                            </p>
+                        </div>
+
+                        <div className="w-full bg-slate-800/40 border border-slate-800 rounded-2xl p-4.5 text-xs font-semibold text-slate-400 leading-relaxed">
+                            Se você acredita que isso foi um engano ou deseja obter mais informações, sinta-se à vontade para entrar em contato com nosso suporte técnico.
+                        </div>
+
+                        <div className="flex flex-col w-full gap-3 pt-2">
+                            <a
+                                href="mailto:suporte@mimochat.com.br"
+                                className="w-full flex items-center justify-center gap-2 py-3 px-4 text-sm font-extrabold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-xl shadow-lg shadow-purple-500/10 transition duration-200 cursor-pointer"
+                            >
+                                <MessageCircle size={16} />
+                                Contatar Suporte
+                            </a>
+                            
+                            <button
+                                onClick={handleLogout}
+                                className="w-full flex items-center justify-center gap-2 py-3 px-4 text-sm font-extrabold text-slate-400 hover:text-white bg-slate-800/40 hover:bg-slate-800 border border-slate-800/80 rounded-xl transition duration-200 cursor-pointer"
+                            >
+                                <LogOut size={16} />
+                                Sair da Conta
+                            </button>
+                        </div>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+}

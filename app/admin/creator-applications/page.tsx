@@ -18,7 +18,7 @@ import { DashboardHeader } from '@/components/admin/DashboardHeader';
 import { InstagramIcon } from '@/components/InstagramIcon';
 import { Sidebar } from '@/components/admin/Sidebar';
 
-type ApplicationStatus = 'pending' | 'contacted' | 'approved' | 'rejected';
+type ApplicationStatus = 'pending' | 'approved' | 'rejected';
 type OnlineExperience = 'yes' | 'no' | 'starting';
 
 interface CreatorApplicationData {
@@ -44,21 +44,18 @@ interface CreatorApplicationData {
 const statusOptions: Array<{ value: ApplicationStatus | ''; label: string }> = [
     { value: '', label: 'Todas' },
     { value: 'pending', label: 'Pendentes' },
-    { value: 'contacted', label: 'Contatadas' },
     { value: 'approved', label: 'Aprovadas' },
     { value: 'rejected', label: 'Rejeitadas' },
 ];
 
 const statusLabels: Record<ApplicationStatus, string> = {
     pending: 'Pendente',
-    contacted: 'Contatada',
     approved: 'Aprovada',
     rejected: 'Rejeitada',
 };
 
 const statusClasses: Record<ApplicationStatus, string> = {
     pending: 'border-amber-200 bg-amber-50 text-amber-700',
-    contacted: 'border-blue-200 bg-blue-50 text-blue-700',
     approved: 'border-emerald-200 bg-emerald-50 text-emerald-700',
     rejected: 'border-rose-200 bg-rose-50 text-rose-700',
 };
@@ -246,8 +243,7 @@ export default function CreatorApplicationsAdminPage() {
                                             <tr>
                                                 <th className="px-5 py-4">Criadora</th>
                                                 <th className="px-5 py-4">Contato</th>
-                                                <th className="px-5 py-4">Idade / Cidade</th>
-                                                <th className="px-5 py-4">Experiência</th>
+                                                <th className="px-5 py-4">E-mail</th>
                                                 <th className="px-5 py-4">Status</th>
                                                 <th className="px-5 py-4">Enviada em</th>
                                                 <th className="w-12 px-4 py-4" />
@@ -265,13 +261,7 @@ export default function CreatorApplicationsAdminPage() {
                                                         <p className="mt-0.5 text-xs text-purple-600">@{application.instagram}</p>
                                                     </td>
                                                     <td className="px-5 py-4 text-xs font-medium text-slate-600">{formatWhatsapp(application.whatsapp)}</td>
-                                                    <td className="px-5 py-4">
-                                                        <p className="text-xs font-bold text-slate-700">{application.age} anos</p>
-                                                        <p className="mt-0.5 text-xs text-slate-500">{application.cityState || 'Não informado'}</p>
-                                                    </td>
-                                                    <td className="px-5 py-4 text-xs text-slate-600">
-                                                        {application.hasOnlineExperience ? experienceLabels[application.hasOnlineExperience] : 'Não informado'}
-                                                    </td>
+                                                    <td className="px-5 py-4 text-xs font-semibold text-slate-600">{application.email}</td>
                                                     <td className="px-5 py-4"><StatusBadge status={application.status} /></td>
                                                     <td className="px-5 py-4 text-xs text-slate-500">{formatDate(application.createdAt)}</td>
                                                     <td className="px-4 py-4"><ChevronRight className="h-4 w-4 text-slate-400" /></td>
@@ -297,7 +287,7 @@ export default function CreatorApplicationsAdminPage() {
                                                 <StatusBadge status={application.status} />
                                             </div>
                                             <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
-                                                <span>{application.age} anos{application.cityState ? ` · ${application.cityState}` : ''}</span>
+                                                <span className="truncate">{application.email}</span>
                                                 <span className="text-right">{formatDate(application.createdAt)}</span>
                                             </div>
                                         </button>
@@ -354,19 +344,13 @@ export default function CreatorApplicationsAdminPage() {
                                 </div>
 
                                 <section className="rounded-2xl border border-slate-200 p-5">
-                                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Dados enviados</h3>
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Dados de Cadastro</h3>
                                     <div className="mt-4 grid gap-x-5 gap-y-4 sm:grid-cols-2">
-                                        <Detail label="Nome completo" value={selected.fullName} />
-                                        <Detail label="Nome artístico" value={selected.artisticName || 'Não informado'} />
+                                        <Detail label="Nome de exibição" value={selected.fullName} />
+                                        <Detail label="Username" value={`@${selected.instagram}`} />
                                         <Detail label="E-mail" value={selected.email || 'Não informado'} />
-                                        <Detail label="Idade" value={`${selected.age} anos`} />
-                                        <Detail label="Cidade/Estado" value={selected.cityState || 'Não informado'} />
-                                        <Detail label="Experiência online" value={selected.hasOnlineExperience ? experienceLabels[selected.hasOnlineExperience] : 'Não informado'} />
-                                        <Detail label="Como conheceu o Mimo" value={selected.howFoundMimo} wide />
-                                        <Detail label="Por que quer entrar" value={selected.reason} wide />
-                                        <Detail label="Maior de idade" value={selected.isAdultConfirmed ? 'Confirmado' : 'Não confirmado'} />
-                                        <Detail label="Aceitou contato" value={selected.contactConsent ? 'Confirmado' : 'Não confirmado'} />
-                                        <Detail label="Data de envio" value={formatDateTime(selected.createdAt)} wide />
+                                        <Detail label="Telefone" value={selected.whatsapp || 'Não informado'} />
+                                        <Detail label="Data de Cadastro" value={formatDateTime(selected.createdAt)} wide />
                                     </div>
                                 </section>
 

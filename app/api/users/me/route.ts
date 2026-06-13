@@ -5,6 +5,9 @@ import { User, type ICard } from '@/models/User';
 import { Room } from '@/models/Room';
 import { Message } from '@/models/Message';
 import { AppSettings } from '@/models/AppSettings';
+import { Resend } from 'resend';
+
+const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
 
 // GET /api/users/me - Get current user
 export async function GET() {
@@ -32,16 +35,47 @@ export async function GET() {
                 const email = clerkUser.emailAddresses[0]?.emailAddress || `user_${userId}@placeholder.com`;
                 const username = clerkUser.username || `user_${userId.substring(userId.length - 8)}`;
 
+                const isProfessional = clerkUser.unsafeMetadata?.role === 'professional';
+                const professionalStatus = isProfessional ? 'pending' : null;
+
                 user = await User.create({
                     clerkId: userId,
                     email: email,
                     username: username,
                     name: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' '),
                     balance: 0,
-                    isProfessional: false,
+                    isProfessional,
+                    professionalStatus,
                     chargePerCharSubscribers: 0.002,
                     chargePerCharNonSubscribers: 0.005,
                 });
+
+                if (isProfessional && professionalStatus === 'pending') {
+                    try {
+                        const appUrl = process.env.NEXT_PUBLIC_API_URL || 'https://www.mimochat.com.br';
+                        await resend.emails.send({
+                            from: 'Mimo Cadastro <onboarding@resend.dev>',
+                            to: 'viriatoceo@gmail.com',
+                            subject: `Nova Inscrição de Criadora (Lazy) - @${username}`,
+                            html: `
+                                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                                    <h2 style="color: #6d28d9; margin-top: 0;">Nova Criadora Cadastrada</h2>
+                                    <p style="color: #475569; font-size: 16px;">Uma nova conta de criadora foi criada e está aguardando aprovação.</p>
+                                    <ul style="background-color: #f8fafc; padding: 15px 25px; border-radius: 6px; list-style-type: none; margin: 20px 0;">
+                                        <li style="margin-bottom: 8px;"><strong>Nome:</strong> ${user.name}</li>
+                                        <li style="margin-bottom: 8px;"><strong>E-mail:</strong> ${email}</li>
+                                        <li style="margin-bottom: 8px;"><strong>Username:</strong> @${username}</li>
+                                        <li style="margin-bottom: 0;"><strong>Data de Cadastro:</strong> ${new Date().toLocaleString('pt-BR')}</li>
+                                    </ul>
+                                    <p style="color: #475569; margin-bottom: 25px;">Acesse o painel do backoffice para avaliar o cadastro.</p>
+                                    <a href="${appUrl}/admin/creator-applications" style="background-color: #6d28d9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; text-align: center;">Ver Inscrições no Backoffice</a>
+                                </div>
+                            `
+                        });
+                    } catch (e) {
+                        console.error('Erro ao enviar email lazy create:', e);
+                    }
+                }
             } catch (createError: any) {
                 if (createError.code === 11000) {
                     user = await User.findOne({ clerkId: userId });
@@ -89,6 +123,7 @@ export async function GET() {
                 coverUrl: user.coverUrl,
                 balance: user.balance,
                 isProfessional: user.isProfessional,
+                professionalStatus: user.professionalStatus,
                 subscriptionPrice: user.subscriptionPrice || 0,
                 isSubscriptionEnabled: user.isSubscriptionEnabled ?? false,
                 chargePerCharSubscribers: user.chargePerCharSubscribers ?? 0.002,
@@ -262,6 +297,7 @@ export async function PATCH(request: NextRequest) {
                 coverUrl: user.coverUrl,
                 balance: user.balance,
                 isProfessional: user.isProfessional,
+                professionalStatus: user.professionalStatus,
                 subscriptionPrice: user.subscriptionPrice || 0,
                 isSubscriptionEnabled: user.isSubscriptionEnabled ?? false,
                 chargePerCharSubscribers: user.chargePerCharSubscribers ?? 0.002,

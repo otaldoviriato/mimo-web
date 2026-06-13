@@ -8,6 +8,7 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { NotificationPromptModal } from '@/components';
 import { StackNavigationProvider, useStackNavigation } from '@/context/StackNavigationContext';
 import { isReservedRoute } from '@/hooks/useTransitionRouter';
+import { useMyProfile } from '@/hooks/useQueries';
 import ChatPage from './chat/[userId]/page';
 import UserProfilePage from './[username]/page';
 import SettingsPage from './settings/page';
@@ -19,6 +20,7 @@ const isTabRoute = (path: string) => {
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const { isLoaded, isSignedIn, getToken } = useAuth();
     const { user } = useUser();
+    const { data: userData, refetch: refetchProfile } = useMyProfile();
     const router = useRouter();
     const pathname = usePathname();
     const { handleRequestPermission } = usePushNotifications();
@@ -29,6 +31,35 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         screensRef.current = screens;
     }, [screens]);
+
+    // Redirecionamento e inicialização para perfil profissional pendente
+    useEffect(() => {
+        if (!isLoaded || !isSignedIn || !userData) return;
+
+        const isProfessionalFlow = typeof window !== 'undefined' && localStorage.getItem('mimo_signup_flow') === 'professional';
+        
+        const handleProfessionalInit = async () => {
+            if (isProfessionalFlow && !userData.isProfessional) {
+                try {
+                    localStorage.removeItem('mimo_signup_flow');
+                    const response = await fetch('/api/users/me/init-professional', { method: 'POST' });
+                    if (response.ok) {
+                        await refetchProfile();
+                        router.replace('/aguardando-aprovacao');
+                    }
+                } catch (err) {
+                    console.error('Erro ao inicializar perfil profissional:', err);
+                }
+                return;
+            }
+
+            if (userData.isProfessional && userData.professionalStatus === 'pending') {
+                router.replace('/aguardando-aprovacao');
+            }
+        };
+
+        handleProfessionalInit();
+    }, [isLoaded, isSignedIn, userData, router, refetchProfile]);
 
     // Inicialização de roteamento para Deep Links no carregamento inicial da sessão
     useEffect(() => {

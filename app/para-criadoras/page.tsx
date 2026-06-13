@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FormEvent, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { 
@@ -23,40 +23,7 @@ import {
 import { InstagramIcon } from '@/components/InstagramIcon';
 import Phone3D from './components/Phone3D';
 
-const initialForm = {
-    fullName: '',
-    artisticName: '',
-    instagram: '',
-    whatsapp: '',
-    email: '',
-    age: '',
-    cityState: '',
-    hasOnlineExperience: '',
-    howFoundMimo: '',
-    reason: '',
-    isAdultConfirmed: false,
-    contactConsent: false,
-    company: '',
-};
 
-type FormState = typeof initialForm;
-
-const inputClass = 'mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-purple-600 focus:ring-2 focus:ring-purple-100';
-
-const formatWhatsApp = (value: string) => {
-    const numbers = value.replace(/\D/g, '');
-    const truncated = numbers.slice(0, 11);
-    if (truncated.length <= 2) {
-        return truncated.length > 0 ? `(${truncated}` : '';
-    }
-    if (truncated.length <= 6) {
-        return `(${truncated.slice(0, 2)}) ${truncated.slice(2)}`;
-    }
-    if (truncated.length <= 10) {
-        return `(${truncated.slice(0, 2)}) ${truncated.slice(2, 6)}-${truncated.slice(6)}`;
-    }
-    return `(${truncated.slice(0, 2)}) ${truncated.slice(2, 7)}-${truncated.slice(7)}`;
-};
 
 export default function ParaCriadorasPage() {
     // Máquina de estados dos passos (0 a 4)
@@ -111,11 +78,7 @@ export default function ParaCriadorasPage() {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
     
-    // Estados do Formulário
-    const [form, setForm] = useState<FormState>(initialForm);
-    const [submitting, setSubmitting] = useState(false);
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState(false);
+
 
     // ─── ESTADOS DO SIMULADOR DE CHAT (PASSO 1) ───
     const [chatMessages, setChatMessages] = useState<Array<{ sender: 'fan' | 'creator'; text: string; time: string; gain?: number }>>([]);
@@ -392,67 +355,7 @@ export default function ParaCriadorasPage() {
         };
     }, [activeStep]);
 
-    function updateField<K extends keyof FormState>(field: K, value: FormState[K]) {
-        setForm(current => ({ ...current, [field]: value }));
-    }
 
-    async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault();
-        setError('');
-
-        const age = Number(form.age);
-        if (!Number.isInteger(age) || age < 18 || age > 100) {
-            setError('Você precisa ter 18 anos ou mais para se inscrever.');
-            return;
-        }
-
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(form.email)) {
-            setError('Por favor, insira um e-mail válido.');
-            return;
-        }
-
-        const whatsappDigits = form.whatsapp.replace(/\D/g, '');
-        if (whatsappDigits.length < 10) {
-            setError('Por favor, insira um número de WhatsApp válido com DDD.');
-            return;
-        }
-
-        if (!form.isAdultConfirmed) {
-            setError('Você precisa declarar ter 18 anos ou mais para continuar.');
-            return;
-        }
-
-        if (!form.contactConsent) {
-            setError('Você precisa autorizar o contato do Mimo para continuar.');
-            return;
-        }
-
-        setSubmitting(true);
-        try {
-            const response = await fetch('/api/creator-applications', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...form, age }),
-            });
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Não foi possível enviar sua inscrição.');
-            }
-
-            setSuccess(true);
-            setForm(initialForm);
-        } catch (submitError) {
-            setError(
-                submitError instanceof Error
-                    ? submitError.message
-                    : 'Não foi possível enviar sua inscrição. Tente novamente.'
-            );
-        } finally {
-            setSubmitting(false);
-        }
-    }
 
     // Renderização do Display Interno do Celular (Compartilhado entre Mobile e Desktop)
     function renderPhoneDisplay(isMobile = false) {
@@ -871,16 +774,14 @@ export default function ParaCriadorasPage() {
             case 4:
                 return (
                     <div className="space-y-1.5">
-                        {!success && (
-                            <div className={`text-center lg:text-left space-y-1.5 ${isExiting ? 'animate-slide-out-title' : 'animate-title-elastic'}`}>
-                                <h2 className="text-3xl font-black text-slate-900 tracking-tight leading-none">
-                                    Faça parte do <span className="bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 bg-clip-text text-transparent">Mimo Chat</span>.
-                                </h2>
-                                <p className="text-xs text-slate-500 leading-relaxed max-w-lg">
-                                    Preencha seus dados com segurança. Seu perfil e privacidade são completamente protegidos.
-                                </p>
-                            </div>
-                        )}
+                        <div className={`text-center lg:text-left space-y-1.5 ${isExiting ? 'animate-slide-out-title' : 'animate-title-elastic'}`}>
+                            <h2 className="text-3xl font-black text-slate-900 tracking-tight leading-none">
+                                Faça parte do <span className="bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 bg-clip-text text-transparent">Mimo Chat</span>.
+                            </h2>
+                            <p className="text-xs text-slate-500 leading-relaxed max-w-lg">
+                                Crie sua conta profissional no Mimo para começar a interagir.
+                            </p>
+                        </div>
                     </div>
                 );
             default:
@@ -941,203 +842,35 @@ export default function ParaCriadorasPage() {
                 );
             case 4:
                 return (
-                    <div className="w-full">
-                        {!success ? (
-                            <form 
-                                onSubmit={handleSubmit} 
-                                className={`space-y-3 mt-3 max-w-xl overflow-y-auto max-h-[62vh] lg:max-h-[calc(100vh-300px)] pb-5 pr-1.5 scrollbar-none ${
-                                    isExiting ? 'animate-slide-out-subtitle' : 'animate-subtitle-elastic'
-                                }`}
+                    <div className="w-full max-w-md mx-auto lg:mx-0 py-8 text-center lg:text-left space-y-6 animate-subtitle-elastic">
+                        <div className="inline-flex w-16 h-16 items-center justify-center bg-purple-100 text-purple-600 rounded-3xl mb-2 shadow-inner">
+                            <Zap className="w-8 h-8 text-purple-600 animate-pulse" />
+                        </div>
+                        <h2 className="text-3xl font-black text-slate-900 leading-tight">
+                            Comece sua Jornada no Mimo 💜
+                        </h2>
+                        <p className="text-sm text-slate-500 leading-relaxed font-medium">
+                            Crie sua conta profissional hoje mesmo para começar a interagir com seus fãs, monetizar suas conversas e ter total controle do seu conteúdo.
+                        </p>
+                        
+                        <div className="pt-2">
+                            <button
+                                onClick={() => {
+                                    if (typeof window !== 'undefined') {
+                                        localStorage.setItem('mimo_signup_flow', 'professional');
+                                        window.location.href = '/login?role=professional';
+                                    }
+                                }}
+                                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 px-10 py-4.5 text-base font-extrabold text-white shadow-xl shadow-purple-200/50 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] cursor-pointer transition-all duration-200"
                             >
-                                <div className="grid grid-cols-2 gap-3">
-                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                                        <span>Nome Completo *</span>
-                                        <input
-                                            required
-                                            value={form.fullName}
-                                            onChange={event => updateField('fullName', event.target.value)}
-                                            className={inputClass}
-                                            placeholder="Ex: Sofia da Silva"
-                                        />
-                                    </label>
-                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                                        <span>Nome Artístico *</span>
-                                        <input
-                                            required
-                                            value={form.artisticName}
-                                            onChange={event => updateField('artisticName', event.target.value)}
-                                            className={inputClass}
-                                            placeholder="Ex: Sofia Almeida"
-                                        />
-                                    </label>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3">
-                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                                        <span>E-mail *</span>
-                                        <input
-                                            required
-                                            type="email"
-                                            value={form.email}
-                                            onChange={event => updateField('email', event.target.value)}
-                                            className={inputClass}
-                                            placeholder="sofia@provedor.com"
-                                        />
-                                    </label>
-                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                                        <span>WhatsApp *</span>
-                                        <input
-                                            required
-                                            type="tel"
-                                            value={form.whatsapp}
-                                            onChange={event => {
-                                                const formatted = formatWhatsApp(event.target.value);
-                                                updateField('whatsapp', formatted);
-                                            }}
-                                            className={inputClass}
-                                            placeholder="(11) 99999-9999"
-                                        />
-                                    </label>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3">
-                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                                        <span>Instagram *</span>
-                                        <input
-                                            required
-                                            value={form.instagram}
-                                            onChange={event => updateField('instagram', event.target.value)}
-                                            className={inputClass}
-                                            placeholder="@sofia_almeida"
-                                        />
-                                    </label>
-                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                                        <span>Idade *</span>
-                                        <input
-                                            required
-                                            type="number"
-                                            min={18}
-                                            max={100}
-                                            value={form.age}
-                                            onChange={event => updateField('age', event.target.value)}
-                                            className={inputClass}
-                                            placeholder="Ex: 22"
-                                            inputMode="numeric"
-                                        />
-                                    </label>
-                                </div>
-
-                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                                    <span>Como conheceu o Mimo? *</span>
-                                    <input
-                                        required
-                                        value={form.howFoundMimo}
-                                        onChange={event => updateField('howFoundMimo', event.target.value)}
-                                        className={inputClass}
-                                        placeholder="Ex: Indicação, Instagram..."
-                                    />
-                                </label>
-                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                                    <span>Por que quer ser criadora? *</span>
-                                    <input
-                                        required
-                                        value={form.reason}
-                                        onChange={event => updateField('reason', event.target.value)}
-                                        className={inputClass}
-                                        placeholder="Fale brevemente sobre o seu interesse"
-                                    />
-                                </label>
-
-                                {/* Honeypot spam bot */}
-                                <div className="absolute -left-[10000px] h-px w-px overflow-hidden" aria-hidden="true">
-                                    <label>
-                                        Empresa
-                                        <input
-                                            tabIndex={-1}
-                                            autoComplete="off"
-                                            value={form.company}
-                                            onChange={event => updateField('company', event.target.value)}
-                                        />
-                                    </label>
-                                </div>
-
-                                <div className="space-y-2 pt-1.5 text-xs text-slate-600 font-bold">
-                                    <label className="flex items-start gap-2 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            required
-                                            checked={form.isAdultConfirmed}
-                                            onChange={event => updateField('isAdultConfirmed', event.target.checked)}
-                                            className="mt-0.5 h-4 w-4 rounded accent-purple-600 cursor-pointer"
-                                        />
-                                        <span>Declaro ter 18 anos ou mais. *</span>
-                                    </label>
-                                    
-                                    <label className="flex items-start gap-2 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            required
-                                            checked={form.contactConsent}
-                                            onChange={event => updateField('contactConsent', event.target.checked)}
-                                            className="mt-0.5 h-4 w-4 rounded accent-purple-600 cursor-pointer"
-                                        />
-                                        <span>Autorizo contato do Mimo via WhatsApp/E-mail. *</span>
-                                    </label>
-                                </div>
-
-                                {error && (
-                                    <div role="alert" className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600 animate-shake">
-                                        {error}
-                                    </div>
-                                )}
-
-                                <div className="flex items-center gap-3 pt-2">
-                                    <button
-                                        type="submit"
-                                        disabled={submitting}
-                                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 px-10 py-4.5 text-sm font-extrabold text-white shadow-lg shadow-purple-200/50 hover:scale-[1.01] hover:-translate-y-0.5 cursor-pointer disabled:opacity-60"
-                                    >
-                                        {submitting ? 'Enviando...' : 'Enviar Candidatura'}
-                                    </button>
-                                </div>
-
-                                {/* Mini nota legal sutil no fim do form */}
-                                <p className="text-[8px] text-slate-400 text-center md:text-left pt-2 font-medium leading-relaxed">
-                                    LEAD CONTEUDOS DIGITAIS LTDA • CNPJ: 60.312.273/0001-01 • suporte@mimochat.com.br
-                                </p>
-                            </form>
-                        ) : (
-                            /* SUCESSO COMPACTO */
-                            <div className="text-center lg:text-left py-6 space-y-4 max-w-md animate-title-elastic">
-                                <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 mx-auto lg:mx-0 animate-bounce">
-                                    <Check className="w-6 h-6" />
-                                </div>
-                                <h2 className="text-2xl font-black text-slate-900 leading-none">Inscrição Enviada! 💜</h2>
-                                <p className="text-xs text-slate-500 leading-relaxed">
-                                    A equipe do Mimo analisará sua inscrição. Entraremos em contato pelo WhatsApp cadastrado nas próximas 24 horas.
-                                </p>
-                                <div className="flex flex-col sm:flex-row items-center gap-3 justify-center lg:justify-start pt-2">
-                                    <a 
-                                        href="https://www.instagram.com/mimochat.oficial/"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-6 py-3 bg-gradient-to-r from-pink-600 to-fuchsia-600 text-white font-extrabold text-[10px] rounded-lg shadow-sm cursor-pointer hover:scale-[1.01] transition"
-                                    >
-                                        <InstagramIcon className="w-3.5 h-3.5" />
-                                        Seguir @mimochat.oficial
-                                    </a>
-                                    <button
-                                        onClick={() => {
-                                            setSuccess(false);
-                                            setStep(0);
-                                        }}
-                                        className="text-xs text-slate-400 hover:text-slate-600 font-bold transition cursor-pointer"
-                                    >
-                                        Recomeçar
-                                    </button>
-                                </div>
-                            </div>
-                        )}
+                                Criar minha Conta Profissional
+                                <ArrowRight className="w-4 h-4 ml-1 inline" />
+                            </button>
+                        </div>
+                        
+                        <p className="text-[10px] text-slate-400 font-medium leading-relaxed pt-4">
+                            Ao prosseguir, você será redirecionada para a nossa central de autenticação Clerk.
+                        </p>
                     </div>
                 );
             default:
