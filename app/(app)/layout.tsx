@@ -27,6 +27,13 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const { screens, popVirtual, pushVirtual } = useStackNavigation();
     const screensRef = useRef(screens);
     const [isNavInitialized, setIsNavInitialized] = React.useState(false);
+    const [isProfessionalReleased, setIsProfessionalReleased] = React.useState<boolean | null>(null);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            setIsProfessionalReleased(localStorage.getItem('mimo_professional_released') === 'true');
+        }
+    }, [pathname]);
 
     useEffect(() => {
         screensRef.current = screens;
@@ -34,7 +41,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
     // Redirecionamento e inicialização para perfil profissional pendente
     useEffect(() => {
-        if (!isLoaded || !isSignedIn || !userData) return;
+        if (!isLoaded || !isSignedIn || !userData || isProfessionalReleased === null) return;
 
         const isProfessionalFlow = typeof window !== 'undefined' && localStorage.getItem('mimo_signup_flow') === 'professional';
         
@@ -61,7 +68,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
             const isPendingProfessional = userData.isProfessional && (
                 userData.professionalStatus === 'pending' ||
-                (userData.professionalStatus === 'approved' && localStorage.getItem('mimo_professional_released') !== 'true')
+                (userData.professionalStatus === 'approved' && isProfessionalReleased === false)
             );
 
             if (isPendingProfessional) {
@@ -70,7 +77,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         };
 
         handleProfessionalInit();
-    }, [isLoaded, isSignedIn, userData, router, refetchProfile]);
+    }, [isLoaded, isSignedIn, userData, isProfessionalReleased, router, refetchProfile]);
 
     // Inicialização de roteamento para Deep Links no carregamento inicial da sessão
     useEffect(() => {
@@ -308,10 +315,13 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const isProfessionalFlow = typeof window !== 'undefined' && localStorage.getItem('mimo_signup_flow') === 'professional';
     const isPendingProfessional = userData && userData.isProfessional && (
         userData.professionalStatus === 'pending' ||
-        (userData.professionalStatus === 'approved' && localStorage.getItem('mimo_professional_released') !== 'true')
+        (userData.professionalStatus === 'approved' && isProfessionalReleased === false)
     );
 
-    if (isProfessionalFlow || isPendingProfessional) {
+    // Evita hydration mismatch e vazamento visual enquanto carrega o perfil ou o estado de liberação local
+    const isResolvingSecurity = (isSignedIn && !userData) || (userData && userData.isProfessional && isProfessionalReleased === null);
+
+    if (isProfessionalFlow || isPendingProfessional || isResolvingSecurity) {
         return (
             <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gradient-to-br from-[#4C1D95] via-[#6D28D9] to-[#8B5CF6] select-none">
                 <div className="flex flex-col items-center animate-fade-in-up">
