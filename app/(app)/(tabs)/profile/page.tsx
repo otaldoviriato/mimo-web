@@ -7,7 +7,7 @@ import { Avatar } from '@/components/Avatar';
 import { useMyProfile, useUploadPhoto, useUploadCover, useMyGallery, useUploadToGallery, useDeleteFromGallery, useDepositHistory, useChatRooms } from '@/hooks/useQueries';
 import { ImageCropper } from '@/components/ImageCropper';
 import { usePayment } from '@/context/PaymentContext';
-import { Settings, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, Heart, Sparkles, LogOut, Globe, Crown, Camera } from 'lucide-react';
+import { Settings, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, Heart, Sparkles, LogOut, Globe, Crown, Camera, Gift, CreditCard, QrCode } from 'lucide-react';
 
 export default function ProfilePage() {
     const { user } = useUser();
@@ -576,7 +576,7 @@ export default function ProfilePage() {
             : tx.type === 'CC'
                 ? 'Cartão de Crédito'
                 : 'Pix',
-        icon: tx.source === 'gift' ? '🎁' : '💳'
+        type: tx.source === 'gift' ? 'gift' : tx.type === 'CC' ? 'card' : 'pix'
     }));
 
     return (
@@ -599,8 +599,13 @@ export default function ProfilePage() {
             {/* Header */}
             <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between sticky top-0 z-20 shadow-md">
                 <div className="flex items-center gap-3">
-                    <Avatar uri={userData?.photoUrl} size={32} />
-                    <h1 className="text-xl font-bold text-white tracking-tight">@{userData?.username}</h1>
+                    <img
+                        src="/Logo.svg"
+                        alt="MimoChat"
+                        className="w-8 h-8 object-contain shrink-0"
+                    />
+                    <h1 className="text-2xl font-black text-white tracking-tighter">Mimo</h1>
+                    <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">Perfil</span>
                 </div>
                 <button
                     onClick={() => router.push('/settings')}
@@ -617,11 +622,12 @@ export default function ProfilePage() {
                     <button
                         onClick={() => fileInputRef.current?.click()}
                         disabled={uploadPhotoMutation.isPending}
-                        className="relative shrink-0 group block p-0.5 bg-purple-50 rounded-full border border-purple-100 shadow-sm"
+                        className="relative shrink-0 block p-0.5 bg-purple-50 rounded-full border border-purple-100 shadow-sm transition-all active:scale-95"
                     >
                         <Avatar uri={localPhotoUrl} size={64} />
-                        <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
-                            <Plus className="w-4 h-4 text-white" />
+                        {/* Ícone indicador de edição de foto */}
+                        <div className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-purple-600 border border-white flex items-center justify-center shadow-md">
+                            <Camera className="w-3 h-3 text-white" />
                         </div>
                     </button>
                     <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
@@ -663,8 +669,10 @@ export default function ProfilePage() {
                             {depositHistoryItems.slice(0, 5).map((tx) => (
                                 <div key={tx.id} className="flex items-center justify-between text-xs">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-7 h-7 rounded-xl bg-slate-50 flex items-center justify-center text-sm">
-                                            {tx.icon}
+                                        <div className="w-7 h-7 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500">
+                                            {tx.type === 'gift' && <Gift className="w-4 h-4 text-purple-600" />}
+                                            {tx.type === 'card' && <CreditCard className="w-4 h-4 text-blue-600" />}
+                                            {tx.type === 'pix' && <QrCode className="w-4 h-4 text-emerald-600" />}
                                         </div>
                                         <div>
                                             <p className="font-bold text-gray-700">{tx.label}</p>
