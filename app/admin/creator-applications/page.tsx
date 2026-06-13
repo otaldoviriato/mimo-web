@@ -10,6 +10,11 @@ import {
     Search,
     UserRound,
     X,
+    CheckCircle2,
+    XCircle,
+    Archive,
+    Sparkles,
+    Undo2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -159,9 +164,35 @@ export default function CreatorApplicationsAdminPage() {
             setApplications(current => current.map(item => (
                 item._id === data.application._id ? data.application : item
             )));
-            toast.success('Inscrição atualizada.');
+            toast.success('Observações salvas.');
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'Erro ao salvar alterações.');
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    async function handleQuickStatusChange(newStatus: ApplicationStatus) {
+        if (!selected) return;
+        setSaving(true);
+
+        try {
+            const response = await fetch(`/api/backoffice/creator-applications/${selected._id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus, notes }),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Erro ao atualizar status.');
+
+            setSelected(data.application);
+            setDetailStatus(data.application.status);
+            setApplications(current => current.map(item => (
+                item._id === data.application._id ? data.application : item
+            )));
+            toast.success(`Inscrição ${statusLabels[newStatus].toLowerCase()} com sucesso!`);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Erro ao atualizar status.');
         } finally {
             setSaving(false);
         }
@@ -381,22 +412,9 @@ export default function CreatorApplicationsAdminPage() {
 
                                 <section className="rounded-2xl border border-slate-200 p-5">
                                     <label className="block text-sm font-bold text-slate-800">
-                                        Status
-                                        <select
-                                            value={detailStatus}
-                                            onChange={event => setDetailStatus(event.target.value as ApplicationStatus)}
-                                            className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-400"
-                                        >
-                                            {statusOptions.filter(option => option.value).map(option => (
-                                                <option key={option.value} value={option.value}>{option.label}</option>
-                                            ))}
-                                        </select>
-                                    </label>
-
-                                    <label className="mt-5 block text-sm font-bold text-slate-800">
                                         Notas internas
                                         <textarea
-                                            rows={6}
+                                            rows={4}
                                             value={notes}
                                             onChange={event => setNotes(event.target.value)}
                                             placeholder="Registre observações para a equipe..."
@@ -408,11 +426,72 @@ export default function CreatorApplicationsAdminPage() {
                                         type="button"
                                         onClick={saveDetails}
                                         disabled={saving}
-                                        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-purple-200 transition hover:bg-purple-700 disabled:opacity-60 cursor-pointer"
+                                        className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-700 transition disabled:opacity-60 cursor-pointer"
                                     >
-                                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                                        {saving ? 'Salvando...' : 'Salvar status e notas'}
+                                        {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                                        Salvar observações
                                     </button>
+                                </section>
+
+                                <section className="rounded-2xl border border-slate-200 p-5">
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Avaliação do Perfil</h3>
+                                    
+                                    {detailStatus === 'pending' ? (
+                                        <div className="mt-4 flex flex-col gap-3">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleQuickStatusChange('approved')}
+                                                disabled={saving}
+                                                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 text-sm font-extrabold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 rounded-xl shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98] transition-all duration-150 disabled:opacity-60 cursor-pointer"
+                                            >
+                                                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                                                Aprovar Criadora
+                                            </button>
+                                            
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleQuickStatusChange('rejected')}
+                                                    disabled={saving}
+                                                    className="w-full flex items-center justify-center gap-2 py-3 px-4 text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 hover:border-rose-300 rounded-xl transition duration-150 disabled:opacity-60 cursor-pointer"
+                                                >
+                                                    <XCircle className="h-4 w-4" />
+                                                    Rejeitar
+                                                </button>
+                                                
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleQuickStatusChange('archived')}
+                                                    disabled={saving}
+                                                    className="w-full flex items-center justify-center gap-2 py-3 px-4 text-xs font-bold text-slate-600 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 hover:border-slate-300 rounded-xl transition duration-150 disabled:opacity-60 cursor-pointer"
+                                                >
+                                                    <Archive className="h-4 w-4" />
+                                                    Arquivar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="mt-4 space-y-4">
+                                            <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                                                <div className="space-y-1">
+                                                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Decisão Tomada</p>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <StatusBadge status={detailStatus} />
+                                                    </div>
+                                                </div>
+                                                
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleQuickStatusChange('pending')}
+                                                    disabled={saving}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl transition duration-150 disabled:opacity-60 cursor-pointer"
+                                                >
+                                                    <Undo2 className="h-3.5 w-3.5" />
+                                                    Reanalisar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </section>
 
                                 <section className="rounded-2xl border border-rose-200 bg-rose-50/20 p-5">

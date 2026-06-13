@@ -1,11 +1,9 @@
 'use client';
-
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useClerk } from '@clerk/nextjs';
 import { Loader2, LogOut, CheckCircle2, AlertTriangle, ShieldAlert, Sparkles, MessageCircle } from 'lucide-react';
-import toast from 'react-hot-toast';
 
 export default function AguardandoAprovacaoPage() {
     const { isLoaded, isSignedIn } = useAuth();
@@ -15,6 +13,8 @@ export default function AguardandoAprovacaoPage() {
     const [status, setStatus] = useState<'pending' | 'approved' | 'rejected' | 'loading'>('loading');
     const [name, setName] = useState('');
     const [animatingRelease, setAnimatingRelease] = useState(false);
+    const [fadeOut, setFadeOut] = useState(false);
+    const isProcessingApproval = useRef(false);
 
     useEffect(() => {
         if (!isLoaded) return;
@@ -23,8 +23,15 @@ export default function AguardandoAprovacaoPage() {
             return;
         }
 
+        let interval: NodeJS.Timeout | null = null;
+
         // Função para checar o status
         const checkStatus = async () => {
+            if (isProcessingApproval.current) {
+                if (interval) clearInterval(interval);
+                return;
+            }
+
             try {
                 const response = await fetch('/api/users/me');
                 if (!response.ok) throw new Error();
@@ -35,21 +42,28 @@ export default function AguardandoAprovacaoPage() {
                     const userStatus = data.user.professionalStatus;
 
                     if (userStatus === 'approved') {
+                        if (isProcessingApproval.current) return;
+                        isProcessingApproval.current = true;
+                        
+                        if (interval) {
+                            clearInterval(interval);
+                            interval = null;
+                        }
+
                         setStatus('approved');
-                        // Se detectou a aprovação agora, inicia a animação de liberação!
                         setAnimatingRelease(true);
-                        toast.success('Sua conta foi aprovada! Redirecionando...', {
-                            duration: 3000,
-                            icon: '🎉',
-                            style: {
-                                borderRadius: '12px',
-                                background: '#1E293B',
-                                color: '#FFF',
-                            }
-                        });
+
+                        // Tempo planejado para transição visual premium:
+                        // 1. Mostrar a comemoração ("Acesso Liberado!") por 2.5 segundos.
+                        // 2. Seta o fadeOut = true para realizar a transição CSS suave de desfoque e opacidade (dura 1000ms).
+                        // 3. Após 3.5 segundos no total, redireciona o usuário para a página de chats.
+                        setTimeout(() => {
+                            setFadeOut(true);
+                        }, 2500);
+
                         setTimeout(() => {
                             router.replace('/chats');
-                        }, 2500);
+                        }, 3500);
                     } else if (userStatus === 'rejected') {
                         setStatus('rejected');
                     } else {
@@ -65,9 +79,11 @@ export default function AguardandoAprovacaoPage() {
         checkStatus();
 
         // Configura o polling a cada 5 segundos
-        const interval = setInterval(checkStatus, 5000);
+        interval = setInterval(checkStatus, 5000);
 
-        return () => clearInterval(interval);
+        return () => {
+            if (interval) clearInterval(interval);
+        };
     }, [isLoaded, isSignedIn, router]);
 
     const handleLogout = async () => {
@@ -88,12 +104,14 @@ export default function AguardandoAprovacaoPage() {
 
     if (animatingRelease) {
         return (
-            <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-50 text-slate-900 relative overflow-hidden transition-all duration-1000">
+            <div className={`min-h-screen w-full flex flex-col items-center justify-center bg-slate-50 text-slate-900 relative overflow-hidden transition-all duration-[1000ms] ease-in-out ${
+                fadeOut ? 'opacity-0 blur-md scale-95 pointer-events-none' : 'opacity-100 blur-none scale-100'
+            }`}>
                 {/* Efeito de flash e liberação */}
                 <div className="absolute inset-0 bg-gradient-to-br from-purple-100/60 via-fuchsia-100/60 to-slate-50 animate-pulse"></div>
                 <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-50"></div>
                 
-                <div className="relative z-10 text-center space-y-6 max-w-md p-6 animate-out fade-out zoom-out-90 duration-[2000ms] delay-500">
+                <div className="relative z-10 text-center space-y-6 max-w-md p-6">
                     <div className="relative mx-auto w-24 h-24 bg-gradient-to-tr from-purple-600 via-fuchsia-600 to-indigo-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-purple-500/25 animate-bounce">
                         <Sparkles className="h-12 w-12 text-white" />
                         <span className="absolute inset-0 rounded-3xl border border-white/40 animate-ping"></span>
