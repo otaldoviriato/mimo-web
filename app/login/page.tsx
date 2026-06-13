@@ -202,7 +202,7 @@ export default function LoginPage() {
     };
 
     const onSignInWithGoogle = async () => {
-        if (!signInLoaded || !signIn) {
+        if (!signInLoaded || !signUpLoaded || !signIn || !signUp) {
             setError('Serviço de autenticação não carregado');
             return;
         }
@@ -215,14 +215,29 @@ export default function LoginPage() {
         setError('');
 
         try {
-            // Para o Google OAuth, o sessionStorage pode ser destruído durante o redirect externo.
-            // Usamos o localStorage para preservar o pending redirect.
-            // O sso-callback irá ler o localStorage e redirecionar corretamente após a autenticação.
-            await signIn.authenticateWithRedirect({
-                strategy: 'oauth_google',
-                redirectUrl: '/sso-callback',
-                redirectUrlComplete: '/chats',
-            });
+            const isProfessionalFlow = typeof window !== 'undefined' && (
+                new URLSearchParams(window.location.search).get('role') === 'professional' ||
+                localStorage.getItem('mimo_signup_flow') === 'professional'
+            );
+
+            if (isProfessionalFlow) {
+                // Se é fluxo profissional, inicia o fluxo do Google via signUp para registrar unsafeMetadata nativo no Clerk
+                await signUp.authenticateWithRedirect({
+                    strategy: 'oauth_google',
+                    redirectUrl: '/sso-callback',
+                    redirectUrlComplete: '/chats',
+                    unsafeMetadata: {
+                        role: 'professional'
+                    }
+                });
+            } else {
+                // Fluxo normal de cliente
+                await signIn.authenticateWithRedirect({
+                    strategy: 'oauth_google',
+                    redirectUrl: '/sso-callback',
+                    redirectUrlComplete: '/chats',
+                });
+            }
         } catch (err: unknown) {
             setError(clerkError(err, 'Erro no login com Google'));
             setGoogleLoading(false);
