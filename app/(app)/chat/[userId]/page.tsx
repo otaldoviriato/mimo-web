@@ -252,8 +252,10 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const [useNativeTransition, setUseNativeTransition] = useState(false);
     const [viewportStyle, setViewportStyle] = useState<React.CSSProperties>({});
 
+    const isViewerOpen = fullscreenIndex !== null;
+
     useEffect(() => {
-        if (fullscreenIndex === null || typeof window === 'undefined') return;
+        if (!isViewerOpen || typeof window === 'undefined') return;
 
         window.history.pushState({ mimoViewerOpen: true }, '');
 
@@ -272,7 +274,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 window.history.back();
             }
         };
-    }, [fullscreenIndex]);
+    }, [isViewerOpen]);
 
     const isSelectionActive = selectedMessageIds.size > 0;
 
