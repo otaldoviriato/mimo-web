@@ -173,6 +173,7 @@ export function RechargeModal({
     const [cardCvv, setCardCvv] = useState('');
     const [saveCard, setSaveCard] = useState(true);
     const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
+    const [loadingCards, setLoadingCards] = useState(true);
     const [selectedSavedCardId, setSelectedSavedCardId] = useState('');
     const [userCpf, setUserCpf] = useState('');
     const [userPhone, setUserPhone] = useState('');
@@ -193,6 +194,16 @@ export function RechargeModal({
 
     useEffect(() => {
         if (!visible) return;
+
+        // Tenta carregar do cache do React Query de forma síncrona imediata
+        const cachedProfile = queryClient.getQueryData<any>(QueryKeys.me);
+        if (cachedProfile?.user?.savedCards) {
+            const cards = (cachedProfile.user.savedCards || []).filter((card: any) => card.canUseForPayments);
+            setSavedCards(cards);
+            setLoadingCards(false);
+        } else {
+            setLoadingCards(true);
+        }
 
         userApi.getMe()
             .then((res: UserProfileResponse) => {
@@ -259,7 +270,10 @@ export function RechargeModal({
                     }
                 }
             })
-            .catch(() => undefined);
+            .catch(() => undefined)
+            .finally(() => {
+                setLoadingCards(false);
+            });
 
         fetch('/api/settings/payments')
             .then((r) => r.json())
@@ -580,43 +594,58 @@ export function RechargeModal({
                                             )}
 
                                             {/* Cartões Salvos do Usuário */}
-                                            {(!paymentAvailability || paymentAvailability.creditCardEnabled !== false) && savedCards.map((card) => {
-                                                const isCardActive = selectedMethod === 'card' && selectedSavedCardId === card.id;
-                                                return (
-                                                    <button
-                                                        key={card.id}
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setSelectedMethod('card');
-                                                            setSelectedSavedCardId(card.id);
-                                                        }}
-                                                        className={`flex min-h-12 items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all ${
-                                                            isCardActive
-                                                                ? 'border-purple-600 bg-purple-50 shadow-sm shadow-purple-600/10 active:scale-[0.99]'
-                                                                : 'border-gray-100 bg-gray-50 hover:border-purple-200 hover:bg-white active:scale-[0.99]'
-                                                        }`}
-                                                    >
-                                                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${
-                                                            isCardActive
-                                                                ? 'border-purple-100 bg-white text-purple-600'
-                                                                : 'border-gray-100 bg-white text-gray-400'
-                                                        }`}>
+                                            {(!paymentAvailability || paymentAvailability.creditCardEnabled !== false) && (
+                                                loadingCards ? (
+                                                    <div className="flex min-h-12 items-center gap-3 rounded-lg border border-gray-100 bg-gray-50/50 px-3 py-2.5 animate-pulse">
+                                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-100 bg-white text-gray-200">
                                                             <CreditCard size={15} strokeWidth={2.2} />
                                                         </div>
                                                         <div className="min-w-0 flex-1">
-                                                            <span className={`block truncate text-sm font-semibold ${isCardActive ? 'text-purple-700' : 'text-gray-800'}`}>
-                                                                {card.brand} final {card.lastFour}
-                                                            </span>
-                                                            <span className="mt-0.5 block text-xs text-gray-400">Cartão de Crédito Salvo</span>
+                                                            <div className="h-3 bg-gray-200 rounded w-28 mb-1.5" />
+                                                            <div className="h-2.5 bg-gray-100 rounded w-16" />
                                                         </div>
-                                                        <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
-                                                            isCardActive ? 'border-purple-600 bg-purple-600 text-white' : 'border-gray-200 bg-white'
-                                                        }`}>
-                                                            {isCardActive && <CheckCircle2 size={12} strokeWidth={3} />}
-                                                        </div>
-                                                    </button>
-                                                );
-                                            })}
+                                                        <div className="h-4 w-4 rounded-full border border-gray-200 bg-white" />
+                                                    </div>
+                                                ) : (
+                                                    savedCards.map((card) => {
+                                                        const isCardActive = selectedMethod === 'card' && selectedSavedCardId === card.id;
+                                                        return (
+                                                            <button
+                                                                key={card.id}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setSelectedMethod('card');
+                                                                    setSelectedSavedCardId(card.id);
+                                                                }}
+                                                                className={`flex min-h-12 items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all ${
+                                                                    isCardActive
+                                                                        ? 'border-purple-600 bg-purple-50 shadow-sm shadow-purple-600/10 active:scale-[0.99]'
+                                                                        : 'border-gray-100 bg-gray-50 hover:border-purple-200 hover:bg-white active:scale-[0.99]'
+                                                                }`}
+                                                            >
+                                                                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${
+                                                                    isCardActive
+                                                                        ? 'border-purple-100 bg-white text-purple-600'
+                                                                        : 'border-gray-100 bg-white text-gray-400'
+                                                                }`}>
+                                                                    <CreditCard size={15} strokeWidth={2.2} />
+                                                                </div>
+                                                                <div className="min-w-0 flex-1">
+                                                                    <span className={`block truncate text-sm font-semibold ${isCardActive ? 'text-purple-700' : 'text-gray-800'}`}>
+                                                                        {card.brand} final {card.lastFour}
+                                                                    </span>
+                                                                    <span className="mt-0.5 block text-xs text-gray-400">Cartão de Crédito Salvo</span>
+                                                                </div>
+                                                                <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                                                                    isCardActive ? 'border-purple-600 bg-purple-600 text-white' : 'border-gray-200 bg-white'
+                                                                }`}>
+                                                                    {isCardActive && <CheckCircle2 size={12} strokeWidth={3} />}
+                                                                </div>
+                                                            </button>
+                                                        );
+                                                    })
+                                                )
+                                            )}
 
                                             {/* Opção Resgatar Cupom */}
                                             {(!paymentAvailability || paymentAvailability.couponsEnabled !== false) && (

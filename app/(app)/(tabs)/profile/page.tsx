@@ -26,7 +26,7 @@ export default function ProfilePage() {
     const uploadCoverMutation = useUploadCover();
     const uploadGalleryMutation = useUploadToGallery();
     const deleteGalleryMutation = useDeleteFromGallery();
-    const { data: depositHistory } = useDepositHistory();
+    const { data: depositHistory, isLoading: loadingHistory } = useDepositHistory();
     const { data: rooms = [] } = useChatRooms();
 
     const [localPhotoUrl, setLocalPhotoUrl] = useState<string | undefined>(undefined);
@@ -664,15 +664,30 @@ export default function ProfilePage() {
                 <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm flex flex-col gap-3">
                     <h3 className="text-xs font-bold text-gray-800 uppercase tracking-wider border-b border-gray-50 pb-2.5">Histórico de Recargas</h3>
                     
-                    {depositHistoryItems.length > 0 ? (
+                    {loadingHistory ? (
+                        <div className="flex flex-col gap-3">
+                            {[...Array(3)].map((_, i) => (
+                                <div key={i} className="flex items-center justify-between text-xs animate-pulse">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-7 h-7 rounded-xl bg-slate-100/70" />
+                                        <div className="flex flex-col gap-1.5">
+                                            <div className="h-3 bg-slate-100 rounded w-20" />
+                                            <div className="h-2 bg-slate-100 rounded w-28" />
+                                        </div>
+                                    </div>
+                                    <div className="h-3 bg-slate-100 rounded w-10" />
+                                </div>
+                            ))}
+                        </div>
+                    ) : depositHistoryItems.length > 0 ? (
                         <div className="flex flex-col gap-3">
                             {depositHistoryItems.slice(0, 5).map((tx) => (
                                 <div key={tx.id} className="flex items-center justify-between text-xs">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-7 h-7 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500">
-                                            {tx.type === 'gift' && <Gift className="w-4 h-4 text-purple-600" />}
-                                            {tx.type === 'card' && <CreditCard className="w-4 h-4 text-blue-600" />}
-                                            {tx.type === 'pix' && <QrCode className="w-4 h-4 text-emerald-600" />}
+                                        <div className="w-7 h-7 rounded-xl bg-slate-100/70 flex items-center justify-center text-slate-600">
+                                            {tx.type === 'gift' && <Gift className="w-4 h-4" />}
+                                            {tx.type === 'card' && <CreditCard className="w-4 h-4" />}
+                                            {tx.type === 'pix' && <QrCode className="w-4 h-4" />}
                                         </div>
                                         <div>
                                             <p className="font-bold text-gray-700">{tx.label}</p>
