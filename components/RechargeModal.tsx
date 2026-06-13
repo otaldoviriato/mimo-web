@@ -200,8 +200,63 @@ export function RechargeModal({
                 if (res?.user?.phone) setUserPhone(formatPhone(res.user.phone));
                 const cards = (res?.user?.savedCards || []).filter((card) => card.canUseForPayments);
                 setSavedCards(cards);
-                if (cards.length > 0) {
-                    setSelectedSavedCardId((current) => current || cards[0].id);
+
+                const localLastMethod = localStorage.getItem('mimo_last_payment_method');
+                const localLastSavedCardId = localStorage.getItem('mimo_last_saved_card_id');
+
+                if (localLastMethod) {
+                    setSelectedMethod(localLastMethod);
+                    if (localLastMethod === 'card') {
+                        if (localLastSavedCardId) {
+                            const cardExists = cards.some(c => c.id === localLastSavedCardId);
+                            if (cardExists) {
+                                setSelectedSavedCardId(localLastSavedCardId);
+                            } else if (cards.length > 0) {
+                                setSelectedSavedCardId(cards[0].id);
+                            } else {
+                                setSelectedSavedCardId('');
+                            }
+                        } else {
+                            setSelectedSavedCardId('');
+                        }
+                    }
+                } else {
+                    const cachedData = queryClient.getQueryData<any>(['deposit', 'history']);
+                    const txs = cachedData?.transactions || [];
+
+                    const applyLastTx = (transactions: any[]) => {
+                        if (transactions.length > 0) {
+                            const lastTx = transactions[0];
+                            const method = lastTx.source === 'gift' ? 'coupon' : lastTx.type === 'CC' ? 'card' : 'pix';
+                            setSelectedMethod(method);
+                            if (method === 'card') {
+                                const lastCardId = lastTx.metadata?.cardId;
+                                const cardExists = cards.some(c => c.id === lastCardId);
+                                if (lastCardId && cardExists) {
+                                    setSelectedSavedCardId(lastCardId);
+                                } else if (cards.length > 0) {
+                                    setSelectedSavedCardId(cards[0].id);
+                                } else {
+                                    setSelectedSavedCardId('');
+                                }
+                            }
+                        } else {
+                            setSelectedMethod('pix');
+                        }
+                    };
+
+                    if (txs.length > 0) {
+                        applyLastTx(txs);
+                    } else {
+                        fetch('/api/users/me/balance/pix')
+                            .then(r => r.json())
+                            .then(data => {
+                                applyLastTx(data?.transactions || []);
+                            })
+                            .catch(() => {
+                                setSelectedMethod('pix');
+                            });
+                    }
                 }
             })
             .catch(() => undefined);
@@ -211,14 +266,13 @@ export function RechargeModal({
             .then((data) => setPaymentAvailability(data))
             .catch(() => undefined);
 
-    }, [visible]);
+    }, [visible, queryClient]);
 
     const resetState = () => {
         setStep('amount_and_method');
         setSelectedAmount(100);
         setIsCustomAmount(false);
         setCustomAmountText('');
-        setSelectedMethod('pix');
         setLoading(false);
         setPixData(null);
         setCcTransactionId('');
@@ -228,7 +282,6 @@ export function RechargeModal({
         setCardExpiry('');
         setCardCvv('');
         setSaveCard(true);
-        setSelectedSavedCardId('');
         setCouponCode('');
         setCouponError('');
         setCouponSuccess('');
@@ -262,6 +315,7 @@ export function RechargeModal({
         try {
             const response = await userApi.claimGiftCode(couponCode);
             if (response?.success) {
+                localStorage.setItem('mimo_last_payment_method', 'coupon');
                 setGiftAmount(typeof response.amount === 'number' ? response.amount : null);
                 handleClose(true);
                 setTimeout(() => {
@@ -311,6 +365,7 @@ export function RechargeModal({
                 if (data?.success) {
                     setPixData(data);
                     setStep('pix_checkout');
+                    localStorage.setItem('mimo_last_payment_method', 'pix');
                 }
             } catch {
             } finally {
@@ -349,11 +404,15 @@ export function RechargeModal({
                 });
 
             if (response?.status === 'PAID') {
+                localStorage.setItem('mimo_last_payment_method', 'card');
+                localStorage.setItem('mimo_last_saved_card_id', selectedSavedCardId || '');
                 handleClose(true);
                 return;
             }
 
             if (response?.transactionId) {
+                localStorage.setItem('mimo_last_payment_method', 'card');
+                localStorage.setItem('mimo_last_saved_card_id', selectedSavedCardId || '');
                 setCcTransactionId(response.transactionId);
                 setStep('processing_payment');
             }
@@ -485,216 +544,263 @@ export function RechargeModal({
                                             <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Forma de pagamento</p>
                                         </div>
                                         <div className="flex flex-col gap-2 p-3">
-                                            {allMethods.map((method) => {
-                                                const isSelected = selectedMethod === method.id;
-                                                const Icon = method.icon === 'qr-code'
-                                                    ? QrCode
-                                                    : method.icon === 'ticket'
-                                                        ? Ticket
-                                                    : CreditCard;
+                                            {/* Opção Pix */}
+                                            {(!paymentAvailability || paymentAvailability.pixEnabled !== false) && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSelectedMethod('pix');
+                                                        setSelectedSavedCardId('');
+                                                    }}
+                                                    className={`flex min-h-12 items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all ${
+                                                        selectedMethod === 'pix'
+                                                            ? 'border-purple-600 bg-purple-50 shadow-sm shadow-purple-600/10 active:scale-[0.99]'
+                                                            : 'border-gray-100 bg-gray-50 hover:border-purple-200 hover:bg-white active:scale-[0.99]'
+                                                    }`}
+                                                >
+                                                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${
+                                                        selectedMethod === 'pix'
+                                                            ? 'border-purple-100 bg-white text-purple-600'
+                                                            : 'border-gray-100 bg-white text-gray-400'
+                                                    }`}>
+                                                        <QrCode size={15} strokeWidth={2.2} />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <span className={`block truncate text-sm font-semibold ${selectedMethod === 'pix' ? 'text-purple-700' : 'text-gray-800'}`}>
+                                                            Pix
+                                                        </span>
+                                                        <span className="mt-0.5 block text-xs text-gray-400">Confirmação rápida e segura</span>
+                                                    </div>
+                                                    <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                                                        selectedMethod === 'pix' ? 'border-purple-600 bg-purple-600 text-white' : 'border-gray-200 bg-white'
+                                                    }`}>
+                                                        {selectedMethod === 'pix' && <CheckCircle2 size={12} strokeWidth={3} />}
+                                                    </div>
+                                                </button>
+                                            )}
 
-                                                const isDisabled =
-                                                    (method.id === 'pix' && !paymentAvailability.pixEnabled) ||
-                                                    (method.id === 'card' && !paymentAvailability.creditCardEnabled);
-
+                                            {/* Cartões Salvos do Usuário */}
+                                            {(!paymentAvailability || paymentAvailability.creditCardEnabled !== false) && savedCards.map((card) => {
+                                                const isCardActive = selectedMethod === 'card' && selectedSavedCardId === card.id;
                                                 return (
-                                                    <React.Fragment key={method.id}>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => !isDisabled && setSelectedMethod(method.id)}
-                                                            disabled={isDisabled}
-                                                            className={`flex min-h-12 items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all ${
-                                                                isDisabled
-                                                                    ? 'cursor-not-allowed border-gray-100 bg-gray-50 opacity-60'
-                                                                    : isSelected
-                                                                        ? 'border-purple-600 bg-purple-50 shadow-sm shadow-purple-600/10 active:scale-[0.99]'
-                                                                        : 'border-gray-100 bg-gray-50 hover:border-purple-200 hover:bg-white active:scale-[0.99]'
-                                                            }`}
-                                                        >
-                                                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${
-                                                                isDisabled
-                                                                    ? 'border-gray-100 bg-white text-gray-300'
-                                                                    : isSelected
-                                                                        ? 'border-purple-100 bg-white text-purple-600'
-                                                                        : 'border-gray-100 bg-white text-gray-400'
-                                                            }`}>
-                                                                <Icon size={15} strokeWidth={2.2} />
-                                                            </div>
-                                                            <div className="min-w-0 flex-1">
-                                                                <span className={`block truncate text-sm font-semibold ${isDisabled ? 'text-gray-400' : isSelected ? 'text-purple-700' : 'text-gray-800'}`}>
-                                                                    {method.label}
-                                                                </span>
-                                                                {isDisabled ? (
-                                                                    <span className="mt-0.5 block text-xs text-amber-500">Indisponível temporariamente</span>
-                                                                ) : (
-                                                                    <>
-                                                                        {method.id === 'pix' && (
-                                                                            <span className="mt-0.5 block text-xs text-gray-400">Confirmação rápida e segura</span>
-                                                                        )}
-                                                                        {method.id === 'coupon' && (
-                                                                            <span className="mt-0.5 block text-xs text-gray-400">Resgate créditos com seu código</span>
-                                                                        )}
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                            <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
-                                                                isDisabled ? 'border-gray-200 bg-white' : isSelected ? 'border-purple-600 bg-purple-600 text-white' : 'border-gray-200 bg-white'
-                                                            }`}>
-                                                                {isSelected && !isDisabled && <CheckCircle2 size={12} strokeWidth={3} />}
-                                                            </div>
-                                                        </button>
-                                                        
-                                                        {method.id === 'card' && isSelected && (
-                                                            <div className="mt-1 flex flex-col gap-3 rounded-lg border border-gray-100 bg-gray-50 p-3 animate-in fade-in duration-200">
-                                                                <div className="flex items-center gap-2 text-xs text-gray-500">
-                                                                    <ShieldCheck size={13} className="text-green-600" strokeWidth={2.2} />
-                                                                    Os dados do cartão são enviados somente para processar esta cobrança.
-                                                                </div>
-                                                                {savedCards.length > 0 && (
-                                                                    <div className="flex flex-col gap-2">
-                                                                        {savedCards.map((card) => {
-                                                                            const isCardActive = selectedSavedCardId === card.id;
+                                                    <button
+                                                        key={card.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setSelectedMethod('card');
+                                                            setSelectedSavedCardId(card.id);
+                                                        }}
+                                                        className={`flex min-h-12 items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all ${
+                                                            isCardActive
+                                                                ? 'border-purple-600 bg-purple-50 shadow-sm shadow-purple-600/10 active:scale-[0.99]'
+                                                                : 'border-gray-100 bg-gray-50 hover:border-purple-200 hover:bg-white active:scale-[0.99]'
+                                                        }`}
+                                                    >
+                                                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${
+                                                            isCardActive
+                                                                ? 'border-purple-100 bg-white text-purple-600'
+                                                                : 'border-gray-100 bg-white text-gray-400'
+                                                        }`}>
+                                                            <CreditCard size={15} strokeWidth={2.2} />
+                                                        </div>
+                                                        <div className="min-w-0 flex-1">
+                                                            <span className={`block truncate text-sm font-semibold ${isCardActive ? 'text-purple-700' : 'text-gray-800'}`}>
+                                                                {card.brand} final {card.lastFour}
+                                                            </span>
+                                                            <span className="mt-0.5 block text-xs text-gray-400">Cartão de Crédito Salvo</span>
+                                                        </div>
+                                                        <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                                                            isCardActive ? 'border-purple-600 bg-purple-600 text-white' : 'border-gray-200 bg-white'
+                                                        }`}>
+                                                            {isCardActive && <CheckCircle2 size={12} strokeWidth={3} />}
+                                                        </div>
+                                                    </button>
+                                                );
+                                            })}
 
-                                                                            return (
-                                                                                <button
-                                                                                    key={card.id}
-                                                                                    type="button"
-                                                                                    onClick={() => setSelectedSavedCardId(card.id)}
-                                                                                    className={`flex min-h-11 items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${
-                                                                                        isCardActive
-                                                                                            ? 'border-purple-500 bg-white text-purple-700'
-                                                                                            : 'border-gray-100 bg-white text-gray-700 hover:border-purple-200'
-                                                                                    }`}
-                                                                                >
-                                                                                    <CreditCard size={15} strokeWidth={2.2} />
-                                                                                    <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                                                                                        {card.brand} final {card.lastFour}
-                                                                                    </span>
-                                                                                    <span className={`h-4 w-4 rounded-full border ${isCardActive ? 'border-purple-600 bg-purple-600' : 'border-gray-200'}`} />
-                                                                                </button>
-                                                                            );
-                                                                        })}
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => setSelectedSavedCardId('')}
-                                                                            className="self-start text-sm font-semibold text-purple-600 transition-colors hover:text-purple-700"
-                                                                        >
-                                                                            Usar outro cartão
-                                                                        </button>
-                                                                    </div>
-                                                                )}
-                                                                {!selectedSavedCardId && (
-                                                                    <>
-                                                                <div className="flex flex-col gap-1">
-                                                                    <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">Nome impresso no cartão</label>
+                                            {/* Opção Resgatar Cupom */}
+                                            {(!paymentAvailability || paymentAvailability.couponsEnabled !== false) && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSelectedMethod('coupon');
+                                                        setSelectedSavedCardId('');
+                                                    }}
+                                                    className={`flex min-h-12 items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all ${
+                                                        selectedMethod === 'coupon'
+                                                            ? 'border-purple-600 bg-purple-50 shadow-sm shadow-purple-600/10 active:scale-[0.99]'
+                                                            : 'border-gray-100 bg-gray-50 hover:border-purple-200 hover:bg-white active:scale-[0.99]'
+                                                    }`}
+                                                >
+                                                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${
+                                                        selectedMethod === 'coupon'
+                                                            ? 'border-purple-100 bg-white text-purple-600'
+                                                            : 'border-gray-100 bg-white text-gray-400'
+                                                    }`}>
+                                                        <Ticket size={15} strokeWidth={2.2} />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <span className={`block truncate text-sm font-semibold ${selectedMethod === 'coupon' ? 'text-purple-700' : 'text-gray-800'}`}>
+                                                            Resgatar Cupom
+                                                        </span>
+                                                        <span className="mt-0.5 block text-xs text-gray-400">Resgate créditos com seu código</span>
+                                                    </div>
+                                                    <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                                                        selectedMethod === 'coupon' ? 'border-purple-600 bg-purple-600 text-white' : 'border-gray-200 bg-white'
+                                                    }`}>
+                                                        {selectedMethod === 'coupon' && <CheckCircle2 size={12} strokeWidth={3} />}
+                                                    </div>
+                                                </button>
+                                            )}
+
+                                            {/* Opção Novo Cartão de Crédito */}
+                                            {(!paymentAvailability || paymentAvailability.creditCardEnabled !== false) && (
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setSelectedMethod('card');
+                                                            setSelectedSavedCardId('');
+                                                        }}
+                                                        className={`flex min-h-12 items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all ${
+                                                            selectedMethod === 'card' && !selectedSavedCardId
+                                                                ? 'border-purple-600 bg-purple-50 shadow-sm shadow-purple-600/10 active:scale-[0.99]'
+                                                                : 'border-gray-100 bg-gray-50 hover:border-purple-200 hover:bg-white active:scale-[0.99]'
+                                                        }`}
+                                                    >
+                                                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${
+                                                            selectedMethod === 'card' && !selectedSavedCardId
+                                                                ? 'border-purple-100 bg-white text-purple-600'
+                                                                : 'border-gray-100 bg-white text-gray-400'
+                                                        }`}>
+                                                            <CreditCard size={15} strokeWidth={2.2} />
+                                                        </div>
+                                                        <div className="min-w-0 flex-1">
+                                                            <span className={`block truncate text-sm font-semibold ${selectedMethod === 'card' && !selectedSavedCardId ? 'text-purple-700' : 'text-gray-800'}`}>
+                                                                Novo Cartão de Crédito
+                                                            </span>
+                                                            <span className="mt-0.5 block text-xs text-gray-400">Cadastre um novo cartão</span>
+                                                        </div>
+                                                        <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                                                            selectedMethod === 'card' && !selectedSavedCardId ? 'border-purple-600 bg-purple-600 text-white' : 'border-gray-200 bg-white'
+                                                        }`}>
+                                                            {selectedMethod === 'card' && !selectedSavedCardId && <CheckCircle2 size={12} strokeWidth={3} />}
+                                                        </div>
+                                                    </button>
+
+                                                    {selectedMethod === 'card' && !selectedSavedCardId && (
+                                                        <div className="mt-1 flex flex-col gap-3 rounded-lg border border-gray-100 bg-gray-50 p-3 animate-in fade-in duration-200">
+                                                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                                                                <ShieldCheck size={13} className="text-green-600" strokeWidth={2.2} />
+                                                                Os dados do cartão são enviados somente para processar esta cobrança.
+                                                            </div>
+                                                            <div className="flex flex-col gap-1">
+                                                                <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">Nome impresso no cartão</label>
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Nome do titular"
+                                                                    value={cardHolderName}
+                                                                    onChange={(e) => setCardHolderName(e.target.value)}
+                                                                    autoComplete="cc-name"
+                                                                    className="rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+                                                                />
+                                                            </div>
+                                                            <div className="flex flex-col gap-1">
+                                                                <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">Número do cartão</label>
+                                                                <div className="flex items-center rounded-lg border border-gray-100 bg-white px-3 py-2.5 focus-within:border-purple-300 focus-within:ring-2 focus-within:ring-purple-100">
                                                                     <input
                                                                         type="text"
-                                                                        placeholder="Nome do titular"
-                                                                        value={cardHolderName}
-                                                                        onChange={(e) => setCardHolderName(e.target.value)}
-                                                                        autoComplete="cc-name"
+                                                                        placeholder="0000 0000 0000 0000"
+                                                                        value={cardNumber}
+                                                                        onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
+                                                                        maxLength={19}
+                                                                        inputMode="numeric"
+                                                                        autoComplete="cc-number"
+                                                                        className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none"
+                                                                    />
+                                                                    {cardNumber.length >= 4 && (
+                                                                        <span className="rounded-md bg-purple-50 px-2 py-0.5 text-xs font-semibold text-purple-700">
+                                                                            {cardBrand}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex w-full gap-3">
+                                                                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                                                                    <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">Validade</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="MM/AA"
+                                                                        value={cardExpiry}
+                                                                        onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
+                                                                        maxLength={5}
+                                                                        inputMode="numeric"
+                                                                        autoComplete="cc-exp"
+                                                                        className="w-full min-w-0 rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+                                                                    />
+                                                                </div>
+                                                                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                                                                    <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">CVV</label>
+                                                                    <input
+                                                                        type="password"
+                                                                        placeholder="123"
+                                                                        value={cardCvv}
+                                                                        onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                                                        maxLength={4}
+                                                                        inputMode="numeric"
+                                                                        autoComplete="cc-csc"
+                                                                        className="w-full min-w-0 rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={saveCard}
+                                                                    onChange={(e) => setSaveCard(e.target.checked)}
+                                                                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-200"
+                                                                />
+                                                                <span className="min-w-0 text-sm font-medium text-gray-700">
+                                                                    Salvar cartão para compras futuras
+                                                                </span>
+                                                            </label>
+                                                            {!hasCpf && (
+                                                                <div className="flex flex-col gap-1">
+                                                                    <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">CPF do titular</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="000.000.000-00"
+                                                                        value={userCpf}
+                                                                        onChange={(e) => setUserCpf(formatCPF(e.target.value))}
+                                                                        maxLength={14}
+                                                                        inputMode="numeric"
                                                                         className="rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
                                                                     />
                                                                 </div>
+                                                            )}
+                                                            {!hasPhone && (
                                                                 <div className="flex flex-col gap-1">
-                                                                    <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">Número do cartão</label>
-                                                                    <div className="flex items-center rounded-lg border border-gray-100 bg-white px-3 py-2.5 focus-within:border-purple-300 focus-within:ring-2 focus-within:ring-purple-100">
-                                                                        <input
-                                                                            type="text"
-                                                                            placeholder="0000 0000 0000 0000"
-                                                                            value={cardNumber}
-                                                                            onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-                                                                            maxLength={19}
-                                                                            inputMode="numeric"
-                                                                            autoComplete="cc-number"
-                                                                            className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none"
-                                                                        />
-                                                                        {cardNumber.length >= 4 && (
-                                                                            <span className="rounded-md bg-purple-50 px-2 py-0.5 text-xs font-semibold text-purple-700">
-                                                                                {cardBrand}
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                                <div className="flex w-full gap-3">
-                                                                    <div className="flex min-w-0 flex-1 flex-col gap-1">
-                                                                        <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">Validade</label>
-                                                                        <input
-                                                                            type="text"
-                                                                            placeholder="MM/AA"
-                                                                            value={cardExpiry}
-                                                                            onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
-                                                                            maxLength={5}
-                                                                            inputMode="numeric"
-                                                                            autoComplete="cc-exp"
-                                                                            className="w-full min-w-0 rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
-                                                                        />
-                                                                    </div>
-                                                                    <div className="flex min-w-0 flex-1 flex-col gap-1">
-                                                                        <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">CVV</label>
-                                                                        <input
-                                                                            type="password"
-                                                                            placeholder="123"
-                                                                            value={cardCvv}
-                                                                            onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                                                                            maxLength={4}
-                                                                            inputMode="numeric"
-                                                                            autoComplete="cc-csc"
-                                                                            className="w-full min-w-0 rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                                <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5">
+                                                                    <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">Telefone</label>
                                                                     <input
-                                                                        type="checkbox"
-                                                                        checked={saveCard}
-                                                                        onChange={(e) => setSaveCard(e.target.checked)}
-                                                                        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-200"
+                                                                        type="text"
+                                                                        placeholder="(00) 00000-0000"
+                                                                        value={userPhone}
+                                                                        onChange={(e) => setUserPhone(formatPhone(e.target.value))}
+                                                                        maxLength={15}
+                                                                        inputMode="tel"
+                                                                        className="rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
                                                                     />
-                                                                    <span className="min-w-0 text-sm font-medium text-gray-700">
-                                                                        Salvar cartão para compras futuras
-                                                                    </span>
-                                                                </label>
-                                                                {!hasCpf && (
-                                                                    <div className="flex flex-col gap-1">
-                                                                        <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">CPF do titular</label>
-                                                                        <input
-                                                                            type="text"
-                                                                            placeholder="000.000.000-00"
-                                                                            value={userCpf}
-                                                                            onChange={(e) => setUserCpf(formatCPF(e.target.value))}
-                                                                            maxLength={14}
-                                                                            inputMode="numeric"
-                                                                            className="rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
-                                                                        />
-                                                                    </div>
-                                                                )}
-                                                                {!hasPhone && (
-                                                                    <div className="flex flex-col gap-1">
-                                                                        <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">Telefone</label>
-                                                                        <input
-                                                                            type="text"
-                                                                            placeholder="(00) 00000-0000"
-                                                                            value={userPhone}
-                                                                            onChange={(e) => setUserPhone(formatPhone(e.target.value))}
-                                                                            maxLength={15}
-                                                                            inputMode="tel"
-                                                                            className="rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
-                                                                        />
-                                                                    </div>
-                                                                )}
-                                                                    </>
-                                                                )}
-                                                                {paymentError && (
-                                                                    <p className="text-xs font-medium text-red-600 animate-in fade-in duration-200">
-                                                                        {paymentError}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </React.Fragment>
-                                                );
-                                            })}
+                                                                </div>
+                                                            )}
+                                                            {paymentError && (
+                                                                <p className="text-xs font-medium text-red-600 animate-in fade-in duration-200 mt-2">
+                                                                    {paymentError}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
                                         </div>
                                     </div>
 
