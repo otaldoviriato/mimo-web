@@ -25,6 +25,12 @@ export default function AguardandoAprovacaoPage() {
             return;
         }
 
+        // Se já foi liberado no localStorage, vai direto para o app sem fazer polling
+        if (typeof window !== 'undefined' && localStorage.getItem('mimo_professional_released') === 'true') {
+            router.replace('/chats');
+            return;
+        }
+
         let interval: NodeJS.Timeout | null = null;
 
         // Função para checar o status
@@ -94,6 +100,9 @@ export default function AguardandoAprovacaoPage() {
                         }, 2500);
 
                         setTimeout(() => {
+                            if (typeof window !== 'undefined') {
+                                localStorage.setItem('mimo_professional_released', 'true');
+                            }
                             router.replace('/chats');
                         }, 3500);
                     } else if (userStatus === 'rejected') {
@@ -119,6 +128,11 @@ export default function AguardandoAprovacaoPage() {
     }, [isLoaded, isSignedIn, router]);
 
     const handleLogout = async () => {
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem('mimo_professional_released');
+            localStorage.removeItem('mimo_signup_flow');
+            localStorage.removeItem('mimo_profile');
+        }
         await signOut();
         router.replace('/login');
     };
