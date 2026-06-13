@@ -77,39 +77,39 @@ export default function AguardandoAprovacaoPage() {
 
     if (!isLoaded || status === 'loading') {
         return (
-            <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-white relative overflow-hidden">
+            <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-50 text-slate-900 relative overflow-hidden">
                 {/* Dotted Background */}
-                <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-60"></div>
-                <Loader2 className="h-10 w-10 animate-spin text-purple-500 relative z-10" />
-                <p className="mt-4 text-sm font-semibold text-slate-400 relative z-10">Carregando seus dados...</p>
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,#cbd5e1_1px,transparent_1px),linear-gradient(to_bottom,#cbd5e1_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-30"></div>
+                <Loader2 className="h-10 w-10 animate-spin text-purple-600 relative z-10" />
+                <p className="mt-4 text-sm font-semibold text-slate-500 relative z-10">Carregando seus dados...</p>
             </div>
         );
     }
 
     if (animatingRelease) {
         return (
-            <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-white relative overflow-hidden transition-all duration-1000">
+            <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-50 text-slate-900 relative overflow-hidden transition-all duration-1000">
                 {/* Efeito de flash e liberação */}
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-fuchsia-900/40 to-slate-950 animate-pulse"></div>
-                <div className="absolute inset-0 bg-[linear-gradient(to_right,#312e81_1px,transparent_1px),linear-gradient(to_bottom,#312e81_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-35"></div>
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-100/60 via-fuchsia-100/60 to-slate-50 animate-pulse"></div>
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-50"></div>
                 
                 <div className="relative z-10 text-center space-y-6 max-w-md p-6 animate-out fade-out zoom-out-90 duration-[2000ms] delay-500">
-                    <div className="relative mx-auto w-24 h-24 bg-gradient-to-tr from-purple-500 via-fuchsia-500 to-indigo-500 rounded-3xl flex items-center justify-center shadow-2xl shadow-purple-500/35 animate-bounce">
+                    <div className="relative mx-auto w-24 h-24 bg-gradient-to-tr from-purple-600 via-fuchsia-600 to-indigo-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-purple-500/25 animate-bounce">
                         <Sparkles className="h-12 w-12 text-white" />
                         <span className="absolute inset-0 rounded-3xl border border-white/40 animate-ping"></span>
                     </div>
                     <div className="space-y-2">
-                        <h1 className="text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-fuchsia-300 to-indigo-300">
+                        <h1 className="text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600">
                             Acesso Liberado!
                         </h1>
-                        <p className="text-sm font-bold text-purple-200">
+                        <p className="text-sm font-bold text-purple-700">
                             Sua conta foi aprovada! Prepare-se para a experiência.
                         </p>
                     </div>
                     <div className="flex space-x-1.5 justify-center items-center pt-2">
-                        <span className="w-2.5 h-2.5 bg-fuchsia-400 rounded-full animate-ping" style={{ animationDelay: '0ms' }}></span>
-                        <span className="w-2.5 h-2.5 bg-purple-400 rounded-full animate-ping" style={{ animationDelay: '150ms' }}></span>
-                        <span className="w-2.5 h-2.5 bg-indigo-400 rounded-full animate-ping" style={{ animationDelay: '300ms' }}></span>
+                        <span className="w-2.5 h-2.5 bg-fuchsia-500 rounded-full animate-ping" style={{ animationDelay: '0ms' }}></span>
+                        <span className="w-2.5 h-2.5 bg-purple-500 rounded-full animate-ping" style={{ animationDelay: '150ms' }}></span>
+                        <span className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-ping" style={{ animationDelay: '300ms' }}></span>
                     </div>
                 </div>
             </div>
@@ -117,15 +117,15 @@ export default function AguardandoAprovacaoPage() {
     }
 
     return (
-        <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-white p-6 relative overflow-hidden select-none">
+        <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-50 text-slate-900 p-6 relative overflow-hidden select-none">
             {/* Dotted Background */}
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e1b4b_1px,transparent_1px),linear-gradient(to_bottom,#1e1b4b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_75%,transparent_100%)] opacity-50"></div>
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#cbd5e1_1px,transparent_1px),linear-gradient(to_bottom,#cbd5e1_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_75%,transparent_100%)] opacity-30"></div>
             
             {/* Luzes decorativas roxas no background */}
-            <div className="absolute -top-40 -left-40 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl"></div>
-            <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-fuchsia-600/10 rounded-full blur-3xl"></div>
+            <div className="absolute -top-40 -left-40 w-96 h-96 bg-purple-200/40 rounded-full blur-3xl"></div>
+            <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-fuchsia-200/40 rounded-full blur-3xl"></div>
 
-            <div className="relative z-10 max-w-md w-full bg-slate-900/70 border border-slate-800/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl flex flex-col items-center text-center space-y-6">
+            <div className="relative z-10 max-w-md w-full bg-white/90 border border-slate-200/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl shadow-slate-200/50 flex flex-col items-center text-center space-y-6">
                 
                 {/* Logo e Status Indicator */}
                 <div className="inline-flex w-20 h-20 items-center justify-center bg-gradient-to-br from-purple-600 to-purple-700 rounded-3xl shadow-lg relative">
@@ -139,43 +139,43 @@ export default function AguardandoAprovacaoPage() {
                 {status === 'pending' && (
                     <>
                         <div className="space-y-2">
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-extrabold uppercase bg-amber-500/10 text-amber-400 rounded-full border border-amber-500/20">
-                                <Loader2 className="h-3 w-3 animate-spin" />
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-extrabold uppercase bg-amber-50 text-amber-600 rounded-full border border-amber-200">
+                                <Loader2 className="h-3 w-3 animate-spin text-amber-500" />
                                 Perfil em Análise
                             </span>
-                            <h1 className="text-2xl font-black tracking-tight mt-3 text-slate-100">
+                            <h1 className="text-2xl font-black tracking-tight mt-3 text-slate-900">
                                 Olá, {name}! 💜
                             </h1>
-                            <p className="text-sm font-semibold text-slate-400 leading-relaxed px-2">
+                            <p className="text-sm font-semibold text-slate-500 leading-relaxed px-2">
                                 Recebemos seu cadastro. Sua conta de criadora profissional está pendente de aprovação pela nossa equipe.
                             </p>
                         </div>
 
-                        <div className="w-full bg-slate-800/40 border border-slate-800 rounded-2xl p-4.5 text-left text-xs font-semibold text-slate-300 leading-relaxed space-y-3">
-                            <p className="flex items-center gap-2 text-slate-200">
+                        <div className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4.5 text-left text-xs font-semibold text-slate-600 leading-relaxed space-y-3">
+                            <p className="flex items-center gap-2 text-slate-800">
                                 <span className="relative flex h-2 w-2 shrink-0">
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
                                     <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
                                 </span>
                                 O que acontece agora?
                             </p>
-                            <p className="pl-4 text-slate-400">
+                            <p className="pl-4 text-slate-500">
                                 1. Estamos revisando seu perfil para garantir a segurança da nossa comunidade.
                             </p>
-                            <p className="pl-4 text-slate-400">
+                            <p className="pl-4 text-slate-500">
                                 2. Assim que seu cadastro for aprovado, **esta tela atualizará automaticamente** e você será notificada por e-mail.
                             </p>
                         </div>
 
                         <div className="flex flex-col w-full gap-3 pt-2">
-                            <div className="text-xs font-bold text-slate-500 flex items-center justify-center gap-1.5">
-                                <div className="h-1.5 w-1.5 bg-purple-500 rounded-full animate-ping"></div>
-                                Polling ativo. Aguardando liberação...
+                            <div className="text-xs font-bold text-slate-400 flex items-center justify-center gap-1.5">
+                                <div className="h-1.5 w-1.5 bg-purple-500 rounded-full animate-pulse"></div>
+                                Verificando status de aprovação...
                             </div>
                             
                             <button
                                 onClick={handleLogout}
-                                className="w-full flex items-center justify-center gap-2 py-3 px-4 text-sm font-extrabold text-slate-400 hover:text-white bg-slate-800/40 hover:bg-slate-800 border border-slate-800/80 rounded-xl transition duration-200 cursor-pointer"
+                                className="w-full flex items-center justify-center gap-2 py-3 px-4 text-sm font-extrabold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl transition duration-200 cursor-pointer"
                             >
                                 <LogOut size={16} />
                                 Sair da Conta
@@ -187,19 +187,19 @@ export default function AguardandoAprovacaoPage() {
                 {status === 'rejected' && (
                     <>
                         <div className="space-y-2">
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-extrabold uppercase bg-rose-500/10 text-rose-400 rounded-full border border-rose-500/20">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-extrabold uppercase bg-rose-50 text-rose-600 rounded-full border border-rose-200">
                                 <ShieldAlert className="h-3 w-3" />
                                 Cadastro Rejeitado
                             </span>
-                            <h1 className="text-2xl font-black tracking-tight mt-3 text-slate-100">
+                            <h1 className="text-2xl font-black tracking-tight mt-3 text-slate-900">
                                 Inscrição Não Aprovada
                             </h1>
-                            <p className="text-sm font-semibold text-slate-400 leading-relaxed px-2">
+                            <p className="text-sm font-semibold text-slate-500 leading-relaxed px-2">
                                 Lamentamos, {name}, mas sua inscrição para perfil profissional não pôde ser aprovada no momento.
                             </p>
                         </div>
 
-                        <div className="w-full bg-slate-800/40 border border-slate-800 rounded-2xl p-4.5 text-xs font-semibold text-slate-400 leading-relaxed">
+                        <div className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4.5 text-xs font-semibold text-slate-500 leading-relaxed">
                             Se você acredita que isso foi um engano ou deseja obter mais informações, sinta-se à vontade para entrar em contato com nosso suporte técnico.
                         </div>
 
@@ -214,7 +214,7 @@ export default function AguardandoAprovacaoPage() {
                             
                             <button
                                 onClick={handleLogout}
-                                className="w-full flex items-center justify-center gap-2 py-3 px-4 text-sm font-extrabold text-slate-400 hover:text-white bg-slate-800/40 hover:bg-slate-800 border border-slate-800/80 rounded-xl transition duration-200 cursor-pointer"
+                                className="w-full flex items-center justify-center gap-2 py-3 px-4 text-sm font-extrabold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl transition duration-200 cursor-pointer"
                             >
                                 <LogOut size={16} />
                                 Sair da Conta
