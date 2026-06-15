@@ -41,6 +41,9 @@ export interface IUser extends Document {
     isOnline?: boolean;
     lastSeen?: Date;
     emailNotificationsEnabled?: boolean;
+    identityDocumentUrl?: string;
+    identitySelfieUrl?: string;
+    identityDocumentType?: string;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -168,6 +171,18 @@ const UserSchema = new Schema<IUser>({
     emailNotificationsEnabled: {
         type: Boolean,
         default: false,
+    },
+    identityDocumentUrl: {
+        type: String,
+        default: '',
+    },
+    identitySelfieUrl: {
+        type: String,
+        default: '',
+    },
+    identityDocumentType: {
+        type: String,
+        default: '',
     },
 }, {
     timestamps: true,

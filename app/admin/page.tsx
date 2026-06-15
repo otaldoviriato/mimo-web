@@ -9,6 +9,7 @@ import { StatsCard } from '@/components/admin/StatsCard';
 import { ActivityChart } from '@/components/admin/ActivityChart';
 import { ClientsTable } from '@/components/admin/ClientsTable';
 import { ProfessionalsTable } from '@/components/admin/ProfessionalsTable';
+import { CreatorApplications } from '@/components/admin/CreatorApplications';
 import { 
     Users, 
     MessageSquare, 
@@ -329,7 +330,7 @@ export default function AdminPage() {
         if (typeof window !== 'undefined') {
             const params = new URLSearchParams(window.location.search);
             const tabParam = params.get('tab');
-            if (tabParam && ['dashboard', 'clients', 'professionals', 'rooms', 'financial', 'withdrawals', 'settings', 'coupons', 'help-tickets', 'institutional-emails'].includes(tabParam)) {
+            if (tabParam && ['dashboard', 'clients', 'professionals', 'rooms', 'financial', 'withdrawals', 'settings', 'coupons', 'help-tickets', 'institutional-emails', 'creator-applications'].includes(tabParam)) {
                 setActiveTab(tabParam);
             }
         }
@@ -455,6 +456,7 @@ export default function AdminPage() {
         coupons: 'Gerenciamento de Cupons de Desconto',
         'help-tickets': 'Tickets de Ajuda',
         'institutional-emails': 'E-mails Institucionais',
+        'creator-applications': 'Inscrições de Criadoras',
     };
 
     // Período comparativo selecionado na Dashboard
@@ -3599,6 +3601,10 @@ export default function AdminPage() {
                                 </div>
                             </div>
                         </div>
+                    )}
+
+                    {activeTab === 'creator-applications' && (
+                        <CreatorApplications />
                     )}
 
                 </main>

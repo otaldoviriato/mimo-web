@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Avatar, TouchableRipple } from '@/components';
 import { useChatRooms, useMyProfile, QueryKeys } from '@/hooks/useQueries';
 import { useSocket } from '@/hooks/useSocket';
-import { CheckCircle2, X, WalletCards, Crown } from 'lucide-react';
+import { CheckCircle2, X, WalletCards, Crown, ShieldAlert, Clock, AlertCircle, ChevronRight } from 'lucide-react';
 
 interface Room {
     _id: string;
@@ -77,6 +77,10 @@ export default function ChatsPage() {
     const [giftAmount, setGiftAmount] = useState<number | null>(null);
     const giftClaimedRef = useRef(false);
 
+    // Estado e controle para verificação de identidade
+    const prevStatusRef = useRef<string | null | undefined>(undefined);
+    const [showSuccessToast, setShowSuccessToast] = useState(false);
+
     // Resolve a transição pendente assim que a lista de chats é montada
     useEffect(() => {
         if (typeof window !== 'undefined' && (window as any).__resolveTransition) {
@@ -87,6 +91,100 @@ export default function ChatsPage() {
 
     const { data: rooms = [], isLoading, isRefetching, refetch: refetchRooms } = useChatRooms();
     const { data: myProfile, refetch: refetchProfile } = useMyProfile();
+
+    useEffect(() => {
+        if (myProfile && myProfile.isProfessional) {
+            const currentStatus = myProfile.professionalStatus;
+            // Se o status anterior era 'pending' e mudou para 'approved'
+            if (prevStatusRef.current === 'pending' && currentStatus === 'approved') {
+                setShowSuccessToast(true);
+                if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+                    try {
+                        navigator.vibrate([100, 50, 100]);
+                    } catch (e) {}
+                }
+            }
+            prevStatusRef.current = currentStatus;
+        }
+    }, [myProfile]);
+
+    const renderVerificationBanner = () => {
+        if (!myProfile || !myProfile.isProfessional) return null;
+        
+        const status = myProfile.professionalStatus;
+        
+        if (status === 'approved') return null;
+
+        if (status === 'pending') {
+            return (
+                <div className="mx-4 mt-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="flex gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+                            <Clock className="w-5 h-5 animate-pulse" />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-amber-900 text-sm">Verificação em análise</h3>
+                            <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+                                Suas fotos e documentos foram enviados. A aprovação pode levar até 48 horas. Você será notificada assim que sua conta for liberada para começar a faturar!
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        if (status === 'rejected') {
+            return (
+                <div className="mx-4 mt-4 bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-2xl p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="flex gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-600">
+                            <AlertCircle className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="font-bold text-red-900 text-sm">Verificação recusada</h3>
+                            <p className="text-xs text-red-700 mt-1 leading-relaxed">
+                                {myProfile.notes || 'Infelizmente sua documentação não pôde ser aprovada. Por favor, reenvie suas fotos com atenção às instruções.'}
+                            </p>
+                            <button
+                                onClick={() => router.push('/verificacao-identidade')}
+                                className="mt-3 inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 active:scale-[0.98] transition-all text-white text-xs font-semibold px-3 py-2 rounded-xl shadow-md shadow-red-600/10"
+                            >
+                                Refazer verificação
+                                <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // status === null ou undefined ou ''
+        return (
+            <div className="mx-4 mt-4 bg-gradient-to-br from-purple-50 via-fuchsia-50 to-indigo-50 border border-purple-100 rounded-2xl p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="flex gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-600">
+                        <ShieldAlert className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="font-bold text-purple-900 text-sm flex items-center gap-1.5">
+                            Seja bem-vinda ao Mimo! 💜
+                            <span className="bg-purple-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider animate-pulse">Ação Necessária</span>
+                        </h3>
+                        <p className="text-xs text-purple-700 mt-1.5 leading-relaxed">
+                            Sua conta profissional foi criada com sucesso! Para começar a receber suas primeiras mensagens de fãs, aceitar assinaturas e aparecer na busca, você precisa realizar a verificação de maioridade (+18).
+                        </p>
+                        <button
+                            onClick={() => router.push('/verificacao-identidade')}
+                            className="mt-3.5 inline-flex items-center gap-1 bg-purple-600 hover:bg-purple-700 active:scale-[0.98] transition-all text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-md shadow-purple-600/10"
+                        >
+                            Verificar Maioridade (+18)
+                            <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
 
     // ─── Listeners de WebSocket em tempo real ───────────────────────────────
     useEffect(() => {
@@ -275,7 +373,19 @@ export default function ChatsPage() {
                     <h1 className="text-2xl font-black text-white tracking-tighter">Mimo</h1>
                     <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">Conversas</span>
                 </div>
+                {myProfile?.isAdmin && (
+                    <button
+                        onClick={() => router.push('/admin')}
+                        className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center"
+                        title="Painel Admin"
+                    >
+                        <ShieldAlert className="w-5 h-5" />
+                    </button>
+                )}
             </div>
+
+            {/* Banner de Verificação de Identidade */}
+            {renderVerificationBanner()}
 
             {/* Modal de crédito promocional */}
             {giftModal && (
@@ -339,6 +449,34 @@ export default function ChatsPage() {
                     </div>
                 </div>
             )}
+
+            {/* Modal de Sucesso na Verificação */}
+            {showSuccessToast && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-5">
+                    <div
+                        className="absolute inset-0 bg-purple-950/45 backdrop-blur-[4px] animate-in fade-in duration-300"
+                        onClick={() => setShowSuccessToast(false)}
+                    />
+                    <div className="relative w-full max-w-[360px] animate-in fade-in slide-in-from-bottom-8 zoom-in-95 duration-500">
+                        <div className="relative overflow-hidden rounded-[28px] border border-purple-100 bg-white text-gray-900 shadow-2xl p-6 text-center">
+                            <div className="mx-auto w-16 h-16 bg-gradient-to-tr from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/25 mb-4 animate-bounce">
+                                <CheckCircle2 className="w-8 h-8 text-white animate-pulse" />
+                            </div>
+                            <h2 className="text-xl font-bold text-gray-900 mb-2">Conta Verificada!</h2>
+                            <p className="text-sm text-gray-600 leading-relaxed mb-6">
+                                Parabéns! Sua identidade foi validada pelo nosso time. Seu perfil já está público e pronto para receber mensagens e assinaturas de fãs. Hora de faturar! 💸🚀
+                            </p>
+                            <button
+                                onClick={() => setShowSuccessToast(false)}
+                                className="w-full rounded-2xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-purple-600/20 hover:from-purple-700 hover:to-fuchsia-700 transition-all active:scale-[0.99]"
+                            >
+                                Começar a faturar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* List */}
             <div className="flex-1 overflow-y-auto pb-16 md:pb-0">
                 {isLoading ? (

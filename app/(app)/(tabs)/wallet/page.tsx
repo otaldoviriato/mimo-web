@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useMyProfile, useRequestWithdraw, usePendingWithdrawal, useUpdateProfile } from '@/hooks/useQueries';
+import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { Avatar } from '@/components/Avatar';
@@ -18,7 +19,8 @@ import {
     AlertCircle,
     Key,
     Eye,
-    EyeOff
+    EyeOff,
+    ShieldAlert
 } from 'lucide-react';
 
 interface CustomerRanking {
@@ -61,6 +63,7 @@ interface WalletDashboardData {
 
 export default function WalletPage() {
     const { data: userData, refetch: refetchProfile } = useMyProfile();
+    const router = useTransitionRouter();
     const updateProfileMutation = useUpdateProfile();
     const requestWithdrawMutation = useRequestWithdraw();
     const { data: pendingWithdrawalData, refetch: refetchPendingWithdrawal } = usePendingWithdrawal();
@@ -232,6 +235,15 @@ export default function WalletPage() {
                     <h1 className="text-2xl font-black text-white tracking-tighter">Mimo</h1>
                     <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">Carteira</span>
                 </div>
+                {userData?.isAdmin && (
+                    <button
+                        onClick={() => router.push('/admin')}
+                        className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center"
+                        title="Painel Admin"
+                    >
+                        <ShieldAlert className="w-5 h-5" />
+                    </button>
+                )}
             </div>
 
             {/* Bento Grid Container - Compacto, sem bordas pretas, sem rosa e ajustado para mobile */}

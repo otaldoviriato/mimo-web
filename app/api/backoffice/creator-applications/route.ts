@@ -27,11 +27,14 @@ export async function GET(request: NextRequest) {
             isProfessional: true,
         };
 
-        if (status) {
+        if (status === 'pending_documents') {
+            query.professionalStatus = { $in: [null, undefined] };
+        } else if (status) {
             query.professionalStatus = status;
-        } else {
+        } else if (!search) {
             // Por padrão, não exibe as arquivadas para evitar poluição no painel principal
-            query.professionalStatus = { $in: ['pending', 'approved', 'rejected'] };
+            // Mas exibe pendentes, aprovadas, rejeitadas e aguardando documentos
+            query.professionalStatus = { $in: ['pending', 'approved', 'rejected', null, undefined] };
         }
 
         if (search) {
@@ -56,7 +59,7 @@ export async function GET(request: NextRequest) {
             email: u.email,
             age: 0,
             cityState: 'Não informado',
-            status: u.professionalStatus || 'pending',
+            status: (u.professionalStatus === null || u.professionalStatus === undefined) ? 'pending_documents' : u.professionalStatus,
             createdAt: u.createdAt ? u.createdAt.toISOString() : new Date().toISOString(),
             updatedAt: u.updatedAt ? u.updatedAt.toISOString() : new Date().toISOString(),
         }));

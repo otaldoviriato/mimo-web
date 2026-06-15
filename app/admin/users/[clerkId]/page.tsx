@@ -20,7 +20,6 @@ import {
     X, 
     Mail, 
     User,
-    Sparkles,
     Eye,
     MessageCircle,
     AlertTriangle,
@@ -533,7 +532,7 @@ export default function UserDetailPage() {
                             {isProfessional && (
                                 <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
                                     <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-3 flex items-center gap-2">
-                                        <Sparkles size={16} className="text-purple-600 animate-pulse" />
+                                        <Coins size={16} className="text-purple-600 animate-pulse" />
                                         Configuração de Ganhos e Mídia
                                     </h3>
 

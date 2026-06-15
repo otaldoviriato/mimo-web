@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Bell, Menu } from 'lucide-react';
+import { Menu } from 'lucide-react';
+import { UserButton } from '@clerk/nextjs';
 
 interface DashboardHeaderProps {
     title: string;
@@ -44,13 +45,7 @@ export function DashboardHeader({ title, children, onMenuToggle }: DashboardHead
 
                 {/* Ações — movidas para cá no mobile para ficarem na mesma linha */}
                 <div className="flex items-center gap-3 md:hidden">
-                    <button className="relative p-2 text-slate-500 hover:text-purple-600 hover:bg-purple-50 rounded-xl transition-all duration-200">
-                        <Bell size={20} />
-                        <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white animate-pulse" />
-                    </button>
-                    <div className="w-9 h-9 rounded-xl bg-linear-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-white text-xs font-bold shadow-md border-2 border-white shrink-0">
-                        AM
-                    </div>
+                    <UserButton />
                 </div>
             </div>
 
@@ -63,13 +58,6 @@ export function DashboardHeader({ title, children, onMenuToggle }: DashboardHead
 
             {/* Ações e perfil — só visíveis no desktop */}
             <div className="hidden md:flex items-center gap-4 shrink-0">
-                <button className="relative p-2.5 text-slate-500 hover:text-purple-600 hover:bg-purple-50 rounded-xl transition-all duration-200 cursor-pointer group">
-                    <Bell size={20} className="transition-transform duration-200 group-hover:rotate-12" />
-                    <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-white animate-pulse" />
-                </button>
-
-                <div className="h-6 w-px bg-slate-200" />
-
                 <div className="flex items-center gap-3">
                     <div className="flex flex-col text-right">
                         <span className="text-sm font-bold text-slate-800 leading-tight">Admin Mimo</span>
@@ -77,9 +65,7 @@ export function DashboardHeader({ title, children, onMenuToggle }: DashboardHead
                             Super Admin
                         </span>
                     </div>
-                    <div className="w-10 h-10 rounded-xl bg-linear-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-white font-bold shadow-md shadow-purple-600/10 border-2 border-white">
-                        AM
-                    </div>
+                    <UserButton />
                 </div>
             </div>
         </header>

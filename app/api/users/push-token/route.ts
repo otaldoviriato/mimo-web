@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
         const updateQuery: any = {
             $setOnInsert: {
                 email: `user_${userId}@placeholder.com`,
-                username: `user_${userId.substring(0, 8)}`,
+                username: `user_${(userId.startsWith('user_') ? userId.slice(5) : userId).substring(0, 8)}`,
                 balance: 0,
                 chargeMode: false,
                 chargePerChar: 0.002

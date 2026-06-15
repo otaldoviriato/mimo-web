@@ -34,7 +34,8 @@ export async function GET(request: NextRequest) {
                 { name: { $regex: new RegExp(cleanQuery, 'i') } }
             ],
             clerkId: { $ne: userId },
-            isProfessional: true, // Busca retorna apenas perfis profissionais
+            isProfessional: true,
+            professionalStatus: 'approved',
         }).select('clerkId username name email photoUrl coverUrl isProfessional subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers').limit(20).lean() as any[];
 
         if (!foundUsers || foundUsers.length === 0) {

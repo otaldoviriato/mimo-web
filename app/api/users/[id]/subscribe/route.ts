@@ -24,8 +24,8 @@ export async function POST(
         const owner = await User.findOne({ clerkId: ownerId });
         const requester = await User.findOne({ clerkId: requesterId });
 
-        if (!owner || !owner.isProfessional) {
-            return NextResponse.json({ error: 'Perfil não encontrado ou não profissional' }, { status: 404 });
+        if (!owner || !owner.isProfessional || owner.professionalStatus !== 'approved') {
+            return NextResponse.json({ error: 'Perfil não encontrado, não profissional ou não verificado' }, { status: 404 });
         }
 
         if (!owner.isSubscriptionEnabled) {

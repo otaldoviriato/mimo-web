@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useClerk } from '@clerk/nextjs';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, LogOut, CheckCircle2, AlertTriangle, ShieldAlert, Sparkles, MessageCircle } from 'lucide-react';
+import { Loader2, LogOut, CheckCircle2, AlertTriangle, ShieldAlert, MessageCircle } from 'lucide-react';
 
 export default function AguardandoAprovacaoPage() {
     const { isLoaded, isSignedIn } = useAuth();
@@ -25,10 +25,18 @@ export default function AguardandoAprovacaoPage() {
             return;
         }
 
-        // Se já foi liberado no localStorage, vai direto para o app sem fazer polling
-        if (typeof window !== 'undefined' && localStorage.getItem('mimo_professional_released') === 'true') {
-            router.replace('/chats');
-            return;
+        // Se o perfil em cache confirma a aprovação ou se for cliente comum (não-profissional), vai direto para o app
+        if (typeof window !== 'undefined') {
+            const cachedProfile = localStorage.getItem('mimo_profile');
+            if (cachedProfile) {
+                try {
+                    const profile = JSON.parse(cachedProfile);
+                    if (profile.professionalStatus === 'approved' || profile.isProfessional === false) {
+                        router.replace('/chats');
+                        return;
+                    }
+                } catch {}
+            }
         }
 
         let interval: NodeJS.Timeout | null = null;
@@ -47,6 +55,13 @@ export default function AguardandoAprovacaoPage() {
                 
                 if (data.user) {
                     setName(data.user.name || data.user.username);
+                    
+                    // Se o usuário não for profissional (cliente comum), redireciona direto para o app
+                    if (!data.user.isProfessional) {
+                        router.replace('/chats');
+                        return;
+                    }
+
                     const userStatus = data.user.professionalStatus;
 
                     if (userStatus === 'approved') {
@@ -86,29 +101,19 @@ export default function AguardandoAprovacaoPage() {
                                     console.error(e);
                                 }
                             }
+                            // Sinaliza que o acesso foi liberado mas a animação de liberação ainda não foi assistida
+                            localStorage.setItem('mimo_professional_released', 'false');
+                            localStorage.removeItem('mimo_signup_flow');
                         }
 
-                        setStatus('approved');
-                        setAnimatingRelease(true);
-
-                        // Tempo planejado para transição visual premium:
-                        // 1. Mostrar a comemoração ("Acesso Liberado!") por 2.5 segundos.
-                        // 2. Seta o fadeOut = true para realizar a transição CSS suave de desfoque e opacidade (dura 1000ms).
-                        // 3. Após 3.5 segundos no total, redireciona o usuário para a página de chats.
-                        setTimeout(() => {
-                            setFadeOut(true);
-                        }, 2500);
-
-                        setTimeout(() => {
-                            if (typeof window !== 'undefined') {
-                                localStorage.setItem('mimo_professional_released', 'true');
-                            }
-                            router.replace('/chats');
-                        }, 3500);
+                        router.replace('/chats');
                     } else if (userStatus === 'rejected') {
                         setStatus('rejected');
                     } else {
                         setStatus('pending');
+                        if (typeof window !== 'undefined') {
+                            localStorage.removeItem('mimo_professional_released');
+                        }
                     }
                 }
             } catch (err) {
@@ -159,7 +164,7 @@ export default function AguardandoAprovacaoPage() {
                 
                 <div className="relative z-10 text-center space-y-6 max-w-md p-6">
                     <div className="relative mx-auto w-24 h-24 bg-gradient-to-tr from-purple-600 via-fuchsia-600 to-indigo-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-purple-500/25 animate-bounce">
-                        <Sparkles className="h-12 w-12 text-white" />
+                        <CheckCircle2 className="h-12 w-12 text-white" />
                         <span className="absolute inset-0 rounded-3xl border border-white/40 animate-ping"></span>
                     </div>
                     <div className="space-y-2">

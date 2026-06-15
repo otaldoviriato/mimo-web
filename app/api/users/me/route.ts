@@ -33,10 +33,11 @@ export async function GET() {
                 const client = await clerkClient();
                 const clerkUser = await client.users.getUser(userId);
                 const email = clerkUser.emailAddresses[0]?.emailAddress || `user_${userId}@placeholder.com`;
-                const username = clerkUser.username || `user_${userId.substring(userId.length - 8)}`;
+                const cleanId = userId.startsWith('user_') ? userId.slice(5) : userId;
+                const username = clerkUser.username || `user_${cleanId.substring(Math.max(0, cleanId.length - 8))}`;
 
                 const isProfessional = clerkUser.unsafeMetadata?.role === 'professional';
-                const professionalStatus = isProfessional ? 'pending' : null;
+                const professionalStatus = null; // Inicializa como null (verificação pendente de envio)
 
                 user = await User.create({
                     clerkId: userId,
@@ -50,25 +51,23 @@ export async function GET() {
                     chargePerCharNonSubscribers: 0.005,
                 });
 
-                if (isProfessional && professionalStatus === 'pending') {
+                if (isProfessional) {
                     try {
-                        const appUrl = process.env.NEXT_PUBLIC_API_URL || 'https://www.mimochat.com.br';
                         await resend.emails.send({
                             from: 'Mimo Cadastro <onboarding@resend.dev>',
                             to: 'viriatoceo@gmail.com',
-                            subject: `Nova Inscrição de Criadora (Lazy) - @${username}`,
+                            subject: `Nova Conta de Criadora Criada (Lazy) - @${username}`,
                             html: `
                                 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                                    <h2 style="color: #6d28d9; margin-top: 0;">Nova Criadora Cadastrada</h2>
-                                    <p style="color: #475569; font-size: 16px;">Uma nova conta de criadora foi criada e está aguardando aprovação.</p>
+                                    <h2 style="color: #6d28d9; margin-top: 0;">Nova Profissional Cadastrada</h2>
+                                    <p style="color: #475569; font-size: 16px;">Uma nova conta de criadora foi criada e está pendente de verificação de identidade/documentos.</p>
                                     <ul style="background-color: #f8fafc; padding: 15px 25px; border-radius: 6px; list-style-type: none; margin: 20px 0;">
                                         <li style="margin-bottom: 8px;"><strong>Nome:</strong> ${user.name}</li>
                                         <li style="margin-bottom: 8px;"><strong>E-mail:</strong> ${email}</li>
                                         <li style="margin-bottom: 8px;"><strong>Username:</strong> @${username}</li>
                                         <li style="margin-bottom: 0;"><strong>Data de Cadastro:</strong> ${new Date().toLocaleString('pt-BR')}</li>
                                     </ul>
-                                    <p style="color: #475569; margin-bottom: 25px;">Acesse o painel do backoffice para avaliar o cadastro.</p>
-                                    <a href="${appUrl}/admin/creator-applications" style="background-color: #6d28d9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; text-align: center;">Ver Inscrições no Backoffice</a>
+                                    <p style="color: #475569;">O perfil só aparecerá no painel de moderação de documentos após o envio de fotos do documento e selfie de maioridade (+18) pela própria criadora.</p>
                                 </div>
                             `
                         });
@@ -97,29 +96,27 @@ export async function GET() {
 
                 if (isProfessionalClerk && !user.isProfessional) {
                     user.isProfessional = true;
-                    user.professionalStatus = 'pending';
+                    user.professionalStatus = null;
                     await user.save();
-                    console.log(`[GET /api/users/me] Sincronizado status profissional pendente para o usuário ${userId} baseado nos metadados do Clerk.`);
+                    console.log(`[GET /api/users/me] Sincronizado status profissional para o usuário ${userId} baseado nos metadados do Clerk.`);
 
                     // Envia email de notificação se for promovido aqui
                     try {
-                        const appUrl = process.env.NEXT_PUBLIC_API_URL || 'https://www.mimochat.com.br';
                         await resend.emails.send({
                             from: 'Mimo Cadastro <onboarding@resend.dev>',
                             to: 'viriatoceo@gmail.com',
-                            subject: `Nova Inscrição de Criadora (Sync GET) - @${user.username}`,
+                            subject: `Nova Conta de Criadora Criada (Sync GET) - @${user.username}`,
                             html: `
                                 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                                    <h2 style="color: #6d28d9; margin-top: 0;">Nova Criadora Cadastrada</h2>
-                                    <p style="color: #475569; font-size: 16px;">Uma nova conta de criadora foi criada e está aguardando aprovação.</p>
+                                    <h2 style="color: #6d28d9; margin-top: 0;">Nova Profissional Cadastrada</h2>
+                                    <p style="color: #475569; font-size: 16px;">Uma nova conta de criadora foi criada e está pendente de verificação de identidade/documentos.</p>
                                     <ul style="background-color: #f8fafc; padding: 15px 25px; border-radius: 6px; list-style-type: none; margin: 20px 0;">
                                         <li style="margin-bottom: 8px;"><strong>Nome:</strong> ${user.name || user.username}</li>
                                         <li style="margin-bottom: 8px;"><strong>E-mail:</strong> ${user.email}</li>
                                         <li style="margin-bottom: 8px;"><strong>Username:</strong> @${user.username}</li>
                                         <li style="margin-bottom: 0;"><strong>Data de Cadastro:</strong> ${new Date().toLocaleString('pt-BR')}</li>
                                     </ul>
-                                    <p style="color: #475569; margin-bottom: 25px;">Acesse o painel do backoffice para avaliar o cadastro.</p>
-                                    <a href="${appUrl}/admin/creator-applications" style="background-color: #6d28d9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; text-align: center;">Ver Inscrições no Backoffice</a>
+                                    <p style="color: #475569;">O perfil só aparecerá no painel de moderação de documentos após o envio de fotos do documento e selfie de maioridade (+18) pela própria criadora.</p>
                                 </div>
                             `
                         });
@@ -311,7 +308,9 @@ export async function PATCH(request: NextRequest) {
                 $set: updateData,
                 $setOnInsert: {
                     email: `user_${userId}@placeholder.com`,
-                    ...(updateData.username ? {} : { username: `user_${userId.substring(userId.length - 8)}` }),
+                    ...(updateData.username ? {} : { 
+                        username: `user_${(userId.startsWith('user_') ? userId.slice(5) : userId).substring(Math.max(0, (userId.startsWith('user_') ? userId.slice(5) : userId).length - 8))}` 
+                    }),
                     balance: 0
                 }
             },

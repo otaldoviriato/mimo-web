@@ -49,6 +49,13 @@ export function useMyProfile() {
             return undefined;
         },
         initialDataUpdatedAt: 0,
+        refetchInterval: (query: any) => {
+            const user = query.state.data;
+            if (user && user.isProfessional && user.professionalStatus === 'pending') {
+                return 5000;
+            }
+            return false;
+        },
     });
 
     useEffect(() => {

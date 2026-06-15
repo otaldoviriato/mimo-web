@@ -14,8 +14,6 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         }
 
-        // Valida se a conta Clerk é nova (criada a menos de 2 minutos)
-        // Isso protege contas antigas de clientes contra a inicialização de perfil profissional
         try {
             const client = await clerkClient();
             const clerkUser = await client.users.getUser(userId);
@@ -29,6 +27,7 @@ export async function POST(request: NextRequest) {
             }
         } catch (clerkErr) {
             console.error('[init-professional] Erro ao obter dados do usuário do Clerk:', clerkErr);
+            return NextResponse.json({ error: 'Erro ao validar conta no Clerk' }, { status: 500 });
         }
 
         await connectToDatabase();
@@ -41,7 +40,8 @@ export async function POST(request: NextRequest) {
                 const client = await clerkClient();
                 const clerkUser = await client.users.getUser(userId);
                 const email = clerkUser.emailAddresses[0]?.emailAddress || `user_${userId}@placeholder.com`;
-                const username = clerkUser.username || `user_${userId.substring(userId.length - 8)}`;
+                const cleanId = userId.startsWith('user_') ? userId.slice(5) : userId;
+                const username = clerkUser.username || `user_${cleanId.substring(Math.max(0, cleanId.length - 8))}`;
 
                 user = await User.create({
                     clerkId: userId,
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
                     name: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' '),
                     balance: 0,
                     isProfessional: true,
-                    professionalStatus: 'pending',
+                    professionalStatus: null,
                     chargePerCharSubscribers: 0.002,
                     chargePerCharNonSubscribers: 0.005,
                 });
@@ -59,14 +59,14 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json({ error: 'Erro ao registrar usuário' }, { status: 500 });
             }
         } else {
-            // Se ele já for profissional (seja pendente ou aprovado), não precisamos fazer de novo
-            if (user.isProfessional && user.professionalStatus) {
+            // Se ele já for profissional, não precisamos fazer de novo
+            if (user.isProfessional) {
                 return NextResponse.json({ success: true, alreadyInitialized: true, status: user.professionalStatus });
             }
 
-            // Atualiza para profissional pendente no MongoDB
+            // Atualiza para profissional no MongoDB
             user.isProfessional = true;
-            user.professionalStatus = 'pending';
+            user.professionalStatus = null;
             await user.save();
         }
 
@@ -83,25 +83,23 @@ export async function POST(request: NextRequest) {
             console.error('[init-professional] Erro ao atualizar metadados no Clerk:', clerkErr);
         }
 
-        // Notifica os administradores por e-mail via Resend
+        // Notifica os administradores por e-mail via Resend (apenas informativo de criação de conta)
         try {
-            const appUrl = process.env.NEXT_PUBLIC_API_URL || 'https://www.mimochat.com.br';
             await resend.emails.send({
                 from: 'Mimo Cadastro <onboarding@resend.dev>',
                 to: 'viriatoceo@gmail.com',
-                subject: `Nova Inscrição de Criadora (Init) - @${user.username}`,
+                subject: `Nova Conta de Criadora Criada - @${user.username}`,
                 html: `
                     <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                        <h2 style="color: #6d28d9; margin-top: 0;">Nova Criadora Cadastrada</h2>
-                        <p style="color: #475569; font-size: 16px;">Uma nova conta de criadora foi criada e está aguardando aprovação.</p>
+                        <h2 style="color: #6d28d9; margin-top: 0;">Nova Profissional Cadastrada</h2>
+                        <p style="color: #475569; font-size: 16px;">Uma nova conta de criadora foi criada e está pendente de verificação de identidade/documentos.</p>
                         <ul style="background-color: #f8fafc; padding: 15px 25px; border-radius: 6px; list-style-type: none; margin: 20px 0;">
                             <li style="margin-bottom: 8px;"><strong>Nome:</strong> ${user.name || user.username}</li>
                             <li style="margin-bottom: 8px;"><strong>E-mail:</strong> ${user.email}</li>
                             <li style="margin-bottom: 8px;"><strong>Username:</strong> @${user.username}</li>
                             <li style="margin-bottom: 0;"><strong>Data de Cadastro:</strong> ${new Date().toLocaleString('pt-BR')}</li>
                         </ul>
-                        <p style="color: #475569; margin-bottom: 25px;">Acesse o painel do backoffice para avaliar o cadastro.</p>
-                        <a href="${appUrl}/admin/creator-applications" style="background-color: #6d28d9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; text-align: center;">Ver Inscrições no Backoffice</a>
+                        <p style="color: #475569;">O perfil só aparecerá no painel de moderação de documentos após o envio de fotos do documento e selfie de maioridade (+18) pela própria criadora.</p>
                     </div>
                 `
             });

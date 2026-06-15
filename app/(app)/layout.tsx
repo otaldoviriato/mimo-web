@@ -13,6 +13,7 @@ import ChatPage from './chat/[userId]/page';
 import UserProfilePage from './[username]/page';
 import SettingsPage from './settings/page';
 
+
 const isTabRoute = (path: string) => {
     return ['/chats', '/search', '/profile', '/'].includes(path);
 };
@@ -28,12 +29,39 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const screensRef = useRef(screens);
     const [isNavInitialized, setIsNavInitialized] = React.useState(false);
     const [isProfessionalReleased, setIsProfessionalReleased] = React.useState<boolean | null>(null);
+    const [fadeOutRelease, setFadeOutRelease] = React.useState(false);
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
-            setIsProfessionalReleased(localStorage.getItem('mimo_professional_released') === 'true');
+            const released = localStorage.getItem('mimo_professional_released');
+            if (released === 'false') {
+                setIsProfessionalReleased(false);
+            } else {
+                setIsProfessionalReleased(true);
+            }
         }
     }, [pathname]);
+
+    useEffect(() => {
+        if (isProfessionalReleased === false) {
+            // Inicia o timer da animação de liberação flutuante
+            const fadeTimer = setTimeout(() => {
+                setFadeOutRelease(true);
+            }, 2500);
+
+            const endTimer = setTimeout(() => {
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem('mimo_professional_released', 'true');
+                }
+                setIsProfessionalReleased(true);
+            }, 3500);
+
+            return () => {
+                clearTimeout(fadeTimer);
+                clearTimeout(endTimer);
+            };
+        }
+    }, [isProfessionalReleased]);
 
     useEffect(() => {
         screensRef.current = screens;
@@ -46,6 +74,11 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         const isProfessionalFlow = typeof window !== 'undefined' && localStorage.getItem('mimo_signup_flow') === 'professional';
         
         const handleProfessionalInit = async () => {
+            if (isProfessionalFlow && userData.isProfessional) {
+                localStorage.removeItem('mimo_signup_flow');
+                return;
+            }
+
             if (isProfessionalFlow && !userData.isProfessional) {
                 try {
                     const response = await fetch('/api/users/me/init-professional', { method: 'POST' });
@@ -59,20 +92,11 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
                     localStorage.removeItem('mimo_signup_flow');
                     await refetchProfile();
-                    router.replace('/aguardando-aprovacao');
+                    router.replace('/chats');
                 } catch (err) {
                     console.error('Erro ao inicializar perfil profissional:', err);
                 }
                 return;
-            }
-
-            const isPendingProfessional = userData.isProfessional && (
-                userData.professionalStatus === 'pending' ||
-                (userData.professionalStatus === 'approved' && isProfessionalReleased === false)
-            );
-
-            if (isPendingProfessional) {
-                router.replace('/aguardando-aprovacao');
             }
         };
 
@@ -313,15 +337,18 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     }
 
     const isProfessionalFlow = typeof window !== 'undefined' && localStorage.getItem('mimo_signup_flow') === 'professional';
-    const isPendingProfessional = userData && userData.isProfessional && (
-        userData.professionalStatus === 'pending' ||
-        (userData.professionalStatus === 'approved' && isProfessionalReleased === false)
-    );
+    
+    // Se o banco local oficial nos disser que o perfil é pendente, limpamos qualquer resíduo local de liberação anterior
+    if (typeof window !== 'undefined' && userData && userData.isProfessional && userData.professionalStatus === 'pending') {
+        if (localStorage.getItem('mimo_professional_released') !== null) {
+            localStorage.removeItem('mimo_professional_released');
+        }
+    }
 
     // Evita hydration mismatch e vazamento visual enquanto carrega o perfil ou o estado de liberação local
     const isResolvingSecurity = (isSignedIn && !userData) || (userData && userData.isProfessional && isProfessionalReleased === null);
 
-    if (isProfessionalFlow || isPendingProfessional || isResolvingSecurity) {
+    if (isProfessionalFlow || isResolvingSecurity) {
         return (
             <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gradient-to-br from-[#4C1D95] via-[#6D28D9] to-[#8B5CF6] select-none">
                 <div className="flex flex-col items-center animate-fade-in-up">
@@ -356,8 +383,45 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     if (!isSignedIn) return null;
 
     return (
-        <div className="bg-black min-h-screen w-full relative overflow-hidden">
-            {children}
+        <div className="bg-slate-50 min-h-screen w-full relative overflow-hidden">
+            <div className={isProfessionalReleased === false ? 'opacity-0 pointer-events-none' : 'opacity-100 transition-opacity duration-500'}>
+                {children}
+            </div>
+
+            {/* Animação Premium de Acesso Liberado */}
+            {isProfessionalReleased === false && (
+                <div className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-50 text-slate-900 overflow-hidden transition-all duration-[1000ms] ease-in-out ${
+                    fadeOutRelease ? 'opacity-0 blur-md scale-95 pointer-events-none' : 'opacity-100 blur-none scale-100'
+                }`}>
+                    {/* Efeito de flash e liberação */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-100/60 via-fuchsia-100/60 to-slate-50 animate-pulse"></div>
+                    <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-50"></div>
+                    
+                    <div className="relative z-[10000] text-center space-y-6 max-w-md p-6">
+                        <div className="relative mx-auto w-24 h-24 bg-gradient-to-tr from-purple-600 via-fuchsia-600 to-indigo-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-purple-500/25 animate-bounce">
+                            <img 
+                                src="/Logo.svg" 
+                                alt="Mimo Logo" 
+                                className="w-14 h-14 object-contain brightness-0 invert"
+                            />
+                            <span className="absolute inset-0 rounded-3xl border border-white/40 animate-ping"></span>
+                        </div>
+                        <div className="space-y-2">
+                            <h1 className="text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600">
+                                Acesso Liberado!
+                            </h1>
+                            <p className="text-sm font-bold text-purple-700">
+                                Sua conta foi aprovada! Prepare-se para a experiência.
+                            </p>
+                        </div>
+                        <div className="flex space-x-1.5 justify-center items-center pt-2">
+                            <span className="w-2.5 h-2.5 bg-fuchsia-500 rounded-full animate-ping" style={{ animationDelay: '0ms' }}></span>
+                            <span className="w-2.5 h-2.5 bg-purple-500 rounded-full animate-ping" style={{ animationDelay: '150ms' }}></span>
+                            <span className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-ping" style={{ animationDelay: '300ms' }}></span>
+                        </div>
+                    </div>
+                </div>
+            )}
             
             {/* Pilha de Telas Virtuais */}
             {screens.map((screen) => {

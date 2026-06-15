@@ -7,7 +7,7 @@ import { Resend } from 'resend';
 import { clerkClient } from '@clerk/nextjs/server';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
-const STATUSES = ['pending', 'approved', 'rejected', 'archived'];
+const STATUSES = ['pending', 'approved', 'rejected', 'archived', 'pending_documents'];
 
 async function authorize() {
     const access = await getAdminAccess();
@@ -49,8 +49,11 @@ export async function GET(
             email: u.email,
             age: 0,
             cityState: 'Não informado',
-            status: u.professionalStatus || 'pending',
+            status: (u.professionalStatus === null || u.professionalStatus === undefined) ? 'pending_documents' : u.professionalStatus,
             notes: u.notes || '',
+            identityDocumentUrl: u.identityDocumentUrl || '',
+            identitySelfieUrl: u.identitySelfieUrl || '',
+            identityDocumentType: u.identityDocumentType || '',
             createdAt: u.createdAt ? u.createdAt.toISOString() : new Date().toISOString(),
             updatedAt: u.updatedAt ? u.updatedAt.toISOString() : new Date().toISOString(),
         };
@@ -78,13 +81,13 @@ export async function PATCH(
         await connectToDatabase();
 
         const body = await request.json();
-        const update: { professionalStatus?: string; notes?: string } = {};
+        const update: { professionalStatus?: string | null; notes?: string } = {};
 
         if (body.status !== undefined) {
             if (!STATUSES.includes(body.status)) {
                 return NextResponse.json({ error: 'Status inválido.' }, { status: 400 });
             }
-            update.professionalStatus = body.status;
+            update.professionalStatus = body.status === 'pending_documents' ? null : body.status;
         }
 
         if (body.notes !== undefined) {
@@ -173,8 +176,11 @@ export async function PATCH(
             email: u.email,
             age: 0,
             cityState: 'Não informado',
-            status: u.professionalStatus || 'pending',
+            status: (u.professionalStatus === null || u.professionalStatus === undefined) ? 'pending_documents' : u.professionalStatus,
             notes: u.notes || '',
+            identityDocumentUrl: u.identityDocumentUrl || '',
+            identitySelfieUrl: u.identitySelfieUrl || '',
+            identityDocumentType: u.identityDocumentType || '',
             createdAt: u.createdAt ? u.createdAt.toISOString() : new Date().toISOString(),
             updatedAt: u.updatedAt ? u.updatedAt.toISOString() : new Date().toISOString(),
         };

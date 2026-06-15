@@ -7,7 +7,6 @@ import {
     ArrowLeft, 
     Shield, 
     MessageSquare, 
-    Sparkles, 
     CreditCard, 
     Lock, 
     Users, 
@@ -76,7 +75,7 @@ export default function InstitucionalPage() {
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16 relative z-10">
                 <div className="text-center max-w-3xl mx-auto space-y-6">
                     <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-50 border border-purple-100 text-purple-700 text-xs font-semibold uppercase tracking-wider">
-                        <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                        <Shield className="w-3.5 h-3.5 text-purple-600" />
                         Conexão Digital Leve e Segura
                     </div>
                     

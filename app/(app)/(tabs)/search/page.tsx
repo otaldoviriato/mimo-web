@@ -6,10 +6,12 @@ import { Input } from '@/components/Input';
 import { Button } from '@/components/Button';
 import { Avatar } from '@/components/Avatar';
 import { userApi } from '@/services/api';
-import { Crown } from 'lucide-react';
+import { useMyProfile } from '@/hooks/useQueries';
+import { Crown, ShieldAlert } from 'lucide-react';
 
 export default function SearchPage() {
     const router = useRouter();
+    const { data: userData } = useMyProfile();
     const [username, setUsername] = useState('');
     const [loading, setLoading] = useState(false);
     const [foundUsers, setFoundUsers] = useState<any[]>([]);
@@ -82,6 +84,15 @@ export default function SearchPage() {
                     <h1 className="text-2xl font-black text-white tracking-tighter">Mimo</h1>
                     <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">Buscar</span>
                 </div>
+                {userData?.isAdmin && (
+                    <button
+                        onClick={() => router.push('/admin')}
+                        className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center"
+                        title="Painel Admin"
+                    >
+                        <ShieldAlert className="w-5 h-5" />
+                    </button>
+                )}
             </div>
 
             {/* Modern Search Bar */}

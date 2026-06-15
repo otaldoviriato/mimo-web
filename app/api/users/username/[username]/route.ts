@@ -27,7 +27,7 @@ export async function GET(
         await connectToDatabase();
 
         let user = await User.findOne({ username: cleanUsername }).select(
-            'clerkId username name email photoUrl coverUrl isProfessional subscriptionPrice isSubscriptionEnabled chargePerCharSubscribers chargePerCharNonSubscribers subscribers balance bio'
+            'clerkId username name email photoUrl coverUrl isProfessional professionalStatus subscriptionPrice isSubscriptionEnabled chargePerCharSubscribers chargePerCharNonSubscribers subscribers balance bio'
         );
 
         if (!user) {
@@ -56,6 +56,11 @@ export async function GET(
 
         // Verificar quem está visualizando
         const { userId: viewerClerkId } = await auth();
+
+        // Se o perfil for de uma profissional e não estiver aprovado, apenas o próprio dono pode visualizá-lo
+        if (user.isProfessional && user.professionalStatus !== 'approved' && viewerClerkId !== user.clerkId) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        }
         let relationshipStats = null;
         let shouldShowBalance = false;
 

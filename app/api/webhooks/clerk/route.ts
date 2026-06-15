@@ -55,7 +55,7 @@ export async function POST(req: Request) {
         const email = email_addresses[0]?.email_address?.toLowerCase()?.trim();
 
         const isProfessional = unsafe_metadata?.role === 'professional';
-        const professionalStatus = isProfessional ? 'pending' : null;
+        const professionalStatus = null; // Inicializa como null (verificação de identidade pendente de envio)
 
         await User.findOneAndUpdate(
             { clerkId: id },
@@ -79,30 +79,28 @@ export async function POST(req: Request) {
 
         console.log(`✅ Clerk Webhook: User created: ${generatedUsername} (Professional: ${isProfessional}, Status: ${professionalStatus})`);
 
-        // Enviar email de notificação se for profissional pendente
-        if (isProfessional && professionalStatus === 'pending') {
+        // Enviar email de notificação se for profissional
+        if (isProfessional) {
             try {
-                const appUrl = process.env.NEXT_PUBLIC_API_URL || 'https://www.mimochat.com.br';
                 await resend.emails.send({
                     from: 'Mimo Cadastro <onboarding@resend.dev>',
                     to: 'viriatoceo@gmail.com',
-                    subject: `Nova Inscrição de Criadora - @${generatedUsername}`,
+                    subject: `Nova Conta de Criadora Criada - @${generatedUsername}`,
                     html: `
                         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                            <h2 style="color: #6d28d9; margin-top: 0;">Nova Criadora Cadastrada</h2>
-                            <p style="color: #475569; font-size: 16px;">Uma nova conta de criadora foi criada e está aguardando aprovação.</p>
+                            <h2 style="color: #6d28d9; margin-top: 0;">Nova Profissional Cadastrada</h2>
+                            <p style="color: #475569; font-size: 16px;">Uma nova conta de criadora foi criada e está pendente de verificação de identidade/documentos.</p>
                             <ul style="background-color: #f8fafc; padding: 15px 25px; border-radius: 6px; list-style-type: none; margin: 20px 0;">
                                 <li style="margin-bottom: 8px;"><strong>Nome:</strong> ${name}</li>
                                 <li style="margin-bottom: 8px;"><strong>E-mail:</strong> ${email}</li>
                                 <li style="margin-bottom: 8px;"><strong>Username:</strong> @${generatedUsername}</li>
                                 <li style="margin-bottom: 0;"><strong>Data de Cadastro:</strong> ${new Date().toLocaleString('pt-BR')}</li>
                             </ul>
-                            <p style="color: #475569; margin-bottom: 25px;">Acesse o painel do backoffice para avaliar o cadastro.</p>
-                            <a href="${appUrl}/admin/creator-applications" style="background-color: #6d28d9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; text-align: center;">Ver Inscrições no Backoffice</a>
+                            <p style="color: #475569;">O perfil só aparecerá no painel de moderação de documentos após o envio de fotos do documento e selfie de maioridade (+18) pela própria criadora.</p>
                         </div>
                     `
                 });
-                console.log(`✉️ Email notification sent to admin for pending creator: ${email}`);
+                console.log(`✉️ Email notification sent to admin for new creator: ${email}`);
             } catch (emailErr) {
                 console.error('Erro ao enviar e-mail de notificação para o admin:', emailErr);
             }
@@ -126,30 +124,28 @@ export async function POST(req: Request) {
         if (currentUser) {
             if (isProfessional && !currentUser.isProfessional) {
                 updateData.isProfessional = true;
-                updateData.professionalStatus = 'pending';
+                updateData.professionalStatus = null;
 
                 try {
-                    const appUrl = process.env.NEXT_PUBLIC_API_URL || 'https://www.mimochat.com.br';
                     await resend.emails.send({
                         from: 'Mimo Cadastro <onboarding@resend.dev>',
                         to: 'viriatoceo@gmail.com',
-                        subject: `Nova Inscrição de Criadora (Webhook Update) - @${username || currentUser.username}`,
+                        subject: `Nova Conta de Criadora Criada (Webhook Update) - @${username || currentUser.username}`,
                         html: `
                             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                                <h2 style="color: #6d28d9; margin-top: 0;">Nova Criadora Cadastrada</h2>
-                                <p style="color: #475569; font-size: 16px;">Uma nova conta de criadora foi criada e está aguardando aprovação.</p>
+                                <h2 style="color: #6d28d9; margin-top: 0;">Nova Profissional Cadastrada</h2>
+                                <p style="color: #475569; font-size: 16px;">Uma nova conta de criadora foi criada e está pendente de verificação de identidade/documentos.</p>
                                 <ul style="background-color: #f8fafc; padding: 15px 25px; border-radius: 6px; list-style-type: none; margin: 20px 0;">
                                     <li style="margin-bottom: 8px;"><strong>Nome:</strong> ${name || currentUser.name || username}</li>
                                     <li style="margin-bottom: 8px;"><strong>E-mail:</strong> ${email_addresses[0]?.email_address || currentUser.email}</li>
                                     <li style="margin-bottom: 8px;"><strong>Username:</strong> @${username || currentUser.username}</li>
                                     <li style="margin-bottom: 0;"><strong>Data de Cadastro:</strong> ${new Date().toLocaleString('pt-BR')}</li>
                                 </ul>
-                                <p style="color: #475569; margin-bottom: 25px;">Acesse o painel do backoffice para avaliar o cadastro.</p>
-                                <a href="${appUrl}/admin/creator-applications" style="background-color: #6d28d9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; text-align: center;">Ver Inscrições no Backoffice</a>
+                                <p style="color: #475569;">O perfil só aparecerá no painel de moderação de documentos após o envio de fotos do documento e selfie de maioridade (+18) pela própria criadora.</p>
                             </div>
                         `
                     });
-                    console.log(`✉️ Email notification sent to admin for pending creator via Webhook Update: ${email_addresses[0]?.email_address}`);
+                    console.log(`✉️ Email notification sent to admin for new creator via Webhook Update: ${email_addresses[0]?.email_address}`);
                 } catch (emailErr) {
                     console.error('Erro ao enviar e-mail de notificação para o admin no webhook update:', emailErr);
                 }
