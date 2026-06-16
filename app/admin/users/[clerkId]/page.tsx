@@ -701,7 +701,7 @@ export default function UserDetailPage() {
                                     ref={fileInputRef}
                                     onChange={handleUploadPhoto}
                                     className="hidden"
-                                    accept="image/*"
+                                    accept="image/jpeg, image/png, image/gif, image/heic, image/webp"
                                 />
                             </div>
 

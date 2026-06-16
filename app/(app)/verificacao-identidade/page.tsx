@@ -42,9 +42,22 @@ export default function VerificationPage() {
     // Outros estados
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [isUploading, setIsUploading] = useState<boolean>(false);
+    const [isMobile, setIsMobile] = useState<boolean>(false);
 
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const selfieInputRef = useRef<HTMLInputElement | null>(null);
+    const documentInputRef = useRef<HTMLInputElement | null>(null);
+
+    // Detecta se é dispositivo móvel
+    useEffect(() => {
+        const checkMobile = () => {
+            const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+            const mobileRegex = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i;
+            setIsMobile(mobileRegex.test(userAgent));
+        };
+        checkMobile();
+    }, []);
 
     // Limpa streams de câmera ao desmontar
     useEffect(() => {
@@ -133,6 +146,22 @@ export default function VerificationPage() {
         if (fileInputRef.current) {
             fileInputRef.current.value = ''; // Limpa o valor anterior para disparar onChange sempre
             fileInputRef.current.click();
+        }
+    };
+
+    const triggerMobileCamera = () => {
+        setErrorMsg(null);
+        setCameraError(null);
+        if (step === 'document-photo') {
+            if (documentInputRef.current) {
+                documentInputRef.current.value = '';
+                documentInputRef.current.click();
+            }
+        } else if (step === 'selfie-photo') {
+            if (selfieInputRef.current) {
+                selfieInputRef.current.value = '';
+                selfieInputRef.current.click();
+            }
         }
     };
 
@@ -344,7 +373,7 @@ export default function VerificationPage() {
                                 ) : (
                                     <>
                                         <button
-                                            onClick={() => startCamera('environment')}
+                                            onClick={() => isMobile ? triggerMobileCamera() : startCamera('environment')}
                                             className="flex-1 flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 active:scale-[0.98] text-white font-semibold py-3 px-4 rounded-2xl shadow-md transition-all text-sm"
                                         >
                                             <Camera className="w-4 h-4" />
@@ -465,7 +494,7 @@ export default function VerificationPage() {
                                 ) : (
                                     <>
                                         <button
-                                            onClick={() => startCamera('user')} // Abre a frontal para a selfie
+                                            onClick={() => isMobile ? triggerMobileCamera() : startCamera('user')} // Abre a frontal para a selfie
                                             className="flex-1 flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 active:scale-[0.98] text-white font-semibold py-3 px-4 rounded-2xl shadow-md transition-all text-sm"
                                         >
                                             <Camera className="w-4 h-4" />
@@ -617,7 +646,25 @@ export default function VerificationPage() {
                 type="file" 
                 ref={fileInputRef} 
                 onChange={handleFileChange} 
-                accept="image/*" 
+                accept="image/jpeg, image/png, image/gif, image/heic, image/webp" 
+                className="hidden" 
+            />
+
+            {/* Inputs Ocultos de Câmera (Mobile) */}
+            <input 
+                type="file" 
+                ref={selfieInputRef} 
+                onChange={handleFileChange} 
+                accept="image/jpeg, image/png, image/gif, image/heic, image/webp" 
+                capture="user"
+                className="hidden" 
+            />
+            <input 
+                type="file" 
+                ref={documentInputRef} 
+                onChange={handleFileChange} 
+                accept="image/jpeg, image/png, image/gif, image/heic, image/webp" 
+                capture="environment"
                 className="hidden" 
             />
         </div>

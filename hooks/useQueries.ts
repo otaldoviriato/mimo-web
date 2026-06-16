@@ -51,7 +51,12 @@ export function useMyProfile() {
         initialDataUpdatedAt: 0,
         refetchInterval: (query: any) => {
             const user = query.state.data;
-            if (user && user.isProfessional && user.professionalStatus === 'pending') {
+            if (
+                user &&
+                user.isProfessional &&
+                user.professionalStatus !== 'approved' &&
+                user.professionalStatus !== 'rejected'
+            ) {
                 return 5000;
             }
             return false;

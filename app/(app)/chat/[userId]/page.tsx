@@ -2009,7 +2009,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                             </>
                         )}
                     </div>
-                    <input type="file" className="hidden" ref={fileInputRef} accept="image/*,video/*" onChange={(e) => {
+                    <input type="file" className="hidden" ref={fileInputRef} accept="image/jpeg, image/png, image/gif, image/heic, image/webp, video/mp4, video/quicktime, video/x-m4v" onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file?.type.startsWith('video/')) handleFileSelect(e, 'video');
                         else handleFileSelect(e, 'image');

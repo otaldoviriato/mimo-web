@@ -1064,7 +1064,7 @@ function ParaCriadorasContent() {
     }
 
     return (
-        <div className="h-[100dvh] w-full bg-[#fafafc] text-slate-800 font-sans selection:bg-purple-100 selection:text-purple-900 relative overflow-hidden flex flex-col justify-between z-10">
+        <div className="h-[100dvh] w-full bg-[#fafafc] text-slate-800 font-sans selection:bg-purple-100 selection:text-purple-900 relative overflow-y-auto lg:overflow-hidden flex flex-col justify-between z-10">
             
             {/* ─── ESTILOS CSS E ANIMAÇÕES EXPO MAIS LENTAS ─── */}
             <style>{`
@@ -1270,7 +1270,7 @@ function ParaCriadorasContent() {
                     
                     {/* Wrapper de conteúdo: no mobile ocupa flex-1 (entre header e botão),
                          no desktop usa contents para participar diretamente no grid de 12 colunas */}
-                    <div className="flex-1 flex flex-col items-center gap-3 min-h-0 overflow-hidden lg:contents">
+                    <div className="flex-1 flex flex-col items-center gap-3 min-h-0 overflow-visible lg:contents">
 
                     {/* 1. TEXTOS DO PASSO */}
                     <div 

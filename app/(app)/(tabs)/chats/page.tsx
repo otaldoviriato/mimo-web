@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Avatar, TouchableRipple } from '@/components';
 import { useChatRooms, useMyProfile, QueryKeys } from '@/hooks/useQueries';
 import { useSocket } from '@/hooks/useSocket';
-import { CheckCircle2, X, WalletCards, Crown, ShieldAlert, Clock, AlertCircle, ChevronRight } from 'lucide-react';
+import { CheckCircle2, X, WalletCards, Crown, ShieldAlert, Clock, AlertCircle, ChevronRight, MessageCircle } from 'lucide-react';
 
 interface Room {
     _id: string;
@@ -117,15 +117,15 @@ export default function ChatsPage() {
 
         if (status === 'pending') {
             return (
-                <div className="mx-4 mt-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
-                    <div className="flex gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
-                            <Clock className="w-5 h-5 animate-pulse" />
+                <div className="mx-4 mt-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-3 md:p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="flex items-center gap-3">
+                        <div className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+                            <Clock className="w-4.5 h-4.5 animate-pulse" />
                         </div>
-                        <div>
-                            <h3 className="font-bold text-amber-900 text-sm">Verificação em análise</h3>
-                            <p className="text-xs text-amber-700 mt-1 leading-relaxed">
-                                Suas fotos e documentos foram enviados. A aprovação pode levar até 48 horas. Você será notificada assim que sua conta for liberada para começar a faturar!
+                        <div className="min-w-0">
+                            <h3 className="font-bold text-amber-900 text-xs md:text-sm">Verificação em análise ⏳</h3>
+                            <p className="text-[11px] md:text-xs text-amber-700 mt-1 leading-snug max-w-xl">
+                                Suas fotos e documentos foram enviados para análise. A liberação ocorrerá em até 48 horas.
                             </p>
                         </div>
                     </div>
@@ -135,19 +135,23 @@ export default function ChatsPage() {
 
         if (status === 'rejected') {
             return (
-                <div className="mx-4 mt-4 bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-2xl p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
-                    <div className="flex gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-600">
-                            <AlertCircle className="w-5 h-5" />
+                <div className="mx-4 mt-4 bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-2xl p-3 md:p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-start gap-3">
+                            <div className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-600">
+                                <AlertCircle className="w-4.5 h-4.5" />
+                            </div>
+                            <div className="min-w-0">
+                                <h3 className="font-bold text-red-950 text-xs md:text-sm">Verificação recusada ❌</h3>
+                                <p className="text-[11px] md:text-xs text-red-700 mt-1 leading-snug max-w-xl">
+                                    {myProfile.notes || 'Infelizmente sua documentação foi recusada. Por favor, reenvie suas fotos.'}
+                                </p>
+                            </div>
                         </div>
-                        <div className="flex-1">
-                            <h3 className="font-bold text-red-900 text-sm">Verificação recusada</h3>
-                            <p className="text-xs text-red-700 mt-1 leading-relaxed">
-                                {myProfile.notes || 'Infelizmente sua documentação não pôde ser aprovada. Por favor, reenvie suas fotos com atenção às instruções.'}
-                            </p>
+                        <div className="shrink-0 flex justify-end">
                             <button
                                 onClick={() => router.push('/verificacao-identidade')}
-                                className="mt-3 inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 active:scale-[0.98] transition-all text-white text-xs font-semibold px-3 py-2 rounded-xl shadow-md shadow-red-600/10"
+                                className="w-full sm:w-auto inline-flex items-center justify-center gap-1 bg-red-600 hover:bg-red-700 active:scale-[0.98] transition-all text-white text-[11px] font-extrabold px-3 py-2 rounded-xl shadow-md shadow-red-600/10 cursor-pointer"
                             >
                                 Refazer verificação
                                 <ChevronRight className="w-3.5 h-3.5" />
@@ -160,24 +164,32 @@ export default function ChatsPage() {
 
         // status === null ou undefined ou ''
         return (
-            <div className="mx-4 mt-4 bg-gradient-to-br from-purple-50 via-fuchsia-50 to-indigo-50 border border-purple-100 rounded-2xl p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
-                <div className="flex gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-600">
-                        <ShieldAlert className="w-5 h-5" />
+            <div className="mx-4 mt-4 bg-gradient-to-br from-purple-50 via-fuchsia-50 to-indigo-50 border border-purple-100 rounded-2xl p-3 md:p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                        <div className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-600">
+                            <ShieldAlert className="w-4.5 h-4.5" />
+                        </div>
+                        <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                <h3 className="font-bold text-purple-900 text-xs md:text-sm">
+                                    Verificação Necessária 💜
+                                </h3>
+                                <span className="inline-block bg-purple-600 text-white text-[8px] md:text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider animate-pulse whitespace-nowrap">
+                                    Ação Necessária
+                                </span>
+                            </div>
+                            <p className="text-[11px] md:text-xs text-purple-700 mt-1 leading-snug max-w-xl">
+                                Sua conta de criadora foi criada. Ative o recebimento de mensagens e assinaturas fazendo a verificação de maioridade (+18).
+                            </p>
+                        </div>
                     </div>
-                    <div className="flex-1">
-                        <h3 className="font-bold text-purple-900 text-sm flex items-center gap-1.5">
-                            Seja bem-vinda ao Mimo! 💜
-                            <span className="bg-purple-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider animate-pulse">Ação Necessária</span>
-                        </h3>
-                        <p className="text-xs text-purple-700 mt-1.5 leading-relaxed">
-                            Sua conta profissional foi criada com sucesso! Para começar a receber suas primeiras mensagens de fãs, aceitar assinaturas e aparecer na busca, você precisa realizar a verificação de maioridade (+18).
-                        </p>
+                    <div className="shrink-0 flex justify-end">
                         <button
                             onClick={() => router.push('/verificacao-identidade')}
-                            className="mt-3.5 inline-flex items-center gap-1 bg-purple-600 hover:bg-purple-700 active:scale-[0.98] transition-all text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-md shadow-purple-600/10"
+                            className="w-full sm:w-auto inline-flex items-center justify-center gap-1 bg-purple-600 hover:bg-purple-700 active:scale-[0.98] transition-all text-white text-[11px] font-extrabold px-3 py-2 rounded-xl shadow-md shadow-purple-600/10 cursor-pointer"
                         >
-                            Verificar Maioridade (+18)
+                            Verificar Maioridade
                             <ChevronRight className="w-3.5 h-3.5" />
                         </button>
                     </div>
@@ -207,13 +219,13 @@ export default function ChatsPage() {
             lastMessageTime: string;
             senderId: string;
         }) => {
+            let matchedRoom = false;
             queryClient.setQueryData(
                 QueryKeys.rooms(user.id!),
                 (old: Room[] | undefined) => {
                     if (!old) return old;
                     // Usa mongoRoomId (ObjectId) para encontrar a sala no cache
                     // pois room._id vem do MongoDB como string ObjectId
-                    let matchedRoom = false;
                     const updated = old.map((room) => {
                         const derivedRoomId = room.roomId ?? [...room.participants].sort().join('_');
                         const match = room._id === data.mongoRoomId
@@ -235,9 +247,6 @@ export default function ChatsPage() {
                         }
                         return room;
                     });
-                    if (!matchedRoom) {
-                        queryClient.invalidateQueries({ queryKey: QueryKeys.rooms(user.id!) });
-                    }
                     // Reordena: sala com mensagem mais recente primeiro
                     return [...updated].sort(
                         (a, b) =>
@@ -246,6 +255,9 @@ export default function ChatsPage() {
                     );
                 }
             );
+            if (!matchedRoom) {
+                queryClient.invalidateQueries({ queryKey: QueryKeys.rooms(user.id!) });
+            }
         };
 
         // 3. Exibe "digitando..." por sala na lista
@@ -478,18 +490,24 @@ export default function ChatsPage() {
             )}
 
             {/* List */}
-            <div className="flex-1 overflow-y-auto pb-16 md:pb-0">
+            <div className="flex-1 overflow-y-auto pb-16 md:pb-0 flex flex-col">
                 {isLoading ? (
                     <ChatListSkeleton />
                 ) : rooms.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full px-8 text-center animate-in fade-in duration-500">
-                        <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mb-6">
-                            <span className="text-5xl">💬</span>
+                    <div className="flex-1 flex flex-col items-center justify-center px-8 py-16 text-center animate-in fade-in duration-500">
+                        <div className="w-14 h-14 bg-purple-50/60 rounded-2xl flex items-center justify-center mb-4 text-purple-500 shadow-inner">
+                            <MessageCircle className="w-6 h-6 text-purple-400" />
                         </div>
-                        <h2 className="text-xl font-bold text-gray-800 mb-2">Sem conversas ainda</h2>
-                        <p className="text-gray-500 text-sm max-w-[240px] leading-relaxed">
-                            Quando você começar a conversar com alguém, elas aparecerão aqui.
-                        </p>
+                        <h2 className="text-base font-bold text-slate-800 mb-1">Sem conversas ainda</h2>
+                        {myProfile?.isProfessional ? (
+                            <p className="text-slate-500 text-xs max-w-[260px] leading-relaxed">
+                                Compartilhe seu nome de usuário <strong className="text-slate-700 font-semibold">@{myProfile?.username}</strong> para que outras pessoas possam te mandar mensagens.
+                            </p>
+                        ) : (
+                            <p className="text-slate-500 text-xs max-w-[240px] leading-relaxed">
+                                Quando você começar a conversar com alguém, elas aparecerão aqui.
+                            </p>
+                        )}
                     </div>
                 ) : (
                     <ul>
