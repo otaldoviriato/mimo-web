@@ -57,6 +57,46 @@ interface CachedRoom {
     };
 }
 
+function formatMediaDuration(durationInSeconds?: number) {
+    if (!durationInSeconds || !Number.isFinite(durationInSeconds) || durationInSeconds <= 0) {
+        return '';
+    }
+
+    const totalSeconds = Math.round(durationInSeconds);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function LockedMediaTypeBadge({ isVideo, duration }: { isVideo?: boolean; duration?: number }) {
+    const formattedDuration = isVideo ? formatMediaDuration(duration) : '';
+
+    return (
+        <div className="absolute left-2 top-2 z-20 flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/55 px-2 py-1 text-white shadow-sm backdrop-blur-md">
+            {isVideo ? (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M8 5v14l11-7z" />
+                </svg>
+            ) : (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <path d="M21 15l-5-5L5 21" />
+                </svg>
+            )}
+            <span className="text-[9px] font-bold uppercase leading-none tracking-wider">
+                {isVideo ? 'Vídeo' : 'Foto'}
+            </span>
+            {formattedDuration && (
+                <span className="text-[9px] font-semibold leading-none text-white/80">
+                    {formattedDuration}
+                </span>
+            )}
+        </div>
+    );
+}
+
 function formatLastSeen(isOnline?: boolean, lastSeenDateStr?: string | Date) {
     if (isOnline) return 'online';
     if (!lastSeenDateStr) return '';
@@ -267,6 +307,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
     const [galleryVisible, setGalleryVisible] = useState(false);
     const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
+    const [videoDurations, setVideoDurations] = useState<Record<string, number>>({});
     const swipeTouchStartX = useRef<number | null>(null);
     const swipeTouchStartY = useRef<number | null>(null);
     const [touchOffset, setTouchOffset] = useState(0);
@@ -405,6 +446,47 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 isVideo: !!m.isVideo,
             }));
     }, [messages]);
+
+    useEffect(() => {
+        const videosToMeasure = messages.filter((message) => (
+            message.isVideo &&
+            message.videoUrl &&
+            !videoDurations[message._id]
+        ));
+
+        if (!videosToMeasure.length) return;
+
+        const createdVideos: HTMLVideoElement[] = [];
+
+        videosToMeasure.forEach((message) => {
+            const video = document.createElement('video');
+            createdVideos.push(video);
+            video.preload = 'metadata';
+            video.src = message.videoUrl!;
+
+            video.onloadedmetadata = () => {
+                if (Number.isFinite(video.duration) && video.duration > 0) {
+                    setVideoDurations((prev) => (
+                        prev[message._id] ? prev : { ...prev, [message._id]: video.duration }
+                    ));
+                }
+            };
+
+            video.onerror = () => {
+                video.removeAttribute('src');
+                video.load();
+            };
+        });
+
+        return () => {
+            createdVideos.forEach((video) => {
+                video.onloadedmetadata = null;
+                video.onerror = null;
+                video.removeAttribute('src');
+                video.load();
+            });
+        };
+    }, [messages, videoDurations]);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -1696,6 +1778,13 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                             </svg>
                                                             <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700/60">Vídeo</span>
                                                         </div>
+                                                    )}
+
+                                                    {!isMine && (
+                                                        <LockedMediaTypeBadge
+                                                            isVideo={item.isVideo}
+                                                            duration={videoDurations[item._id]}
+                                                        />
                                                     )}
 
                                                     {/* Progresso de upload circular para envio em background */}
