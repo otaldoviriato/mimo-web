@@ -23,7 +23,11 @@ import {
     Eye,
     MessageCircle,
     AlertTriangle,
-    ShieldAlert
+    ShieldAlert,
+    Lock,
+    Unlock,
+    ChevronDown,
+    ChevronUp
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -89,6 +93,7 @@ export default function UserDetailPage() {
     const [rooms, setRooms] = useState<ChatRoom[]>([]);
     const [loadingRooms, setLoadingRooms] = useState(true);
     const [selectedAuditChat, setSelectedAuditChat] = useState<ChatRoom | null>(null);
+    const [galleryExpanded, setGalleryExpanded] = useState(false);
 
     // Inputs
     const [name, setName] = useState('');
@@ -213,9 +218,7 @@ export default function UserDetailPage() {
                     setCoverUrl(data.user.coverUrl || '');
 
                     setIsAuthorized(true);
-                    if (data.user.isProfessional) {
-                        fetchRooms();
-                    }
+                    fetchRooms();
                 } else if (response.status === 403) {
                     setIsAuthorized(false);
                     toast.error('Acesso restrito a administradores.');
@@ -329,6 +332,29 @@ export default function UserDetailPage() {
             }
         } catch (error) {
             console.error('Erro ao deletar foto:', error);
+            toast.error('Erro de conexão com o servidor.');
+        }
+    };
+
+    // Alterna a visibilidade da foto da galeria (Pública vs Assinantes)
+    const handleToggleVisibility = async (itemId: string, currentVisibility: 'public' | 'subscribers') => {
+        const newVisibility = currentVisibility === 'subscribers' ? 'public' : 'subscribers';
+        try {
+            const response = await fetch(`/api/admin/users/${clerkId}/gallery`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ itemId, visibility: newVisibility })
+            });
+
+            if (response.ok) {
+                toast.success(`Visibilidade alterada para ${newVisibility === 'public' ? 'Pública' : 'Assinantes'}!`);
+                setGallery(prev => prev.map(item => item._id === itemId ? { ...item, visibility: newVisibility } : item));
+            } else {
+                const data = await response.json();
+                toast.error(data.error || 'Erro ao alterar visibilidade.');
+            }
+        } catch (error) {
+            console.error('Erro ao alterar visibilidade da foto:', error);
             toast.error('Erro de conexão com o servidor.');
         }
     };
@@ -706,27 +732,72 @@ export default function UserDetailPage() {
                             </div>
 
                             {gallery.length > 0 ? (
-                                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
-                                    {gallery.map((item) => (
-                                        <div key={item._id} className="relative aspect-square rounded-2xl overflow-hidden bg-slate-50 border border-slate-200 group shadow-sm">
-                                            <img 
-                                                src={item.imageUrl} 
-                                                alt="Galeria Item" 
-                                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
-                                            />
-                                            {/* Overlay hover para deletar */}
-                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleDeletePhoto(item._id)}
-                                                    className="p-2.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-xl shadow-md transition-all hover:scale-110 cursor-pointer"
-                                                    title="Excluir Foto"
-                                                >
-                                                    <Trash2 size={15} />
-                                                </button>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
+                                        {(galleryExpanded ? gallery : gallery.slice(0, 5)).map((item) => (
+                                            <div key={item._id} className="relative aspect-square rounded-2xl overflow-hidden bg-slate-50 border border-slate-200 group shadow-sm">
+                                                <img 
+                                                    src={item.imageUrl} 
+                                                    alt="Galeria Item" 
+                                                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
+                                                />
+                                                {/* Badge de visibilidade */}
+                                                {item.visibility === 'subscribers' ? (
+                                                    <div className="absolute top-2 left-2 z-20 px-2 py-0.5 text-[9px] font-bold bg-amber-500 text-white rounded-md shadow flex items-center gap-0.5 select-none">
+                                                        <Lock size={9} />
+                                                        Assinantes
+                                                    </div>
+                                                ) : (
+                                                    <div className="absolute top-2 left-2 z-20 px-2 py-0.5 text-[9px] font-bold bg-slate-600/80 backdrop-blur-sm text-white rounded-md shadow flex items-center gap-0.5 select-none">
+                                                        <Eye size={9} />
+                                                        Pública
+                                                    </div>
+                                                )}
+                                                {/* Overlay hover para deletar e alterar visibilidade */}
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2.5 z-10">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleToggleVisibility(item._id, item.visibility)}
+                                                        className="p-2.5 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white rounded-xl shadow-md transition-all hover:scale-110 cursor-pointer"
+                                                        title={item.visibility === 'subscribers' ? 'Tornar Pública' : 'Tornar Exclusiva'}
+                                                    >
+                                                        {item.visibility === 'subscribers' ? <Unlock size={14} /> : <Lock size={14} />}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeletePhoto(item._id)}
+                                                        className="p-2.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-xl shadow-md transition-all hover:scale-110 cursor-pointer"
+                                                        title="Excluir Foto"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
                                             </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Botão de Expandir/Ocultar */}
+                                    {gallery.length > 5 && (
+                                        <div className="flex justify-center pt-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setGalleryExpanded(!galleryExpanded)}
+                                                className="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm"
+                                            >
+                                                {galleryExpanded ? (
+                                                    <>
+                                                        <ChevronUp size={14} />
+                                                        Mostrar Menos
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <ChevronDown size={14} />
+                                                        Mostrar Mais (+{gallery.length - 5} fotos)
+                                                    </>
+                                                )}
+                                            </button>
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
                             ) : (
                                 <div className="py-12 text-center text-xs font-semibold text-slate-400 border-2 border-dashed border-slate-100 rounded-2xl">
@@ -736,105 +807,103 @@ export default function UserDetailPage() {
                         </div>
                     )}
 
-                    {/* Salas de Chat (Apenas se for profissional) */}
-                    {isProfessional && (
-                        <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-6">
-                            <div>
-                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                                    <MessageCircle size={16} className="text-purple-600" />
-                                    Salas de Chat e Auditoria
-                                </h3>
-                                <p className="text-[11px] text-slate-400 font-medium mt-0.5">Visualize as trocas de mensagens da profissional para fins de moderação e auditoria.</p>
-                            </div>
-
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                                            <th className="py-4 px-6">Cliente</th>
-                                            <th className="py-4 px-6">Mensagens</th>
-                                            <th className="py-4 px-6">Faturamento</th>
-                                            <th className="py-4 px-6">Última Mensagem</th>
-                                            <th className="py-4 px-6">Último Contato</th>
-                                            <th className="py-4 px-6 text-center">Ações</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {loadingRooms ? (
-                                            <tr>
-                                                <td colSpan={6} className="py-12 text-center text-xs font-semibold text-slate-400">
-                                                    <div className="flex flex-col items-center gap-2 justify-center">
-                                                        <Loader2 size={16} className="animate-spin text-purple-600" />
-                                                        <span>Buscando conversas reais...</span>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ) : rooms.length > 0 ? (
-                                            rooms.map((chat) => {
-                                                const otherParticipant = chat.userA.clerkId === clerkId ? chat.userB : chat.userA;
-                                                const otherInitials = otherParticipant.name ? 
-                                                    (otherParticipant.name.split(' ').length >= 2 ? `${otherParticipant.name.split(' ')[0][0]}${otherParticipant.name.split(' ')[1][0]}` : otherParticipant.name.substring(0,2)) : 'US';
-                                                return (
-                                                    <tr key={chat.id} className="hover:bg-slate-50/40 transition-colors group">
-                                                        <td className="py-4 px-6">
-                                                            <div className="flex items-center gap-2.5">
-                                                                <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-700 border border-blue-100 flex items-center justify-center font-bold text-xs">
-                                                                    {otherInitials.toUpperCase()}
-                                                                </div>
-                                                                <div className="flex flex-col min-w-0">
-                                                                    <span className="text-xs font-bold text-slate-800 leading-tight truncate">{otherParticipant.name}</span>
-                                                                    <span className="text-[10px] text-slate-400 font-semibold truncate">{otherParticipant.email}</span>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td className="py-4 px-6 text-xs text-slate-650 font-bold">
-                                                            {chat.messagesCount}
-                                                        </td>
-                                                        <td className="py-4 px-6">
-                                                            <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                                                                <Coins size={12} className="text-amber-500" />
-                                                                {chat.totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                                            </span>
-                                                        </td>
-                                                        <td className="py-4 px-6 text-xs text-slate-550 max-w-xs truncate" title={chat.lastMessage}>
-                                                            {chat.lastMessage}
-                                                        </td>
-                                                        <td className="py-4 px-6 text-xs text-slate-500 font-bold">
-                                                            {chat.time}
-                                                        </td>
-                                                        <td className="py-4 px-6 text-center" onClick={(e) => e.stopPropagation()}>
-                                                            <div className="flex justify-center gap-2">
-                                                                <button
-                                                                    onClick={() => handleOpenAuditModal(chat)}
-                                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-100 text-purple-600 text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-sm active:scale-95"
-                                                                >
-                                                                    <Eye size={12} />
-                                                                    Auditar
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleDeleteRoom(chat.id, otherParticipant.name)}
-                                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-100 text-rose-600 text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-sm active:scale-95"
-                                                                >
-                                                                    <Trash2 size={12} />
-                                                                    Excluir
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })
-                                        ) : (
-                                            <tr>
-                                                <td colSpan={6} className="py-12 text-center text-xs font-semibold text-slate-400">
-                                                    Nenhuma conversa iniciada por esta profissional até o momento.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
+                    {/* Salas de Chat e Auditoria */}
+                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-6">
+                        <div>
+                            <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                                <MessageCircle size={16} className="text-purple-600" />
+                                Salas de Chat e Auditoria
+                            </h3>
+                            <p className="text-[11px] text-slate-400 font-medium mt-0.5">Visualize as trocas de mensagens deste perfil para fins de moderação e auditoria.</p>
                         </div>
-                    )}
+
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+                                        <th className="py-4 px-6">Contato / Participante</th>
+                                        <th className="py-4 px-6">Mensagens</th>
+                                        <th className="py-4 px-6">Faturamento</th>
+                                        <th className="py-4 px-6">Última Mensagem</th>
+                                        <th className="py-4 px-6">Último Contato</th>
+                                        <th className="py-4 px-6 text-center">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {loadingRooms ? (
+                                        <tr>
+                                            <td colSpan={6} className="py-12 text-center text-xs font-semibold text-slate-400">
+                                                <div className="flex flex-col items-center gap-2 justify-center">
+                                                    <Loader2 size={16} className="animate-spin text-purple-600" />
+                                                    <span>Buscando conversas reais...</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ) : rooms.length > 0 ? (
+                                        rooms.map((chat) => {
+                                            const otherParticipant = chat.userA.clerkId === clerkId ? chat.userB : chat.userA;
+                                            const otherInitials = otherParticipant.name ? 
+                                                (otherParticipant.name.split(' ').length >= 2 ? `${otherParticipant.name.split(' ')[0][0]}${otherParticipant.name.split(' ')[1][0]}` : otherParticipant.name.substring(0,2)) : 'US';
+                                            return (
+                                                <tr key={chat.id} className="hover:bg-slate-50/40 transition-colors group">
+                                                    <td className="py-4 px-6">
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-700 border border-blue-100 flex items-center justify-center font-bold text-xs">
+                                                                {otherInitials.toUpperCase()}
+                                                            </div>
+                                                            <div className="flex flex-col min-w-0">
+                                                                <span className="text-xs font-bold text-slate-800 leading-tight truncate">{otherParticipant.name}</span>
+                                                                <span className="text-[10px] text-slate-400 font-semibold truncate">{otherParticipant.email}</span>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-4 px-6 text-xs text-slate-650 font-bold">
+                                                        {chat.messagesCount}
+                                                    </td>
+                                                    <td className="py-4 px-6">
+                                                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                                                            <Coins size={12} className="text-amber-500" />
+                                                            {chat.totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-4 px-6 text-xs text-slate-550 max-w-xs truncate" title={chat.lastMessage}>
+                                                        {chat.lastMessage}
+                                                    </td>
+                                                    <td className="py-4 px-6 text-xs text-slate-500 font-bold">
+                                                        {chat.time}
+                                                    </td>
+                                                    <td className="py-4 px-6 text-center" onClick={(e) => e.stopPropagation()}>
+                                                        <div className="flex justify-center gap-2">
+                                                            <button
+                                                                onClick={() => handleOpenAuditModal(chat)}
+                                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-100 text-purple-600 text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-sm active:scale-95"
+                                                            >
+                                                                <Eye size={12} />
+                                                                Auditar
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteRoom(chat.id, otherParticipant.name)}
+                                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-100 text-rose-600 text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-sm active:scale-95"
+                                                            >
+                                                                <Trash2 size={12} />
+                                                                Excluir
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={6} className="py-12 text-center text-xs font-semibold text-slate-400">
+                                                Nenhuma conversa encontrada para este perfil até o momento.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </main>
             </div>
 

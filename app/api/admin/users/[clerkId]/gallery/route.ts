@@ -70,7 +70,7 @@ export async function POST(
         });
 
         return NextResponse.json({ item: newItem });
-    } catch (error: any) {
+    } catch (error) {
         console.error('Erro ao enviar foto para galeria via admin:', error);
         return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
     }
@@ -108,8 +108,55 @@ export async function DELETE(
         }
 
         return NextResponse.json({ success: true, message: 'Item removido com sucesso pela administração.' });
-    } catch (error: any) {
+    } catch (error) {
         console.error('Erro ao deletar item de galeria via admin:', error);
         return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
     }
 }
+
+// PATCH /api/admin/users/[clerkId]/gallery - Admin updates photo visibility in user's gallery
+export async function PATCH(
+    request: NextRequest,
+    { params }: { params: Promise<{ clerkId: string }> }
+) {
+    try {
+        const { userId: adminUserId } = await auth();
+        const isAdmin = await checkAdmin(adminUserId);
+        
+        if (!isAdmin) {
+            return NextResponse.json({ error: 'Acesso proibido. Apenas administradores.' }, { status: 403 });
+        }
+
+        const { clerkId } = await params;
+        if (!clerkId) {
+            return NextResponse.json({ error: 'ID do usuário é obrigatório' }, { status: 400 });
+        }
+
+        const body = await request.json();
+        const { itemId, visibility } = body;
+
+        if (!itemId || !visibility) {
+            return NextResponse.json({ error: 'ID do item e visibilidade são obrigatórios' }, { status: 400 });
+        }
+
+        if (visibility !== 'public' && visibility !== 'subscribers') {
+            return NextResponse.json({ error: 'Visibilidade inválida' }, { status: 400 });
+        }
+
+        const updatedItem = await GalleryItem.findOneAndUpdate(
+            { _id: itemId, ownerId: clerkId },
+            { visibility },
+            { new: true }
+        );
+
+        if (!updatedItem) {
+            return NextResponse.json({ error: 'Item não encontrado ou não pertence a este usuário' }, { status: 404 });
+        }
+
+        return NextResponse.json({ item: updatedItem });
+    } catch (error) {
+        console.error('Erro ao atualizar visibilidade de foto de galeria via admin:', error);
+        return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+    }
+}
+
