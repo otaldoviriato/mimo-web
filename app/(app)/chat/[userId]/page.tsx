@@ -882,57 +882,149 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [userData]);
 
-    const generateVideoThumbnail = (file: File): Promise<string> => {
+    const waitForVideoEvent = (video: HTMLVideoElement, eventName: keyof HTMLVideoElementEventMap, timeoutMs: number) => {
+        return new Promise<void>((resolve, reject) => {
+            const timeoutId = window.setTimeout(() => {
+                cleanup();
+                reject(new Error(`Timeout waiting for ${eventName}`));
+            }, timeoutMs);
+
+            const onEvent = () => {
+                cleanup();
+                resolve();
+            };
+
+            const onError = () => {
+                cleanup();
+                reject(new Error('Video failed to load'));
+            };
+
+            const cleanup = () => {
+                window.clearTimeout(timeoutId);
+                video.removeEventListener(eventName, onEvent);
+                video.removeEventListener('error', onError);
+            };
+
+            video.addEventListener(eventName, onEvent, { once: true });
+            video.addEventListener('error', onError, { once: true });
+        });
+    };
+
+    const waitForVideoFrame = () => {
+        return new Promise<void>((resolve) => {
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        });
+    };
+
+    const isCanvasMostlyBlack = (canvas: HTMLCanvasElement) => {
+        const sampleWidth = Math.min(80, canvas.width);
+        const sampleHeight = Math.min(80, canvas.height);
+        const sampleCanvas = document.createElement('canvas');
+        sampleCanvas.width = sampleWidth;
+        sampleCanvas.height = sampleHeight;
+
+        const sampleCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
+        if (!sampleCtx) return true;
+
+        sampleCtx.drawImage(canvas, 0, 0, sampleWidth, sampleHeight);
+        const imageData = sampleCtx.getImageData(0, 0, sampleWidth, sampleHeight).data;
+        let darkPixels = 0;
+        let visiblePixels = 0;
+
+        for (let i = 0; i < imageData.length; i += 4) {
+            const alpha = imageData[i + 3];
+            if (alpha < 16) continue;
+
+            visiblePixels += 1;
+            const brightness = (imageData[i] + imageData[i + 1] + imageData[i + 2]) / 3;
+            if (brightness < 8) darkPixels += 1;
+        }
+
+        if (visiblePixels === 0) return true;
+        return darkPixels / visiblePixels > 0.985;
+    };
+
+    const buildThumbnailSeekTimes = (duration: number) => {
+        const fallbackTimes = [0.5, 1.5, 3, 5, 8];
+        if (!Number.isFinite(duration) || duration <= 0) return fallbackTimes;
+
+        return Array.from(new Set([
+            Math.min(0.5, Math.max(duration - 0.1, 0)),
+            Math.min(1.5, Math.max(duration - 0.1, 0)),
+            duration * 0.05,
+            duration * 0.12,
+            duration * 0.25,
+            duration * 0.5,
+        ].map(time => Number(Math.max(0, Math.min(duration - 0.1, time)).toFixed(2)))));
+    };
+
+    const captureVideoThumbnailAt = async (video: HTMLVideoElement, time: number) => {
+        if (Math.abs(video.currentTime - time) > 0.05) {
+            const seeked = waitForVideoEvent(video, 'seeked', 5000);
+            video.currentTime = time;
+            await seeked;
+        }
+
+        await waitForVideoFrame();
+
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth || 320;
+        canvas.height = video.videoHeight || 240;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return '';
+
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        if (isCanvasMostlyBlack(canvas)) return '';
+
+        return canvas.toDataURL('image/jpeg', 0.86);
+    };
+
+    const generateVideoThumbnail = async (file: File): Promise<string> => {
         return new Promise((resolve) => {
             const video = document.createElement('video');
-            video.preload = 'metadata';
+            video.preload = 'auto';
             video.muted = true;
             video.playsInline = true;
 
             const timeoutId = setTimeout(() => {
                 cleanup();
                 resolve('');
-            }, 3000);
+            }, 12000);
 
             const cleanup = () => {
                 clearTimeout(timeoutId);
-                video.onloadeddata = null;
-                video.onseeked = null;
-                video.onerror = null;
                 try {
                     URL.revokeObjectURL(video.src);
-                } catch (e) {}
+                } catch {}
             };
 
-            video.onloadeddata = () => {
-                video.currentTime = 0.5; 
-            };
-
-            video.onseeked = () => {
+            const loadAndCapture = async () => {
                 try {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = video.videoWidth || 320;
-                    canvas.height = video.videoHeight || 240;
-                    const ctx = canvas.getContext('2d');
-                    ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    const thumbData = canvas.toDataURL('image/jpeg');
+                    await waitForVideoEvent(video, 'loadedmetadata', 5000);
+                    await waitForVideoEvent(video, 'loadeddata', 5000).catch(() => undefined);
+
+                    for (const seekTime of buildThumbnailSeekTimes(video.duration)) {
+                        const thumbnail = await captureVideoThumbnailAt(video, Number(seekTime));
+                        if (thumbnail) {
+                            cleanup();
+                            resolve(thumbnail);
+                            return;
+                        }
+                    }
+
                     cleanup();
-                    resolve(thumbData);
-                } catch (e) {
+                    resolve('');
+                } catch {
                     cleanup();
                     resolve('');
                 }
             };
 
-            video.onerror = () => {
-                cleanup();
-                resolve('');
-            };
-
             try {
                 video.src = URL.createObjectURL(file);
                 video.load();
-            } catch (e) {
+                loadAndCapture();
+            } catch {
                 cleanup();
                 resolve('');
             }
