@@ -5,6 +5,7 @@ export interface IRoom extends Document {
     lastMessage?: string;
     lastMessageTime?: Date;
     unreadCount?: Map<string, number>;
+    deletedBy?: string[]; // clerkIds que excluíram esta conversa
     createdAt: Date;
     updatedAt: Date;
 }
@@ -28,6 +29,10 @@ const RoomSchema = new Schema<IRoom>({
         type: Map,
         of: Number,
         default: new Map(),
+    },
+    deletedBy: {
+        type: [String],
+        default: [],
     },
 }, {
     timestamps: true,

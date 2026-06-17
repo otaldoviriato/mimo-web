@@ -26,8 +26,8 @@ export async function GET(
         // Professionals only see a conversation after its first message.
         // This also hides empty rooms left behind by the previous join flow.
         const roomFilter = currentUser?.isProfessional
-            ? { participants: userId, lastMessageTime: { $exists: true } }
-            : { participants: userId };
+            ? { participants: userId, lastMessageTime: { $exists: true }, deletedBy: { $nin: [userId] } }
+            : { participants: userId, deletedBy: { $nin: [userId] } };
 
         const rooms = await Room.find(roomFilter)
             .sort({ lastMessageTime: -1, updatedAt: -1 })
@@ -65,6 +65,46 @@ export async function GET(
 
     } catch (error) {
         console.error('Error fetching rooms:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+}
+
+export async function POST(
+    request: NextRequest,
+    { params }: { params: Promise<{ userId: string }> }
+) {
+    try {
+        const { userId } = await params;
+        const { userId: authUserId } = await auth();
+
+        if (!authUserId || authUserId !== userId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const { roomId } = await request.json();
+        if (!roomId) {
+            return NextResponse.json({ error: 'RoomId is required' }, { status: 400 });
+        }
+
+        await connectToDatabase();
+
+        let query: any;
+        const mongoose = require('mongoose');
+        if (mongoose.Types.ObjectId.isValid(roomId)) {
+            query = { _id: roomId };
+        } else {
+            const sortedParticipants = roomId.split('_').sort();
+            query = { participants: { $all: sortedParticipants } };
+        }
+
+        await Room.updateOne(
+            query,
+            { $addToSet: { deletedBy: userId } }
+        );
+
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting room:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

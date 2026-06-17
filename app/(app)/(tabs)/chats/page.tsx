@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Avatar, TouchableRipple } from '@/components';
 import { useChatRooms, useMyProfile, QueryKeys } from '@/hooks/useQueries';
 import { useSocket } from '@/hooks/useSocket';
-import { CheckCircle2, X, WalletCards, Crown, ShieldAlert, Clock, AlertCircle, ChevronRight, MessageCircle } from 'lucide-react';
+import { CheckCircle2, X, WalletCards, Crown, ShieldAlert, Clock, AlertCircle, ChevronRight, MessageCircle, Trash2 } from 'lucide-react';
 
 interface Room {
     _id: string;
@@ -76,6 +76,10 @@ export default function ChatsPage() {
     const [giftModal, setGiftModal] = useState(false);
     const [giftAmount, setGiftAmount] = useState<number | null>(null);
     const giftClaimedRef = useRef(false);
+
+    // Modal de confirmação de exclusão
+    const [deleteConfirmRoomId, setDeleteConfirmRoomId] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // Estado e controle para verificação de identidade
     const prevStatusRef = useRef<string | null | undefined>(undefined);
@@ -296,16 +300,23 @@ export default function ChatsPage() {
             );
         };
 
+        // 5. Atualiza quando uma sala é excluída (soft-delete)
+        const handleRoomDeletedOnSocket = (data: { roomId: string }) => {
+            queryClient.invalidateQueries({ queryKey: QueryKeys.rooms(user.id!) });
+        };
+
         socket.on('balance_update', handleBalanceUpdate);
         socket.on('room_updated', handleRoomUpdated);
         socket.on('global_typing', handleGlobalTyping);
         socket.on('room_read', handleRoomRead);
+        socket.on('room_deleted', handleRoomDeletedOnSocket);
 
         return () => {
             socket.off('balance_update', handleBalanceUpdate);
             socket.off('room_updated', handleRoomUpdated);
             socket.off('global_typing', handleGlobalTyping);
             socket.off('room_read', handleRoomRead);
+            socket.off('room_deleted', handleRoomDeletedOnSocket);
         };
     }, [socket, socketVersion, user?.id, queryClient]);
 
@@ -365,6 +376,33 @@ export default function ChatsPage() {
     // Abre a tela de conversa física usando o roteador de transição
     const handleOpenChat = (userId: string) => {
         router.push(`/chat/${userId}`);
+    };
+
+    const handleDeleteRoom = async (roomId: string) => {
+        if (!user?.id) return;
+        setIsDeleting(true);
+        try {
+            const response = await fetch(`/api/rooms/${user.id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ roomId }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Falha ao excluir conversa');
+            }
+
+            socketService.deleteRoom(roomId);
+            await queryClient.invalidateQueries({ queryKey: QueryKeys.rooms(user.id) });
+            setDeleteConfirmRoomId(null);
+        } catch (error) {
+            console.error('Erro ao excluir sala:', error);
+            alert('Não foi possível excluir a conversa. Tente novamente.');
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     const onRefresh = useCallback(() => {
@@ -489,6 +527,49 @@ export default function ChatsPage() {
                 </div>
             )}
 
+            {/* Modal de Confirmação de Exclusão */}
+            {deleteConfirmRoomId && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center p-5">
+                    <div
+                        className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] animate-in fade-in duration-200"
+                        onClick={() => !isDeleting && setDeleteConfirmRoomId(null)}
+                    />
+                    <div className="relative w-full max-w-[360px] animate-in fade-in slide-in-from-bottom-6 zoom-in-95 duration-300">
+                        <div className="overflow-hidden rounded-[24px] border border-gray-100 bg-white shadow-2xl">
+                            <div className="px-6 pt-6 pb-5">
+                                <div className="flex items-center gap-3.5 mb-3 text-red-600">
+                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 ring-1 ring-red-100">
+                                        <Trash2 size={20} strokeWidth={2.2} />
+                                    </div>
+                                    <h3 className="text-base font-bold text-gray-900 leading-tight">Excluir conversa?</h3>
+                                </div>
+                                <p className="text-xs text-gray-500 leading-relaxed mb-6">
+                                    Essa conversa será ocultada da sua lista de conversas. O histórico de mensagens continuará salvo de forma segura.
+                                </p>
+                                <div className="flex gap-3">
+                                    <button
+                                        type="button"
+                                        disabled={isDeleting}
+                                        onClick={() => setDeleteConfirmRoomId(null)}
+                                        className="flex-1 rounded-xl bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 text-xs font-semibold py-3 transition-colors active:scale-[0.99] cursor-pointer"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={isDeleting}
+                                        onClick={() => deleteConfirmRoomId && handleDeleteRoom(deleteConfirmRoomId)}
+                                        className="flex-1 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-semibold py-3 transition-colors shadow-md shadow-red-600/10 active:scale-[0.99] cursor-pointer flex items-center justify-center gap-1.5"
+                                    >
+                                        {isDeleting ? 'Excluindo...' : 'Excluir'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* List */}
             <div className="flex-1 overflow-y-auto pb-16 md:pb-0 flex flex-col">
                 {isLoading ? (
@@ -529,7 +610,7 @@ export default function ChatsPage() {
                                 <li key={room._id}>
                                     <TouchableRipple
                                         onClick={() => otherUserId && handleOpenChat(otherUserId)}
-                                        className="w-full flex items-center px-4 py-3.5 bg-white border-b border-gray-100 hover:bg-gray-50 transition-colors text-left"
+                                        className="group w-full flex items-center px-4 py-3.5 bg-white border-b border-gray-100 hover:bg-gray-50 transition-colors text-left"
                                     >
                                         <div className="relative shrink-0">
                                             <Avatar size={52} uri={room.otherUser?.photoUrl} />
@@ -572,11 +653,23 @@ export default function ChatsPage() {
                                                         {room.lastMessage || 'Toque para iniciar a conversa! ✨'}
                                                     </span>
                                                 )}
-                                                {hasUnread && (
-                                                    <span className="shrink-0 bg-purple-600 text-white text-xs font-bold rounded-full min-w-[22px] h-[22px] flex items-center justify-center px-1">
-                                                        {myUnreadCount > 99 ? '99+' : myUnreadCount}
-                                                    </span>
-                                                )}
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    {hasUnread && (
+                                                        <span className="shrink-0 bg-purple-600 text-white text-xs font-bold rounded-full min-w-[22px] h-[22px] flex items-center justify-center px-1">
+                                                            {myUnreadCount > 99 ? '99+' : myUnreadCount}
+                                                        </span>
+                                                    )}
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setDeleteConfirmRoomId(derivedRoomId);
+                                                        }}
+                                                        className="p-1.5 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg transition-all cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100 md:opacity-0 max-md:opacity-60 hover:scale-105 active:scale-95 flex items-center justify-center"
+                                                        title="Excluir conversa"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </TouchableRipple>

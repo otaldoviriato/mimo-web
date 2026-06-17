@@ -86,6 +86,21 @@ class SocketService {
         });
     }
 
+    deleteRoom(roomId: string) {
+        if (!this.socket) return;
+        this.socket.emit('delete_room', { roomId });
+    }
+
+    onRoomDeleted(callback: (data: { roomId: string }) => void) {
+        if (!this.socket) return;
+        this.socket.on('room_deleted', callback);
+    }
+
+    offRoomDeleted() {
+        if (!this.socket) return;
+        this.socket.off('room_deleted');
+    }
+
     onNewMessage(callback: (message: any) => void) {
         if (!this.socket) return;
         // Remove o listener anterior antes de registrar um novo
