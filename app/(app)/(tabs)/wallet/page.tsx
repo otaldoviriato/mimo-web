@@ -251,7 +251,7 @@ export default function WalletPage() {
                     <div className="flex justify-between items-start gap-4">
                         <div className="flex flex-col">
                             <div className="flex items-center gap-1.5">
-                                <span className="text-[10px] text-purple-650 font-extrabold uppercase tracking-widest">
+                                <span className="text-[11.5px] text-purple-650 font-extrabold uppercase tracking-widest">
                                     Saldo Disponível
                                 </span>
                                 <button
@@ -266,13 +266,13 @@ export default function WalletPage() {
                                 {renderValue(data.balance)}
                             </h2>
                         </div>
-                        <span className="text-[9px] bg-slate-200/60 border border-slate-300/40 text-slate-600 font-bold px-2 py-0.5 rounded-lg uppercase tracking-wider backdrop-blur-sm">
+                        <span className="text-[10.5px] bg-slate-200/60 border border-slate-300/40 text-slate-600 font-bold px-2 py-0.5 rounded-lg uppercase tracking-wider backdrop-blur-sm">
                             Real (BRL)
                         </span>
                     </div>
 
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4 pt-4 border-t border-purple-100/50">
-                        <p className="text-[9px] text-slate-450 max-w-xs flex items-center gap-1.5 leading-snug">
+                        <p className="text-[11px] text-slate-450 max-w-xs flex items-center gap-1.5 leading-snug">
                             <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                             Saques via Pix transferidos para a chave PIX cadastrada.
                         </p>
@@ -286,7 +286,7 @@ export default function WalletPage() {
                                 }
                             }}
                             disabled={data.balance <= 0}
-                            className={`h-9 px-4 rounded-xl font-bold text-xs tracking-wide uppercase transition-all active:scale-[0.97] flex items-center justify-center gap-1.5 shrink-0 shadow-sm ${
+                            className={`h-9 px-4 rounded-xl font-bold text-xs sm:text-sm tracking-wide uppercase transition-all active:scale-[0.97] flex items-center justify-center gap-1.5 shrink-0 shadow-sm ${
                                 data.balance <= 0
                                     ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none border border-slate-200/40'
                                     : 'bg-purple-600 hover:bg-purple-700 text-white shadow-purple-950/10'
@@ -305,14 +305,14 @@ export default function WalletPage() {
                             <div className="w-6.5 h-6.5 rounded-lg bg-slate-50 flex items-center justify-center text-slate-500 border border-slate-200/50 shrink-0">
                                 <Wallet2 className="w-3.5 h-3.5" />
                             </div>
-                            <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wider">
+                            <span className="text-xs text-slate-500 font-extrabold uppercase tracking-wider">
                                 Histórico de Saques
                             </span>
                         </div>
                         
                         <div className="flex flex-col items-end">
-                            <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider leading-none">Total Sacado</span>
-                            <span className="text-sm font-black text-emerald-650 leading-tight">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none">Total Sacado</span>
+                            <span className="text-base font-black text-emerald-650 leading-tight">
                                 {renderValue(data.totalWithdrawn)}
                             </span>
                         </div>
@@ -328,7 +328,7 @@ export default function WalletPage() {
                     ) : (withdrawalsData.withdrawals || []).length === 0 ? (
                         <div className="flex flex-col items-center justify-center border border-dashed border-gray-150 rounded-xl py-8 gap-2 bg-slate-50/50">
                             <span className="text-xl">💸</span>
-                            <p className="text-[10px] text-gray-400">Nenhum saque realizado ainda.</p>
+                            <p className="text-xs text-gray-400">Nenhum saque realizado ainda.</p>
                         </div>
                     ) : (
                         <div className="flex flex-col gap-2.5">
@@ -370,17 +370,17 @@ export default function WalletPage() {
                                                 <ArrowUpRight className="w-3.5 h-3.5" />
                                             </div>
                                             <div className="min-w-0">
-                                                <h4 className="text-[10px] font-bold text-gray-900 leading-tight">Saque via Pix</h4>
-                                                <p className="text-[8px] text-gray-400 mt-0.5">
+                                                <h4 className="text-xs font-bold text-gray-900 leading-tight">Saque via Pix</h4>
+                                                <p className="text-[10px] text-gray-400 mt-0.5">
                                                     {new Date(w.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
                                                 </p>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
-                                            <span className="text-[10.5px] font-extrabold text-gray-800">
+                                            <span className="text-[12.5px] font-extrabold text-gray-800">
                                                 {renderValue(w.amount)}
                                             </span>
-                                            <span className={`text-[8px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider border ${statusStyles}`}>
+                                            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider border ${statusStyles}`}>
                                                 {statusLabel}
                                             </span>
                                         </div>
@@ -391,7 +391,7 @@ export default function WalletPage() {
                             {(withdrawalsData.withdrawals || []).length > 5 && (
                                 <button
                                     onClick={() => setIsExpanded(!isExpanded)}
-                                    className="text-[9px] font-extrabold text-purple-600 hover:text-purple-700 self-center py-1.5 px-3 rounded-lg bg-purple-50 hover:bg-purple-100/80 transition-all active:scale-[0.98] mt-1 border border-purple-100/30"
+                                    className="text-[11px] font-extrabold text-purple-600 hover:text-purple-700 self-center py-1.5 px-3 rounded-lg bg-purple-50 hover:bg-purple-100/80 transition-all active:scale-[0.98] mt-1 border border-purple-100/30"
                                 >
                                     {isExpanded ? 'Recolher histórico' : 'Carregar mais saques'}
                                 </button>
@@ -403,10 +403,10 @@ export default function WalletPage() {
                 {/* ── BENTO BLOCK 3: TOP CLIENTES (FÃS VIP) (Terceiro Card) ── */}
                 <div className="bg-white border border-purple-100/60 rounded-2xl p-4 shadow-[0_4px_20px_rgb(0,0,0,0.015)] flex flex-col justify-between min-h-[220px]">
                     <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
-                        <span className="text-[9.5px] text-gray-500 font-bold uppercase tracking-widest">
+                        <span className="text-xs text-gray-500 font-bold uppercase tracking-widest">
                             Top Faturamento
                         </span>
-                        <span className="text-[8.5px] text-purple-600 font-bold uppercase tracking-wider bg-purple-50 px-2 py-0.5 rounded-md border border-purple-100/50">Top 5</span>
+                        <span className="text-[10.5px] text-purple-650 font-bold uppercase tracking-wider bg-purple-50 px-2 py-0.5 rounded-md border border-purple-100/50">Top 5</span>
                     </div>
 
                     {data.topCustomers && data.topCustomers.length > 0 ? (
@@ -414,7 +414,7 @@ export default function WalletPage() {
                             {data.topCustomers.map((customer, index) => (
                                 <div key={customer.clerkId} className="flex items-center justify-between py-1 border-b border-gray-50 last:border-b-0">
                                     <div className="flex items-center gap-2.5 min-w-0">
-                                        <div className="w-5.5 h-5.5 rounded-full flex items-center justify-center text-[10px] font-bold bg-slate-50 border border-gray-200 shrink-0 text-gray-500">
+                                        <div className="w-5.5 h-5.5 rounded-full flex items-center justify-center text-[10.5px] font-bold bg-slate-50 border border-gray-200 shrink-0 text-gray-500">
                                             {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
                                         </div>
                                         <div className="p-[0.5px] bg-gradient-to-tr from-purple-500 to-indigo-500 rounded-full shrink-0">
@@ -423,57 +423,31 @@ export default function WalletPage() {
                                             </div>
                                         </div>
                                         <div className="min-w-0">
-                                            <h4 className="text-[10px] font-bold text-gray-900 truncate leading-tight">{customer.name}</h4>
-                                            <p className="text-[8px] text-gray-400 truncate mt-0.5">@{customer.username}</p>
+                                            <h4 className="text-xs font-bold text-gray-900 truncate leading-tight">{customer.name}</h4>
+                                            <p className="text-[10px] text-gray-400 truncate mt-0.5">@{customer.username}</p>
                                         </div>
                                     </div>
-                                    <span className="text-[10.5px] font-extrabold text-purple-650 shrink-0 text-right">{renderValue(customer.totalSpent)}</span>
+                                    <span className="text-xs font-extrabold text-purple-650 shrink-0 text-right">{renderValue(customer.totalSpent)}</span>
                                 </div>
                             ))}
                         </div>
                     ) : (
                         <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-gray-100 rounded-xl gap-1 py-6 bg-slate-50/50">
                             <span className="text-base">👑</span>
-                            <p className="text-[10px] text-gray-400">Nenhum VIP listado ainda.</p>
+                            <p className="text-xs text-gray-400">Nenhum VIP listado ainda.</p>
                         </div>
                     )}
                 </div>
 
-                {/* ── SEÇÃO INDICADORES COMPACTOS - EM GRID 2 COLUNAS MOBILE (Preenche todo o espaço) ── */}
-                <div className="grid grid-cols-2 gap-3">
-                    {/* Indicador: Total Retirado */}
-                    <div className="bg-white border border-purple-100/60 rounded-2xl p-3 flex items-center gap-2.5 shadow-[0_4px_20px_rgb(0,0,0,0.015)]">
-                        <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
-                            <ArrowUpRight className="w-3.5 h-3.5" />
-                        </div>
-                        <div className="min-w-0">
-                            <span className="text-[8px] text-gray-400 font-extrabold uppercase tracking-wider block leading-none truncate">Total Retirado</span>
-                            <span className="text-sm font-black text-gray-900 mt-0.5 block leading-tight truncate">{renderValue(data.totalWithdrawn)}</span>
-                            <span className="text-[7.5px] text-emerald-650 font-medium block mt-0.5 truncate">Enviado Pix</span>
-                        </div>
-                    </div>
-
-                    {/* Indicador: Faturamento Histórico */}
-                    <div className="bg-white border border-purple-100/60 rounded-2xl p-3 flex items-center gap-2.5 shadow-[0_4px_20px_rgb(0,0,0,0.015)]">
-                        <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-650 shrink-0">
-                            <TrendingUp className="w-3.5 h-3.5" />
-                        </div>
-                        <div className="min-w-0">
-                            <span className="text-[8px] text-gray-400 font-extrabold uppercase tracking-wider block leading-none truncate">Faturamento Total</span>
-                            <span className="text-sm font-black text-gray-900 mt-0.5 block leading-tight truncate">{renderValue(data.balance + data.totalWithdrawn)}</span>
-                            <span className="text-[7.5px] text-blue-600 font-medium block mt-0.5 truncate">Ganhos brutos</span>
-                        </div>
-                    </div>
-                </div>
 
                 {/* ── BENTO BLOCK 5: GRÁFICO DE EVOLUÇÃO (Refinado, Compacto, SVG Roxo) ── */}
                 <div className="bg-white border border-purple-100/60 rounded-2xl p-4 shadow-[0_4px_20px_rgb(0,0,0,0.015)] flex flex-col justify-between min-h-[200px]">
                     <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
-                        <span className="text-[9.5px] text-gray-500 font-bold uppercase tracking-widest flex items-center gap-1.5">
+                        <span className="text-xs text-gray-500 font-bold uppercase tracking-widest flex items-center gap-1.5">
                             <TrendingUp className="w-3.5 h-3.5 text-purple-650" />
                             Evolução de Ganhos Diários
                         </span>
-                        <span className="text-[8.5px] text-gray-400 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100 font-medium">Últimos 15 Dias</span>
+                        <span className="text-[10.5px] text-gray-400 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100 font-medium">Últimos 15 Dias</span>
                     </div>
 
                     {/* Gráfico SVG Linha Suave */}
@@ -511,7 +485,7 @@ export default function WalletPage() {
                             </svg>
                             
                             {/* Eixo X com as datas */}
-                            <div className="flex justify-between px-2.5 mt-1.5 border-t border-gray-50 pt-1.5 text-[8.5px] text-gray-400 font-medium">
+                            <div className="flex justify-between px-2.5 mt-1.5 border-t border-gray-50 pt-1.5 text-[10px] text-gray-400 font-medium">
                                 <span>{points[0]?.date}</span>
                                 <span>{points[Math.floor(points.length / 2)]?.date}</span>
                                 <span>{points[points.length - 1]?.date}</span>
@@ -527,15 +501,15 @@ export default function WalletPage() {
                 {/* ── BENTO BLOCK 6: DETALHAMENTO DE PRODUTOS (Origem dos Ganhos) ── */}
                 <div className="bg-white border border-purple-100/60 rounded-2xl p-4 shadow-[0_4px_20px_rgb(0,0,0,0.015)] flex flex-col justify-between min-h-[220px]">
                     <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
-                        <span className="text-[9.5px] text-gray-500 font-bold uppercase tracking-widest">Origem dos Ganhos</span>
-                        <span className="text-[8.5px] text-gray-450 font-bold uppercase tracking-wider">Divisão</span>
+                        <span className="text-xs text-gray-500 font-bold uppercase tracking-widest">Origem dos Ganhos</span>
+                        <span className="text-[10.5px] text-gray-450 font-bold uppercase tracking-wider">Divisão</span>
                     </div>
 
                     <div className="flex-1 flex flex-col gap-2 justify-center">
                         {/* Mensagens */}
                         <div className="flex flex-col gap-0.5">
-                            <div className="flex justify-between items-center text-[9px] font-semibold text-gray-500">
-                                <span className="flex items-center gap-1.5"><MessageSquare className="w-3 h-3 text-purple-650" /> Mensagens</span>
+                            <div className="flex justify-between items-center text-xs font-semibold text-gray-500">
+                                <span className="flex items-center gap-1.5"><MessageSquare className="w-3.5 h-3.5 text-purple-650" /> Mensagens</span>
                                 <span className="font-bold text-gray-900">{renderValue(data.earningsByCategory.message)} ({getPercent(data.earningsByCategory.message)})</span>
                             </div>
                             <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden border border-gray-200/30">
@@ -545,8 +519,8 @@ export default function WalletPage() {
 
                         {/* Mídias */}
                         <div className="flex flex-col gap-0.5">
-                            <div className="flex justify-between items-center text-[9px] font-semibold text-gray-500">
-                                <span className="flex items-center gap-1.5"><ImageIcon className="w-3 h-3 text-purple-650" /> Mídias Privadas</span>
+                            <div className="flex justify-between items-center text-xs font-semibold text-gray-500">
+                                <span className="flex items-center gap-1.5"><ImageIcon className="w-3.5 h-3.5 text-purple-650" /> Mídias Privadas</span>
                                 <span className="font-bold text-gray-900">{renderValue(data.earningsByCategory.image_unlock)} ({getPercent(data.earningsByCategory.image_unlock)})</span>
                             </div>
                             <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden border border-gray-200/30">
@@ -556,8 +530,8 @@ export default function WalletPage() {
 
                         {/* Assinaturas */}
                         <div className="flex flex-col gap-0.5">
-                            <div className="flex justify-between items-center text-[9px] font-semibold text-gray-500">
-                                <span className="flex items-center gap-1.5"><Crown className="w-3 h-3 text-purple-650" /> Assinaturas</span>
+                            <div className="flex justify-between items-center text-xs font-semibold text-gray-500">
+                                <span className="flex items-center gap-1.5"><Crown className="w-3.5 h-3.5 text-purple-650" /> Assinaturas</span>
                                 <span className="font-bold text-gray-900">{renderValue(data.earningsByCategory.subscription)} ({getPercent(data.earningsByCategory.subscription)})</span>
                             </div>
                             <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden border border-gray-200/30">
@@ -567,8 +541,8 @@ export default function WalletPage() {
 
                         {/* Presentes */}
                         <div className="flex flex-col gap-0.5">
-                            <div className="flex justify-between items-center text-[9px] font-semibold text-gray-500">
-                                <span className="flex items-center gap-1.5"><Gift className="w-3 h-3 text-purple-650" /> Presentes</span>
+                            <div className="flex justify-between items-center text-xs font-semibold text-gray-500">
+                                <span className="flex items-center gap-1.5"><Gift className="w-3.5 h-3.5 text-purple-650" /> Presentes</span>
                                 <span className="font-bold text-gray-900">{renderValue(data.earningsByCategory.gift)} ({getPercent(data.earningsByCategory.gift)})</span>
                             </div>
                             <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden border border-gray-200/30">
