@@ -8,6 +8,7 @@ import { Avatar, TouchableRipple } from '@/components';
 import { useChatRooms, useMyProfile, QueryKeys } from '@/hooks/useQueries';
 import { useSocket } from '@/hooks/useSocket';
 import { CheckCircle2, X, WalletCards, Crown, ShieldAlert, Clock, AlertCircle, ChevronRight, MessageCircle, Trash2 } from 'lucide-react';
+import { Drawer } from 'vaul';
 
 interface Room {
     _id: string;
@@ -80,6 +81,13 @@ export default function ChatsPage() {
     // Modal de confirmação de exclusão
     const [deleteConfirmRoomId, setDeleteConfirmRoomId] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // Estado para o menu de opções da conversa (Drawer / Bottom Sheet)
+    const [selectedRoomIdForMenu, setSelectedRoomIdForMenu] = useState<string | null>(null);
+
+    // Refs para controle de Long Press
+    const longPressTimeout = useRef<NodeJS.Timeout | null>(null);
+    const isLongPressActive = useRef(false);
 
     // Estado e controle para verificação de identidade
     const prevStatusRef = useRef<string | null | undefined>(undefined);
@@ -405,6 +413,42 @@ export default function ChatsPage() {
         }
     };
 
+    const startPress = (roomId: string) => {
+        isLongPressActive.current = false;
+        longPressTimeout.current = setTimeout(() => {
+            isLongPressActive.current = true;
+            setSelectedRoomIdForMenu(roomId);
+            if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+                try {
+                    navigator.vibrate(40);
+                } catch (e) {}
+            }
+        }, 500);
+    };
+
+    const endPress = (e: React.MouseEvent | React.TouchEvent, onClickAction: () => void) => {
+        if (longPressTimeout.current) {
+            clearTimeout(longPressTimeout.current);
+            longPressTimeout.current = null;
+        }
+        if (!isLongPressActive.current) {
+            onClickAction();
+        } else {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    };
+
+    const handleContextMenu = (e: React.MouseEvent, roomId: string) => {
+        e.preventDefault();
+        setSelectedRoomIdForMenu(roomId);
+        if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+            try {
+                navigator.vibrate(40);
+            } catch (err) {}
+        }
+    };
+
     const onRefresh = useCallback(() => {
         refetchRooms();
         refetchProfile();
@@ -527,6 +571,39 @@ export default function ChatsPage() {
                 </div>
             )}
 
+            {/* Drawer de Opções da Conversa */}
+            <Drawer.Root open={!!selectedRoomIdForMenu} onOpenChange={(open) => !open && setSelectedRoomIdForMenu(null)}>
+                <Drawer.Portal>
+                    <Drawer.Overlay className="fixed inset-0 z-[115] bg-slate-950/40 backdrop-blur-[1px]" />
+                    <Drawer.Content className="fixed inset-x-0 bottom-0 z-[120] mx-auto flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-t-[28px] bg-white shadow-[0_-20px_60px_rgba(15,23,42,0.15)] outline-none">
+                        <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-200 mt-4 shrink-0" />
+                        <div className="px-6 pb-8 pt-2">
+                            <Drawer.Title className="text-base font-bold text-gray-900 mb-5 text-center">Opções da conversa</Drawer.Title>
+                            <div className="flex flex-col gap-3">
+                                <button
+                                    onClick={() => {
+                                        if (selectedRoomIdForMenu) {
+                                            setDeleteConfirmRoomId(selectedRoomIdForMenu);
+                                            setSelectedRoomIdForMenu(null);
+                                        }
+                                    }}
+                                    className="w-full flex items-center justify-center gap-2 py-4 bg-red-50 hover:bg-red-100 text-red-600 font-extrabold rounded-2xl transition-colors text-sm cursor-pointer"
+                                >
+                                    <Trash2 className="w-5 h-5" />
+                                    Excluir conversa
+                                </button>
+                                <button
+                                    onClick={() => setSelectedRoomIdForMenu(null)}
+                                    className="w-full py-4 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold rounded-2xl transition-colors text-sm cursor-pointer"
+                                >
+                                    Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    </Drawer.Content>
+                </Drawer.Portal>
+            </Drawer.Root>
+
             {/* Modal de Confirmação de Exclusão */}
             {deleteConfirmRoomId && (
                 <div className="fixed inset-0 z-[120] flex items-center justify-center p-5">
@@ -606,11 +683,28 @@ export default function ChatsPage() {
                             const hasUnread = myUnreadCount > 0;
                             const isRoomTyping = typingRooms[derivedRoomId] ?? false;
 
+                            const handleItemClick = () => {
+                                if (otherUserId) {
+                                    handleOpenChat(otherUserId);
+                                }
+                            };
+
                             return (
                                 <li key={room._id}>
                                     <TouchableRipple
-                                        onClick={() => otherUserId && handleOpenChat(otherUserId)}
-                                        className="group w-full flex items-center px-4 py-3.5 bg-white border-b border-gray-100 hover:bg-gray-50 transition-colors text-left"
+                                        onClick={(e) => endPress(e, handleItemClick)}
+                                        onMouseDown={() => startPress(derivedRoomId)}
+                                        onMouseUp={(e) => endPress(e, handleItemClick)}
+                                        onMouseLeave={() => {
+                                            if (longPressTimeout.current) {
+                                                clearTimeout(longPressTimeout.current);
+                                                longPressTimeout.current = null;
+                                            }
+                                        }}
+                                        onTouchStart={() => startPress(derivedRoomId)}
+                                        onTouchEnd={(e) => endPress(e, handleItemClick)}
+                                        onContextMenu={(e) => handleContextMenu(e, derivedRoomId)}
+                                        className="w-full flex items-center px-4 py-3.5 bg-white border-b border-gray-100 hover:bg-gray-50 transition-colors text-left select-none"
                                     >
                                         <div className="relative shrink-0">
                                             <Avatar size={52} uri={room.otherUser?.photoUrl} />
@@ -653,23 +747,11 @@ export default function ChatsPage() {
                                                         {room.lastMessage || 'Toque para iniciar a conversa! ✨'}
                                                     </span>
                                                 )}
-                                                <div className="flex items-center gap-2 shrink-0">
-                                                    {hasUnread && (
-                                                        <span className="shrink-0 bg-purple-600 text-white text-xs font-bold rounded-full min-w-[22px] h-[22px] flex items-center justify-center px-1">
-                                                            {myUnreadCount > 99 ? '99+' : myUnreadCount}
-                                                        </span>
-                                                    )}
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setDeleteConfirmRoomId(derivedRoomId);
-                                                        }}
-                                                        className="p-1.5 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg transition-all cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100 md:opacity-0 max-md:opacity-60 hover:scale-105 active:scale-95 flex items-center justify-center"
-                                                        title="Excluir conversa"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </div>
+                                                {hasUnread && (
+                                                    <span className="shrink-0 bg-purple-600 text-white text-xs font-bold rounded-full min-w-[22px] h-[22px] flex items-center justify-center px-1">
+                                                        {myUnreadCount > 99 ? '99+' : myUnreadCount}
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     </TouchableRipple>
