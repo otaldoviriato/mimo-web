@@ -1974,16 +1974,13 @@ export default function AdminPage() {
                                                     </td>
                                                     {/* Ações */}
                                                     <td className="py-4 px-6 text-center">
-                                                        {withdraw.status === 'pendente' ? (
-                                                            <div className="flex gap-2 justify-center">
-                                                                <button
-                                                                    onClick={() => handleApproveWithdrawal(withdraw.id)}
-                                                                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 text-xs font-bold rounded-lg transition-all border border-emerald-100 cursor-pointer shadow-sm active:scale-95"
-                                                                    title="Aprovar e enviar Pix via API Asaas"
-                                                                >
-                                                                    <Check size={12} />
-                                                                    Aprovar Saque (Pix)
-                                                                </button>
+                                                        {(withdraw.status === 'pendente' || withdraw.status === 'processando') ? (
+                                                            <div className="flex items-center gap-3 justify-center">
+                                                                {withdraw.status === 'processando' && (
+                                                                    <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wider animate-pulse mr-2">
+                                                                        Processando (Asaas)...
+                                                                    </span>
+                                                                )}
                                                                 <button
                                                                     onClick={() => handleRejectWithdrawal(withdraw.id)}
                                                                     className="inline-flex items-center gap-1 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold rounded-lg transition-all border border-rose-100 cursor-pointer shadow-sm active:scale-95"
@@ -1993,10 +1990,6 @@ export default function AdminPage() {
                                                                     Rejeitar
                                                                 </button>
                                                             </div>
-                                                        ) : withdraw.status === 'processando' ? (
-                                                            <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wider animate-pulse">
-                                                                Aguardando Asaas...
-                                                            </span>
                                                         ) : (
                                                             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                                                                 Resolvido

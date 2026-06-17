@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { WithdrawRequest } from '@/models/WithdrawRequest';
 import { Resend } from 'resend';
+import { createAsaasPixTransfer } from '@/lib/asaas';
 
 // Inicializa a Resend (certifique-se de adicionar RESEND_API_KEY no .env.local)
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
@@ -35,15 +36,34 @@ export async function POST(request: NextRequest) {
 
         const amountToWithdraw = user.balance;
 
-        // 1. Cria o pedido de saque pendente
+        // 1. Iniciar transferência Pix automática no Asaas
+        let asaasTransferId = undefined;
+        try {
+            const transfer = await createAsaasPixTransfer(amountToWithdraw, user.pixKey);
+            asaasTransferId = transfer.id;
+        } catch (apiError: any) {
+            console.error('Erro ao chamar API do Asaas para transferência na criação do saque:', apiError);
+            
+            let message = 'Falha ao iniciar transferência no Asaas';
+            if (apiError.payload?.errors && apiError.payload.errors.length > 0) {
+                message = apiError.payload.errors.map((e: any) => e.description).join(', ');
+            }
+            
+            return NextResponse.json({ 
+                error: `Erro na API do Asaas: ${message}` 
+            }, { status: 400 });
+        }
+
+        // 2. Cria o pedido de saque como processando
         const withdrawRequest = await WithdrawRequest.create({
             userId: user.clerkId,
             amount: amountToWithdraw,
             pixKey: user.pixKey,
-            status: 'pendente',
+            status: 'processando',
+            asaasTransferId,
         });
 
-        // 2. Zera o saldo na carteira
+        // 3. Zera o saldo na carteira
         user.balance = 0;
         await user.save();
 
@@ -64,7 +84,7 @@ export async function POST(request: NextRequest) {
                             <li style="margin-bottom: 8px;"><strong>ID do Pedido:</strong> ${withdrawRequest._id}</li>
                             <li style="margin-bottom: 0;"><strong>Data:</strong> ${new Date().toLocaleString('pt-BR')}</li>
                         </ul>
-                        <p style="color: #475569; margin-bottom: 25px;">O saldo na carteira do usuário foi zerado e o pedido consta como <strong>pendente</strong> de aprovação.</p>
+                        <p style="color: #475569; margin-bottom: 25px;">O saldo na carteira do usuário foi zerado e o pedido consta como <strong>processando (enviado ao Asaas)</strong>.</p>
                         <a href="${appUrl}/admin?tab=withdrawals" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; text-align: center;">Aprovar ou Rejeitar Saque</a>
                     </div>
                 `,
@@ -110,7 +130,7 @@ export async function GET(request: NextRequest) {
 
         const pendingWithdrawal = await WithdrawRequest.findOne({ 
             userId: userId,
-            status: 'pendente'
+            status: { $in: ['pendente', 'processando'] }
         }).sort({ createdAt: -1 });
 
         return NextResponse.json({ pendingWithdrawal });

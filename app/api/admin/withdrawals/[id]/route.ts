@@ -49,31 +49,12 @@ export async function PATCH(
             return NextResponse.json({ error: 'Solicitação de saque não encontrada' }, { status: 404 });
         }
 
-        if (withdraw.status !== 'pendente') {
+        if (withdraw.status !== 'pendente' && withdraw.status !== 'processando') {
             return NextResponse.json({ error: 'Esta solicitação de saque já foi processada' }, { status: 400 });
         }
 
         if (action === 'approve') {
-            // APROVAR SAQUE VIA PIX AUTOMÁTICO DO ASAAS:
-            try {
-                const transfer = await createAsaasPixTransfer(withdraw.amount, withdraw.pixKey);
-                
-                withdraw.status = 'processando';
-                withdraw.asaasTransferId = transfer.id;
-                await withdraw.save();
-            } catch (apiError: any) {
-                console.error('Erro ao chamar API do Asaas para transferência:', apiError);
-                
-                let message = 'Falha ao iniciar transferência no Asaas';
-                if (apiError.payload?.errors && apiError.payload.errors.length > 0) {
-                    message = apiError.payload.errors.map((e: any) => e.description).join(', ');
-                }
-                
-                return NextResponse.json({ 
-                    error: `Erro na API do Asaas: ${message}` 
-                }, { status: 400 });
-            }
-
+            return NextResponse.json({ error: 'A aprovação pelo painel foi desativada. Libere o Pix diretamente na dashboard do Asaas.' }, { status: 400 });
         } else if (action === 'reject') {
             // REJEITAR SAQUE:
             // 1. Devolve o saldo retido para a profissional (no banco, em centavos)

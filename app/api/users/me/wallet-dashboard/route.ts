@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
         // 2. Saque pendente
         const pendingWithdrawal = await WithdrawRequest.findOne({
             userId: user.clerkId,
-            status: 'pendente'
+            status: { $in: ['pendente', 'processando'] }
         }).sort({ createdAt: -1 }).lean();
 
         // 3. Total sacado (concluído)
