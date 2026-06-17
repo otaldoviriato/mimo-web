@@ -1872,12 +1872,10 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                         </div>
                                                     )}
 
-                                                    {!isMine && (
-                                                        <LockedMediaTypeBadge
-                                                            isVideo={item.isVideo}
-                                                            duration={videoDurations[item._id]}
-                                                        />
-                                                    )}
+                                                    <LockedMediaTypeBadge
+                                                        isVideo={item.isVideo}
+                                                        duration={videoDurations[item._id]}
+                                                    />
 
                                                     {/* Progresso de upload circular para envio em background */}
                                                     {isMine && item.tempId && uploadTasks[item.tempId] && (
@@ -1940,10 +1938,15 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                         </div>
                                                     ) : (
                                                         (!item.tempId || !uploadTasks[item.tempId]) && (
-                                                            <div className="absolute top-2 right-2">
+                                                            <div className="absolute top-2 right-2 z-20">
                                                                 <div className="bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 flex items-center gap-1.5 shadow-md">
                                                                     <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                                                                    <span className="text-[8px] font-bold text-white uppercase tracking-wider">Aguardando</span>
+                                                                    <span className="text-[8px] font-bold text-white uppercase tracking-wider">
+                                                                        {item.lockedImagePrice && item.lockedImagePrice > 0 
+                                                                            ? `Aguardando • R$ ${((item.lockedImagePrice || 0) / 100).toFixed(2)}` 
+                                                                            : 'Aguardando'
+                                                                        }
+                                                                    </span>
                                                                 </div>
                                                             </div>
                                                         )
@@ -2028,6 +2031,25 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                                                                     <path d="M8 5v14l11-7z" />
                                                                 </svg>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Badges de informações para a profissional após o desbloqueio */}
+                                                    {isMine && (
+                                                        <LockedMediaTypeBadge
+                                                            isVideo={item.isVideo}
+                                                            duration={videoDurations[item._id]}
+                                                        />
+                                                    )}
+
+                                                    {isMine && item.lockedImagePrice! > 0 && (
+                                                        <div className="absolute top-2 right-2 z-20">
+                                                            <div className="bg-emerald-500/80 backdrop-blur-md px-2 py-1.5 rounded-lg border border-emerald-400/20 flex items-center gap-1.5 shadow-md animate-in fade-in duration-200">
+                                                                <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                                                                <span className="text-[8px] font-black text-white uppercase tracking-wider">
+                                                                    Desbloqueado • R$ {((item.lockedImagePrice || 0) / 100).toFixed(2)}
+                                                                </span>
                                                             </div>
                                                         </div>
                                                     )}
