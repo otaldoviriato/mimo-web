@@ -5,7 +5,7 @@ import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { useUserByUsername, usePublicGallery, useSubscribe, useMyProfile } from '@/hooks/useQueries';
-import { UserX, Briefcase, Camera, Lock } from 'lucide-react';
+import { UserX, Briefcase, Camera, Lock, Eye, EyeOff, X } from 'lucide-react';
 
 interface UserProfilePageProps {
     params?: Promise<{ username: string }>;
@@ -18,6 +18,8 @@ interface UserProfilePageProps {
 export default function UserProfilePage({ params, username: propUsername, onBack, isSubPage = false, isClosing = false }: UserProfilePageProps) {
     const router = useTransitionRouter();
     const [activeGalleryTab, setActiveGalleryTab] = useState<'public' | 'private'>('public');
+    const [revealedItems, setRevealedItems] = useState<Record<string, boolean>>({});
+    const [activeImage, setActiveImage] = useState<string | null>(null);
 
     let resolvedUsername = '';
     if (propUsername) {
@@ -335,10 +337,21 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                             <div className="grid grid-cols-3 gap-0.5 px-0.5">
                                 {galleryData?.items?.map((item: any) => {
                                     const isLocked = item.visibility === 'subscribers' && !isSubscriber && !isOwner;
+                                    const isOwnerSubscribersOnly = item.visibility === 'subscribers' && isOwner;
+                                    const isOwnerLocked = isOwnerSubscribersOnly && !revealedItems[item._id];
                                     return (
                                         <div key={item._id} className="relative aspect-square overflow-hidden bg-gray-100 group">
-                                            {isLocked ? (
-                                                <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-indigo-600 to-pink-500 flex flex-col items-center justify-center p-2.5 text-center select-none">
+                                            {isLocked || isOwnerLocked ? (
+                                                <div 
+                                                    onClick={() => {
+                                                        if (isOwnerLocked) {
+                                                            setActiveImage(item.imageUrl);
+                                                        } else {
+                                                            handleSubscribe();
+                                                        }
+                                                    }}
+                                                    className="absolute inset-0 bg-gradient-to-br from-purple-600 via-indigo-600 to-pink-500 flex flex-col items-center justify-center p-2.5 text-center select-none cursor-pointer"
+                                                >
                                                     {/* Textura geométrica de bolinhas */}
                                                     <div 
                                                         className="absolute inset-0 opacity-[0.15]" 
@@ -351,6 +364,19 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                                                     <div 
                                                         className="absolute inset-0 opacity-[0.08] bg-[linear-gradient(45deg,_rgba(255,255,255,0.15)_25%,_transparent_25%,_transparent_50%,_rgba(255,255,255,0.15)_50%,_rgba(255,255,255,0.15)_75%,_transparent_75%,_transparent)] bg-[size:16px_16px]" 
                                                     />
+                                                    
+                                                    {isOwnerLocked && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setRevealedItems(prev => ({ ...prev, [item._id]: true }));
+                                                            }}
+                                                            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/25 hover:bg-white/35 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-md transition-all active:scale-90 z-20"
+                                                            title="Revelar foto na galeria"
+                                                        >
+                                                            <Eye className="w-4 h-4 text-white" />
+                                                        </button>
+                                                    )}
                                                     
                                                     <div className="relative z-10 flex flex-col items-center gap-1">
                                                         <div className="w-7 h-7 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-md">
@@ -368,11 +394,37 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <img
-                                                    src={item.imageUrl}
-                                                    alt="Gallery item"
-                                                    className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
-                                                />
+                                                <div 
+                                                    className="w-full h-full relative cursor-pointer"
+                                                    onClick={() => setActiveImage(item.imageUrl)}
+                                                >
+                                                    <img
+                                                        src={item.imageUrl}
+                                                        alt="Gallery item"
+                                                        className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
+                                                    />
+                                                    {isOwnerSubscribersOnly && revealedItems[item._id] && (
+                                                        <>
+                                                            <div className="absolute bottom-2 left-2 bg-purple-600/90 text-[8px] font-black uppercase text-white px-1.5 py-0.5 rounded-md backdrop-blur-xs flex items-center gap-1 shadow-md z-10">
+                                                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                                                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                                                </svg>
+                                                                <span>Exclusivo</span>
+                                                            </div>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setRevealedItems(prev => ({ ...prev, [item._id]: false }));
+                                                                }}
+                                                                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md flex items-center justify-center border border-white/10 shadow-md transition-all active:scale-90 z-20"
+                                                                title="Ocultar foto na galeria"
+                                                            >
+                                                                <EyeOff className="w-4 h-4 text-white" />
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
                                             )}
                                         </div>
                                     );
@@ -399,11 +451,16 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                                                 </div>
                                             </div>
                                         ) : (
-                                            <img
-                                                src={item.imageUrl}
-                                                alt="Private Gallery item"
-                                                className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
-                                            />
+                                            <div 
+                                                className="w-full h-full cursor-pointer"
+                                                onClick={() => setActiveImage(item.imageUrl)}
+                                            >
+                                                <img
+                                                    src={item.imageUrl}
+                                                    alt="Private Gallery item"
+                                                    className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
+                                                />
+                                            </div>
                                         )}
                                     </div>
                                 ))}
@@ -450,6 +507,35 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                     )}
                 </div>
             </div>
+
+            {/* Lightbox para visualização de fotos em tela cheia */}
+            {activeImage && (
+                <div 
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md transition-all duration-300 animate-in fade-in animate-duration-200"
+                    onClick={() => setActiveImage(null)}
+                >
+                    <button 
+                        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all z-[110] active:scale-95"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveImage(null);
+                        }}
+                        title="Fechar visualização"
+                    >
+                        <X className="w-6 h-6" />
+                    </button>
+                    <div 
+                        className="relative max-w-[95vw] max-h-[85vh] flex items-center justify-center animate-in zoom-in-95 duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <img 
+                            src={activeImage} 
+                            alt="Visualização ampliada" 
+                            className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl border border-white/5"
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
