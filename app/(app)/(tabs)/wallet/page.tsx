@@ -2,9 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useMyProfile, useRequestWithdraw, usePendingWithdrawal, useUpdateProfile } from '@/hooks/useQueries';
+import { useMyProfile, useRequestWithdraw, usePendingWithdrawal, useUpdateProfile, useWithdrawalHistory } from '@/hooks/useQueries';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
-import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { Avatar } from '@/components/Avatar';
 import { 
@@ -39,7 +38,7 @@ interface EarningEvolutionPoint {
 interface WalletDashboardData {
     balance: number;
     totalWithdrawn: number;
-    pendingWithdrawal: any;
+    pendingWithdrawal: unknown;
     projectedMonthlyRecurring: number;
     earningsByCategory: {
         subscription: number;
@@ -66,13 +65,14 @@ export default function WalletPage() {
     const router = useTransitionRouter();
     const updateProfileMutation = useUpdateProfile();
     const requestWithdrawMutation = useRequestWithdraw();
-    const { data: pendingWithdrawalData, refetch: refetchPendingWithdrawal } = usePendingWithdrawal();
+    const { refetch: refetchPendingWithdrawal } = usePendingWithdrawal();
+    const { data: withdrawalsData, refetch: refetchWithdrawals } = useWithdrawalHistory();
 
     const [pixKey, setPixKey] = useState('');
     const [pixModalOpen, setPixModalOpen] = useState(false);
     const [withdrawConfirmModalOpen, setWithdrawConfirmModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [period, setPeriod] = useState<'month' | 'total'>('month');
+    const [isExpanded, setIsExpanded] = useState(false);
 
     const [showValues, setShowValues] = useState<boolean>(() => {
         if (typeof window !== 'undefined') {
@@ -92,10 +92,6 @@ export default function WalletPage() {
 
     const renderValue = (amountInCentavos: number) => {
         return showValues ? formatCurrency(amountInCentavos) : 'R$ ••••';
-    };
-
-    const renderCount = (count: number) => {
-        return showValues ? count : '••••';
     };
 
     // Estado da query de dashboard
@@ -123,7 +119,7 @@ export default function WalletPage() {
             await refetchProfile();
             setPixModalOpen(false);
             setWithdrawConfirmModalOpen(true);
-        } catch (error) {
+        } catch {
             alert('Erro ao salvar chave Pix');
         } finally {
             setLoading(false);
@@ -137,7 +133,8 @@ export default function WalletPage() {
             refetchProfile();
             refetchPendingWithdrawal();
             refetchDashboard();
-        } catch (error) {
+            refetchWithdrawals();
+        } catch {
             alert('Erro ao solicitar saque.');
         }
     };
@@ -301,82 +298,106 @@ export default function WalletPage() {
                     </div>
                 </div>
 
-                {/* ── BENTO BLOCK 2: GANHOS COM MENSAGENS & MÍDIAS (Coração da Monetização - Refinado & Dinâmico) ── */}
+                {/* ── BENTO BLOCK 2: HISTÓRICO DE SAQUES (Substitui Desempenho no Chat) ── */}
                 <div className="bg-white border border-purple-100/60 rounded-2xl p-5 shadow-[0_4px_20px_rgb(0,0,0,0.012)] flex flex-col gap-4">
                     <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                         <div className="flex items-center gap-2">
                             <div className="w-6.5 h-6.5 rounded-lg bg-slate-50 flex items-center justify-center text-slate-500 border border-slate-200/50 shrink-0">
-                                <MessageSquare className="w-3.5 h-3.5" />
+                                <Wallet2 className="w-3.5 h-3.5" />
                             </div>
                             <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wider">
-                                Desempenho no Chat
+                                Histórico de Saques
                             </span>
                         </div>
                         
-                        {/* Seletor Discreto de Período */}
-                        <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/40">
-                            <button
-                                onClick={() => setPeriod('month')}
-                                className={`px-2.5 py-1 text-[9px] font-extrabold rounded-md transition-all ${
-                                    period === 'month'
-                                        ? 'bg-white text-purple-700 shadow-sm border border-purple-100/30'
-                                        : 'text-slate-400 hover:text-slate-600'
-                                }`}
-                            >
-                                Este Mês
-                            </button>
-                            <button
-                                onClick={() => setPeriod('total')}
-                                className={`px-2.5 py-1 text-[9px] font-extrabold rounded-md transition-all ${
-                                    period === 'total'
-                                        ? 'bg-white text-purple-700 shadow-sm border border-purple-100/30'
-                                        : 'text-slate-400 hover:text-slate-600'
-                                }`}
-                            >
-                                Histórico
-                            </button>
+                        <div className="flex flex-col items-end">
+                            <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider leading-none">Total Sacado</span>
+                            <span className="text-sm font-black text-emerald-650 leading-tight">
+                                {renderValue(data.totalWithdrawn)}
+                            </span>
                         </div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex flex-col">
-                            <span className="text-[8.5px] text-slate-400 font-bold uppercase tracking-wider">Ganhos com Mensagens</span>
-                            <span className="text-xl font-extrabold text-slate-800 mt-1 leading-none tracking-tight">
-                                {renderValue(
-                                    period === 'month'
-                                        ? data.monthlyMessageEarnings
-                                        : data.totalMessageEarnings
-                                )}
-                            </span>
+                    {/* Lista de Saques */}
+                    {withdrawalsData === undefined ? (
+                        <div className="flex flex-col gap-2 py-4 animate-pulse">
+                            <div className="h-10 bg-slate-50 rounded-xl" />
+                            <div className="h-10 bg-slate-50 rounded-xl" />
+                            <div className="h-10 bg-slate-50 rounded-xl" />
                         </div>
-                        
-                        <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:border-l border-slate-100 pt-3 sm:pt-0 sm:pl-6 flex-1">
-                            <div>
-                                <span className="text-[7.5px] text-slate-400 font-bold uppercase block leading-none">Mensagens Recebidas</span>
-                                <span className="text-sm font-black text-slate-700 mt-1 block leading-tight">
-                                    {renderCount(period === 'month' ? data.monthlyMessagesCount : data.totalMessagesCount)}
-                                </span>
-                            </div>
-                            <div>
-                                <span className="text-[7.5px] text-slate-400 font-bold uppercase block leading-none">Valor Médio / Mensagem</span>
-                                <span className="text-sm font-black text-slate-700 mt-1 block leading-tight">
-                                    {renderValue(period === 'month' ? data.monthlyAverageEarningPerMessage : data.averageEarningPerMessage)}
-                                </span>
-                            </div>
-                            <div>
-                                <span className="text-[7.5px] text-slate-400 font-bold uppercase block leading-none">Mídias Desbloqueadas</span>
-                                <span className="text-sm font-black text-slate-700 mt-1 block leading-tight">
-                                    {renderCount(period === 'month' ? data.monthlyImageUnlocksCount : data.totalImageUnlocksCount)}
-                                </span>
-                            </div>
-                            <div>
-                                <span className="text-[7.5px] text-slate-400 font-bold uppercase block leading-none">Faturamento Mídias</span>
-                                <span className="text-sm font-black text-slate-700 mt-1 block leading-tight">
-                                    {renderValue(period === 'month' ? data.monthlyImageUnlockEarnings : data.totalImageUnlockEarnings)}
-                                </span>
-                            </div>
+                    ) : (withdrawalsData.withdrawals || []).length === 0 ? (
+                        <div className="flex flex-col items-center justify-center border border-dashed border-gray-150 rounded-xl py-8 gap-2 bg-slate-50/50">
+                            <span className="text-xl">💸</span>
+                            <p className="text-[10px] text-gray-400">Nenhum saque realizado ainda.</p>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="flex flex-col gap-2.5">
+                            {((withdrawalsData.withdrawals || []).slice(0, isExpanded ? undefined : 5)).map((w: { id: string; amount: number; status: string; createdAt: string }) => {
+                                const statusStyles = (() => {
+                                    switch (w.status) {
+                                        case 'concluido':
+                                            return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+                                        case 'processando':
+                                        case 'pendente':
+                                            return 'bg-amber-50 text-amber-700 border-amber-100';
+                                        case 'rejeitado':
+                                            return 'bg-red-50 text-red-700 border-red-100';
+                                        default:
+                                            return 'bg-slate-50 text-slate-700 border-slate-100';
+                                    }
+                                })();
+
+                                const statusLabel = (() => {
+                                    switch (w.status) {
+                                        case 'concluido': return 'Concluído';
+                                        case 'processando': return 'Processando';
+                                        case 'pendente': return 'Pendente';
+                                        case 'rejeitado': return 'Rejeitado';
+                                        default: return w.status;
+                                    }
+                                })();
+
+                                return (
+                                    <div key={w.id} className="flex items-center justify-between py-1 border-b border-gray-50 last:border-b-0">
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                                                w.status === 'concluido'
+                                                    ? 'bg-emerald-50 text-emerald-600'
+                                                    : w.status === 'rejeitado'
+                                                    ? 'bg-red-50 text-red-500'
+                                                    : 'bg-amber-50 text-amber-600'
+                                            }`}>
+                                                <ArrowUpRight className="w-3.5 h-3.5" />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <h4 className="text-[10px] font-bold text-gray-900 leading-tight">Saque via Pix</h4>
+                                                <p className="text-[8px] text-gray-400 mt-0.5">
+                                                    {new Date(w.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <span className="text-[10.5px] font-extrabold text-gray-800">
+                                                {renderValue(w.amount)}
+                                            </span>
+                                            <span className={`text-[8px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider border ${statusStyles}`}>
+                                                {statusLabel}
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            
+                            {(withdrawalsData.withdrawals || []).length > 5 && (
+                                <button
+                                    onClick={() => setIsExpanded(!isExpanded)}
+                                    className="text-[9px] font-extrabold text-purple-600 hover:text-purple-700 self-center py-1.5 px-3 rounded-lg bg-purple-50 hover:bg-purple-100/80 transition-all active:scale-[0.98] mt-1 border border-purple-100/30"
+                                >
+                                    {isExpanded ? 'Recolher histórico' : 'Carregar mais saques'}
+                                </button>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* ── BENTO BLOCK 3: TOP CLIENTES (FÃS VIP) (Terceiro Card) ── */}

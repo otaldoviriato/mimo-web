@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
         if (request.nextUrl.searchParams.get('history') === 'true') {
             const withdrawals = await WithdrawRequest.find({ userId })
                 .sort({ createdAt: -1 })
-                .limit(10)
+                .limit(50)
                 .lean();
 
             return NextResponse.json({
