@@ -85,9 +85,11 @@ export default function ChatsPage() {
     // Estado para o menu de opções da conversa (Drawer / Bottom Sheet)
     const [selectedRoomIdForMenu, setSelectedRoomIdForMenu] = useState<string | null>(null);
 
-    // Refs para controle de Long Press
+    // Refs para controle de Long Press e Scroll
     const longPressTimeout = useRef<NodeJS.Timeout | null>(null);
     const isLongPressActive = useRef(false);
+    const touchStartPos = useRef<{ x: number; y: number } | null>(null);
+    const hasMoved = useRef(false);
 
     // Estado e controle para verificação de identidade
     const prevStatusRef = useRef<string | null | undefined>(undefined);
@@ -413,17 +415,36 @@ export default function ChatsPage() {
         }
     };
 
-    const startPress = (roomId: string) => {
+    const startPress = (roomId: string, clientX: number, clientY: number) => {
         isLongPressActive.current = false;
+        hasMoved.current = false;
+        touchStartPos.current = { x: clientX, y: clientY };
+
         longPressTimeout.current = setTimeout(() => {
-            isLongPressActive.current = true;
-            setSelectedRoomIdForMenu(roomId);
-            if (typeof window !== 'undefined' && 'vibrate' in navigator) {
-                try {
-                    navigator.vibrate(40);
-                } catch (e) {}
+            if (!hasMoved.current) {
+                isLongPressActive.current = true;
+                setSelectedRoomIdForMenu(roomId);
+                if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+                    try {
+                        navigator.vibrate(40);
+                    } catch (e) {}
+                }
             }
         }, 500);
+    };
+
+    const movePress = (clientX: number, clientY: number) => {
+        if (!touchStartPos.current) return;
+        const dx = Math.abs(clientX - touchStartPos.current.x);
+        const dy = Math.abs(clientY - touchStartPos.current.y);
+
+        if (dx > 10 || dy > 10) {
+            hasMoved.current = true;
+            if (longPressTimeout.current) {
+                clearTimeout(longPressTimeout.current);
+                longPressTimeout.current = null;
+            }
+        }
     };
 
     const endPress = (e: React.MouseEvent | React.TouchEvent, onClickAction: () => void) => {
@@ -431,12 +452,15 @@ export default function ChatsPage() {
             clearTimeout(longPressTimeout.current);
             longPressTimeout.current = null;
         }
-        if (!isLongPressActive.current) {
-            onClickAction();
-        } else {
+
+        if (isLongPressActive.current || hasMoved.current) {
             e.preventDefault();
             e.stopPropagation();
+        } else {
+            onClickAction();
         }
+
+        touchStartPos.current = null;
     };
 
     const handleContextMenu = (e: React.MouseEvent, roomId: string) => {
@@ -693,15 +717,28 @@ export default function ChatsPage() {
                                 <li key={room._id}>
                                     <TouchableRipple
                                         onClick={(e) => endPress(e, handleItemClick)}
-                                        onMouseDown={() => startPress(derivedRoomId)}
+                                        onMouseDown={(e) => startPress(derivedRoomId, e.clientX, e.clientY)}
+                                        onMouseMove={(e) => movePress(e.clientX, e.clientY)}
                                         onMouseUp={(e) => endPress(e, handleItemClick)}
                                         onMouseLeave={() => {
                                             if (longPressTimeout.current) {
                                                 clearTimeout(longPressTimeout.current);
                                                 longPressTimeout.current = null;
                                             }
+                                            touchStartPos.current = null;
                                         }}
-                                        onTouchStart={() => startPress(derivedRoomId)}
+                                        onTouchStart={(e) => {
+                                            const touch = e.touches[0];
+                                            if (touch) {
+                                                startPress(derivedRoomId, touch.clientX, touch.clientY);
+                                            }
+                                        }}
+                                        onTouchMove={(e) => {
+                                            const touch = e.touches[0];
+                                            if (touch) {
+                                                movePress(touch.clientX, touch.clientY);
+                                            }
+                                        }}
                                         onTouchEnd={(e) => endPress(e, handleItemClick)}
                                         onContextMenu={(e) => handleContextMenu(e, derivedRoomId)}
                                         className="w-full flex items-center px-4 py-3.5 bg-white border-b border-gray-100 hover:bg-gray-50 transition-colors text-left select-none"
