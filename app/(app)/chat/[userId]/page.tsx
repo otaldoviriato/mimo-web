@@ -307,6 +307,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
     const [galleryVisible, setGalleryVisible] = useState(false);
     const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
+    const [fullscreenLockedMessage, setFullscreenLockedMessage] = useState<Message | null>(null);
     const [videoDurations, setVideoDurations] = useState<Record<string, number>>({});
     const swipeTouchStartX = useRef<number | null>(null);
     const swipeTouchStartY = useRef<number | null>(null);
@@ -323,7 +324,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const [useNativeTransition, setUseNativeTransition] = useState(false);
     const [viewportStyle, setViewportStyle] = useState<React.CSSProperties>({});
 
-    const isViewerOpen = fullscreenIndex !== null;
+    const isViewerOpen = fullscreenIndex !== null || fullscreenLockedMessage !== null;
 
     useEffect(() => {
         if (!isViewerOpen || typeof window === 'undefined') return;
@@ -332,6 +333,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
         const handlePopState = () => {
             setFullscreenIndex(null);
+            setFullscreenLockedMessage(null);
         };
 
         window.addEventListener('popstate', handlePopState);
@@ -1849,11 +1851,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                         const price = 'lockedImagePrice' in item ? item.lockedImagePrice : (item as any).lockedPrice;
                                                         handleUnlockImage(item._id, price || 0, item.isVideo);
                                                     } else {
-                                                        const url = item.isVideo ? item.videoUrl : item.originalImageUrl;
-                                                        if (url) {
-                                                            const idx = mediaItems.findIndex(m => m.url === url);
-                                                            setFullscreenIndex(idx >= 0 ? idx : 0);
-                                                        }
+                                                        setFullscreenLockedMessage(item);
                                                     }
                                                 }}>
                                                     {(item.isVideo ? item.thumbnailUrl : item.originalImageUrl) ? (
@@ -2734,6 +2732,68 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                     ))}
                                 </div>
                             )}
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* ===== VIEWER FULLSCREEN DEDICADO PARA MÍDIA BLOQUEADA (PROFISSIONAL) ===== */}
+            {fullscreenLockedMessage !== null && (() => {
+                const isVideo = !!fullscreenLockedMessage.isVideo;
+                const mediaUrl = isVideo ? fullscreenLockedMessage.videoUrl : fullscreenLockedMessage.originalImageUrl;
+                
+                return (
+                    <div className="fixed inset-0 z-[100] bg-black flex flex-col select-none overflow-hidden animate-in fade-in duration-200">
+                        {/* Container da mídia */}
+                        <div className="absolute inset-0 z-0 flex items-center justify-center" onClick={() => setControlsVisible(v => !v)}>
+                            {isVideo ? (
+                                <VideoPlayer
+                                    key={mediaUrl}
+                                    src={mediaUrl!}
+                                    isActive={true}
+                                    controlsVisible={controlsVisible}
+                                />
+                            ) : (
+                                <img
+                                    key={mediaUrl}
+                                    src={mediaUrl!}
+                                    className="max-w-full max-h-full object-contain"
+                                    alt="Mídia Bloqueada"
+                                />
+                            )}
+                        </div>
+
+                        {/* Controles flutuantes */}
+                        <div
+                            className="absolute inset-0 z-20 pointer-events-none"
+                            style={{
+                                opacity: controlsVisible ? 1 : 0,
+                                transition: 'opacity 400ms ease'
+                            }}
+                        >
+                            {/* Topo flutuante */}
+                            <div 
+                                className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pb-2 bg-gradient-to-b from-black/60 to-transparent" 
+                                style={{ paddingTop: 'max(24px, env(safe-area-inset-top))' }}
+                            >
+                                <button
+                                    className="w-10 h-10 rounded-full bg-black/45 flex items-center justify-center text-white hover:bg-black/60 active:scale-95 transition-all pointer-events-auto backdrop-blur-sm"
+                                    onClick={() => setFullscreenLockedMessage(null)}
+                                >
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18"/>
+                                        <line x1="6" y1="6" x2="18" y2="18"/>
+                                    </svg>
+                                </button>
+                                
+                                <div className="pointer-events-auto flex items-center gap-1.5 bg-black/55 border border-white/10 px-3 py-1.5 rounded-full backdrop-blur-md shadow-md animate-in fade-in duration-300">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                                    <span className="text-[10px] font-bold text-white uppercase tracking-wider">
+                                        Aguardando Abertura • R$ {((fullscreenLockedMessage.lockedImagePrice || 0) / 100).toFixed(2)}
+                                    </span>
+                                </div>
+                                <div className="w-10" />
+                            </div>
                         </div>
                     </div>
                 );
