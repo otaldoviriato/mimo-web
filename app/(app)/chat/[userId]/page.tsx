@@ -130,6 +130,37 @@ function formatLastSeen(isOnline?: boolean, lastSeenDateStr?: string | Date) {
     }
 }
 
+function formatSeparatorDate(timestamp: string | Date) {
+    try {
+        const date = new Date(timestamp);
+        const today = new Date();
+        
+        const dDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const dToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        
+        // Ontem
+        const dYesterday = new Date(dToday);
+        dYesterday.setDate(dYesterday.getDate() - 1);
+        
+        if (dDate.getTime() === dToday.getTime()) {
+            return 'Hoje';
+        }
+        
+        if (dDate.getTime() === dYesterday.getTime()) {
+            return 'Ontem';
+        }
+        
+        // Se for do mesmo ano, exibe apenas dia e mês por extenso. Caso contrário, exibe o ano também.
+        if (date.getFullYear() === today.getFullYear()) {
+            return date.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' });
+        }
+        
+        return date.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+    } catch {
+        return '';
+    }
+}
+
 interface EarningsIndicatorProps {
     messageId: string;
     receiverEarnings?: number;
@@ -1735,14 +1766,31 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                         </div>
                     </div>
                 )}
-                {[...messages].reverse().map((item) => {
+                {[...messages].reverse().map((item, index, arr) => {
                     const isMine = item.senderId === user?.id;
                     const isLocked = item.isLockedImage;
                     const isText = !item.isGift && !isLocked && !item.originalImageUrl && !item.isVideo;
+                    
+                    const nextItem = arr[index + 1];
+                    let shouldShowSeparator = false;
+                    if (!nextItem) {
+                        shouldShowSeparator = true;
+                    } else {
+                        const currentDate = new Date(item.timestamp);
+                        const nextDate = new Date(nextItem.timestamp);
+                        if (
+                            currentDate.getFullYear() !== nextDate.getFullYear() ||
+                            currentDate.getMonth() !== nextDate.getMonth() ||
+                            currentDate.getDate() !== nextDate.getDate()
+                        ) {
+                            shouldShowSeparator = true;
+                        }
+                    }
+                    
                     return (
-                        <div
-                            key={item._id}
-                            className={`flex ${isMine ? 'justify-end' : 'justify-start'} items-end ${isText ? 'mb-0.5' : 'mb-2'} -mx-4 px-4 py-0.5 transition-colors duration-300 ${selectedMessageIds.has(item._id) ? 'bg-purple-100/50' : ''} select-none no-select`}
+                        <React.Fragment key={item._id}>
+                            <div
+                                className={`flex ${isMine ? 'justify-end' : 'justify-start'} items-end ${isText ? 'mb-0.5' : 'mb-2'} -mx-4 px-4 py-0.5 transition-colors duration-300 ${selectedMessageIds.has(item._id) ? 'bg-purple-100/50' : ''} select-none no-select`}
                             onMouseDown={(e) => handleStartPress(item._id, e)}
                             onMouseMove={handleMovePress}
                             onMouseUp={handleEndPress}
@@ -2139,7 +2187,16 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                     )}
                                 </>
                             )}
-                        </div>
+                            </div>
+                            {shouldShowSeparator && (
+                                <div className="flex items-center gap-3 my-6 px-4 w-full">
+                                    <span className="text-[8.5px] font-black uppercase tracking-[0.15em] text-purple-600/75 dark:text-purple-400/80 whitespace-nowrap">
+                                        {formatSeparatorDate(item.timestamp)}
+                                    </span>
+                                    <div className="flex-1 h-[1px] bg-gradient-to-r from-purple-200/40 dark:from-purple-900/30 to-transparent" />
+                                </div>
+                            )}
+                        </React.Fragment>
                     );
                 })}
                         </div>
