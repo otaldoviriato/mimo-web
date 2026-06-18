@@ -74,6 +74,18 @@ interface ChatRoom {
     history: ChatMessage[];
 }
 
+interface WithdrawalRecord {
+    id: string;
+    amount: number;
+    pixKey: string;
+    status: 'pendente' | 'processando' | 'concluido' | 'rejeitado';
+    asaasTransferId?: string | null;
+    hiddenFromUser?: boolean;
+    hiddenFromUserAt?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
 export default function UserDetailPage() {
     const { isLoaded, isSignedIn, userId: adminUserId } = useAuth();
     const params = useParams();
@@ -88,6 +100,7 @@ export default function UserDetailPage() {
     // Estados do Formulário
     const [user, setUser] = useState<UserDetail | null>(null);
     const [gallery, setGallery] = useState<GalleryItemType[]>([]);
+    const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>([]);
 
     // Estados do Gerenciamento de Salas de Chat da Profissional
     const [rooms, setRooms] = useState<ChatRoom[]>([]);
@@ -201,6 +214,7 @@ export default function UserDetailPage() {
                     const data = await response.json();
                     setUser(data.user);
                     setGallery(data.gallery || []);
+                    setWithdrawals(data.withdrawals || []);
                     
                     // Preenche os states dos inputs
                     setName(data.user.name || '');
@@ -310,6 +324,36 @@ export default function UserDetailPage() {
             toast.error('Erro de conexão com o servidor.');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleHideWithdrawalFromUser = async (withdrawalId: string) => {
+        const confirmHide = window.confirm(
+            'Deseja ocultar esta retirada do histórico da profissional? Ela continuará visível no back-office para auditoria.'
+        );
+        if (!confirmHide) return;
+
+        try {
+            const response = await fetch(`/api/admin/withdrawals/${withdrawalId}`, {
+                method: 'DELETE',
+            });
+
+            if (response.ok) {
+                toast.success('Retirada ocultada do histórico da profissional.', {
+                    style: { borderRadius: '12px', background: '#1E293B', color: '#FFF', fontWeight: 600 }
+                });
+                setWithdrawals(prev => prev.map(item => (
+                    item.id === withdrawalId
+                        ? { ...item, hiddenFromUser: true, hiddenFromUserAt: new Date().toLocaleString('pt-BR') }
+                        : item
+                )));
+            } else {
+                const data = await response.json();
+                toast.error(data.error || 'Erro ao ocultar retirada.');
+            }
+        } catch (error) {
+            console.error('Erro ao ocultar retirada:', error);
+            toast.error('Erro de conexão com o servidor.');
         }
     };
 
@@ -804,6 +848,111 @@ export default function UserDetailPage() {
                                     Nenhuma foto na galeria desta profissional até o momento.
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {/* Histórico de Retiradas */}
+                    {isProfessional && (
+                        <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-6">
+                            <div>
+                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                                    <Coins size={16} className="text-purple-600" />
+                                    Histórico de Retiradas
+                                </h3>
+                                <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                                    Veja as retiradas solicitadas por esta profissional e oculte registros que não devem aparecer na carteira dela.
+                                </p>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+                                            <th className="py-4 px-6">Valor</th>
+                                            <th className="py-4 px-6">Chave Pix</th>
+                                            <th className="py-4 px-6">Solicitada em</th>
+                                            <th className="py-4 px-6">Status</th>
+                                            <th className="py-4 px-6 text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {withdrawals.length > 0 ? (
+                                            withdrawals.map((withdrawal) => (
+                                                <tr key={withdrawal.id} className="hover:bg-slate-50/40 transition-colors group">
+                                                    <td className="py-4 px-6">
+                                                        <span className="text-sm font-extrabold text-slate-800">
+                                                            {withdrawal.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-4 px-6">
+                                                        <span className="text-xs font-mono font-bold text-slate-700 bg-slate-100/80 px-2.5 py-1 rounded-lg border border-slate-200/60 w-fit break-all">
+                                                            {withdrawal.pixKey}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-4 px-6 text-xs text-slate-500 font-semibold">
+                                                        {withdrawal.createdAt}
+                                                    </td>
+                                                    <td className="py-4 px-6">
+                                                        <div className="flex flex-col items-start">
+                                                            <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                                                                withdrawal.status === 'concluido' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                                                withdrawal.status === 'processando' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                                                                withdrawal.status === 'pendente' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                                                'bg-rose-50 text-rose-700 border-rose-100'
+                                                            }`}>
+                                                                <span className={`w-1.5 h-1.5 rounded-full ${
+                                                                    withdrawal.status === 'concluido' ? 'bg-emerald-500' :
+                                                                    withdrawal.status === 'processando' ? 'bg-blue-500' :
+                                                                    withdrawal.status === 'pendente' ? 'bg-amber-500' : 'bg-rose-500'
+                                                                }`} />
+                                                                {withdrawal.status === 'concluido' ? 'Pago' :
+                                                                 withdrawal.status === 'processando' ? 'Processando' :
+                                                                 withdrawal.status === 'pendente' ? 'Pendente' : 'Recusada'}
+                                                            </span>
+                                                            {withdrawal.hiddenFromUser && (
+                                                                <span
+                                                                    className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200"
+                                                                    title={withdrawal.hiddenFromUserAt ? `Oculta em ${withdrawal.hiddenFromUserAt}` : 'Oculta do histórico da profissional'}
+                                                                >
+                                                                    <Eye size={10} className="opacity-60" />
+                                                                    Oculta da profissional
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-4 px-6 text-center">
+                                                        {withdrawal.hiddenFromUser ? (
+                                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                                                Já oculta
+                                                            </span>
+                                                        ) : withdrawal.status === 'pendente' || withdrawal.status === 'processando' ? (
+                                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                                                Em andamento
+                                                            </span>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleHideWithdrawalFromUser(withdrawal.id)}
+                                                                className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-bold rounded-lg transition-all border border-slate-200 cursor-pointer shadow-sm active:scale-95"
+                                                                title="Ocultar retirada do histórico da profissional"
+                                                            >
+                                                                <Trash2 size={12} />
+                                                                Ocultar
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={5} className="py-12 text-center text-xs font-semibold text-slate-400">
+                                                    Nenhuma retirada encontrada para esta profissional.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     )}
 

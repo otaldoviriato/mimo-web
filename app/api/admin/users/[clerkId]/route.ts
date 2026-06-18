@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { AppSettings } from '@/models/AppSettings';
 import { GalleryItem } from '@/models/GalleryItem';
+import { WithdrawRequest } from '@/models/WithdrawRequest';
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
@@ -41,13 +42,25 @@ export async function GET(
 
         // Buscar galeria do usuário
         const galleryItems = await GalleryItem.find({ ownerId: clerkId }).sort({ createdAt: -1 }).lean();
+        const withdrawals = await WithdrawRequest.find({ userId: clerkId }).sort({ createdAt: -1 }).lean() as any[];
 
         return NextResponse.json({
             user: {
                 ...userObj,
                 createdAt: userObj.createdAt ? new Date(userObj.createdAt).toLocaleDateString('pt-BR') : 'N/A',
             },
-            gallery: galleryItems
+            gallery: galleryItems,
+            withdrawals: withdrawals.map((withdrawal) => ({
+                id: withdrawal._id.toString(),
+                amount: withdrawal.amount / 100,
+                pixKey: withdrawal.pixKey,
+                status: withdrawal.status,
+                asaasTransferId: withdrawal.asaasTransferId || null,
+                hiddenFromUser: withdrawal.hiddenFromUser === true,
+                hiddenFromUserAt: withdrawal.hiddenFromUserAt ? new Date(withdrawal.hiddenFromUserAt).toLocaleString('pt-BR') : null,
+                createdAt: withdrawal.createdAt ? new Date(withdrawal.createdAt).toLocaleString('pt-BR') : 'N/A',
+                updatedAt: withdrawal.updatedAt ? new Date(withdrawal.updatedAt).toLocaleString('pt-BR') : 'N/A',
+            }))
         });
     } catch (error: any) {
         console.error('Erro ao obter detalhes do usuário pelo admin:', error);
