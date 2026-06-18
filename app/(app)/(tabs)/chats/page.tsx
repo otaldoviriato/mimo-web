@@ -736,7 +736,7 @@ export default function ChatsPage() {
                                 <li key={room._id}>
                                     <TouchableRipple
                                         onClick={handleItemClick}
-                                        onMouseDown={(e) => startPress(derivedRoomId, e.clientX, e.clientY)}
+                                        onMouseDown={(e) => startPress(room._id, e.clientX, e.clientY)}
                                         onMouseMove={(e) => movePress(e.clientX, e.clientY)}
                                         onMouseUp={endPress}
                                         onMouseLeave={() => {
@@ -749,7 +749,7 @@ export default function ChatsPage() {
                                         onTouchStart={(e) => {
                                             const touch = e.touches[0];
                                             if (touch) {
-                                                startPress(derivedRoomId, touch.clientX, touch.clientY);
+                                                startPress(room._id, touch.clientX, touch.clientY);
                                             }
                                         }}
                                         onTouchMove={(e) => {
@@ -759,7 +759,7 @@ export default function ChatsPage() {
                                             }
                                         }}
                                         onTouchEnd={endPress}
-                                        onContextMenu={(e) => handleContextMenu(e, derivedRoomId)}
+                                        onContextMenu={(e) => handleContextMenu(e, room._id)}
                                         className="w-full flex items-center px-4 py-3.5 bg-white border-b border-gray-100 hover:bg-gray-50 transition-colors text-left select-none"
                                     >
                                         <div className="relative shrink-0">

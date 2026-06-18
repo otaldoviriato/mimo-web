@@ -93,10 +93,16 @@ export async function POST(
         if (mongoose.Types.ObjectId.isValid(roomId)) {
             query = { _id: roomId };
         } else {
-            const parts = roomId.split('_');
-            const sortedParticipants = parts.length >= 4 
-                ? [`${parts[0]}_${parts[1]}`, `${parts[2]}_${parts[3]}`].sort() 
-                : [roomId];
+            let sortedParticipants: string[];
+            if (roomId.includes(userId)) {
+                const otherUserId = roomId.replace(userId, '').replace(/^_+|_+$/g, '');
+                sortedParticipants = [userId, otherUserId].sort();
+            } else {
+                const parts = roomId.split('_');
+                sortedParticipants = parts.length >= 4 
+                    ? [`${parts[0]}_${parts[1]}`, `${parts[2]}_${parts[3]}`].sort() 
+                    : [roomId];
+            }
             query = { participants: { $all: sortedParticipants } };
         }
 

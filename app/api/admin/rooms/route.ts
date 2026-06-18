@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
             }
 
             return {
-                id: roomIdStr,
+                id: room._id.toString(),
                 userA,
                 userB,
                 messagesCount,

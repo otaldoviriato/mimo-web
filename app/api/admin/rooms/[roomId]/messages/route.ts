@@ -42,7 +42,18 @@ export async function GET(
         const limitStr = searchParams.get('limit');
         const limit = limitStr ? parseInt(limitStr, 10) : 50;
 
-        const filter: any = { roomId };
+        let resolvedRoomIdStr = roomId;
+        const mongoose = require('mongoose');
+        if (mongoose.Types.ObjectId.isValid(roomId)) {
+            const { Room } = await import('@/models/Room');
+            const room = await Room.findById(roomId).lean() as any;
+            if (room) {
+                const sortedParticipants = [...room.participants].sort();
+                resolvedRoomIdStr = sortedParticipants.join('_');
+            }
+        }
+
+        const filter: any = { roomId: resolvedRoomIdStr };
         if (before) {
             filter.timestamp = { $lt: new Date(before) };
         }
