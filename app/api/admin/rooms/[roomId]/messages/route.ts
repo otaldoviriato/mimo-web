@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { Message } from '@/models/Message';
 import { AppSettings } from '@/models/AppSettings';
+import mongoose from 'mongoose';
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
@@ -43,7 +44,6 @@ export async function GET(
         const limit = limitStr ? parseInt(limitStr, 10) : 50;
 
         let resolvedRoomIdStr = roomId;
-        const mongoose = require('mongoose');
         if (mongoose.Types.ObjectId.isValid(roomId)) {
             const { Room } = await import('@/models/Room');
             const room = await Room.findById(roomId).lean() as any;

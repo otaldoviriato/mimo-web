@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/lib/db';
 import { Room } from '@/models/Room';
 import { Message } from '@/models/Message';
 import { AppSettings } from '@/models/AppSettings';
+import mongoose from 'mongoose';
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
@@ -34,7 +35,6 @@ export async function DELETE(
             return NextResponse.json({ error: 'Acesso proibido. Apenas administradores.' }, { status: 403 });
         }
 
-        const mongoose = require('mongoose');
         let roomIdStr = roomId;
         let participants: string[] = [];
 

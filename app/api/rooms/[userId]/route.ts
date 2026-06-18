@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { Room } from '@/models/Room';
 import { User } from '@/models/User';
+import mongoose from 'mongoose';
 
 export async function GET(
     request: NextRequest,
@@ -89,7 +90,6 @@ export async function POST(
         await connectToDatabase();
 
         let query: any;
-        const mongoose = require('mongoose');
         if (mongoose.Types.ObjectId.isValid(roomId)) {
             query = { _id: roomId };
         } else {

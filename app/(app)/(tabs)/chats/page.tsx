@@ -412,6 +412,36 @@ export default function ChatsPage() {
     const handleDeleteRoom = async (roomId: string) => {
         if (!user?.id) return;
         setIsDeleting(true);
+
+        const roomsKey = `mimo_rooms_${user.id}`;
+        const pendingKey = `mimo_pending_rooms_${user.id}`;
+        
+        const filterFn = (r: any) => 
+            r._id !== roomId && 
+            r.roomId !== roomId && 
+            (r.roomId ?? [...r.participants].sort().join('_')) !== roomId;
+
+        // Limpar do localStorage imediatamente para atualizar de forma otimista
+        try {
+            const cachedRooms = localStorage.getItem(roomsKey);
+            if (cachedRooms) {
+                localStorage.setItem(roomsKey, JSON.stringify(JSON.parse(cachedRooms).filter(filterFn)));
+            }
+        } catch (err) {}
+
+        try {
+            const cachedPending = localStorage.getItem(pendingKey);
+            if (cachedPending) {
+                localStorage.setItem(pendingKey, JSON.stringify(JSON.parse(cachedPending).filter(filterFn)));
+            }
+        } catch (err) {}
+
+        // Atualizar cache local do queryClient de forma imediata e otimista
+        queryClient.setQueryData(QueryKeys.rooms(user.id), (old: any[] | undefined) => {
+            if (!old) return [];
+            return old.filter(filterFn);
+        });
+
         try {
             const response = await fetch(`/api/rooms/${user.id}`, {
                 method: 'POST',
@@ -421,7 +451,8 @@ export default function ChatsPage() {
                 body: JSON.stringify({ roomId }),
             });
 
-            if (!response.ok) {
+            // Se for 404 (sala não encontrada no banco, ex: sala virtual pendente), ignoramos e prosseguimos
+            if (!response.ok && response.status !== 404) {
                 throw new Error('Falha ao excluir conversa');
             }
 
