@@ -533,6 +533,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const isFirstLoadRef = useRef(true);
+    const loadingMoreRef = useRef(false);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const typingTimeoutRef = useRef<any>(null);
@@ -1394,7 +1395,8 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 }
  
     const loadMoreMessages = async () => {
-        if (loadingMore || !hasMore || messages.length === 0) return;
+        if (loadingMoreRef.current || !hasMore || messages.length === 0) return;
+        loadingMoreRef.current = true;
         setLoadingMore(true);
 
         try {
@@ -1416,7 +1418,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     setHasMore(false);
                 }
                 if (newMessages.length > 0) {
-                    setMessages(prev => [...newMessages, ...prev]);
+                    setMessages(prev => {
+                        const existingIds = new Set(prev.map(m => m._id));
+                        const uniqueNewMessages = newMessages.filter(m => !existingIds.has(m._id));
+                        return [...uniqueNewMessages, ...prev];
+                    });
                 }
             } else {
                 setHasMore(false);
@@ -1424,6 +1430,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         } catch (error) {
             console.error('Erro ao carregar mais mensagens:', error);
         } finally {
+            loadingMoreRef.current = false;
             setLoadingMore(false);
         }
     };
@@ -1437,7 +1444,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         const scrollOffset = Math.abs(scrollTop);
         const isNearTop = scrollHeight - clientHeight - scrollOffset < 100;
 
-        if (isNearTop && hasMore && !loadingMore && messages.length > 0) {
+        if (isNearTop && hasMore && !loadingMoreRef.current && messages.length > 0) {
             await loadMoreMessages();
         }
     };
