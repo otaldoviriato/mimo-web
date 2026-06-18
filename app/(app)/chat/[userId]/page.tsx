@@ -536,6 +536,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const typingTimeoutRef = useRef<any>(null);
+    const partnerTypingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const [couponClaimModal, setCouponClaimModal] = useState(false);
     const [couponClaimAmount, setCouponClaimAmount] = useState<number | null>(null);
@@ -820,7 +821,26 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         });
 
         socket.on('user_typing', (data: { isTyping: boolean }) => {
-            setIsTyping(data.isTyping);
+            if (partnerTypingTimeoutRef.current) {
+                clearTimeout(partnerTypingTimeoutRef.current);
+                partnerTypingTimeoutRef.current = null;
+            }
+
+            if (data.isTyping) {
+                setIsTyping(true);
+                // Fallback automático de 5s caso o evento isTyping: false nunca chegue
+                partnerTypingTimeoutRef.current = setTimeout(() => {
+                    setIsTyping(false);
+                    partnerTypingTimeoutRef.current = null;
+                }, 5000);
+            } else {
+                // Ao parar de digitar, adicionamos um atraso de 2s para ocultar
+                // Isso previne que a tela pisque se o usuário parar e recomeçar logo em seguida
+                partnerTypingTimeoutRef.current = setTimeout(() => {
+                    setIsTyping(false);
+                    partnerTypingTimeoutRef.current = null;
+                }, 2000);
+            }
         });
 
         socket.on('messages_read', (data: { roomId: string; readBy: string }) => {
@@ -897,6 +917,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             socket.off('message_updated');
             socket.off('message_deleted');
             socket.off('room_read');
+
+            if (partnerTypingTimeoutRef.current) {
+                clearTimeout(partnerTypingTimeoutRef.current);
+                partnerTypingTimeoutRef.current = null;
+            }
         };
     }, [socket, socketVersion, roomId, otherUserId, user?.id, receiver, queryClient]);
 

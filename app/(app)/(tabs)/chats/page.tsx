@@ -72,6 +72,8 @@ export default function ChatsPage() {
 
     // Estado de "digitando" por sala: { [roomId]: boolean }
     const [typingRooms, setTypingRooms] = useState<Record<string, boolean>>({});
+    // Rastreia os timeouts ativos de digitação por sala para evitar conflitos concorrentes
+    const typingTimeouts = useRef<Record<string, NodeJS.Timeout>>({});
 
     // Modal de crédito promocional (gift code)
     const [giftModal, setGiftModal] = useState(false);
@@ -277,13 +279,28 @@ export default function ChatsPage() {
         // 3. Exibe "digitando..." por sala na lista
         // O servidor emite global_typing para user:${receiverId} sempre que alguém digita
         const handleGlobalTyping = (data: { roomId: string; userId: string; isTyping: boolean }) => {
-            setTypingRooms((prev) => ({ ...prev, [data.roomId]: data.isTyping }));
+            // Limpa qualquer timeout ativo anterior para esta sala (de exibição ou ocultação)
+            if (typingTimeouts.current[data.roomId]) {
+                clearTimeout(typingTimeouts.current[data.roomId]);
+                delete typingTimeouts.current[data.roomId];
+            }
 
-            // Auto-limpa após 3s como fallback (caso o evento isTyping=false não chegue)
             if (data.isTyping) {
-                setTimeout(() => {
+                // Mostra "digitando" imediatamente
+                setTypingRooms((prev) => ({ ...prev, [data.roomId]: true }));
+
+                // Auto-limpa após 5s como fallback (caso o evento isTyping=false não chegue)
+                typingTimeouts.current[data.roomId] = setTimeout(() => {
                     setTypingRooms((prev) => ({ ...prev, [data.roomId]: false }));
-                }, 3000);
+                    delete typingTimeouts.current[data.roomId];
+                }, 5000);
+            } else {
+                // Ao parar de digitar, adicionamos um atraso de 2s para ocultar
+                // Isso previne que a tela pisque se o usuário parar e recomeçar logo em seguida
+                typingTimeouts.current[data.roomId] = setTimeout(() => {
+                    setTypingRooms((prev) => ({ ...prev, [data.roomId]: false }));
+                    delete typingTimeouts.current[data.roomId];
+                }, 2000);
             }
         };
 
@@ -327,6 +344,10 @@ export default function ChatsPage() {
             socket.off('global_typing', handleGlobalTyping);
             socket.off('room_read', handleRoomRead);
             socket.off('room_deleted', handleRoomDeletedOnSocket);
+
+            // Limpa todos os timeouts de typing ativos
+            Object.values(typingTimeouts.current).forEach(clearTimeout);
+            typingTimeouts.current = {};
         };
     }, [socket, socketVersion, user?.id, queryClient]);
 
