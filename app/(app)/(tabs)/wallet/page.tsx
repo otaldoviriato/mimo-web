@@ -400,46 +400,6 @@ export default function WalletPage() {
                     )}
                 </div>
 
-                {/* ── BENTO BLOCK 3: TOP CLIENTES (FÃS VIP) (Terceiro Card) ── */}
-                <div className="bg-white border border-purple-100/60 rounded-2xl p-4 shadow-[0_4px_20px_rgb(0,0,0,0.015)] flex flex-col justify-between min-h-[220px]">
-                    <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
-                        <span className="text-xs text-gray-500 font-bold uppercase tracking-widest">
-                            Top Faturamento
-                        </span>
-                        <span className="text-[10.5px] text-purple-650 font-bold uppercase tracking-wider bg-purple-50 px-2 py-0.5 rounded-md border border-purple-100/50">Top 5</span>
-                    </div>
-
-                    {data.topCustomers && data.topCustomers.length > 0 ? (
-                        <div className="flex-1 flex flex-col gap-3 justify-center">
-                            {data.topCustomers.map((customer, index) => (
-                                <div key={customer.clerkId} className="flex items-center justify-between py-1 border-b border-gray-50 last:border-b-0">
-                                    <div className="flex items-center gap-2.5 min-w-0">
-                                        <div className="w-5.5 h-5.5 rounded-full flex items-center justify-center text-[10.5px] font-bold bg-slate-50 border border-gray-200 shrink-0 text-gray-500">
-                                            {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
-                                        </div>
-                                        <div className="p-[0.5px] bg-gradient-to-tr from-purple-500 to-indigo-500 rounded-full shrink-0">
-                                            <div className="bg-white p-[1px] rounded-full">
-                                                <Avatar uri={customer.photoUrl} size={24} />
-                                            </div>
-                                        </div>
-                                        <div className="min-w-0">
-                                            <h4 className="text-xs font-bold text-gray-900 truncate leading-tight">{customer.name}</h4>
-                                            <p className="text-[10px] text-gray-400 truncate mt-0.5">@{customer.username}</p>
-                                        </div>
-                                    </div>
-                                    <span className="text-xs font-extrabold text-purple-650 shrink-0 text-right">{renderValue(customer.totalSpent)}</span>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-gray-100 rounded-xl gap-1 py-6 bg-slate-50/50">
-                            <span className="text-base">👑</span>
-                            <p className="text-xs text-gray-400">Nenhum VIP listado ainda.</p>
-                        </div>
-                    )}
-                </div>
-
-
                 {/* ── BENTO BLOCK 5: GRÁFICO DE EVOLUÇÃO (Refinado, Compacto, SVG Roxo) ── */}
                 <div className="bg-white border border-purple-100/60 rounded-2xl p-4 shadow-[0_4px_20px_rgb(0,0,0,0.015)] flex flex-col justify-between min-h-[200px]">
                     <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
@@ -494,6 +454,45 @@ export default function WalletPage() {
                     ) : (
                         <div className="h-32 flex items-center justify-center text-xs text-gray-400 border border-dashed border-gray-200 rounded-xl">
                             Nenhum faturamento registrado nos últimos 15 dias.
+                        </div>
+                    )}
+                </div>
+
+                {/* ── BENTO BLOCK 3: TOP CLIENTES (FÃS VIP) (Terceiro Card) ── */}
+                <div className="bg-white border border-purple-100/60 rounded-2xl p-4 shadow-[0_4px_20px_rgb(0,0,0,0.015)] flex flex-col justify-between min-h-[220px]">
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
+                        <span className="text-xs text-gray-500 font-bold uppercase tracking-widest">
+                            Top Faturamento
+                        </span>
+                        <span className="text-[10.5px] text-purple-650 font-bold uppercase tracking-wider bg-purple-50 px-2 py-0.5 rounded-md border border-purple-100/50">Top 5</span>
+                    </div>
+
+                    {data.topCustomers && data.topCustomers.length > 0 ? (
+                        <div className="flex-1 flex flex-col gap-3 justify-center">
+                            {data.topCustomers.map((customer, index) => (
+                                <div key={customer.clerkId} className="flex items-center justify-between py-1 border-b border-gray-50 last:border-b-0">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="w-5.5 h-5.5 rounded-full flex items-center justify-center text-[10.5px] font-bold bg-slate-50 border border-gray-200 shrink-0 text-gray-500">
+                                            {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
+                                        </div>
+                                        <div className="p-[0.5px] bg-gradient-to-tr from-purple-500 to-indigo-500 rounded-full shrink-0">
+                                            <div className="bg-white p-[1px] rounded-full">
+                                                <Avatar uri={customer.photoUrl} size={24} />
+                                            </div>
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h4 className="text-xs font-bold text-gray-900 truncate leading-tight">{customer.name}</h4>
+                                            <p className="text-[10px] text-gray-400 truncate mt-0.5">@{customer.username}</p>
+                                        </div>
+                                    </div>
+                                    <span className="text-xs font-extrabold text-purple-650 shrink-0 text-right">{renderValue(customer.totalSpent)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-gray-100 rounded-xl gap-1 py-6 bg-slate-50/50">
+                            <span className="text-base">👑</span>
+                            <p className="text-xs text-gray-400">Nenhum VIP listado ainda.</p>
                         </div>
                     )}
                 </div>
