@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { useMyProfile, useRequestWithdraw, usePendingWithdrawal, useUpdateProfile, useWithdrawalHistory } from '@/hooks/useQueries';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Input } from '@/components/Input';
@@ -19,7 +20,11 @@ import {
     Key,
     Eye,
     EyeOff,
-    ShieldAlert
+    ShieldAlert,
+    Loader2,
+    CheckCircle2,
+    Clock3,
+    XCircle
 } from 'lucide-react';
 
 interface CustomerRanking {
@@ -65,7 +70,7 @@ export default function WalletPage() {
     const router = useTransitionRouter();
     const updateProfileMutation = useUpdateProfile();
     const requestWithdrawMutation = useRequestWithdraw();
-    const { refetch: refetchPendingWithdrawal } = usePendingWithdrawal();
+    const { data: pendingWithdrawal, refetch: refetchPendingWithdrawal } = usePendingWithdrawal();
     const { data: withdrawalsData, refetch: refetchWithdrawals } = useWithdrawalHistory();
 
     const [pixKey, setPixKey] = useState('');
@@ -73,6 +78,8 @@ export default function WalletPage() {
     const [withdrawConfirmModalOpen, setWithdrawConfirmModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
+    const [withdrawFeedback, setWithdrawFeedback] = useState<'created' | 'approved' | 'failed' | null>(null);
+    const [lastSeenWithdrawalStatus, setLastSeenWithdrawalStatus] = useState<string | null>(null);
 
     const [showValues, setShowValues] = useState<boolean>(() => {
         if (typeof window !== 'undefined') {
@@ -102,7 +109,7 @@ export default function WalletPage() {
             if (!res.ok) throw new Error('Falha ao buscar dados da carteira');
             return res.json();
         },
-        refetchInterval: 30 * 1005
+        refetchInterval: 30 * 1000
     });
 
     useEffect(() => {
@@ -128,31 +135,24 @@ export default function WalletPage() {
 
     const handleRequestWithdraw = async () => {
         try {
-            await requestWithdrawMutation.mutateAsync();
+            const response = await requestWithdrawMutation.mutateAsync();
             setWithdrawConfirmModalOpen(false);
-            refetchProfile();
-            refetchPendingWithdrawal();
-            refetchDashboard();
-            refetchWithdrawals();
-        } catch {
-            alert('Erro ao solicitar saque.');
+            setWithdrawFeedback('created');
+            toast.success('Saque criado. A transferência Pix já está em processamento.');
+            await Promise.all([
+                refetchProfile(),
+                refetchPendingWithdrawal(),
+                refetchDashboard(),
+                refetchWithdrawals(),
+            ]);
+            if (response?.withdrawRequest?.status) {
+                setLastSeenWithdrawalStatus(response.withdrawRequest.status);
+            }
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Erro ao solicitar saque.';
+            toast.error(message);
         }
     };
-
-    if (loadingDashboard) {
-        return (
-            <div className="flex flex-col h-full bg-slate-50 overflow-y-auto pb-16 animate-pulse">
-                {/* Header */}
-                <div className="bg-white border-b border-gray-100 px-5 h-[72px] shrink-0 flex items-center">
-                    <div className="h-6 w-32 bg-gray-150 rounded-lg" />
-                </div>
-                <div className="p-4 flex flex-col gap-4 max-w-3xl mx-auto w-full">
-                    <div className="h-36 bg-white rounded-2xl border border-gray-100 shadow-sm" />
-                    <div className="h-24 bg-white rounded-2xl border border-gray-100 shadow-sm" />
-                </div>
-            </div>
-        );
-    }
 
     const data = dashboardData || {
         balance: 0,
@@ -177,6 +177,59 @@ export default function WalletPage() {
     const formatCurrency = (amountInCentavos: number) => {
         return (amountInCentavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     };
+
+    const latestWithdrawal = withdrawalsData?.withdrawals?.[0] || null;
+    const activeWithdrawal = pendingWithdrawal || (
+        latestWithdrawal && ['pendente', 'processando'].includes(latestWithdrawal.status)
+            ? latestWithdrawal
+            : null
+    );
+    const hasActiveWithdrawal = Boolean(activeWithdrawal);
+    const withdrawAmount = Number((activeWithdrawal as { amount?: number } | null)?.amount || latestWithdrawal?.amount || 0);
+
+    useEffect(() => {
+        if (!latestWithdrawal) return;
+
+        if (!lastSeenWithdrawalStatus) {
+            setLastSeenWithdrawalStatus(latestWithdrawal.status);
+            return;
+        }
+
+        if (latestWithdrawal.status === lastSeenWithdrawalStatus) return;
+
+        setLastSeenWithdrawalStatus(latestWithdrawal.status);
+
+        if (latestWithdrawal.status === 'concluido') {
+            setWithdrawFeedback('approved');
+            toast.success(`Saque de ${formatCurrency(latestWithdrawal.amount)} realizado com sucesso.`);
+            refetchDashboard();
+            refetchProfile();
+            refetchPendingWithdrawal();
+        }
+
+        if (latestWithdrawal.status === 'rejeitado') {
+            setWithdrawFeedback('failed');
+            toast.error('O saque não foi concluído. O saldo será atualizado na carteira.');
+            refetchDashboard();
+            refetchProfile();
+            refetchPendingWithdrawal();
+        }
+    }, [latestWithdrawal, lastSeenWithdrawalStatus, refetchDashboard, refetchPendingWithdrawal, refetchProfile]);
+
+    if (loadingDashboard) {
+        return (
+            <div className="flex flex-col h-full bg-slate-50 overflow-y-auto pb-16 animate-pulse">
+                {/* Header */}
+                <div className="bg-white border-b border-gray-100 px-5 h-[72px] shrink-0 flex items-center">
+                    <div className="h-6 w-32 bg-gray-150 rounded-lg" />
+                </div>
+                <div className="p-4 flex flex-col gap-4 max-w-3xl mx-auto w-full">
+                    <div className="h-36 bg-white rounded-2xl border border-gray-100 shadow-sm" />
+                    <div className="h-24 bg-white rounded-2xl border border-gray-100 shadow-sm" />
+                </div>
+            </div>
+        );
+    }
 
     // Cálculos para o gráfico SVG de linha
     const points = data.earningsEvolution;
@@ -285,20 +338,68 @@ export default function WalletPage() {
                                     setWithdrawConfirmModalOpen(true);
                                 }
                             }}
-                            disabled={data.balance <= 0}
+                            disabled={data.balance <= 0 || hasActiveWithdrawal || requestWithdrawMutation.isPending}
                             className={`h-9 px-4 rounded-xl font-bold text-xs sm:text-sm tracking-wide uppercase transition-all active:scale-[0.97] flex items-center justify-center gap-1.5 shrink-0 shadow-sm ${
-                                data.balance <= 0
+                                data.balance <= 0 || hasActiveWithdrawal || requestWithdrawMutation.isPending
                                     ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none border border-slate-200/40'
                                     : 'bg-purple-600 hover:bg-purple-700 text-white shadow-purple-950/10'
                             }`}
                         >
-                            <ArrowDownRight className="w-3.5 h-3.5 shrink-0" />
-                            Sacar Saldo (PIX)
+                            {requestWithdrawMutation.isPending ? (
+                                <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" />
+                            ) : (
+                                <ArrowDownRight className="w-3.5 h-3.5 shrink-0" />
+                            )}
+                            {hasActiveWithdrawal ? 'Saque em andamento' : requestWithdrawMutation.isPending ? 'Criando saque...' : 'Sacar Saldo (PIX)'}
                         </button>
                     </div>
                 </div>
 
                 {/* ── BENTO BLOCK 2: HISTÓRICO DE SAQUES (Substitui Desempenho no Chat) ── */}
+                {(withdrawFeedback || hasActiveWithdrawal) && (
+                    <div className={`rounded-2xl border p-4 flex items-start gap-3 shadow-[0_4px_20px_rgb(0,0,0,0.012)] ${
+                        withdrawFeedback === 'approved'
+                            ? 'bg-emerald-50 border-emerald-100 text-emerald-800'
+                            : withdrawFeedback === 'failed'
+                            ? 'bg-red-50 border-red-100 text-red-800'
+                            : 'bg-amber-50 border-amber-100 text-amber-800'
+                    }`}>
+                        <div className="w-8 h-8 rounded-xl bg-white/70 border border-white/80 flex items-center justify-center shrink-0">
+                            {withdrawFeedback === 'approved' ? (
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            ) : withdrawFeedback === 'failed' ? (
+                                <XCircle className="w-4 h-4 text-red-600" />
+                            ) : (
+                                <Loader2 className="w-4 h-4 text-amber-600 animate-spin" />
+                            )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-xs font-black uppercase tracking-wider">
+                                {withdrawFeedback === 'approved'
+                                    ? 'Saque realizado'
+                                    : withdrawFeedback === 'failed'
+                                    ? 'Saque não concluído'
+                                    : withdrawFeedback === 'created'
+                                    ? 'Saque criado'
+                                    : 'Transferência Pix em processamento'}
+                            </p>
+                            <p className="text-xs leading-snug mt-1">
+                                {withdrawFeedback === 'approved'
+                                    ? `O Pix de ${formatCurrency(withdrawAmount)} foi confirmado.`
+                                    : withdrawFeedback === 'failed'
+                                    ? 'A transferência não foi concluída. Atualizaremos seu saldo automaticamente.'
+                                    : `Solicitação de ${formatCurrency(withdrawAmount)} enviada ao financeiro. Esta tela atualiza sozinha quando o Pix for aprovado.`}
+                            </p>
+                        </div>
+                        {hasActiveWithdrawal && (
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-1 rounded-lg bg-white/70 border border-white/80 shrink-0 flex items-center gap-1">
+                                <Clock3 className="w-3 h-3" />
+                                Ao vivo
+                            </span>
+                        )}
+                    </div>
+                )}
+
                 <div className="bg-white border border-purple-100/60 rounded-2xl p-5 shadow-[0_4px_20px_rgb(0,0,0,0.012)] flex flex-col gap-4">
                     <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                         <div className="flex items-center gap-2">
@@ -643,7 +744,14 @@ export default function WalletPage() {
                                 disabled={requestWithdrawMutation.isPending || data.balance <= 0}
                                 className="flex-1 h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center disabled:opacity-50"
                             >
-                                {requestWithdrawMutation.isPending ? 'Enviando...' : 'Confirmar'}
+                                {requestWithdrawMutation.isPending ? (
+                                    <span className="flex items-center gap-1.5">
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        Criando...
+                                    </span>
+                                ) : (
+                                    'Confirmar'
+                                )}
                             </button>
                         </div>
                     </div>

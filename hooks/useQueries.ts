@@ -15,6 +15,21 @@ import { userApi } from '@/services/api';
 
 const CHAT_SERVER_URL = process.env.NEXT_PUBLIC_CHAT_SERVER_URL || 'http://localhost:3001';
 
+type WithdrawalStatus = 'pendente' | 'processando' | 'concluido' | 'rejeitado';
+
+type WithdrawalHistoryResponse = {
+    withdrawals: Array<{
+        id: string;
+        amount: number;
+        status: WithdrawalStatus;
+        createdAt: string;
+    }>;
+};
+
+type PendingWithdrawalResponse = {
+    status?: WithdrawalStatus;
+} | null;
+
 // ─── Chaves de cache ────────────────────────────────────────────────────────
 export const QueryKeys = {
     me: ['user', 'me'] as const,
@@ -470,7 +485,13 @@ export function usePendingWithdrawal() {
         queryKey: ['withdraw', 'pending'],
         queryFn: async () => {
             const data = await userApi.getPendingWithdrawal();
-            return data.pendingWithdrawal ?? null;
+            return (data.pendingWithdrawal ?? null) as PendingWithdrawalResponse;
+        },
+        refetchInterval: (query: { state: { data?: PendingWithdrawalResponse } }) => {
+            const withdrawal = query.state.data;
+            return withdrawal?.status === 'pendente' || withdrawal?.status === 'processando'
+                ? 5000
+                : false;
         },
     });
 }
@@ -494,16 +515,17 @@ export function useWithdrawalHistory() {
         queryFn: async () => {
             const response = await fetch('/api/withdraw?history=true');
             if (!response.ok) return { withdrawals: [] };
-            return response.json() as Promise<{
-                withdrawals: Array<{
-                    id: string;
-                    amount: number;
-                    status: 'pendente' | 'concluido' | 'rejeitado';
-                    createdAt: string;
-                }>;
-            }>;
+            return response.json() as Promise<WithdrawalHistoryResponse>;
         },
-        staleTime: 60 * 1000,
+        refetchInterval: (query: { state: { data?: WithdrawalHistoryResponse } }) => {
+            const withdrawals = query.state.data?.withdrawals ?? [];
+            return withdrawals.some((withdrawal: { status: string }) =>
+                withdrawal.status === 'pendente' || withdrawal.status === 'processando'
+            )
+                ? 5000
+                : false;
+        },
+        staleTime: 5 * 1000,
     });
 }
 

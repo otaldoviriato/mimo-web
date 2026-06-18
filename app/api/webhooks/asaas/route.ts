@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Resend } from 'resend';
 import { connectToDatabase } from '@/lib/db';
 import { mapAsaasPaymentStatus } from '@/lib/asaas';
 import { sendPushNotification } from '@/lib/push';
 import { Transaction } from '@/models/Transaction';
 import { User } from '@/models/User';
 import { WithdrawRequest } from '@/models/WithdrawRequest';
+
+const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
 
 type AsaasWebhookBody = {
     id?: string;
@@ -78,6 +81,12 @@ export async function POST(request: NextRequest) {
                 withdraw.status = 'concluido';
                 await withdraw.save();
 
+                const user = await User.findOne({ clerkId: withdraw.userId });
+                const amountInReais = (withdraw.amount / 100).toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                });
+
                 const existingTx = await Transaction.findOne({ 'metadata.withdrawRequestId': withdraw._id.toString() });
                 if (!existingTx) {
                     await Transaction.create({
@@ -93,6 +102,43 @@ export async function POST(request: NextRequest) {
                             asaasTransferId: transferId
                         }
                     });
+                }
+
+                if (user) {
+                    await sendPushNotification(
+                        user.clerkId,
+                        'Saque realizado!',
+                        `Seu saque de ${amountInReais} foi enviado via Pix.`,
+                        {
+                            type: 'withdrawal_completed',
+                            amount: withdraw.amount,
+                            url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.mimochat.com.br'}/wallet`,
+                        }
+                    );
+
+                    if (user.email && process.env.RESEND_API_KEY) {
+                        try {
+                            await resend.emails.send({
+                                from: 'Mimo Financeiro <onboarding@resend.dev>',
+                                to: user.email,
+                                subject: `Saque de ${amountInReais} realizado`,
+                                html: `
+                                    <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #0f172a;">
+                                        <h2 style="margin: 0 0 12px; color: #0f172a;">Saque realizado com sucesso</h2>
+                                        <p style="font-size: 16px; line-height: 1.5; color: #334155;">Seu saque de <strong>${amountInReais}</strong> foi confirmado e enviado via Pix para a chave cadastrada.</p>
+                                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin: 20px 0;">
+                                            <p style="margin: 0 0 8px;"><strong>Valor:</strong> ${amountInReais}</p>
+                                            <p style="margin: 0 0 8px;"><strong>Status:</strong> Realizado</p>
+                                            <p style="margin: 0;"><strong>Data:</strong> ${new Date().toLocaleString('pt-BR')}</p>
+                                        </div>
+                                        <p style="font-size: 13px; color: #64748b;">Se você não reconhece essa movimentação, responda este e-mail ou fale com o suporte do Mimo.</p>
+                                    </div>
+                                `,
+                            });
+                        } catch (emailError) {
+                            console.error('Erro ao enviar e-mail de confirmação de saque:', emailError);
+                        }
+                    }
                 }
             } else if (event === 'TRANSFER_FAILED' || event === 'TRANSFER_CANCELLED') {
                 if (withdraw.status === 'rejeitado') {
