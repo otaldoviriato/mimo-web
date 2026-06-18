@@ -6,6 +6,9 @@ export interface IWithdrawRequest extends Document {
     pixKey: string;
     status: 'pendente' | 'processando' | 'concluido' | 'rejeitado';
     asaasTransferId?: string;
+    hiddenFromUser?: boolean;
+    hiddenFromUserAt?: Date;
+    hiddenFromUserBy?: string;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -33,6 +36,19 @@ const WithdrawRequestSchema = new Schema<IWithdrawRequest>({
         type: String,
         required: false,
         index: true,
+    },
+    hiddenFromUser: {
+        type: Boolean,
+        default: false,
+        index: true,
+    },
+    hiddenFromUserAt: {
+        type: Date,
+        required: false,
+    },
+    hiddenFromUserBy: {
+        type: String,
+        required: false,
     },
 }, {
     timestamps: true,

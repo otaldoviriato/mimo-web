@@ -122,6 +122,8 @@ interface WithdrawRequest {
     amount: number;
     pixKey: string;
     status: 'pendente' | 'processando' | 'concluido' | 'rejeitado';
+    hiddenFromUser?: boolean;
+    hiddenFromUserAt?: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -640,6 +642,37 @@ export default function AdminPage() {
             }
         } catch (error) {
             console.error('Erro ao rejeitar saque:', error);
+            toast.error('Erro de conexão com o servidor.');
+        }
+    };
+
+    const handleHideWithdrawalFromUser = async (id: string) => {
+        const confirmDelete = window.confirm(
+            'Deseja ocultar esta transferência do histórico da usuária? Ela continuará visível no back-office para auditoria.'
+        );
+        if (!confirmDelete) return;
+
+        try {
+            const response = await fetch(`/api/admin/withdrawals/${id}`, {
+                method: 'DELETE',
+            });
+
+            if (response.ok) {
+                toast.success('Transferência ocultada do histórico da usuária.', {
+                    style: {
+                        borderRadius: '12px',
+                        background: '#1E293B',
+                        color: '#FFF',
+                        fontWeight: 600,
+                    }
+                });
+                fetchWithdrawals();
+            } else {
+                const data = await response.json();
+                toast.error(data.error || 'Erro ao ocultar transferência.');
+            }
+        } catch (error) {
+            console.error('Erro ao ocultar saque:', error);
             toast.error('Erro de conexão com o servidor.');
         }
     };
@@ -1971,6 +2004,15 @@ export default function AdminPage() {
                                                              withdraw.status === 'processando' ? 'Processando (Asaas)' :
                                                              withdraw.status === 'pendente' ? 'Pendente' : 'Rejeitado'}
                                                         </span>
+                                                        {withdraw.hiddenFromUser && (
+                                                            <span
+                                                                className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200"
+                                                                title={withdraw.hiddenFromUserAt ? `Oculto em ${withdraw.hiddenFromUserAt}` : 'Oculto do histórico da usuária'}
+                                                            >
+                                                                <Eye size={10} className="opacity-60" />
+                                                                Oculto da usuária
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     {/* Ações */}
                                                     <td className="py-4 px-6 text-center">
@@ -1991,9 +2033,21 @@ export default function AdminPage() {
                                                                 </button>
                                                             </div>
                                                         ) : (
-                                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                                                                Resolvido
-                                                            </span>
+                                                            <div className="flex items-center gap-2 justify-center">
+                                                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                                                    Resolvido
+                                                                </span>
+                                                                {!withdraw.hiddenFromUser && (
+                                                                    <button
+                                                                        onClick={() => handleHideWithdrawalFromUser(withdraw.id)}
+                                                                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-bold rounded-lg transition-all border border-slate-200 cursor-pointer shadow-sm active:scale-95"
+                                                                        title="Ocultar transferência do histórico da usuária"
+                                                                    >
+                                                                        <Trash2 size={12} />
+                                                                        Ocultar
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                         )}
                                                     </td>
                                                 </tr>

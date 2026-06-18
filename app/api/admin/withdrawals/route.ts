@@ -51,6 +51,8 @@ export async function GET(request: NextRequest) {
                 amount: w.amount / 100, // Converte centavos para Reais
                 pixKey: w.pixKey,
                 status: w.status, // 'pendente' | 'concluido' | 'rejeitado'
+                hiddenFromUser: w.hiddenFromUser === true,
+                hiddenFromUserAt: w.hiddenFromUserAt ? new Date(w.hiddenFromUserAt).toLocaleString('pt-BR') : null,
                 createdAt: w.createdAt ? new Date(w.createdAt).toLocaleString('pt-BR') : 'N/A',
                 updatedAt: w.updatedAt ? new Date(w.updatedAt).toLocaleString('pt-BR') : 'N/A',
             };

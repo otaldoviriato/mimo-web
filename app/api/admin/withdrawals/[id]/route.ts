@@ -5,8 +5,6 @@ import { WithdrawRequest } from '@/models/WithdrawRequest';
 import { User } from '@/models/User';
 import { Transaction } from '@/models/Transaction';
 import { AppSettings } from '@/models/AppSettings';
-import { createAsaasPixTransfer } from '@/lib/asaas';
-
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
 export async function PATCH(
@@ -76,6 +74,57 @@ export async function PATCH(
 
     } catch (error: any) {
         console.error('Erro ao processar saque:', error);
+        return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+    }
+}
+
+export async function DELETE(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const { userId } = await auth();
+        if (!userId) {
+            return NextResponse.json({ error: 'NÃ£o autorizado' }, { status: 401 });
+        }
+
+        const { id } = await params;
+        if (!id) {
+            return NextResponse.json({ error: 'ID da solicitaÃ§Ã£o Ã© obrigatÃ³rio' }, { status: 400 });
+        }
+
+        await connectToDatabase();
+
+        const settings = await AppSettings.findOne({ key: 'global' });
+        const isAdmin = settings 
+            ? settings.adminClerkIds.includes(userId) || userId === FALLBACK_ADMIN 
+            : userId === FALLBACK_ADMIN;
+
+        if (!isAdmin) {
+            return NextResponse.json({ error: 'Acesso proibido. Apenas administradores.' }, { status: 403 });
+        }
+
+        const withdraw = await WithdrawRequest.findById(id);
+        if (!withdraw) {
+            return NextResponse.json({ error: 'SolicitaÃ§Ã£o de saque nÃ£o encontrada' }, { status: 404 });
+        }
+
+        if (withdraw.status === 'pendente' || withdraw.status === 'processando') {
+            return NextResponse.json({
+                error: 'SÃ³ Ã© possÃ­vel ocultar saques jÃ¡ resolvidos. Rejeite o saque antes se ele ainda estiver pendente ou processando.',
+            }, { status: 400 });
+        }
+
+        withdraw.hiddenFromUser = true;
+        withdraw.hiddenFromUserAt = new Date();
+        withdraw.hiddenFromUserBy = userId;
+        await withdraw.save();
+
+        console.log(`[MODERATION] Withdraw ${id} hidden from user by admin ${userId}`);
+
+        return NextResponse.json({ success: true });
+    } catch (error: any) {
+        console.error('Erro ao ocultar saque do usuÃ¡rio:', error);
         return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
     }
 }

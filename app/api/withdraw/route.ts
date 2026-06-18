@@ -113,7 +113,10 @@ export async function GET(request: NextRequest) {
         await connectToDatabase();
 
         if (request.nextUrl.searchParams.get('history') === 'true') {
-            const withdrawals = await WithdrawRequest.find({ userId })
+            const withdrawals = await WithdrawRequest.find({
+                userId,
+                hiddenFromUser: { $ne: true },
+            })
                 .sort({ createdAt: -1 })
                 .limit(50)
                 .lean();
@@ -130,7 +133,8 @@ export async function GET(request: NextRequest) {
 
         const pendingWithdrawal = await WithdrawRequest.findOne({ 
             userId: userId,
-            status: { $in: ['pendente', 'processando'] }
+            status: { $in: ['pendente', 'processando'] },
+            hiddenFromUser: { $ne: true },
         }).sort({ createdAt: -1 });
 
         return NextResponse.json({ pendingWithdrawal });

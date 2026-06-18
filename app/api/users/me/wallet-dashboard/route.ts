@@ -56,13 +56,15 @@ export async function GET(request: NextRequest) {
         // 2. Saque pendente
         const pendingWithdrawal = await WithdrawRequest.findOne({
             userId: user.clerkId,
-            status: { $in: ['pendente', 'processando'] }
+            status: { $in: ['pendente', 'processando'] },
+            hiddenFromUser: { $ne: true },
         }).sort({ createdAt: -1 }).lean();
 
         // 3. Total sacado (concluído)
         const completedWithdrawals = await WithdrawRequest.find({
             userId: user.clerkId,
-            status: 'concluido'
+            status: 'concluido',
+            hiddenFromUser: { $ne: true },
         });
         const totalWithdrawn = completedWithdrawals.reduce((sum, req) => sum + req.amount, 0);
 
