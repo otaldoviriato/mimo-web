@@ -339,6 +339,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const [showFreeMediaConfirm, setShowFreeMediaConfirm] = useState(false);
     const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
     const [galleryVisible, setGalleryVisible] = useState(false);
+    const [allMediaItemsLoaded, setAllMediaItemsLoaded] = useState<any[]>([]);
     const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
     const [fullscreenLockedMessage, setFullscreenLockedMessage] = useState<Message | null>(null);
     const [videoDurations, setVideoDurations] = useState<Record<string, number>>({});
@@ -468,9 +469,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         : undefined;
     const receiverBalance = receiver?.balance ?? cachedRoom?.otherUser?.balance ?? 0;
 
-    // Lista derivada das mensagens com mídia desbloqueada (imagens e vídeos)
+    // Lista derivada das mídias históricas carregadas combinadas com as mídias das mensagens locais
     const mediaItems = React.useMemo(() => {
-        return messages
+        const loadedUrls = new Set(allMediaItemsLoaded.map(item => item.url));
+        
+        const localMedias = messages
             .filter(m => {
                 if (m.isLockedImage) return false; // locked não entra
                 return m.originalImageUrl || (m.isVideo && m.videoUrl);
@@ -480,7 +483,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 thumbnailUrl: m.isVideo ? m.thumbnailUrl : m.originalImageUrl,
                 isVideo: !!m.isVideo,
             }));
-    }, [messages]);
+
+        const newLocalMedias = localMedias.filter(item => !loadedUrls.has(item.url));
+
+        return [...allMediaItemsLoaded, ...newLocalMedias];
+    }, [allMediaItemsLoaded, messages]);
 
     useEffect(() => {
         const videosToMeasure = messages.filter((message) => (
@@ -621,6 +628,23 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             localStorage.setItem(`mimo_messages_${currentRoomId}`, JSON.stringify(recentMessages));
         }
     }, [messages, user?.id, otherUserId, loadingMessages]);
+
+    // Busca mídias históricas do backend quando a galeria for aberta
+    useEffect(() => {
+        if (galleryVisible && roomId && user?.id) {
+            const fetchMedia = async () => {
+                try {
+                    const response = await axios.get(`/api/rooms/${user.id}/media`, {
+                        params: { roomId }
+                    });
+                    setAllMediaItemsLoaded(response.data);
+                } catch (error) {
+                    console.error('Erro ao carregar mídias da galeria:', error);
+                }
+            };
+            fetchMedia();
+        }
+    }, [galleryVisible, roomId, user?.id]);
 
     // Notifica que o DOM está pronto imediatamente na montagem para iniciar a transição sem delay (estilo nativo)
     useEffect(() => {
@@ -1383,9 +1407,10 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         const container = e.currentTarget;
         const { scrollTop, scrollHeight, clientHeight } = container;
 
-        // Em flex-col-reverse, o topo visual (mensagens antigas) é alcançado conforme scrollTop aumenta
-        // e se aproxima de scrollHeight - clientHeight.
-        const isNearTop = scrollHeight - clientHeight - scrollTop < 100;
+        // Em flex-col-reverse, no topo visual (mensagens antigas) o valor absoluto do scrollTop
+        // se aproxima de scrollHeight - clientHeight.
+        const scrollOffset = Math.abs(scrollTop);
+        const isNearTop = scrollHeight - clientHeight - scrollOffset < 100;
 
         if (isNearTop && hasMore && !loadingMore && messages.length > 0) {
             await loadMoreMessages();
