@@ -28,9 +28,10 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         console.log('[ASAAS_VALIDATE_WITHDRAW] Payload recebido:', JSON.stringify(body));
 
-        // O Asaas envia o payload da transferência (mesmo objeto que criamos na API)
-        const transferId = body.id;
-        const valueInReais = body.value;
+        // O Asaas pode enviar o objeto de transferência na raiz ou envelopado em "transfer"
+        const transferObj = body.transfer || body;
+        const transferId = transferObj.id;
+        const valueInReais = transferObj.value;
 
         if (!transferId || valueInReais === undefined) {
             console.error('[ASAAS_VALIDATE_WITHDRAW] Payload inválido. Faltando ID ou Value:', body);

@@ -315,6 +315,8 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
     const [messages, setMessages] = useState<Message[]>([]);
     const [loadingMessages, setLoadingMessages] = useState(true);
+    const [hasMore, setHasMore] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [messageText, setMessageText] = useState('');
     const [sending, setSending] = useState(false);
     const [newIncomingMessageIds, setNewIncomingMessageIds] = useState<Set<string>>(new Set());
@@ -611,11 +613,12 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         }
     }, [user?.id, otherUserId]);
 
-    // Salva mensagens no cache local sempre que elas mudarem
+    // Salva apenas as últimas 50 mensagens no cache local para não sobrecarregar o armazenamento
     useEffect(() => {
         if (typeof window !== 'undefined' && user?.id && otherUserId && !loadingMessages) {
             const currentRoomId = [user.id, otherUserId].sort().join('_');
-            localStorage.setItem(`mimo_messages_${currentRoomId}`, JSON.stringify(messages));
+            const recentMessages = messages.slice(-50);
+            localStorage.setItem(`mimo_messages_${currentRoomId}`, JSON.stringify(recentMessages));
         }
     }, [messages, user?.id, otherUserId, loadingMessages]);
 
@@ -666,6 +669,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         socket.on('room_joined', (data: { messages: Message[] }) => {
             setMessages([...data.messages]);
             setLoadingMessages(false);
+            if (data.messages.length < 50) {
+                setHasMore(false);
+            } else {
+                setHasMore(true);
+            }
             socket.emit('mark_as_read', { roomId });
 
             // Atualiza cache local de rooms
@@ -1335,6 +1343,54 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         </div>
     );
 }
+ 
+    const loadMoreMessages = async () => {
+        if (loadingMore || !hasMore || messages.length === 0) return;
+        setLoadingMore(true);
+
+        try {
+            const oldestMessage = messages[0];
+            const before = oldestMessage.timestamp;
+
+            const response = await axios.get(`/api/rooms/${user?.id}/messages`, {
+                params: {
+                    roomId,
+                    before,
+                    limit: 50
+                }
+            });
+
+            const newMessages = response.data;
+
+            if (newMessages && Array.isArray(newMessages)) {
+                if (newMessages.length < 50) {
+                    setHasMore(false);
+                }
+                if (newMessages.length > 0) {
+                    setMessages(prev => [...newMessages, ...prev]);
+                }
+            } else {
+                setHasMore(false);
+            }
+        } catch (error) {
+            console.error('Erro ao carregar mais mensagens:', error);
+        } finally {
+            setLoadingMore(false);
+        }
+    };
+
+    const handleScroll = async (e: React.UIEvent<HTMLDivElement>) => {
+        const container = e.currentTarget;
+        const { scrollTop, scrollHeight, clientHeight } = container;
+
+        // Em flex-col-reverse, o topo visual (mensagens antigas) é alcançado conforme scrollTop aumenta
+        // e se aproxima de scrollHeight - clientHeight.
+        const isNearTop = scrollHeight - clientHeight - scrollTop < 100;
+
+        if (isNearTop && hasMore && !loadingMore && messages.length > 0) {
+            await loadMoreMessages();
+        }
+    };
 
     const handleSend = () => {
         console.log('[handleSend] Tentando enviar mensagem. Texto:', messageText.trim().substring(0, 20), 'sending:', sending, 'socket:', !!socket);
@@ -1748,7 +1804,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             </div>
 
             {/* Messages */}
-            <div ref={messagesContainerRef} className={`flex-1 overflow-y-auto flex flex-col ${loadingMessages ? '' : 'flex-col-reverse'} gap-1`}>
+            <div ref={messagesContainerRef} onScroll={handleScroll} className={`flex-1 overflow-y-auto flex flex-col ${loadingMessages ? '' : 'flex-col-reverse'} gap-1`}>
                 {loadingMessages ? (
                     <MessageSkeleton />
                 ) : (
@@ -2199,6 +2255,14 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                         </React.Fragment>
                     );
                 })}
+                {loadingMore && (
+                    <div className="flex justify-center py-4 w-full">
+                        <svg className="animate-spin h-6 w-6 text-purple-600" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                    </div>
+                )}
                         </div>
                     </>
                 )}
