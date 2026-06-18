@@ -18,6 +18,7 @@ export const RESERVED_BASE_ROUTES = [
     '/search',
     '/profile',
     '/settings',
+    '/wallet',
     '/api',
     '/admin',
     '/verificacao-identidade',
