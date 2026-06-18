@@ -229,7 +229,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                 </div>
             </div>
 
-            <div className="p-4 flex flex-col gap-4 max-w-md w-full mx-auto pb-24">
+            <div className="p-4 flex flex-col gap-4 max-w-md w-full mx-auto pb-12">
                 {loadingProfile && !userData ? (
                     <div>
                         <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Dados do Perfil</p>
@@ -723,12 +723,14 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                                 <button
                                     onClick={() => setIsAboutExpanded(!isAboutExpanded)}
-                                    className="w-full px-4 py-3.5 flex items-center justify-between"
+                                    className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
                                 >
                                     <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-500">
-                                                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
+                                                <circle cx="12" cy="12" r="10"/>
+                                                <line x1="12" y1="16" x2="12" y2="12"/>
+                                                <line x1="12" y1="8" x2="12.01" y2="8"/>
                                             </svg>
                                         </div>
                                         <span className="text-sm font-medium text-gray-800">Sobre o MimoChat</span>
@@ -741,8 +743,8 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                     </svg>
                                 </button>
                                 {isAboutExpanded && (
-                                    <div className="border-t border-gray-50 animate-in fade-in slide-in-from-top-1 duration-150">
-                                        <div className="px-4 py-2.5 flex items-center justify-between border-b border-gray-50">
+                                    <div className="border-t border-gray-100 bg-gray-50/30 animate-in fade-in slide-in-from-top-1 duration-150">
+                                        <div className="px-4 py-2.5 flex items-center justify-between border-b border-gray-100">
                                             <span className="text-xs text-gray-400">Versão</span>
                                             <span className="text-xs font-semibold text-gray-700 tabular-nums">1.0.0</span>
                                         </div>
@@ -762,16 +764,18 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                 )}
 
                                 {/* Links de Conformidade Legal */}
-                                <div className="border-t border-gray-100 flex flex-col bg-gray-50/30">
+                                <div className="border-t border-gray-100 flex flex-col">
                                     <Link
                                         href="/ajuda"
-                                        className="px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100"
+                                        className="px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100"
                                     >
                                         <div className="flex items-center gap-3">
-                                            <div className="w-5 h-5 flex items-center justify-center text-xs">
-                                                💬
+                                            <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center">
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
+                                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                                </svg>
                                             </div>
-                                            <span className="text-xs text-gray-700 font-medium">Central de Ajuda & Suporte</span>
+                                            <span className="text-sm font-medium text-gray-800">Central de Ajuda & Suporte</span>
                                         </div>
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-gray-400">
                                             <polyline points="9 18 15 12 9 6"/>
@@ -780,13 +784,19 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                     <Link
                                         href="/termos-de-uso"
                                         target="_blank"
-                                        className="px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100"
+                                        className="px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100"
                                     >
                                         <div className="flex items-center gap-3">
-                                            <div className="w-5 h-5 flex items-center justify-center text-xs">
-                                                📜
+                                            <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center">
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
+                                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                                    <polyline points="14 2 14 8 20 8"/>
+                                                    <line x1="16" y1="13" x2="8" y2="13"/>
+                                                    <line x1="16" y1="17" x2="8" y2="17"/>
+                                                    <polyline points="10 9 9 9 8 9"/>
+                                                </svg>
                                             </div>
-                                            <span className="text-xs text-gray-700 font-medium">Termos de Uso</span>
+                                            <span className="text-sm font-medium text-gray-800">Termos de Uso</span>
                                         </div>
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-gray-400">
                                             <polyline points="9 18 15 12 9 6"/>
@@ -795,36 +805,21 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                     <Link
                                         href="/politica-de-privacidade"
                                         target="_blank"
-                                        className="px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100"
+                                        className="px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
                                     >
                                         <div className="flex items-center gap-3">
-                                            <div className="w-5 h-5 flex items-center justify-center text-xs">
-                                                🔒
+                                            <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center">
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
+                                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                                </svg>
                                             </div>
-                                            <span className="text-xs text-gray-700 font-medium">Política de Privacidade</span>
+                                            <span className="text-sm font-medium text-gray-800">Política de Privacidade</span>
                                         </div>
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-gray-400">
                                             <polyline points="9 18 15 12 9 6"/>
                                         </svg>
                                     </Link>
-                                    <a
-                                        href="https://www.instagram.com/mimochat.oficial/"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="px-4 py-3 flex items-center justify-between hover:bg-pink-50 transition-colors"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-5 h-5 flex items-center justify-center">
-                                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-pink-500">
-                                                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
-                                                </svg>
-                                            </div>
-                                            <span className="text-xs text-pink-600 font-semibold">@mimochat.oficial</span>
-                                        </div>
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-gray-400">
-                                            <polyline points="9 18 15 12 9 6"/>
-                                        </svg>
-                                    </a>
                                 </div>
                             </div>
                         </div>
@@ -844,6 +839,25 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                     </div>
                                     <span className="text-sm font-medium text-red-500">Sair da conta</span>
                                 </button>
+                            </div>
+                        </div>
+
+                        {/* ── FOOTER FORMAL ── */}
+                        <div className="mt-7 mb-2 flex flex-col items-center justify-center gap-2 text-center px-4">
+                            <a
+                                href="https://www.instagram.com/mimochat.oficial/"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 text-gray-500 hover:text-pink-600 transition-colors"
+                            >
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 hover:text-pink-500 transition-colors">
+                                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+                                </svg>
+                                <span className="text-xs font-semibold">@mimochat.oficial</span>
+                            </a>
+                            <div className="flex flex-col gap-1 text-[10px] text-gray-400">
+                                <p>© {new Date().getFullYear()} MimoChat. Todos os direitos reservados.</p>
+                                <p>LEAD CONTEUDOS DIGITAIS LTDA | CNPJ: 60.312.273/0001-01</p>
                             </div>
                         </div>
                     </>

@@ -4,7 +4,7 @@ import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useUser } from '@clerk/nextjs';
 import { useQueryClient } from '@tanstack/react-query';
-import { Avatar, TouchableRipple } from '@/components';
+import { Avatar, TouchableRipple, PullToRefresh } from '@/components';
 import { useChatRooms, useMyProfile, QueryKeys } from '@/hooks/useQueries';
 import { useSocket } from '@/hooks/useSocket';
 import { CheckCircle2, X, WalletCards, Crown, ShieldAlert, Clock, AlertCircle, ChevronRight, MessageCircle, Trash2 } from 'lucide-react';
@@ -722,7 +722,7 @@ export default function ChatsPage() {
             )}
 
             {/* List */}
-            <div className="flex-1 overflow-y-auto pb-16 md:pb-0 flex flex-col">
+            <PullToRefresh onRefresh={onRefresh} className="pb-16 md:pb-0">
                 {isLoading ? (
                     <ChatListSkeleton />
                 ) : rooms.length === 0 ? (
@@ -847,7 +847,7 @@ export default function ChatsPage() {
                         })}
                     </ul>
                 )}
-            </div>
+            </PullToRefresh>
 
         </div>
     );
