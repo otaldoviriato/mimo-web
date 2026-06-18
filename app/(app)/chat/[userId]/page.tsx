@@ -320,6 +320,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const [messageText, setMessageText] = useState('');
     const [sending, setSending] = useState(false);
     const [newIncomingMessageIds, setNewIncomingMessageIds] = useState<Set<string>>(new Set());
+    const [showNewMessagesBadge, setShowNewMessagesBadge] = useState(false);
     const [newUnlockedMediaIds, setNewUnlockedMediaIds] = useState<Set<string>>(new Set());
     const [isTyping, setIsTyping] = useState(false);
     const [menuVisible, setMenuVisible] = useState(false);
@@ -687,11 +688,25 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 isFirstLoadRef.current = false;
                 lastMessageIdRef.current = lastId;
             } else if (lastMessageIdRef.current !== lastId) {
-                scrollToBottom('smooth');
+                const sentByMe = lastMessage.senderId === user?.id;
+
+                const container = messagesContainerRef.current;
+                let userIsAtBottom = true;
+                if (container) {
+                    const { scrollTop } = container;
+                    userIsAtBottom = Math.abs(scrollTop) < 50;
+                }
+
+                if (sentByMe || userIsAtBottom) {
+                    scrollToBottom('smooth');
+                    setShowNewMessagesBadge(false);
+                } else {
+                    setShowNewMessagesBadge(true);
+                }
                 lastMessageIdRef.current = lastId;
             }
         }
-    }, [messages, loadingMessages]);
+    }, [messages, loadingMessages, user?.id]);
 
     useEffect(() => {
         if (!socket || !user?.id) return;
@@ -1445,9 +1460,14 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         const container = e.currentTarget;
         const { scrollTop, scrollHeight, clientHeight } = container;
 
+        const scrollOffset = Math.abs(scrollTop);
+
+        if (scrollOffset < 50) {
+            setShowNewMessagesBadge(false);
+        }
+
         // Em flex-col-reverse, no topo visual (mensagens antigas) o valor absoluto do scrollTop
         // se aproxima de scrollHeight - clientHeight.
-        const scrollOffset = Math.abs(scrollTop);
         const isNearTop = scrollHeight - clientHeight - scrollOffset < 100;
 
         if (isNearTop && hasMore && !loadingMoreRef.current && messages.length > 0) {
@@ -1866,8 +1886,10 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 )}
             </div>
 
-            {/* Messages */}
-            <div ref={messagesContainerRef} onScroll={handleScroll} className={`flex-1 overflow-y-auto flex flex-col ${loadingMessages ? '' : 'flex-col-reverse'} gap-1`}>
+            {/* Messages Container Wrapper */}
+            <div className="flex-1 relative overflow-hidden flex flex-col">
+                {/* Messages */}
+                <div ref={messagesContainerRef} onScroll={handleScroll} className={`flex-1 overflow-y-auto flex flex-col ${loadingMessages ? '' : 'flex-col-reverse'} gap-1`}>
                 {loadingMessages ? (
                     <MessageSkeleton />
                 ) : (
@@ -2328,6 +2350,27 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 )}
                         </div>
                     </>
+                )}
+                </div>
+
+                {/* Badge de novas mensagens */}
+                {showNewMessagesBadge && (
+                    <button
+                        onClick={() => {
+                            scrollToBottom('smooth');
+                            setShowNewMessagesBadge(false);
+                        }}
+                        className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4.5 py-2.5 rounded-full shadow-lg shadow-purple-500/20 hover:shadow-xl hover:shadow-purple-500/35 hover:scale-105 active:scale-95 transition-all duration-300 flex items-center gap-2 z-20 animate-in fade-in slide-in-from-bottom-4"
+                    >
+                        <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span>
+                        </span>
+                        <span className="text-xs font-bold tracking-wide">Novas mensagens</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="animate-bounce mt-0.5">
+                            <path d="M12 5v14M19 12l-7 7-7-7" />
+                        </svg>
+                    </button>
                 )}
             </div>
 
