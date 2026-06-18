@@ -93,7 +93,10 @@ export async function POST(
         if (mongoose.Types.ObjectId.isValid(roomId)) {
             query = { _id: roomId };
         } else {
-            const sortedParticipants = roomId.split('_').sort();
+            const parts = roomId.split('_');
+            const sortedParticipants = parts.length >= 4 
+                ? [`${parts[0]}_${parts[1]}`, `${parts[2]}_${parts[3]}`].sort() 
+                : [roomId];
             query = { participants: { $all: sortedParticipants } };
         }
 

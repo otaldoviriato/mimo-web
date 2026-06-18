@@ -24,7 +24,11 @@ export async function GET(
         }
 
         // Validar se o usuário faz parte da sala (segurança adicional)
-        const participants = roomId.split('_');
+        const parts = roomId.split('_');
+        const participants = parts.length >= 4 
+            ? [`${parts[0]}_${parts[1]}`, `${parts[2]}_${parts[3]}`] 
+            : [roomId];
+            
         if (!participants.includes(userId)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }

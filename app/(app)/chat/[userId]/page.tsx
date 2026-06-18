@@ -533,6 +533,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const isFirstLoadRef = useRef(true);
+    const lastMessageIdRef = useRef<string | null>(null);
     const loadingMoreRef = useRef(false);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -678,11 +679,16 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
     useEffect(() => {
         if (!loadingMessages && messages.length > 0) {
+            const lastMessage = messages[messages.length - 1];
+            const lastId = lastMessage._id;
+
             if (isFirstLoadRef.current) {
                 scrollToBottom('auto');
                 isFirstLoadRef.current = false;
-            } else {
+                lastMessageIdRef.current = lastId;
+            } else if (lastMessageIdRef.current !== lastId) {
                 scrollToBottom('smooth');
+                lastMessageIdRef.current = lastId;
             }
         }
     }, [messages, loadingMessages]);
