@@ -36,10 +36,20 @@ export async function GET(
             return NextResponse.json({ error: 'Acesso proibido. Apenas administradores.' }, { status: 403 });
         }
 
-        // 2. Buscar as mensagens da sala
-        const messages = await Message.find({ roomId })
-            .sort({ timestamp: 1 }) // Ordem cronológica para exibição no chat
-            .limit(100) // Limite de segurança de 100 mensagens
+        // 2. Buscar as mensagens da sala com paginação
+        const { searchParams } = new URL(request.url);
+        const before = searchParams.get('before');
+        const limitStr = searchParams.get('limit');
+        const limit = limitStr ? parseInt(limitStr, 10) : 50;
+
+        const filter: any = { roomId };
+        if (before) {
+            filter.timestamp = { $lt: new Date(before) };
+        }
+
+        const messages = await Message.find(filter)
+            .sort({ timestamp: -1 }) // Mais recente primeiro para buscar corretamente o final da conversa
+            .limit(limit)
             .lean() as any[];
 
         // 3. Mapear para o formato do frontend
@@ -52,14 +62,17 @@ export async function GET(
             const formattedTime = `${dateStr} às ${timeStr}`;
 
             return {
+                _id: msg._id.toString(),
                 sender: msg.senderId,
                 text: msg.content || '',
                 time: formattedTime,
                 cost: (msg.cost || 0) / 100, // converte centavos para reais
+                timestamp: msg.timestamp,
             };
         });
 
-        return NextResponse.json({ history: messagesMapped });
+        // Retorna em ordem cronológica (mais antiga primeiro)
+        return NextResponse.json({ history: messagesMapped.reverse() });
 
     } catch (error: any) {
         console.error('Erro na API de mensagens de sala do admin:', error);

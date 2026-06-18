@@ -61,6 +61,7 @@ interface ChatMessage {
     text: string;
     time: string;
     cost: number;
+    timestamp?: string;
 }
 
 interface ChatRoom {
@@ -106,6 +107,10 @@ export default function UserDetailPage() {
     const [rooms, setRooms] = useState<ChatRoom[]>([]);
     const [loadingRooms, setLoadingRooms] = useState(true);
     const [selectedAuditChat, setSelectedAuditChat] = useState<ChatRoom | null>(null);
+    const [auditLoadingMore, setAuditLoadingMore] = useState(false);
+    const [auditHasMore, setAuditHasMore] = useState(true);
+    const [isFirstAuditLoad, setIsFirstAuditLoad] = useState(false);
+    const auditContainerRef = useRef<HTMLDivElement>(null);
     const [galleryExpanded, setGalleryExpanded] = useState(false);
 
     // Inputs
@@ -152,21 +157,79 @@ export default function UserDetailPage() {
             ...chat,
             history: []
         });
+        setAuditHasMore(true);
+        setIsFirstAuditLoad(true);
 
         try {
-            const response = await fetch(`/api/admin/rooms/${chat.id}/messages`);
+            const response = await fetch(`/api/admin/rooms/${chat.id}/messages?limit=50`);
             if (response.ok) {
                 const data = await response.json();
+                const history = data.history || [];
                 setSelectedAuditChat({
                     ...chat,
-                    history: data.history || []
+                    history
                 });
+                setAuditHasMore(history.length === 50);
             } else {
                 toast.error('Erro ao buscar mensagens do chat.');
             }
         } catch (error) {
             console.error('Erro de conexão ao buscar mensagens:', error);
             toast.error('Erro de conexão com o servidor.');
+        }
+    };
+
+    // Auto-scroll para o fundo no carregamento inicial da auditoria
+    useEffect(() => {
+        if (selectedAuditChat && selectedAuditChat.history.length > 0 && isFirstAuditLoad && auditContainerRef.current) {
+            auditContainerRef.current.scrollTop = auditContainerRef.current.scrollHeight;
+            setIsFirstAuditLoad(false);
+        }
+    }, [selectedAuditChat, isFirstAuditLoad]);
+
+    // Paginação por scroll para carregar mensagens mais antigas na auditoria
+    const handleAuditScroll = async (e: React.UIEvent<HTMLDivElement>) => {
+        const container = e.currentTarget;
+        const { scrollTop } = container;
+
+        if (scrollTop < 50 && auditHasMore && !auditLoadingMore && selectedAuditChat && selectedAuditChat.history.length > 0) {
+            setAuditLoadingMore(true);
+            const oldestMsg = selectedAuditChat.history[0];
+            const before = oldestMsg.timestamp;
+
+            try {
+                const response = await fetch(`/api/admin/rooms/${selectedAuditChat.id}/messages?before=${before}&limit=50`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const newMessages = data.history || [];
+
+                    if (newMessages.length < 50) {
+                        setAuditHasMore(false);
+                    }
+
+                    if (newMessages.length > 0) {
+                        const previousScrollHeight = container.scrollHeight;
+                        const previousScrollTop = container.scrollTop;
+
+                        setSelectedAuditChat(prev => {
+                            if (!prev) return null;
+                            return {
+                                ...prev,
+                                history: [...newMessages, ...prev.history]
+                            };
+                        });
+
+                        requestAnimationFrame(() => {
+                            const newScrollHeight = container.scrollHeight;
+                            container.scrollTop = previousScrollTop + (newScrollHeight - previousScrollHeight);
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error('Erro ao carregar mais mensagens de auditoria:', err);
+            } finally {
+                setAuditLoadingMore(false);
+            }
         }
     };
 
@@ -1083,7 +1146,7 @@ export default function UserDetailPage() {
                         </div>
 
                         {/* Corpo do Modal - Balões de Chat */}
-                        <div className="flex-1 p-6 overflow-y-auto bg-slate-950/40 space-y-4 flex flex-col">
+                        <div ref={auditContainerRef} onScroll={handleAuditScroll} className="flex-1 p-6 overflow-y-auto bg-slate-950/40 space-y-4 flex flex-col">
                             {selectedAuditChat.history.map((msg, idx) => {
                                 const isUserA = msg.sender === selectedAuditChat.userA.clerkId;
                                 return (
