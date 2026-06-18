@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 
 export interface StackScreen {
     type: 'chat' | 'profile' | 'settings';
@@ -18,6 +18,20 @@ interface StackNavigationContextType {
 
 const StackNavigationContext = createContext<StackNavigationContextType | undefined>(undefined);
 
+function isSameVirtualScreen(screen: StackScreen | undefined, type: StackScreen['type'], params: any) {
+    if (!screen || screen.type !== type) return false;
+
+    if (type === 'chat') {
+        return screen.params?.userId === params?.userId;
+    }
+
+    if (type === 'profile') {
+        return screen.params?.username === params?.username;
+    }
+
+    return true;
+}
+
 export function StackNavigationProvider({ children }: { children: React.ReactNode }) {
     const [screens, setScreens] = useState<StackScreen[]>([]);
     const screensRef = useRef<StackScreen[]>([]);
@@ -29,7 +43,14 @@ export function StackNavigationProvider({ children }: { children: React.ReactNod
 
     const isManualPopRef = useRef(false);
 
-    const pushVirtual = (type: 'chat' | 'profile' | 'settings', params: any) => {
+    const pushVirtual = useCallback((type: 'chat' | 'profile' | 'settings', params: any) => {
+        const currentScreens = screensRef.current;
+        const topScreen = currentScreens[currentScreens.length - 1];
+
+        if (isSameVirtualScreen(topScreen, type, params)) {
+            return;
+        }
+
         const key = `${type}-${Date.now()}`;
         const newScreen: StackScreen = { type, key, params };
 
@@ -47,23 +68,28 @@ export function StackNavigationProvider({ children }: { children: React.ReactNod
             window.history.pushState({ isVirtual: true, key }, '', url);
         }
 
-        setScreens((prev) => [...prev, newScreen]);
-    };
+        const nextScreens = [...currentScreens, newScreen];
+        screensRef.current = nextScreens;
+        setScreens(nextScreens);
+    }, []);
 
-    const popVirtual = () => {
+    const popVirtual = useCallback(() => {
         const currentScreens = screensRef.current;
         if (currentScreens.length === 0) return;
 
         // Inicia animação de saída da última tela
         const lastScreen = currentScreens[currentScreens.length - 1];
-        
-        setScreens((prev) =>
-            prev.map((s) => (s.key === lastScreen.key ? { ...s, isClosing: true } : s))
-        );
+        if (lastScreen.isClosing) return;
+
+        const closingScreens = currentScreens.map((s) => (s.key === lastScreen.key ? { ...s, isClosing: true } : s));
+        screensRef.current = closingScreens;
+        setScreens(closingScreens);
 
         // Remove a tela definitivamente após a duração da animação (250ms)
         setTimeout(() => {
-            setScreens((prev) => prev.filter((s) => s.key !== lastScreen.key));
+            const nextScreens = screensRef.current.filter((s) => s.key !== lastScreen.key);
+            screensRef.current = nextScreens;
+            setScreens(nextScreens);
         }, 250);
 
         // CRÍTICO: se a URL atual foi empurrada via pushState pelo pushVirtual (isVirtual: true),
@@ -76,7 +102,7 @@ export function StackNavigationProvider({ children }: { children: React.ReactNod
             isManualPopRef.current = true;
             window.history.back();
         }
-    };
+    }, []);
 
     // Escuta o evento de voltar do navegador (gesto ou botão de voltar do Android/iOS)
     useEffect(() => {
@@ -108,7 +134,7 @@ export function StackNavigationProvider({ children }: { children: React.ReactNod
         return () => {
             window.removeEventListener('popstate', handlePopState);
         };
-    }, []);
+    }, [popVirtual]);
 
     const isVirtualActive = screens.length > 0;
 

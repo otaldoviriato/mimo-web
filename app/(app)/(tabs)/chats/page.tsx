@@ -468,7 +468,7 @@ export default function ChatsPage() {
         }
     };
 
-    const endPress = (e: React.MouseEvent | React.TouchEvent, onClickAction: () => void) => {
+    const endPress = (e: React.MouseEvent | React.TouchEvent) => {
         if (longPressTimeout.current) {
             clearTimeout(longPressTimeout.current);
             longPressTimeout.current = null;
@@ -477,8 +477,6 @@ export default function ChatsPage() {
         if (isLongPressActive.current || hasMoved.current) {
             e.preventDefault();
             e.stopPropagation();
-        } else {
-            onClickAction();
         }
 
         touchStartPos.current = null;
@@ -737,10 +735,10 @@ export default function ChatsPage() {
                             return (
                                 <li key={room._id}>
                                     <TouchableRipple
-                                        onClick={(e) => endPress(e, handleItemClick)}
+                                        onClick={handleItemClick}
                                         onMouseDown={(e) => startPress(derivedRoomId, e.clientX, e.clientY)}
                                         onMouseMove={(e) => movePress(e.clientX, e.clientY)}
-                                        onMouseUp={(e) => endPress(e, handleItemClick)}
+                                        onMouseUp={endPress}
                                         onMouseLeave={() => {
                                             if (longPressTimeout.current) {
                                                 clearTimeout(longPressTimeout.current);
@@ -760,7 +758,7 @@ export default function ChatsPage() {
                                                 movePress(touch.clientX, touch.clientY);
                                             }
                                         }}
-                                        onTouchEnd={(e) => endPress(e, handleItemClick)}
+                                        onTouchEnd={endPress}
                                         onContextMenu={(e) => handleContextMenu(e, derivedRoomId)}
                                         className="w-full flex items-center px-4 py-3.5 bg-white border-b border-gray-100 hover:bg-gray-50 transition-colors text-left select-none"
                                     >
