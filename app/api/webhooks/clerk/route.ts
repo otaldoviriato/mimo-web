@@ -54,20 +54,25 @@ export async function POST(req: Request) {
         const name = [first_name, last_name].filter(Boolean).join(' ') || generatedUsername;
         const email = email_addresses[0]?.email_address?.toLowerCase()?.trim();
 
-        const isProfessional = unsafe_metadata?.role === 'professional';
+        const roleMetadata = unsafe_metadata?.role;
+        const isProfessional = roleMetadata === 'professional' ? true : (roleMetadata === 'client' ? false : undefined);
         const professionalStatus = null; // Inicializa como null (verificação de identidade pendente de envio)
+
+        const updateSet: any = {
+            email: email_addresses[0]?.email_address,
+            username: generatedUsername,
+            name,
+            professionalStatus,
+            ...(image_url ? { photoUrl: image_url } : {}),
+        };
+        if (isProfessional !== undefined) {
+            updateSet.isProfessional = isProfessional;
+        }
 
         await User.findOneAndUpdate(
             { clerkId: id },
             {
-                $set: {
-                    email: email_addresses[0]?.email_address,
-                    username: generatedUsername,
-                    name,
-                    isProfessional,
-                    professionalStatus,
-                    ...(image_url ? { photoUrl: image_url } : {}),
-                },
+                $set: updateSet,
                 $setOnInsert: {
                     balance: 0, 
                     chargePerCharSubscribers: 0.002,
@@ -122,6 +127,7 @@ export async function POST(req: Request) {
 
         const currentUser = await User.findOne({ clerkId: id });
         if (currentUser) {
+
             if (isProfessional && !currentUser.isProfessional) {
                 updateData.isProfessional = true;
                 updateData.professionalStatus = null;

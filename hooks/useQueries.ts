@@ -38,8 +38,9 @@ export const QueryKeys = {
     userById: (userId: string) => ['user', userId] as const,
 } as const;
 
-// ─── Hook: dados do perfil do usuário logado ────────────────────────────────
 export function useMyProfile() {
+    const { user: clerkUser } = useUser();
+
     const query = useQuery({
         queryKey: QueryKeys.me,
         queryFn: async () => {
@@ -55,7 +56,13 @@ export function useMyProfile() {
                 const cached = localStorage.getItem('mimo_profile');
                 if (cached) {
                     try {
-                        return JSON.parse(cached);
+                        const parsed = JSON.parse(cached);
+                        // Ignora o cache se for de outro usuário logado no Clerk para evitar flashes visuais
+                        if (clerkUser?.id && parsed.clerkId !== clerkUser.id) {
+                            localStorage.removeItem('mimo_profile');
+                            return undefined;
+                        }
+                        return parsed;
                     } catch {
                         return undefined;
                     }

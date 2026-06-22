@@ -110,15 +110,7 @@ export default function LoginPage() {
             if (errCode === 'form_identifier_not_found') {
                 // Conta não existe — cria transparentemente sem o usuário perceber
                 try {
-                    const isProfessionalFlow = typeof window !== 'undefined' && (
-                        new URLSearchParams(window.location.search).get('role') === 'professional' ||
-                        localStorage.getItem('mimo_signup_flow') === 'professional'
-                    );
-
                     const signUpParams: any = { emailAddress: email };
-                    if (isProfessionalFlow) {
-                        signUpParams.unsafeMetadata = { role: 'professional' };
-                    }
 
                     await signUp!.create(signUpParams);
                     await signUp!.prepareEmailAddressVerification({ strategy: 'email_code' });
@@ -215,29 +207,12 @@ export default function LoginPage() {
         setError('');
 
         try {
-            const isProfessionalFlow = typeof window !== 'undefined' && (
-                new URLSearchParams(window.location.search).get('role') === 'professional' ||
-                localStorage.getItem('mimo_signup_flow') === 'professional'
-            );
-
-            if (isProfessionalFlow) {
-                // Se é fluxo profissional, inicia o fluxo do Google via signUp para registrar unsafeMetadata nativo no Clerk
-                await signUp.authenticateWithRedirect({
-                    strategy: 'oauth_google',
-                    redirectUrl: '/sso-callback',
-                    redirectUrlComplete: '/chats',
-                    unsafeMetadata: {
-                        role: 'professional'
-                    }
-                });
-            } else {
-                // Fluxo normal de cliente
-                await signIn.authenticateWithRedirect({
-                    strategy: 'oauth_google',
-                    redirectUrl: '/sso-callback',
-                    redirectUrlComplete: '/chats',
-                });
-            }
+            // Fluxo de autenticação agnóstico e padrão
+            await signIn.authenticateWithRedirect({
+                strategy: 'oauth_google',
+                redirectUrl: '/sso-callback',
+                redirectUrlComplete: '/chats',
+            });
         } catch (err: unknown) {
             setError(clerkError(err, 'Erro no login com Google'));
             setGoogleLoading(false);

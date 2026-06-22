@@ -5,7 +5,7 @@ import { useAuth, useUser } from '@clerk/nextjs';
 import { useRouter, usePathname } from 'next/navigation';
 import { setupAxiosInterceptors } from '@/services/api';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
-import { NotificationPromptModal } from '@/components';
+import { NotificationPromptModal, ProfileSelectionModal } from '@/components';
 import { StackNavigationProvider, useStackNavigation } from '@/context/StackNavigationContext';
 import { isReservedRoute } from '@/hooks/useTransitionRouter';
 import { useMyProfile } from '@/hooks/useQueries';
@@ -22,6 +22,10 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const { isLoaded, isSignedIn, getToken } = useAuth();
     const { user } = useUser();
     const { data: userData, refetch: refetchProfile } = useMyProfile();
+    
+    // Garante que o perfil carregado no cache/Query pertence ao usuário atualmente logado no Clerk
+    const isProfileValid = !!(userData && user && userData.clerkId === user.id);
+
     const router = useRouter();
     const pathname = usePathname();
     const { handleRequestPermission } = usePushNotifications();
@@ -67,41 +71,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         screensRef.current = screens;
     }, [screens]);
 
-    // Redirecionamento e inicialização para perfil profissional pendente
-    useEffect(() => {
-        if (!isLoaded || !isSignedIn || !userData || isProfessionalReleased === null) return;
 
-        const isProfessionalFlow = typeof window !== 'undefined' && localStorage.getItem('mimo_signup_flow') === 'professional';
-        
-        const handleProfessionalInit = async () => {
-            if (isProfessionalFlow && userData.isProfessional) {
-                localStorage.removeItem('mimo_signup_flow');
-                return;
-            }
-
-            if (isProfessionalFlow && !userData.isProfessional) {
-                try {
-                    const response = await fetch('/api/users/me/init-professional', { method: 'POST' });
-                    const data = await response.json();
-                    
-                    // Se a API indicar que a conta é antiga ou houver erro, limpa a flag e não faz nada
-                    if (data.reason === 'existing_account' || !response.ok) {
-                        localStorage.removeItem('mimo_signup_flow');
-                        return;
-                    }
-
-                    localStorage.removeItem('mimo_signup_flow');
-                    await refetchProfile();
-                    router.replace('/chats');
-                } catch (err) {
-                    console.error('Erro ao inicializar perfil profissional:', err);
-                }
-                return;
-            }
-        };
-
-        handleProfessionalInit();
-    }, [isLoaded, isSignedIn, userData, isProfessionalReleased, router, refetchProfile]);
 
     // Inicialização de roteamento para Deep Links no carregamento inicial da sessão
     useEffect(() => {
@@ -336,19 +306,19 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         );
     }
 
-    const isProfessionalFlow = typeof window !== 'undefined' && localStorage.getItem('mimo_signup_flow') === 'professional';
-    
     // Se o banco local oficial nos disser que o perfil é pendente, limpamos qualquer resíduo local de liberação anterior
-    if (typeof window !== 'undefined' && userData && userData.isProfessional && userData.professionalStatus === 'pending') {
+    if (typeof window !== 'undefined' && isProfileValid && userData.isProfessional && userData.professionalStatus === 'pending') {
         if (localStorage.getItem('mimo_professional_released') !== null) {
             localStorage.removeItem('mimo_professional_released');
         }
     }
 
-    // Evita hydration mismatch e vazamento visual enquanto carrega o perfil ou o estado de liberação local
-    const isResolvingSecurity = (isSignedIn && !userData) || (userData && userData.isProfessional && isProfessionalReleased === null);
 
-    if (isProfessionalFlow || isResolvingSecurity) {
+    // Evita hydration mismatch e vazamento visual enquanto carrega o perfil ou o estado de liberação local
+    const isResolvingSecurity = (isSignedIn && !isProfileValid) || (isProfileValid && userData.isProfessional && isProfessionalReleased === null);
+
+
+    if (isResolvingSecurity) {
         return (
             <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gradient-to-br from-[#4C1D95] via-[#6D28D9] to-[#8B5CF6] select-none">
                 <div className="flex flex-col items-center animate-fade-in-up">
@@ -381,6 +351,14 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     }
 
     if (!isSignedIn) return null;
+
+    // Se o perfil não foi selecionado (isProfessional está indefinido), exibe apenas a modal de escolha bloqueando o app
+    if (isProfileValid && userData.isProfessional === undefined) {
+        return (
+            <ProfileSelectionModal onSuccess={async () => { await refetchProfile(); }} />
+        );
+    }
+
 
     return (
         <div className="bg-slate-50 min-h-screen w-full relative overflow-hidden">

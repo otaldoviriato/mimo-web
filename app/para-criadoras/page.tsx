@@ -1048,7 +1048,7 @@ function ParaCriadorasContent() {
                 return (
                     <div className={`pt-1 flex items-center justify-center lg:justify-start gap-3 ${isExiting ? 'animate-slide-out-button' : 'animate-button-elastic'}`}>
                         <button
-                            onClick={nextStep}
+                            onClick={() => router.push('/login')}
                             className="w-full md:max-w-md py-4 lg:py-4.5 px-8 sm:px-10 text-sm sm:text-sm lg:text-base font-extrabold text-white bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 rounded-2xl transition shadow-xl shadow-purple-300/30 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] cursor-pointer"
                         >
                             Quero fazer parte do Mimo

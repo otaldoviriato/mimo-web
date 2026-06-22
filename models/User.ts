@@ -19,11 +19,12 @@ export interface IUser extends Document {
     name?: string;
     email: string;
     taxId?: string;
+    birthDate?: Date;
     phone?: string;
     photoUrl?: string;
     coverUrl?: string;
     balance: number;
-    isProfessional: boolean;
+    isProfessional?: boolean;
     professionalStatus?: 'pending' | 'approved' | 'rejected' | null;
     notes?: string;
     subscriptionPrice: number;
@@ -72,6 +73,9 @@ const UserSchema = new Schema<IUser>({
     taxId: {
         type: String,
     },
+    birthDate: {
+        type: Date,
+    },
     phone: {
         type: String,
     },
@@ -88,7 +92,6 @@ const UserSchema = new Schema<IUser>({
     },
     isProfessional: {
         type: Boolean,
-        default: false,
     },
     professionalStatus: {
         type: String,

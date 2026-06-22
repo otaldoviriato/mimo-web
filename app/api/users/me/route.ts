@@ -36,20 +36,25 @@ export async function GET() {
                 const cleanId = userId.startsWith('user_') ? userId.slice(5) : userId;
                 const username = clerkUser.username || `user_${cleanId.substring(Math.max(0, cleanId.length - 8))}`;
 
-                const isProfessional = clerkUser.unsafeMetadata?.role === 'professional';
+                const roleMetadata = clerkUser.unsafeMetadata?.role;
+                const isProfessional = roleMetadata === 'professional' ? true : (roleMetadata === 'client' ? false : undefined);
                 const professionalStatus = null; // Inicializa como null (verificação pendente de envio)
 
-                user = await User.create({
+                const userFields: any = {
                     clerkId: userId,
                     email: email,
                     username: username,
                     name: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' '),
                     balance: 0,
-                    isProfessional,
                     professionalStatus,
                     chargePerCharSubscribers: 0.002,
                     chargePerCharNonSubscribers: 0.005,
-                });
+                };
+                if (isProfessional !== undefined) {
+                    userFields.isProfessional = isProfessional;
+                }
+
+                user = await User.create(userFields);
 
                 if (isProfessional) {
                     try {
@@ -88,6 +93,16 @@ export async function GET() {
                 }
             }
         } else {
+            // Se o usuário antigo não tiver o isProfessional definido no MongoDB, considera cliente (false)
+            // se a conta tiver mais de 10 minutos (para evitar pegar contas que acabaram de ser criadas)
+            if (user.isProfessional === undefined) {
+                const isOldAccount = user.createdAt ? (Date.now() - new Date(user.createdAt).getTime() > 600000) : true;
+                if (isOldAccount) {
+                    user.isProfessional = false;
+                    await user.save();
+                }
+            }
+
             // O usuário já existe no MongoDB. Sincroniza o status profissional se houver discrepância com o Clerk
             try {
                 const client = await clerkClient();
@@ -317,7 +332,7 @@ export async function PATCH(request: NextRequest) {
             { returnDocument: 'after', runValidators: true, upsert: true }
         );
 
-        // Se isProfessional mudou, deleta todas as conversas do usuário
+        // Se isProfessional mudou, deleta todas as conversas do usuário e atualiza metadados
         if (isProfessionalChanging) {
             const rooms = await Room.find({ participants: userId }).select('_id').lean();
             const roomIds = rooms.map((r: any) => r._id);
@@ -326,6 +341,49 @@ export async function PATCH(request: NextRequest) {
                 Room.deleteMany({ participants: userId }),
                 Message.deleteMany({ roomId: { $in: roomIds } }),
             ]);
+
+            // Sincroniza metadados no Clerk
+            try {
+                const client = await clerkClient();
+                await client.users.updateUserMetadata(userId, {
+                    unsafeMetadata: {
+                        role: isProfessional ? 'professional' : 'client'
+                    }
+                });
+                console.log(`[PATCH /api/users/me] Clerk unsafeMetadata atualizado para role "${isProfessional ? 'professional' : 'client'}" para o usuário ${userId}`);
+            } catch (clerkErr) {
+                console.error('[PATCH /api/users/me] Erro ao atualizar metadados no Clerk:', clerkErr);
+            }
+
+            // Se mudou para profissional, dispara o e-mail administrativo e define professionalStatus = null
+            if (isProfessional) {
+                user.professionalStatus = null;
+                await user.save();
+
+                try {
+                    await resend.emails.send({
+                        from: 'Mimo Cadastro <onboarding@resend.dev>',
+                        to: 'viriatoceo@gmail.com',
+                        subject: `Nova Conta de Criadora Criada - @${user.username}`,
+                        html: `
+                            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                                <h2 style="color: #6d28d9; margin-top: 0;">Nova Profissional Cadastrada</h2>
+                                <p style="color: #475569; font-size: 16px;">Uma nova conta de criadora foi criada e está pendente de verificação de identidade/documentos.</p>
+                                <ul style="background-color: #f8fafc; padding: 15px 25px; border-radius: 6px; list-style-type: none; margin: 20px 0;">
+                                    <li style="margin-bottom: 8px;"><strong>Nome:</strong> ${user.name || user.username}</li>
+                                    <li style="margin-bottom: 8px;"><strong>E-mail:</strong> ${user.email}</li>
+                                    <li style="margin-bottom: 8px;"><strong>Username:</strong> @${user.username}</li>
+                                    <li style="margin-bottom: 0;"><strong>Data de Cadastro:</strong> ${new Date().toLocaleString('pt-BR')}</li>
+                                </ul>
+                                <p style="color: #475569;">O perfil só aparecerá no painel de moderação de documentos após o envio de fotos do documento e selfie de maioridade (+18) pela própria criadora.</p>
+                            </div>
+                        `
+                    });
+                    console.log(`[PATCH /api/users/me] E-mail de notificação de profissional enviado.`);
+                } catch (emailErr) {
+                    console.error('[PATCH /api/users/me] Erro ao enviar e-mail de notificação:', emailErr);
+                }
+            }
         }
 
         return NextResponse.json({
