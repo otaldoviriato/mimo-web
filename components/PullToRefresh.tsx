@@ -96,7 +96,7 @@ export function PullToRefresh({ onRefresh, children, className = '' }: PullToRef
     return (
         <div 
             ref={containerRef} 
-            className={`relative flex-1 overflow-y-auto flex flex-col ${className}`}
+            className={`relative flex-1 overflow-y-auto overflow-x-hidden flex flex-col ${className}`}
             style={{
                 WebkitOverflowScrolling: 'touch',
             }}

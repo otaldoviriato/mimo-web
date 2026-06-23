@@ -229,7 +229,7 @@ export default function ProfilePage() {
     // ─── LAYOUT CREATOR (PROFISSIONAL) ───────────────────────────────────────
     if (isProfessional) {
         return (
-            <div className="flex flex-col h-full bg-slate-50 relative">
+            <div className="flex flex-col h-full bg-slate-50 relative overflow-hidden max-w-full">
                 <PullToRefresh onRefresh={onRefreshCreator} className="pb-28 no-scrollbar">
                 {/* Efeitos de Fundo Aurora */}
                 <div className="absolute top-[-10%] left-[-20%] w-[350px] h-[350px] rounded-full bg-purple-400/15 blur-[100px] pointer-events-none select-none z-0" />
@@ -591,7 +591,7 @@ export default function ProfilePage() {
     }));
 
     return (
-        <div className="flex flex-col h-full bg-slate-50 relative">
+        <div className="flex flex-col h-full bg-slate-50 relative overflow-hidden max-w-full">
             {/* Efeito de Fundo Aurora (Esferas Desfocadas Modernas) */}
             <div className="absolute top-[-10%] left-[-20%] w-[350px] h-[350px] rounded-full bg-purple-400/15 blur-[100px] pointer-events-none select-none z-0" />
             <div className="absolute top-[35%] right-[-15%] w-[300px] h-[300px] rounded-full bg-pink-400/12 blur-[90px] pointer-events-none select-none z-0" />

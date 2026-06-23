@@ -95,31 +95,31 @@ export default function VerificationPage() {
         switch (step) {
             case 'form':
                 return (
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                    <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
                         <div className="text-center">
-                            <div className="mx-auto w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600 mb-3">
-                                <ShieldCheck className="w-6 h-6" />
+                            <div className="mx-auto w-10 h-10 sm:w-12 sm:h-12 bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600 mb-2 sm:mb-3">
+                                <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6" />
                             </div>
-                            <h2 className="text-xl font-bold text-gray-900">Confirme seus dados para continuar</h2>
-                            <p className="text-sm text-gray-500 mt-1.5 leading-relaxed max-w-[320px] mx-auto">
+                            <h2 className="text-lg sm:text-xl font-bold text-gray-900">Confirme seus dados para continuar</h2>
+                            <p className="text-xs sm:text-sm text-gray-500 mt-1 leading-relaxed max-w-[320px] mx-auto">
                                 Precisamos do seu CPF e da sua data de nascimento para confirmar sua identidade e validar que você é maior de idade.
                             </p>
                         </div>
 
-                        <div className="rounded-2xl border border-purple-100 bg-purple-50/60 p-4 text-left">
-                            <p className="text-xs font-semibold leading-relaxed text-purple-900">
+                        <div className="rounded-2xl border border-purple-100 bg-purple-50/60 p-3 sm:p-4 text-left">
+                            <p className="text-[11px] sm:text-xs font-semibold leading-relaxed text-purple-900">
                                 Essas informações também protegem seus repasses: os valores recebidos na plataforma só poderão ser transferidos para uma chave Pix vinculada a este CPF.
                             </p>
                         </div>
 
                         {errorMsg && (
-                            <div className="flex gap-2.5 p-3.5 bg-red-50 border border-red-100 rounded-2xl text-red-700 animate-in fade-in slide-in-from-top-2 duration-300">
-                                <AlertCircle className="w-5 h-5 shrink-0 text-red-500" />
+                            <div className="flex gap-2.5 p-3 bg-red-50 border border-red-100 rounded-2xl text-red-700 animate-in fade-in slide-in-from-top-2 duration-300">
+                                <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
                                 <p className="text-xs font-semibold leading-normal">{errorMsg}</p>
                             </div>
                         )}
 
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             {/* Input de CPF */}
                             <div className="space-y-1.5">
                                 <label htmlFor="cpf-input" className="text-xs font-bold text-gray-600 uppercase tracking-wider block">
@@ -138,7 +138,7 @@ export default function VerificationPage() {
                                         maxLength={14}
                                         required
                                         disabled={isSubmitting}
-                                        className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-200 focus:border-purple-500 focus:bg-white text-gray-900 rounded-2xl text-sm font-semibold transition-all outline-none"
+                                        className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 focus:border-purple-500 focus:bg-white text-gray-900 rounded-2xl text-sm font-semibold transition-all outline-none"
                                     />
                                 </div>
                             </div>
@@ -159,17 +159,17 @@ export default function VerificationPage() {
                                         onChange={(e) => setBirthDate(e.target.value)}
                                         required
                                         disabled={isSubmitting}
-                                        className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-200 focus:border-purple-500 focus:bg-white text-gray-900 rounded-2xl text-sm font-semibold transition-all outline-none cursor-pointer"
+                                        className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 focus:border-purple-500 focus:bg-white text-gray-900 rounded-2xl text-sm font-semibold transition-all outline-none cursor-pointer"
                                     />
                                 </div>
                             </div>
                         </div>
 
-                        <div className="pt-2">
+                        <div className="pt-1">
                             <button
                                 type="submit"
                                 disabled={isSubmitting}
-                                className="w-full py-4 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 text-white font-extrabold rounded-2xl shadow-lg shadow-purple-600/10 active:scale-[0.99] transition-all text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 text-white font-extrabold rounded-2xl shadow-lg shadow-purple-600/10 active:scale-[0.99] transition-all text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Confirmar e Validar
                             </button>
@@ -218,9 +218,9 @@ export default function VerificationPage() {
     };
 
     return (
-        <div className="flex flex-col min-h-screen bg-slate-50">
+        <div className="flex h-[100dvh] max-w-full flex-col overflow-hidden bg-slate-50">
             {/* Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] flex items-center justify-between sticky top-0 z-10 shadow-md">
+            <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-14 sm:h-[72px] shrink-0 flex items-center justify-between z-10 shadow-md">
                 <div className="flex items-center gap-3">
                     <div>
                         <h1 className="text-lg font-bold text-white leading-tight">Validação de Identidade</h1>
@@ -237,8 +237,8 @@ export default function VerificationPage() {
             </div>
 
             {/* Container Principal */}
-            <div className="flex-1 flex flex-col justify-center items-center p-4">
-                <div className="w-full max-w-md bg-white border border-gray-100 rounded-[32px] p-6 sm:p-8 shadow-xl shadow-gray-200/50">
+            <div className="min-h-0 flex-1 flex flex-col justify-center items-center p-3 sm:p-4 overflow-hidden">
+                <div className="w-full max-w-md max-h-full overflow-hidden bg-white border border-gray-100 rounded-[28px] sm:rounded-[32px] p-4 sm:p-6 shadow-xl shadow-gray-200/50">
                     {renderContent()}
                 </div>
             </div>
