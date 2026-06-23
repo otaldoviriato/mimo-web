@@ -3,6 +3,7 @@ import { auth, clerkClient } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { Resend } from 'resend';
+import { buildProfileRoleMetadata } from '@/lib/profileRole';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
 
@@ -74,9 +75,7 @@ export async function POST(request: NextRequest) {
         try {
             const client = await clerkClient();
             await client.users.updateUserMetadata(userId, {
-                unsafeMetadata: {
-                    role: 'professional'
-                }
+                unsafeMetadata: buildProfileRoleMetadata('professional')
             });
             console.log(`[init-professional] Clerk unsafeMetadata atualizado para professional para o usuário ${userId}`);
         } catch (clerkErr) {

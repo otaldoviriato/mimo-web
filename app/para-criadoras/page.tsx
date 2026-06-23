@@ -28,6 +28,11 @@ import {
 import { InstagramIcon } from '@/components/InstagramIcon';
 import Phone3D from './components/Phone3D';
 
+const buildProfessionalMetadata = () => ({
+    role: 'professional',
+    profileSelectedAt: new Date().toISOString(),
+});
+
 
 
 function ParaCriadorasContent() {
@@ -124,7 +129,7 @@ function ParaCriadorasContent() {
             if (errCode === 'form_identifier_not_found') {
                 try {
                     const signUpParams: any = { emailAddress: email };
-                    signUpParams.unsafeMetadata = { role: 'professional' };
+                    signUpParams.unsafeMetadata = buildProfessionalMetadata();
 
                     await signUp!.create(signUpParams);
                     await signUp!.prepareEmailAddressVerification({ strategy: 'email_code' });
@@ -229,9 +234,7 @@ function ParaCriadorasContent() {
                 strategy: 'oauth_google',
                 redirectUrl: '/sso-callback',
                 redirectUrlComplete: '/chats',
-                unsafeMetadata: {
-                    role: 'professional'
-                }
+                unsafeMetadata: buildProfessionalMetadata()
             });
         } catch (err: unknown) {
             setError(clerkError(err, 'Erro no login com Google'));

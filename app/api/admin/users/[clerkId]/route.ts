@@ -5,6 +5,7 @@ import { User } from '@/models/User';
 import { AppSettings } from '@/models/AppSettings';
 import { GalleryItem } from '@/models/GalleryItem';
 import { WithdrawRequest } from '@/models/WithdrawRequest';
+import { buildProfileRoleMetadata } from '@/lib/profileRole';
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
@@ -149,9 +150,18 @@ export async function PATCH(
         // Tenta atualizar no Clerk (opcional, sem quebrar caso falhe)
         try {
             const client = await clerkClient();
-            await client.users.updateUser(clerkId, {
-                ...(name !== undefined && { firstName: name.split(' ')[0], lastName: name.split(' ').slice(1).join(' ') }),
-            });
+            if (name !== undefined) {
+                await client.users.updateUser(clerkId, {
+                    firstName: name.split(' ')[0],
+                    lastName: name.split(' ').slice(1).join(' '),
+                });
+            }
+
+            if (isProfessional !== undefined) {
+                await client.users.updateUserMetadata(clerkId, {
+                    unsafeMetadata: buildProfileRoleMetadata(isProfessional ? 'professional' : 'client'),
+                });
+            }
         } catch (clerkErr: any) {
             if (clerkErr.status === 404 || (clerkErr.errors && clerkErr.errors[0]?.code === 'resource_not_found')) {
                 console.info(`[Clerk Sync] Usuário ${clerkId} não encontrado no Clerk (provavelmente usuário mockado local). Sincronização ignorada.`);
@@ -207,6 +217,12 @@ export async function DELETE(
         // 2. Deleta do Clerk
         try {
             const client = await clerkClient();
+            await client.users.updateUserMetadata(clerkId, {
+                unsafeMetadata: {
+                    role: null,
+                    profileSelectedAt: null,
+                },
+            });
             await client.users.deleteUser(clerkId);
         } catch (clerkErr: any) {
             console.warn('Falha ao excluir usuário do Clerk, mas deletado do banco:', clerkId, clerkErr);
