@@ -12,6 +12,7 @@ type InfoSimplesCpfRecord = {
     ano_obito?: string | null;
     cpf?: string | null;
     data_nascimento?: string | null;
+    mock?: boolean;
     nome?: string | null;
     normalizado_ano_obito?: string | null;
     normalizado_cpf?: string | null;
@@ -66,6 +67,15 @@ function onlyDigits(value: string | null | undefined): string {
     return (value || '').replace(/\D/g, '');
 }
 
+function formatDateToBrazilian(date: string): string {
+    const [year, month, day] = date.split('-');
+    return `${day}/${month}/${year}`;
+}
+
+function shouldUseInfoSimplesMock(): boolean {
+    return process.env.INFO_SIMPLES_MOCK === 'true' && process.env.NODE_ENV !== 'production';
+}
+
 function isRegularCpfStatus(status: string | null | undefined): boolean {
     return (status || '')
         .normalize('NFD')
@@ -91,6 +101,20 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 async function validateCpfWithInfoSimples(cpf: string, birthDate: string): Promise<InfoSimplesCpfRecord> {
+    if (shouldUseInfoSimplesMock()) {
+        return {
+            ano_obito: null,
+            cpf,
+            data_nascimento: formatDateToBrazilian(birthDate),
+            mock: true,
+            nome: 'VALIDACAO LOCAL',
+            normalizado_ano_obito: null,
+            normalizado_cpf: cpf,
+            normalizado_data_nascimento: formatDateToBrazilian(birthDate),
+            situacao_cadastral: 'REGULAR'
+        };
+    }
+
     const token = process.env.INFO_SIMPLES_TOKEN_SECRET || process.env.INFOSIMPLES_TOKEN_SECRET;
 
     if (!token) {
@@ -213,6 +237,10 @@ export async function POST(request: NextRequest) {
 
         // Enviar e-mail informativo para a administração
         try {
+            const verificationSource = infoSimplesRecord.mock
+                ? 'validação local de desenvolvimento'
+                : 'consulta real na Receita Federal';
+
             await resend.emails.send({
                 from: 'Mimo Cadastro <onboarding@resend.dev>',
                 to: 'viriatoceo@gmail.com',
@@ -220,7 +248,7 @@ export async function POST(request: NextRequest) {
                 html: `
                     <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
                         <h2 style="color: #6d28d9; margin-top: 0;">Cadastro Aprovado</h2>
-                        <p style="color: #475569; font-size: 16px;">A profissional <strong>@${updatedUser.username}</strong> foi aprovada de forma automatizada via consulta real na Receita Federal.</p>
+                        <p style="color: #475569; font-size: 16px;">A profissional <strong>@${updatedUser.username}</strong> foi aprovada de forma automatizada via ${verificationSource}.</p>
                         <ul style="background-color: #f8fafc; padding: 15px 25px; border-radius: 6px; list-style-type: none; margin: 20px 0;">
                             <li style="margin-bottom: 8px;"><strong>Nome:</strong> ${updatedUser.name || updatedUser.username}</li>
                             <li style="margin-bottom: 8px;"><strong>Nome Receita Federal:</strong> ${infoSimplesRecord.nome || '-'}</li>
