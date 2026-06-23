@@ -31,6 +31,7 @@ import Phone3D from './components/Phone3D';
 const buildProfessionalMetadata = () => ({
     role: 'professional',
     profileSelectedAt: new Date().toISOString(),
+    profileRoleSource: 'creator_landing',
 });
 
 

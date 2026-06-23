@@ -221,6 +221,7 @@ export async function DELETE(
                 unsafeMetadata: {
                     role: null,
                     profileSelectedAt: null,
+                    profileRoleSource: null,
                 },
             });
             await client.users.deleteUser(clerkId);

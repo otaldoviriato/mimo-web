@@ -6,7 +6,7 @@ import { Room } from '@/models/Room';
 import { Message } from '@/models/Message';
 import { AppSettings } from '@/models/AppSettings';
 import { Resend } from 'resend';
-import { buildProfileRoleMetadata, getExplicitProfileRole } from '@/lib/profileRole';
+import { buildProfileRoleMetadata, getCreatorLandingProfileRole } from '@/lib/profileRole';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
 
@@ -37,7 +37,7 @@ export async function GET() {
                 const cleanId = userId.startsWith('user_') ? userId.slice(5) : userId;
                 const username = clerkUser.username || `user_${cleanId.substring(Math.max(0, cleanId.length - 8))}`;
 
-                const roleMetadata = getExplicitProfileRole(clerkUser.unsafeMetadata);
+                const roleMetadata = getCreatorLandingProfileRole(clerkUser.unsafeMetadata);
                 const isProfessional = roleMetadata === 'professional' ? true : (roleMetadata === 'client' ? false : undefined);
                 const professionalStatus = null; // Inicializa como null (verificação pendente de envio)
 
@@ -108,7 +108,7 @@ export async function GET() {
             try {
                 const client = await clerkClient();
                 const clerkUser = await client.users.getUser(userId);
-                const explicitRole = getExplicitProfileRole(clerkUser.unsafeMetadata);
+                const explicitRole = getCreatorLandingProfileRole(clerkUser.unsafeMetadata);
                 const isProfessionalClerk = explicitRole === 'professional';
 
                 if (isProfessionalClerk && !user.isProfessional) {

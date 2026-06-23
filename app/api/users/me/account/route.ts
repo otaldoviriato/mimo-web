@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { Room } from '@/models/Room';
@@ -59,6 +59,19 @@ export async function DELETE() {
 
         const rooms = await Room.find({ participants: userId }).select('_id').lean();
         const roomIds = rooms.map((room: any) => room._id);
+
+        try {
+            const client = await clerkClient();
+            await client.users.updateUserMetadata(userId, {
+                unsafeMetadata: {
+                    role: null,
+                    profileSelectedAt: null,
+                    profileRoleSource: null,
+                },
+            });
+        } catch (clerkErr) {
+            console.warn('[DELETE /api/users/me/account] Failed to clear Clerk profile metadata:', clerkErr);
+        }
 
         await Promise.all([
             User.findOneAndDelete({ clerkId: userId }),

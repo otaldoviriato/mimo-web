@@ -4,7 +4,7 @@ import { headers } from 'next/headers';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { Resend } from 'resend';
-import { getExplicitProfileRole } from '@/lib/profileRole';
+import { getCreatorLandingProfileRole } from '@/lib/profileRole';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
 const webhookSecret = process.env.CLERK_WEBHOOK_SECRET || '';
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
         const name = [first_name, last_name].filter(Boolean).join(' ') || generatedUsername;
         const email = email_addresses[0]?.email_address?.toLowerCase()?.trim();
 
-        const roleMetadata = getExplicitProfileRole(unsafe_metadata);
+        const roleMetadata = getCreatorLandingProfileRole(unsafe_metadata);
         const isProfessional = roleMetadata === 'professional' ? true : (roleMetadata === 'client' ? false : undefined);
         const professionalStatus = null; // Inicializa como null (verificação de identidade pendente de envio)
 
@@ -117,7 +117,7 @@ export async function POST(req: Request) {
         const { id, email_addresses, username, first_name, last_name, image_url, unsafe_metadata } = evt.data;
 
         const name = [first_name, last_name].filter(Boolean).join(' ') || undefined;
-        const explicitRole = getExplicitProfileRole(unsafe_metadata);
+        const explicitRole = getCreatorLandingProfileRole(unsafe_metadata);
         const isProfessional = explicitRole === 'professional';
 
         const updateData: any = {
