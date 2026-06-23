@@ -62,11 +62,6 @@ function isValidCPF(cpf: string): boolean {
     return true;
 }
 
-function formatBirthdateForInfoSimples(birthDate: string): string {
-    const [year, month, day] = birthDate.split('-');
-    return `${day}/${month}/${year}`;
-}
-
 function onlyDigits(value: string | null | undefined): string {
     return (value || '').replace(/\D/g, '');
 }
@@ -104,8 +99,10 @@ async function validateCpfWithInfoSimples(cpf: string, birthDate: string): Promi
 
     const searchParams = new URLSearchParams({
         token,
+        timeout: '600',
+        ignore_site_receipt: '0',
         cpf,
-        birthdate: formatBirthdateForInfoSimples(birthDate)
+        birthdate: birthDate
     });
 
     const response = await fetch(`${INFO_SIMPLES_CPF_URL}?${searchParams.toString()}`, {
