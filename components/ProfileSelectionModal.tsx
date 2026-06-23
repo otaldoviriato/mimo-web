@@ -3,12 +3,14 @@
 import React, { useState } from 'react';
 import { User, Crown, Check } from 'lucide-react';
 import { Button } from './Button';
+import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 
 interface ProfileSelectionModalProps {
     onSuccess: () => Promise<void>;
 }
 
 export function ProfileSelectionModal({ onSuccess }: ProfileSelectionModalProps) {
+    const router = useTransitionRouter();
     const [selectedRole, setSelectedRole] = useState<'client' | 'professional' | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -35,6 +37,10 @@ export function ProfileSelectionModal({ onSuccess }: ProfileSelectionModalProps)
 
             // Atualiza os dados do perfil no React Query e no estado da aplicação
             await onSuccess();
+
+            if (selectedRole === 'professional') {
+                router.replace('/verificacao-identidade');
+            }
         } catch (err: any) {
             console.error('[ProfileSelectionModal] Erro ao selecionar perfil:', err);
             setError(err.message || 'Houve um erro de comunicação. Tente novamente.');

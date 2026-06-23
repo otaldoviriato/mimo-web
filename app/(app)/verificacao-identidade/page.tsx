@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useMyProfile } from '@/hooks/useQueries';
 import { 
-    ArrowLeft, 
     UserCheck, 
     RefreshCw, 
     AlertCircle, 
@@ -99,9 +98,15 @@ export default function VerificationPage() {
                             <div className="mx-auto w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600 mb-3">
                                 <ShieldCheck className="w-6 h-6" />
                             </div>
-                            <h2 className="text-xl font-bold text-gray-900">Verificação de Maioridade</h2>
-                            <p className="text-sm text-gray-500 mt-1.5 leading-relaxed max-w-[280px] mx-auto">
-                                Para fins fiscais e legais, precisamos confirmar se você é maior de 18 anos.
+                            <h2 className="text-xl font-bold text-gray-900">Confirme seus dados para continuar</h2>
+                            <p className="text-sm text-gray-500 mt-1.5 leading-relaxed max-w-[320px] mx-auto">
+                                Precisamos do seu CPF e da sua data de nascimento para confirmar sua identidade e validar que você é maior de idade.
+                            </p>
+                        </div>
+
+                        <div className="rounded-2xl border border-purple-100 bg-purple-50/60 p-4 text-left">
+                            <p className="text-xs font-semibold leading-relaxed text-purple-900">
+                                Essas informações também protegem seus repasses: os valores recebidos na plataforma só poderão ser transferidos para uma chave Pix vinculada a este CPF.
                             </p>
                         </div>
 
@@ -215,14 +220,6 @@ export default function VerificationPage() {
             {/* Header */}
             <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] flex items-center justify-between sticky top-0 z-10 shadow-md">
                 <div className="flex items-center gap-3">
-                    {step === 'form' && (
-                        <button
-                            onClick={() => router.push('/chats')}
-                            className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white cursor-pointer"
-                        >
-                            <ArrowLeft className="w-5 h-5" />
-                        </button>
-                    )}
                     <div>
                         <h1 className="text-lg font-bold text-white leading-tight">Validação de Identidade</h1>
                         <p className="text-[11px] text-purple-200 font-semibold tracking-wide">Mimo Profissional</p>

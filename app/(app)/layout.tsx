@@ -25,6 +25,10 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     
     // Garante que o perfil carregado no cache/Query pertence ao usuário atualmente logado no Clerk
     const isProfileValid = !!(userData && user && userData.clerkId === user.id);
+    const professionalNeedsIdentity =
+        isProfileValid &&
+        userData.isProfessional === true &&
+        (!userData.taxId || !userData.birthDate);
 
     const router = useRouter();
     const pathname = usePathname();
@@ -274,6 +278,12 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         }
     }, [isSignedIn, user, getToken]);
 
+    useEffect(() => {
+        if (professionalNeedsIdentity && pathname !== '/verificacao-identidade') {
+            router.replace('/verificacao-identidade');
+        }
+    }, [professionalNeedsIdentity, pathname, router]);
+
     if (!isLoaded || (isSignedIn && !isNavInitialized)) {
         return (
             <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gradient-to-br from-[#4C1D95] via-[#6D28D9] to-[#8B5CF6] select-none">
@@ -359,6 +369,23 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         );
     }
 
+    if (professionalNeedsIdentity && pathname !== '/verificacao-identidade') {
+        return (
+            <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gradient-to-br from-[#4C1D95] via-[#6D28D9] to-[#8B5CF6] select-none">
+                <div className="relative w-24 h-24 rounded-3xl overflow-hidden shadow-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 animate-pulse">
+                    <img
+                        src="/Logo.svg"
+                        alt="MimoChat Logo"
+                        className="w-16 h-16 object-contain"
+                    />
+                </div>
+            </div>
+        );
+    }
+
+    if (professionalNeedsIdentity && pathname === '/verificacao-identidade') {
+        return <>{children}</>;
+    }
 
     return (
         <div className="bg-slate-50 min-h-screen w-full relative overflow-hidden">

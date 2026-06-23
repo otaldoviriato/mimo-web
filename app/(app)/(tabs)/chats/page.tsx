@@ -178,40 +178,7 @@ export default function ChatsPage() {
             );
         }
 
-        // status === null ou undefined ou ''
-        return (
-            <div className="mx-4 mt-4 bg-gradient-to-br from-purple-50 via-fuchsia-50 to-indigo-50 border border-purple-100 rounded-2xl p-3 md:p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                        <div className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-600">
-                            <ShieldAlert className="w-4.5 h-4.5" />
-                        </div>
-                        <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                                <h3 className="font-bold text-purple-900 text-xs md:text-sm">
-                                    Verificação Necessária 💜
-                                </h3>
-                                <span className="inline-block bg-purple-600 text-white text-[8px] md:text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider animate-pulse whitespace-nowrap">
-                                    Ação Necessária
-                                </span>
-                            </div>
-                            <p className="text-[11px] md:text-xs text-purple-700 mt-1 leading-snug max-w-xl">
-                                Sua conta de criadora foi criada. Ative o recebimento de mensagens e assinaturas fazendo a verificação de maioridade (+18).
-                            </p>
-                        </div>
-                    </div>
-                    <div className="shrink-0 flex justify-end">
-                        <button
-                            onClick={() => router.push('/verificacao-identidade')}
-                            className="w-full sm:w-auto inline-flex items-center justify-center gap-1 bg-purple-600 hover:bg-purple-700 active:scale-[0.98] transition-all text-white text-[11px] font-extrabold px-3 py-2 rounded-xl shadow-md shadow-purple-600/10 cursor-pointer"
-                        >
-                            Verificar Maioridade
-                            <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
+        return null;
     };
 
     // ─── Listeners de WebSocket em tempo real ───────────────────────────────
