@@ -51,6 +51,9 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const [isAboutExpanded, setIsAboutExpanded] = useState(false);
     const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(false);
     const [savingEmailPref, setSavingEmailPref] = useState(false);
+    const [accountAction, setAccountAction] = useState<'suspend' | 'delete' | null>(null);
+    const [accountActionLoading, setAccountActionLoading] = useState(false);
+    const [accountActionError, setAccountActionError] = useState('');
 
     const hasPopulated = useRef(false);
 
@@ -150,6 +153,40 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const handleLogout = async () => {
         if (confirm('Tem certeza que deseja sair da sua conta?')) {
             await signOut(() => router.replace('/login'));
+        }
+    };
+
+    const closeAccountActionModal = () => {
+        if (accountActionLoading) return;
+        setAccountAction(null);
+        setAccountActionError('');
+    };
+
+    const handleAccountActionConfirm = async () => {
+        if (!accountAction) return;
+
+        setAccountActionLoading(true);
+        setAccountActionError('');
+
+        try {
+            const response = await fetch('/api/users/me/account', {
+                method: accountAction === 'suspend' ? 'PATCH' : 'DELETE',
+            });
+
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || 'Não foi possível concluir a ação.');
+            }
+
+            if (typeof window !== 'undefined') {
+                localStorage.removeItem('mimo_profile');
+            }
+
+            await signOut(() => router.replace('/login'));
+        } catch (error: any) {
+            setAccountActionError(error.message || 'Não foi possível concluir a ação.');
+        } finally {
+            setAccountActionLoading(false);
         }
     };
 
@@ -824,20 +861,48 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                             </div>
                         </div>
 
-                        {/* ── SEÇÃO: CONTA (sair) ── */}
+                        {/* ── SEÇÃO: CONTA ── */}
                         <div>
                             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Conta</p>
                             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                                 <button
                                     onClick={handleLogout}
+                                    className="w-full px-4 py-3.5 flex items-center gap-3 hover:bg-gray-50 active:bg-gray-100 transition-colors border-b border-gray-50"
+                                >
+                                    <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-500">
+                                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                                        </svg>
+                                    </div>
+                                    <span className="text-sm font-medium text-gray-800">Sair da conta</span>
+                                </button>
+                                <button
+                                    onClick={() => setAccountAction('suspend')}
+                                    className="w-full px-4 py-3.5 flex items-center gap-3 hover:bg-amber-50 active:bg-amber-100 transition-colors border-b border-gray-50"
+                                >
+                                    <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-600">
+                                            <circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/>
+                                        </svg>
+                                    </div>
+                                    <div className="min-w-0 text-left">
+                                        <span className="block text-sm font-medium text-gray-800">Suspender conta</span>
+                                        <span className="block text-[10px] text-gray-400">Desativa o acesso até reativação manual</span>
+                                    </div>
+                                </button>
+                                <button
+                                    onClick={() => setAccountAction('delete')}
                                     className="w-full px-4 py-3.5 flex items-center gap-3 hover:bg-red-50 active:bg-red-100 transition-colors"
                                 >
                                     <div className="w-8 h-8 rounded-lg bg-red-50 border border-red-100 flex items-center justify-center shrink-0">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500">
-                                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                                            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
                                         </svg>
                                     </div>
-                                    <span className="text-sm font-medium text-red-500">Sair da conta</span>
+                                    <div className="min-w-0 text-left">
+                                        <span className="block text-sm font-medium text-red-500">Excluir conta</span>
+                                        <span className="block text-[10px] text-red-400">Remove seu usuário do banco de dados</span>
+                                    </div>
                                 </button>
                             </div>
                         </div>
@@ -863,6 +928,52 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                     </>
                 )}
             </div>
+            {accountAction && (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm">
+                    <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+                        <div className={`mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full ${accountAction === 'delete' ? 'bg-red-50 text-red-500' : 'bg-amber-50 text-amber-600'}`}>
+                            {accountAction === 'delete' ? (
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+                                </svg>
+                            ) : (
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/>
+                                </svg>
+                            )}
+                        </div>
+                        <h2 className="text-center text-base font-bold text-gray-900">
+                            {accountAction === 'delete' ? 'Excluir conta?' : 'Suspender conta?'}
+                        </h2>
+                        <p className="mt-2 text-center text-xs leading-relaxed text-gray-500">
+                            {accountAction === 'delete'
+                                ? 'Seu usuário será removido do banco de dados do Mimo. Esta ação não pode ser desfeita por você.'
+                                : 'Sua conta será marcada como suspensa e você será desconectado agora.'}
+                        </p>
+                        {accountActionError && (
+                            <p className="mt-3 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-medium text-red-600">
+                                {accountActionError}
+                            </p>
+                        )}
+                        <div className="mt-5 flex gap-2">
+                            <button
+                                onClick={closeAccountActionModal}
+                                disabled={accountActionLoading}
+                                className="h-10 flex-1 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 disabled:opacity-60"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleAccountActionConfirm}
+                                disabled={accountActionLoading}
+                                className={`h-10 flex-1 rounded-xl text-xs font-bold text-white disabled:opacity-60 ${accountAction === 'delete' ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-500 hover:bg-amber-600'}`}
+                            >
+                                {accountActionLoading ? 'Aguarde...' : accountAction === 'delete' ? 'Excluir' : 'Suspender'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

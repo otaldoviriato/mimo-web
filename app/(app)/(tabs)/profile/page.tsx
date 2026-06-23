@@ -1,18 +1,17 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useUser, useClerk } from '@clerk/nextjs';
+import { useUser } from '@clerk/nextjs';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Avatar } from '@/components/Avatar';
 import { useMyProfile, useUploadPhoto, useUploadCover, useMyGallery, useUploadToGallery, useDeleteFromGallery, useDepositHistory, useChatRooms } from '@/hooks/useQueries';
 import { ImageCropper } from '@/components/ImageCropper';
 import { usePayment } from '@/context/PaymentContext';
 import { PullToRefresh } from '@/components';
-import { Settings, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, ShieldAlert, Heart, LogOut, Globe, Crown, Camera, Gift, CreditCard, QrCode } from 'lucide-react';
+import { Settings, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, ShieldAlert, Heart, Globe, Crown, Camera, Gift, CreditCard, QrCode } from 'lucide-react';
 
 export default function ProfilePage() {
     const { user } = useUser();
-    const { signOut } = useClerk();
     const router = useTransitionRouter();
     const { openRechargeModal } = usePayment();
 
@@ -201,12 +200,6 @@ export default function ProfilePage() {
             await deleteGalleryMutation.mutateAsync(itemId);
         } catch (error: any) {
             alert(error.message || 'Erro ao deletar foto');
-        }
-    };
-
-    const handleLogout = async () => {
-        if (confirm('Tem certeza que deseja sair da sua conta?')) {
-            await signOut(() => router.replace('/login'));
         }
     };
 
@@ -645,9 +638,9 @@ export default function ProfilePage() {
                 </div>
             </div>
 
-            <PullToRefresh onRefresh={onRefreshClient} className="p-4 pb-24 gap-4 max-w-md w-full mx-auto relative z-10">
+            <PullToRefresh onRefresh={onRefreshClient} className="px-4 pt-5 pb-24 max-w-md w-full mx-auto relative z-10">
                 {/* Informações Básicas */}
-                <div className="bg-white rounded-2xl border border-gray-100 p-5 flex items-center gap-4 shadow-sm">
+                <div className="bg-white rounded-3xl border border-gray-100 p-5 flex items-center gap-4 shadow-sm shadow-purple-100/40">
                     <button
                         onClick={() => fileInputRef.current?.click()}
                         disabled={uploadPhotoMutation.isPending}
@@ -671,7 +664,7 @@ export default function ProfilePage() {
                 </div>
 
                 {/* Card de Saldo */}
-                <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm flex flex-col gap-4">
+                <div className="mt-3 bg-white rounded-3xl border border-gray-100 p-5 shadow-sm shadow-purple-100/40 flex flex-col gap-4">
                     <div className="flex justify-between items-start">
                         <div>
                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Meu Saldo</span>
@@ -690,7 +683,7 @@ export default function ProfilePage() {
                 </div>
 
                 {/* Histórico de Depósitos */}
-                <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm flex flex-col gap-3">
+                <div className="mt-3 bg-white rounded-3xl border border-gray-100 p-5 shadow-sm shadow-purple-100/40 flex flex-col gap-3">
                     <h3 className="text-xs font-bold text-gray-800 uppercase tracking-wider border-b border-gray-50 pb-2.5">Histórico de Recargas</h3>
                     
                     {loadingHistory ? (
@@ -734,14 +727,6 @@ export default function ProfilePage() {
                     )}
                 </div>
 
-                {/* Sair da Conta */}
-                <button
-                    onClick={handleLogout}
-                    className="w-full h-10 border border-red-200 rounded-2xl bg-white hover:bg-red-50 font-bold text-xs text-red-500 transition-colors active:scale-[0.98] flex items-center justify-center gap-2 shadow-sm"
-                >
-                    <LogOut className="w-4 h-4 shrink-0" />
-                    Sair da minha conta
-                </button>
             </PullToRefresh>
 
             {cropperState && cropperState.open && (

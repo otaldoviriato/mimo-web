@@ -144,6 +144,10 @@ export async function GET() {
             }
         }
 
+        if (user.isSuspended) {
+            return NextResponse.json({ error: 'Account suspended' }, { status: 403 });
+        }
+
         if (user.email.includes('@placeholder.com')) {
             try {
                 const client = await clerkClient();
