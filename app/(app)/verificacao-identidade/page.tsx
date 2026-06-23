@@ -78,8 +78,10 @@ export default function VerificationPage() {
             }
 
             // Atualiza os dados do perfil do usuário na aplicação
-            await refetchProfile();
             setStep('success');
+            await refetchProfile().catch((refetchError) => {
+                console.warn('[IdentityVerification] Falha ao revalidar perfil apos sucesso:', refetchError);
+            });
         } catch (err: any) {
             console.error('[IdentityVerification] Erro no fluxo:', err);
             setErrorMsg(err.message || 'Erro de conexão com o servidor. Tente novamente.');

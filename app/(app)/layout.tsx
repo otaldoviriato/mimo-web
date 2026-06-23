@@ -383,7 +383,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         );
     }
 
-    if (professionalNeedsIdentity && pathname === '/verificacao-identidade') {
+    if (isProfileValid && userData.isProfessional === true && pathname === '/verificacao-identidade') {
         return <>{children}</>;
     }
 
