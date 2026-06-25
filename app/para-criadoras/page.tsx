@@ -129,7 +129,14 @@ function ParaCriadorasContent() {
 
             if (errCode === 'form_identifier_not_found') {
                 try {
-                    const signUpParams: any = { emailAddress: email };
+                    const baseUsername = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
+                    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+                    const generatedUsername = `${baseUsername}${randomSuffix}`;
+
+                    const signUpParams: any = { 
+                        emailAddress: email,
+                        username: generatedUsername
+                    };
                     signUpParams.unsafeMetadata = buildProfessionalMetadata();
 
                     await signUp!.create(signUpParams);
@@ -195,6 +202,9 @@ function ParaCriadorasContent() {
                     }
                     await setSignUpActive!({ session: signUp!.createdSessionId });
                     router.replace('/chats');
+                } else {
+                    console.error('[SignUp Error] Status incompleto após verificação:', signUp!.status, 'Campos em falta:', (signUp as any).missingFields);
+                    throw new Error(`Cadastro incompleto. Status: ${signUp!.status}. Requisitos pendentes: ${(signUp as any).missingFields?.join(', ') || 'Nenhum'}`);
                 }
             } else {
                 await signIn!.attemptFirstFactor({ strategy: 'email_code', code });
@@ -954,7 +964,7 @@ function ParaCriadorasContent() {
                             Cobre pelas suas <span className="bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 bg-clip-text text-transparent">fotos e vídeos</span>.
                         </h2>
                         <p className={`text-sm sm:text-sm lg:text-base text-slate-500 max-w-xl mx-auto lg:mx-0 leading-relaxed ${isExiting ? 'animate-slide-out-subtitle' : 'animate-subtitle-elastic'}`}>
-                            Envie mídias privadas e borradas no chat. O fã faz um Pix para desbloquear na hora e assistir.
+                            Envie mídias privadas e borradas no chat. A pessoa faz um Pix para desbloquear na hora e assistir.
                         </p>
                         <div className={`p-2 bg-slate-50 border border-slate-100 rounded-xl max-w-xs mx-auto lg:mx-0 flex justify-between items-center gap-2 shadow-2xs ${isExiting ? 'animate-slide-out-subtitle' : 'animate-subtitle-elastic'}`}>
                             <span className="text-[9px] font-bold text-slate-400 uppercase">Preço Simulado:</span>
@@ -986,7 +996,7 @@ function ParaCriadorasContent() {
                             Receba <span className="bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 bg-clip-text text-transparent">mimos espontâneos</span> de apoiadores.
                         </h2>
                         <p className={`text-sm sm:text-sm lg:text-base text-slate-500 max-w-xl mx-auto lg:mx-0 leading-relaxed ${isExiting ? 'animate-slide-out-subtitle' : 'animate-subtitle-elastic'}`}>
-                            Seus fãs podem enviar presentes em dinheiro diretamente no chat, como forma de carinho, sem precisar de nada em troca.
+                            As pessoas podem enviar mimos em dinheiro diretamente no chat, como forma de carinho, sem precisar de nada em troca.
                         </p>
                     </div>
                 );
@@ -1000,7 +1010,7 @@ function ParaCriadorasContent() {
                             Comece sua Jornada no <span className="bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 bg-clip-text text-transparent">Mimo Chat</span> 💜
                         </h2>
                         <p className="text-sm lg:text-base text-slate-500 leading-relaxed font-medium max-w-lg animate-subtitle-elastic">
-                            Crie sua conta profissional hoje mesmo para começar a interagir com seus fãs, monetizar suas conversas e ter total controle do seu conteúdo.
+                            Crie seu perfil no MimoChat hoje mesmo para começar a interagir, monetizar suas conversas e ter total controle do seu conteúdo.
                         </p>
                     </div>
                 );
@@ -1251,7 +1261,7 @@ function ParaCriadorasContent() {
                             M
                         </div>
                         <span className="text-lg font-black tracking-tight text-slate-900">
-                            mimo<span className="text-purple-600 font-extrabold text-[9px] ml-1 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded-md uppercase tracking-wider">Criadoras</span>
+                            mimo<span className="text-purple-600 font-extrabold text-[9px] ml-1 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded-md uppercase tracking-wider">Chat</span>
                         </span>
                     </div>
                 </div>
@@ -1295,7 +1305,7 @@ function ParaCriadorasContent() {
                                 
                                 <div className="text-center mb-6">
                                     <h3 className="text-xl font-bold text-slate-900">Criar minha Conta</h3>
-                                    <p className="text-xs text-slate-500 mt-1">Crie sua conta profissional ou acesse uma conta existente.</p>
+                                    <p className="text-xs text-slate-500 mt-1">Crie seu perfil no MimoChat ou acesse uma conta existente.</p>
                                 </div>
 
                                 {!pendingVerification ? (

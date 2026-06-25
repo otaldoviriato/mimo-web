@@ -6,7 +6,6 @@ import { useAuth } from '@clerk/nextjs';
 import { useSignIn, useSignUp } from '@clerk/nextjs/legacy';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
-import { usePWA } from '@/context/PWAContext';
 import Link from 'next/link';
 
 function GiftCapture() {
@@ -26,7 +25,7 @@ export default function LoginPage() {
     const { isSignedIn } = useAuth();
     const { isLoaded: signInLoaded, signIn, setActive: setSignInActive } = useSignIn();
     const { isLoaded: signUpLoaded, signUp, setActive: setSignUpActive } = useSignUp();
-    const { isInstallable, promptInstall, mounted, isStandalone } = usePWA();
+
 
     const [email, setEmail] = useState('');
     const [code, setCode] = useState('');
@@ -110,7 +109,14 @@ export default function LoginPage() {
             if (errCode === 'form_identifier_not_found') {
                 // Conta não existe — cria transparentemente sem o usuário perceber
                 try {
-                    const signUpParams: any = { emailAddress: email };
+                    const baseUsername = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
+                    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+                    const generatedUsername = `${baseUsername}${randomSuffix}`;
+
+                    const signUpParams: any = { 
+                        emailAddress: email,
+                        username: generatedUsername
+                    };
 
                     await signUp!.create(signUpParams);
                     await signUp!.prepareEmailAddressVerification({ strategy: 'email_code' });
@@ -178,6 +184,9 @@ export default function LoginPage() {
                 if (signUp!.status === 'complete') {
                     await setSignUpActive!({ session: signUp!.createdSessionId });
                     router.replace('/chats');
+                } else {
+                    console.error('[SignUp Error] Status incompleto após verificação:', signUp!.status, 'Campos em falta:', (signUp as any).missingFields);
+                    throw new Error(`Cadastro incompleto. Status: ${signUp!.status}. Requisitos pendentes: ${(signUp as any).missingFields?.join(', ') || 'Nenhum'}`);
                 }
             } else {
                 await signIn!.attemptFirstFactor({ strategy: 'email_code', code });
@@ -379,22 +388,6 @@ export default function LoginPage() {
                     )}
                 </div>
 
-                {mounted && isInstallable && !isStandalone && (
-                    <div className="mt-8 p-4 bg-purple-50 rounded-2xl border border-purple-100 flex flex-col items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <div className="flex items-center gap-2">
-                            <span className="text-xl">📱</span>
-                            <p className="text-sm text-purple-900 font-bold">
-                                MimoChat fica melhor no App!
-                            </p>
-                        </div>
-                        <Button
-                            title="Instalar Aplicativo"
-                            onPress={promptInstall}
-                            size="sm"
-                            className="w-full bg-purple-600 shadow-md font-bold !text-white"
-                        />
-                    </div>
-                )}
 
                 <div className="mt-8 text-center text-[10px] text-gray-400 leading-relaxed space-y-1">
                     <p>
