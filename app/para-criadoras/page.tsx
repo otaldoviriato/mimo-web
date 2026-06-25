@@ -129,14 +129,7 @@ function ParaCriadorasContent() {
 
             if (errCode === 'form_identifier_not_found') {
                 try {
-                    const baseUsername = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
-                    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-                    const generatedUsername = `${baseUsername}${randomSuffix}`;
-
-                    const signUpParams: any = { 
-                        emailAddress: email,
-                        username: generatedUsername
-                    };
+                    const signUpParams: any = { emailAddress: email };
                     signUpParams.unsafeMetadata = buildProfessionalMetadata();
 
                     await signUp!.create(signUpParams);
