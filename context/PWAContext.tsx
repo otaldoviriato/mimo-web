@@ -8,6 +8,7 @@ interface PWAContextType {
     isIOS: boolean;
     isStandalone: boolean;
     mounted: boolean;
+    hasDeferredPrompt: boolean;
     promptInstall: () => Promise<void>;
 }
 
@@ -114,7 +115,7 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <PWAContext.Provider value={{ isInstallable, isIOS, isStandalone, mounted, promptInstall }}>
+        <PWAContext.Provider value={{ isInstallable, isIOS, isStandalone, mounted, hasDeferredPrompt: deferredPrompt !== null, promptInstall }}>
             {children}
             {installModal && (
                 <InstallPWAModal type={installModal} onClose={() => setInstallModal(null)} />

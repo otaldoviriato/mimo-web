@@ -7,6 +7,7 @@ import { useMyProfile } from '@/hooks/useQueries';
 import { BalanceDisplay } from '@/components/BalanceDisplay';
 import { Avatar } from '@/components/Avatar';
 import { useUser } from '@clerk/nextjs';
+import { PWAPromoModal } from '@/components/PWAPromoModal';
 
 // As abas são geradas dinamicamente dentro do componente com base no tipo de perfil (profissional ou não)
 
@@ -68,7 +69,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
             <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 shrink-0">
                 {/* Brand */}
                 <div className="flex items-center gap-3 px-5 py-5 border-b border-gray-100">
-                    <div className="flex w-9 h-9 items-center justify-center bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl shrink-0">
+                    <div className="flex w-9 h-9 items-center justify-center bg-linear-to-br from-purple-600 to-purple-700 rounded-xl shrink-0">
                         <img
                             src="/Logo.svg"
                             alt="MimoChat"
@@ -124,6 +125,9 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                 {children}
             </div>
 
+            {/* Modal de instalação PWA — aparece uma vez por sessão quando o Chrome libera o prompt */}
+            <PWAPromoModal />
+
             {/* Bottom nav (mobile) */}
             <nav className="md:hidden fixed bottom-0 left-0 right-0 h-[calc(72px+env(safe-area-inset-bottom))] bg-white border-t border-gray-200 flex items-start z-40 shadow-[0_-6px_18px_rgba(15,23,42,0.05)] pb-[env(safe-area-inset-bottom)]">
                 {resolvedTabs.map((tab) => {
@@ -133,7 +137,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                             key={tab.href}
                             href={tab.href}
                             replace={tab.href !== '/chats'}
-                            className={`flex-1 h-[72px] flex flex-col items-center justify-center gap-1 px-2 text-xs font-semibold transition-colors
+                            className={`flex-1 h-18 flex flex-col items-center justify-center gap-1 px-2 text-xs font-semibold transition-colors
                                 ${isActive ? 'text-purple-600' : 'text-gray-400'}`}
                         >
                             {tab.icon(isActive)}
