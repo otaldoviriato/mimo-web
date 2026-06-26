@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { InstallPWAModal, type InstallModalType } from '@/components/InstallPWAModal';
 
 interface PWAContextType {
     isInstallable: boolean;
@@ -23,6 +24,7 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
     const [isStandalone, setIsStandalone] = useState(false);
     const [mounted, setMounted] = useState(false);
     const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+    const [installModal, setInstallModal] = useState<InstallModalType | null>(null);
 
     useEffect(() => {
         setTimeout(() => setMounted(true), 0);
@@ -88,7 +90,7 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
 
     const promptInstall = async () => {
         if (isIOS) {
-            alert('Para instalar no iPhone: clique no ícone de compartilhamento (quadrado com seta para cima) e escolha "Adicionar à Tela de Início".');
+            setInstallModal('ios');
             return;
         }
 
@@ -101,18 +103,21 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
                     setIsInstallable(false);
                 }
             } catch {
-                // Prompt já consumido ou inválido; limpa e cai no fluxo manual
+                // Prompt já consumido ou inválido; mostra modal de indisponibilidade
                 setDeferredPrompt(null);
-                alert('Para instalar: procure o ícone de instalação na barra de endereços (geralmente um computador com uma seta) ou vá no menu do navegador e selecione "Instalar Mimo".');
+                setInstallModal('unavailable');
             }
         } else {
-            alert('Para instalar: procure o ícone de instalação na barra de endereços (geralmente um computador com uma seta) ou vá no menu do navegador e selecione "Instalar Mimo".');
+            setInstallModal('unavailable');
         }
     };
 
     return (
         <PWAContext.Provider value={{ isInstallable, isIOS, isStandalone, mounted, promptInstall }}>
             {children}
+            {installModal && (
+                <InstallPWAModal type={installModal} onClose={() => setInstallModal(null)} />
+            )}
         </PWAContext.Provider>
     );
 }
