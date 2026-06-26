@@ -5,7 +5,10 @@ import { X } from 'lucide-react';
 import { usePWA } from '@/context/PWAContext';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 
-const SESSION_KEY = 'notif_promo_seen';
+const SHOWN_KEY     = 'notif_promo_shown';
+const LAST_HIDDEN_KEY = 'mimo_last_hidden';
+const SESSION_GAP_MS  = 5 * 60 * 1000;
+const COOLDOWN_MS     = 60 * 60 * 1000;
 
 const benefits = [
     {
@@ -45,22 +48,43 @@ export function NotifPromoModal() {
     const [animating, setAnimating] = useState(false);
 
     useEffect(() => {
-        if (!isStandalone) return;
-        if (permission !== 'default') return;
         if (typeof window === 'undefined') return;
-        if (sessionStorage.getItem(SESSION_KEY)) return;
 
-        const t = setTimeout(() => {
-            setVisible(true);
-            setTimeout(() => setAnimating(true), 10);
-        }, 2000);
+        const shouldShow = () => {
+            if (!isStandalone || permission !== 'default') return false;
+            const lastHidden = Number(localStorage.getItem(LAST_HIDDEN_KEY) ?? '0');
+            const lastShown  = Number(localStorage.getItem(SHOWN_KEY) ?? '0');
+            const now = Date.now();
+            const isNewSession = lastHidden === 0 || now - lastHidden > SESSION_GAP_MS;
+            const canShow = now - lastShown > COOLDOWN_MS;
+            return isNewSession && canShow;
+        };
 
-        return () => clearTimeout(t);
+        const tryShow = () => {
+            if (!shouldShow()) return;
+            localStorage.setItem(SHOWN_KEY, String(Date.now()));
+            setTimeout(() => {
+                setVisible(true);
+                setTimeout(() => setAnimating(true), 10);
+            }, 2000);
+        };
+
+        tryShow();
+
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                tryShow();
+            } else {
+                localStorage.setItem(LAST_HIDDEN_KEY, String(Date.now()));
+            }
+        };
+
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', onVisibilityChange);
     }, [isStandalone, permission]);
 
     const dismiss = () => {
         setAnimating(false);
-        sessionStorage.setItem(SESSION_KEY, '1');
         setTimeout(() => setVisible(false), 300);
     };
 
@@ -73,23 +97,20 @@ export function NotifPromoModal() {
 
     return (
         <div
-            className={`fixed inset-0 z-[180] flex items-center justify-center p-5 transition-opacity duration-300 ${
+            className={`fixed inset-0 z-180 flex items-center justify-center p-5 transition-opacity duration-300 ${
                 animating ? 'opacity-100' : 'opacity-0'
             }`}
         >
-            {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-gray-950/70 backdrop-blur-sm"
                 onClick={dismiss}
             />
 
-            {/* Card */}
             <div
                 className={`relative w-full max-w-sm overflow-hidden rounded-3xl bg-white shadow-2xl transition-all duration-300 transform ${
                     animating ? 'scale-100 translate-y-0' : 'scale-90 translate-y-8'
                 }`}
             >
-                {/* Fechar */}
                 <button
                     onClick={dismiss}
                     className="absolute right-4 top-4 z-10 rounded-full p-1.5 bg-white/20 text-white/80 hover:bg-white/30 transition-colors"
@@ -103,7 +124,6 @@ export function NotifPromoModal() {
                     <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full bg-white/5" />
                     <div className="absolute -bottom-10 -left-10 w-52 h-52 rounded-full bg-white/5" />
 
-                    {/* Ícone animado */}
                     <div className="relative flex h-20 w-20 items-center justify-center rounded-3xl bg-white/15 border border-white/20 shadow-xl mb-4 backdrop-blur-sm">
                         <div className="absolute inset-0 rounded-3xl bg-white/10 animate-ping" style={{ animationDuration: '2.5s' }} />
                         <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -138,7 +158,7 @@ export function NotifPromoModal() {
 
                     <button
                         onClick={handleEnable}
-                        className="w-full h-12 rounded-2xl bg-linear-to-r from-[#7A1FA2] to-[#6D28D9] text-white font-bold text-sm tracking-wide shadow-lg shadow-purple-700/30 transition-all active:scale-[0.98] hover:shadow-purple-700/40"
+                        className="w-full h-12 rounded-2xl bg-linear-to-r from-[#7A1FA2] to-[#6D28D9] text-white font-bold text-sm tracking-wide shadow-lg shadow-purple-700/30 transition-all active:scale-[0.98]"
                     >
                         Ativar notificações
                     </button>

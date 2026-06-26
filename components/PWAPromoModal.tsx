@@ -4,7 +4,14 @@ import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { usePWA } from '@/context/PWAContext';
 
-const SESSION_KEY = 'pwa_promo_seen';
+// Chave que rastreia quando o modal foi exibido pela última vez
+const SHOWN_KEY = 'pwa_promo_shown';
+// Chave compartilhada que registra quando o app foi colocado em segundo plano
+const LAST_HIDDEN_KEY = 'mimo_last_hidden';
+// Tempo mínimo em segundo plano para considerar uma nova sessão (5 min)
+const SESSION_GAP_MS = 5 * 60 * 1000;
+// Cooldown mínimo entre exibições do modal (1 hora)
+const COOLDOWN_MS = 60 * 60 * 1000;
 
 const benefits = [
     {
@@ -44,21 +51,49 @@ export function PWAPromoModal() {
     const [animating, setAnimating] = useState(false);
 
     useEffect(() => {
-        if (!hasDeferredPrompt || isStandalone) return;
         if (typeof window === 'undefined') return;
-        if (sessionStorage.getItem(SESSION_KEY)) return;
 
-        const t = setTimeout(() => {
-            setVisible(true);
-            setTimeout(() => setAnimating(true), 10);
-        }, 2000);
+        const shouldShow = () => {
+            if (!hasDeferredPrompt || isStandalone) return false;
+            const lastHidden = Number(localStorage.getItem(LAST_HIDDEN_KEY) ?? '0');
+            const lastShown  = Number(localStorage.getItem(SHOWN_KEY) ?? '0');
+            const now = Date.now();
+            // Primeira visita (lastHidden = 0) ou ficou afastado pelo tempo de sessão
+            const isNewSession = lastHidden === 0 || now - lastHidden > SESSION_GAP_MS;
+            // Respeita o cooldown entre exibições
+            const canShow = now - lastShown > COOLDOWN_MS;
+            return isNewSession && canShow;
+        };
 
-        return () => clearTimeout(t);
+        const tryShow = () => {
+            if (!shouldShow()) return;
+            // Marca imediatamente para evitar duplo disparo
+            localStorage.setItem(SHOWN_KEY, String(Date.now()));
+            setTimeout(() => {
+                setVisible(true);
+                setTimeout(() => setAnimating(true), 10);
+            }, 2000);
+        };
+
+        // Verifica ao montar (cold start: Chrome fechou e reabriu a página)
+        tryShow();
+
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                // Verifica ao retornar ao app (Chrome restaurou a aba do background)
+                tryShow();
+            } else {
+                // Registra o momento em que o app foi para segundo plano
+                localStorage.setItem(LAST_HIDDEN_KEY, String(Date.now()));
+            }
+        };
+
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', onVisibilityChange);
     }, [hasDeferredPrompt, isStandalone]);
 
     const dismiss = () => {
         setAnimating(false);
-        sessionStorage.setItem(SESSION_KEY, '1');
         setTimeout(() => setVisible(false), 300);
     };
 
@@ -71,23 +106,20 @@ export function PWAPromoModal() {
 
     return (
         <div
-            className={`fixed inset-0 z-[180] flex items-center justify-center p-5 transition-opacity duration-300 ${
+            className={`fixed inset-0 z-180 flex items-center justify-center p-5 transition-opacity duration-300 ${
                 animating ? 'opacity-100' : 'opacity-0'
             }`}
         >
-            {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-gray-950/70 backdrop-blur-sm"
                 onClick={dismiss}
             />
 
-            {/* Card */}
             <div
                 className={`relative w-full max-w-sm overflow-hidden rounded-3xl bg-white shadow-2xl transition-all duration-300 transform ${
                     animating ? 'scale-100 translate-y-0' : 'scale-90 translate-y-8'
                 }`}
             >
-                {/* Fechar */}
                 <button
                     onClick={dismiss}
                     className="absolute right-4 top-4 z-10 rounded-full p-1.5 bg-white/20 text-white/80 hover:bg-white/30 transition-colors"
@@ -96,13 +128,11 @@ export function PWAPromoModal() {
                     <X size={18} strokeWidth={2.5} />
                 </button>
 
-                {/* Hero com gradiente */}
-                <div className="relative flex flex-col items-center justify-center pt-10 pb-8 px-6 bg-gradient-to-br from-[#7A1FA2] via-[#6D28D9] to-[#4c1d95] overflow-hidden">
-                    {/* Círculos decorativos */}
+                {/* Hero */}
+                <div className="relative flex flex-col items-center justify-center pt-10 pb-8 px-6 bg-linear-to-br from-[#7A1FA2] via-[#6D28D9] to-[#4c1d95] overflow-hidden">
                     <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full bg-white/5" />
                     <div className="absolute -bottom-10 -left-10 w-52 h-52 rounded-full bg-white/5" />
 
-                    {/* Logo */}
                     <div className="relative flex h-20 w-20 items-center justify-center rounded-3xl bg-white/15 border border-white/20 shadow-xl mb-4 backdrop-blur-sm">
                         <img src="/Logo.svg" alt="Mimo" className="w-11 h-11 object-contain" />
                     </div>
@@ -131,10 +161,9 @@ export function PWAPromoModal() {
                         ))}
                     </div>
 
-                    {/* Ações */}
                     <button
                         onClick={handleInstall}
-                        className="w-full h-12 rounded-2xl bg-gradient-to-r from-[#7A1FA2] to-[#6D28D9] text-white font-bold text-sm tracking-wide shadow-lg shadow-purple-700/30 transition-all active:scale-[0.98] hover:shadow-purple-700/40"
+                        className="w-full h-12 rounded-2xl bg-linear-to-r from-[#7A1FA2] to-[#6D28D9] text-white font-bold text-sm tracking-wide shadow-lg shadow-purple-700/30 transition-all active:scale-[0.98]"
                     >
                         Instalar aplicativo
                     </button>
