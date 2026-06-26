@@ -681,7 +681,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                     )}
 
                                     {/* Instalar app (PWA) */}
-                                    {isInstallable && !isStandalone && (
+                                    {isInstallable && (
                                         <div className="px-4 py-3.5 flex items-center justify-between">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">

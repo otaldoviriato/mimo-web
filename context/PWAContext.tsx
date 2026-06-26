@@ -72,13 +72,9 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
 
         window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-        // iOS: sempre mostramos o botão (instrução manual via Safari)
-        // Android/Desktop: isInstallable é ativado apenas quando beforeinstallprompt dispara
-        if (standalone) {
-            setIsInstallable(false);
-        } else if (ios) {
-            setIsInstallable(true);
-        }
+        // O botão de instalar aparece sempre — o comportamento ao clicar é que varia:
+        // standalone → alerta de "já instalado" | ios → modal de passos | sem prompt → modal de indisponível
+        setIsInstallable(true);
 
         return () => {
             window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -89,6 +85,11 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const promptInstall = async () => {
+        if (isStandalone) {
+            alert('O Mimo já está instalado neste dispositivo.');
+            return;
+        }
+
         if (isIOS) {
             setInstallModal('ios');
             return;
