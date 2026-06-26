@@ -214,9 +214,13 @@ export default function LoginPage() {
                 strategy: 'oauth_google',
                 redirectUrl: '/sso-callback',
                 redirectUrlComplete: '/chats',
-                // Força o Google a sempre exibir o seletor de conta,
-                // impedindo auto-login com a última conta usada (FedCM / one-tap).
-                oidcPrompt: 'select_account',
+                // 'select_account' força o picker de contas no Android/Chrome.
+                // 'consent' é necessário no iOS/Safari: sem ele, o Safari compartilha
+                // os cookies de sessão do Google e o picker é ignorado, pois o Google
+                // detecta uma sessão válida e pula a seleção automaticamente.
+                // Combinando os dois, o Google exige escolha de conta E confirmação
+                // de permissões — nenhum cache de sessão consegue dispensar essa tela.
+                oidcPrompt: 'select_account consent',
             });
         } catch (err: unknown) {
             setError(clerkError(err, 'Erro no login com Google'));
