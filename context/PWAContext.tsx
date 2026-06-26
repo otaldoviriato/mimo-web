@@ -60,20 +60,22 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
         setIsStandalone(!!standalone);
 
         const handleBeforeInstallPrompt = (e: Event) => {
-            console.log('Evento beforeinstallprompt disparado');
-            // e.preventDefault(); // Comentado para permitir que o ícone de instalação do navegador apareça
+            // Impede a mini-infobar automática do Chrome para controlar o momento exato
+            // em que o diálogo aparece. Sem isso, o Chrome consome o evento antes que o
+            // usuário toque em "Instalar", invalidando o deferredPrompt.
+            e.preventDefault();
             setDeferredPrompt(e as BeforeInstallPromptEvent);
-            setIsInstallable(true);
+            if (!ios) setIsInstallable(true);
         };
 
         window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-        // Mostramos o banner "sempre" se não estiver instalado, 
-        // mesmo que o prompt automático não tenha disparado ainda.
-        if (!standalone) {
-            setIsInstallable(true);
-        } else {
+        // iOS: sempre mostramos o botão (instrução manual via Safari)
+        // Android/Desktop: isInstallable é ativado apenas quando beforeinstallprompt dispara
+        if (standalone) {
             setIsInstallable(false);
+        } else if (ios) {
+            setIsInstallable(true);
         }
 
         return () => {
@@ -91,14 +93,19 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (deferredPrompt) {
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            if (outcome === 'accepted') {
-                setIsInstallable(false);
+            try {
+                await deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
                 setDeferredPrompt(null);
+                if (outcome === 'accepted') {
+                    setIsInstallable(false);
+                }
+            } catch {
+                // Prompt já consumido ou inválido; limpa e cai no fluxo manual
+                setDeferredPrompt(null);
+                alert('Para instalar: procure o ícone de instalação na barra de endereços (geralmente um computador com uma seta) ou vá no menu do navegador e selecione "Instalar Mimo".');
             }
         } else {
-            // Instrução manual para Desktop ou navegadores que não suportam prompt automático
             alert('Para instalar: procure o ícone de instalação na barra de endereços (geralmente um computador com uma seta) ou vá no menu do navegador e selecione "Instalar Mimo".');
         }
     };

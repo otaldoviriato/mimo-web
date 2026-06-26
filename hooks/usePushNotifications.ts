@@ -14,18 +14,6 @@ export const usePushNotifications = () => {
       setPermission(Notification.permission);
     }
 
-    // Registrar o Service Worker automaticamente
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker
-        .register("/firebase-messaging-sw.js")
-        .then((registration) => {
-          console.log("Service Worker registrado com sucesso:", registration);
-        })
-        .catch((error) => {
-          console.error("Falha ao registrar o Service Worker:", error);
-        });
-    }
-
     // Escutar eventos de foreground messages
     const setupForegroundListener = async () => {
       await onForegroundMessage((payload) => {
