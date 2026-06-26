@@ -214,6 +214,9 @@ export default function LoginPage() {
                 strategy: 'oauth_google',
                 redirectUrl: '/sso-callback',
                 redirectUrlComplete: '/chats',
+                // Força o Google a sempre exibir o seletor de conta,
+                // impedindo auto-login com a última conta usada (FedCM / one-tap).
+                oidcPrompt: 'select_account',
             });
         } catch (err: unknown) {
             setError(clerkError(err, 'Erro no login com Google'));
