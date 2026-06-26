@@ -3,17 +3,22 @@
 import React, { useEffect, useState } from 'react';
 import { Bell, X } from 'lucide-react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { usePWA } from '@/context/PWAContext';
 
 const INACTIVITY_THRESHOLD = 12 * 60 * 60 * 1000; // 12 horas
 const COOLDOWN_THRESHOLD = 24 * 60 * 60 * 1000; // 24 horas (não incomodar se fechar)
 
 export function NotificationPromptModal() {
+    const { isStandalone } = usePWA();
     const { permission, handleRequestPermission } = usePushNotifications();
     const [isVisible, setIsVisible] = useState(false);
     const [isAnimating, setIsAnimating] = useState(false);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
+
+        // Notificações só fazem sentido dentro do PWA instalado
+        if (!isStandalone) return;
 
         // Se já foi concedida a permissão, não precisamos fazer nada
         if (permission === 'granted') return;
@@ -72,7 +77,7 @@ export function NotificationPromptModal() {
             if (initTimer) clearTimeout(initTimer);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [permission]);
+    }, [permission, isStandalone]);
 
     const handleClose = () => {
         setIsAnimating(false);

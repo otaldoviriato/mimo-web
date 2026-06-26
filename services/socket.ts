@@ -2,10 +2,69 @@ import { io, Socket } from 'socket.io-client';
 
 const CHAT_SERVER_URL = process.env.NEXT_PUBLIC_CHAT_SERVER_URL || 'http://localhost:3001';
 
+// Chaves usadas para detecção de sessão (lidas pelos modais de promoção)
+export const SESSION_KEYS = {
+    newSession:    'mimo_new_session',
+    intentional:   'mimo_session_intentional',
+    sessionEnded:  'mimo_session_ended',
+    everConnected: 'mimo_ever_connected',
+} as const;
+
+// Evento customizado disparado quando uma nova sessão é detectada
+export const NEW_SESSION_EVENT = 'mimo:new-session';
+
 class SocketService {
     public socket: Socket | null = null;
     private _currentUserId: string | null = null;
     private _newMessageCallback: ((data: any) => void) | null = null;
+
+    // ── Detecção de sessão ──────────────────────────────────────────────────
+
+    private _markSessionEnded(intentional: boolean) {
+        if (typeof window === 'undefined') return;
+        // Não sobrescreve se já marcado (evita duplo-registro na sequência disconnect→disconnect)
+        if (!localStorage.getItem(SESSION_KEYS.sessionEnded)) {
+            localStorage.setItem(SESSION_KEYS.sessionEnded, String(Date.now()));
+        }
+        if (intentional) {
+            localStorage.setItem(SESSION_KEYS.intentional, '1');
+        }
+    }
+
+    private _onSocketConnected() {
+        if (typeof window === 'undefined') return;
+
+        const wasIntentional = localStorage.getItem(SESSION_KEYS.intentional) === '1';
+        const sessionEndedStr = localStorage.getItem(SESSION_KEYS.sessionEnded);
+        const everConnected   = !!localStorage.getItem(SESSION_KEYS.everConnected);
+
+        const now = Date.now();
+        let isNewSession = false;
+
+        if (!everConnected) {
+            isNewSession = true; // Primeira visita de todos os tempos
+        } else if (wasIntentional) {
+            isNewSession = true; // Logout ou troca de usuário
+        } else if (sessionEndedStr) {
+            // Consideramos nova sessão se o socket ficou desconectado > 2 min
+            isNewSession = now - Number(sessionEndedStr) > 2 * 60 * 1000;
+        }
+
+        // Limpa flags da sessão anterior antes de disparar
+        localStorage.removeItem(SESSION_KEYS.intentional);
+        localStorage.removeItem(SESSION_KEYS.sessionEnded);
+        localStorage.setItem(SESSION_KEYS.everConnected, '1');
+
+        if (isNewSession) {
+            // Flag para modais que montarem após este evento
+            localStorage.setItem(SESSION_KEYS.newSession, wasIntentional ? 'intentional' : '1');
+            window.dispatchEvent(
+                new CustomEvent(NEW_SESSION_EVENT, { detail: { intentional: wasIntentional } })
+            );
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
 
     connect(userId?: string) {
         const newUserId = userId ?? this._currentUserId;
@@ -16,9 +75,10 @@ class SocketService {
             return;
         }
 
-        // Troca de usuário com socket ativo — desconecta e reconecta
+        // Troca de usuário com socket ativo — desconecta e reconecta (intencional)
         if (this.socket) {
             console.log('[SocketService] Desconectando socket anterior...');
+            this._markSessionEnded(true);
             this.socket.disconnect();
             this.socket = null;
         }
@@ -42,6 +102,12 @@ class SocketService {
             if (this._currentUserId) {
                 this.authenticate(this._currentUserId);
             }
+            this._onSocketConnected();
+        });
+
+        this.socket.on('disconnect', () => {
+            // Desconexão não-intencional (rede, Chrome matou processo, etc.)
+            this._markSessionEnded(false);
         });
 
         this.socket.on('connect_error', (err) => {
@@ -51,6 +117,7 @@ class SocketService {
 
     disconnect() {
         if (this.socket) {
+            this._markSessionEnded(true); // Desconexão explícita (logout)
             this.socket.disconnect();
             this.socket = null;
         }

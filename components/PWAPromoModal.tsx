@@ -3,15 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { usePWA } from '@/context/PWAContext';
+import { SESSION_KEYS, NEW_SESSION_EVENT } from '@/services/socket';
 
-// Chave que rastreia quando o modal foi exibido pela última vez
+// Cooldown entre exibições: 10 min para reconexões automáticas,
+// ignorado em sessões intencionais (logout/login, troca de conta)
+const COOLDOWN_MS = 10 * 60 * 1000;
 const SHOWN_KEY = 'pwa_promo_shown';
-// Chave compartilhada que registra quando o app foi colocado em segundo plano
-const LAST_HIDDEN_KEY = 'mimo_last_hidden';
-// Tempo mínimo em segundo plano para considerar uma nova sessão (5 min)
-const SESSION_GAP_MS = 5 * 60 * 1000;
-// Cooldown mínimo entre exibições do modal (1 hora)
-const COOLDOWN_MS = 60 * 60 * 1000;
 
 const benefits = [
     {
@@ -53,21 +50,12 @@ export function PWAPromoModal() {
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
-        const shouldShow = () => {
-            if (!hasDeferredPrompt || isStandalone) return false;
-            const lastHidden = Number(localStorage.getItem(LAST_HIDDEN_KEY) ?? '0');
-            const lastShown  = Number(localStorage.getItem(SHOWN_KEY) ?? '0');
-            const now = Date.now();
-            // Primeira visita (lastHidden = 0) ou ficou afastado pelo tempo de sessão
-            const isNewSession = lastHidden === 0 || now - lastHidden > SESSION_GAP_MS;
-            // Respeita o cooldown entre exibições
-            const canShow = now - lastShown > COOLDOWN_MS;
-            return isNewSession && canShow;
-        };
-
-        const tryShow = () => {
-            if (!shouldShow()) return;
-            // Marca imediatamente para evitar duplo disparo
+        const tryShow = (intentional: boolean) => {
+            // Só exibe se o Chrome confirmou que pode instalar E app não está instalado
+            if (!hasDeferredPrompt || isStandalone) return;
+            const lastShown = Number(localStorage.getItem(SHOWN_KEY) ?? '0');
+            // Sessões intencionais (logout/troca de conta) ignoram o cooldown
+            if (!intentional && Date.now() - lastShown < COOLDOWN_MS) return;
             localStorage.setItem(SHOWN_KEY, String(Date.now()));
             setTimeout(() => {
                 setVisible(true);
@@ -75,21 +63,19 @@ export function PWAPromoModal() {
             }, 2000);
         };
 
-        // Verifica ao montar (cold start: Chrome fechou e reabriu a página)
-        tryShow();
+        // Verifica flag persistida para o caso do evento ter disparado antes deste mount
+        const pending = localStorage.getItem(SESSION_KEYS.newSession);
+        if (pending) {
+            tryShow(pending === 'intentional');
+        }
 
-        const onVisibilityChange = () => {
-            if (document.visibilityState === 'visible') {
-                // Verifica ao retornar ao app (Chrome restaurou a aba do background)
-                tryShow();
-            } else {
-                // Registra o momento em que o app foi para segundo plano
-                localStorage.setItem(LAST_HIDDEN_KEY, String(Date.now()));
-            }
+        const onNewSession = (e: Event) => {
+            const intentional = (e as CustomEvent<{ intentional: boolean }>).detail?.intentional ?? false;
+            tryShow(intentional);
         };
 
-        document.addEventListener('visibilitychange', onVisibilityChange);
-        return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+        window.addEventListener(NEW_SESSION_EVENT, onNewSession);
+        return () => window.removeEventListener(NEW_SESSION_EVENT, onNewSession);
     }, [hasDeferredPrompt, isStandalone]);
 
     const dismiss = () => {
@@ -132,11 +118,9 @@ export function PWAPromoModal() {
                 <div className="relative flex flex-col items-center justify-center pt-10 pb-8 px-6 bg-linear-to-br from-[#7A1FA2] via-[#6D28D9] to-[#4c1d95] overflow-hidden">
                     <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full bg-white/5" />
                     <div className="absolute -bottom-10 -left-10 w-52 h-52 rounded-full bg-white/5" />
-
                     <div className="relative flex h-20 w-20 items-center justify-center rounded-3xl bg-white/15 border border-white/20 shadow-xl mb-4 backdrop-blur-sm">
                         <img src="/Logo.svg" alt="Mimo" className="w-11 h-11 object-contain" />
                     </div>
-
                     <h2 className="text-2xl font-extrabold text-white tracking-tight text-center leading-tight">
                         Mimo fica melhor<br />no aplicativo
                     </h2>
@@ -160,14 +144,12 @@ export function PWAPromoModal() {
                             </div>
                         ))}
                     </div>
-
                     <button
                         onClick={handleInstall}
                         className="w-full h-12 rounded-2xl bg-linear-to-r from-[#7A1FA2] to-[#6D28D9] text-white font-bold text-sm tracking-wide shadow-lg shadow-purple-700/30 transition-all active:scale-[0.98]"
                     >
                         Instalar aplicativo
                     </button>
-
                     <button
                         onClick={dismiss}
                         className="w-full mt-3 h-9 rounded-xl text-gray-400 hover:text-gray-600 font-medium text-xs transition-colors"
