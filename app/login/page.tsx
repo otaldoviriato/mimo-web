@@ -390,16 +390,6 @@ export default function LoginPage() {
 
 
                 <div className="mt-8 text-center text-[10px] text-gray-400 leading-relaxed space-y-1">
-                    <p>
-                        Ao continuar, você concorda com nossos{' '}
-                        <Link href="/termos-de-uso" target="_blank" className="underline hover:text-purple-600 font-semibold">
-                            Termos de Uso
-                        </Link>{' '}
-                        e{' '}
-                        <Link href="/politica-de-privacidade" target="_blank" className="underline hover:text-purple-600 font-semibold">
-                            Política de Privacidade
-                        </Link>.
-                    </p>
                     <div className="border-t border-gray-100 pt-4 mt-4 space-y-0.5 select-none">
                         <p className="font-semibold text-gray-500">LEAD CONTEUDOS DIGITAIS LTDA</p>
                         <p>

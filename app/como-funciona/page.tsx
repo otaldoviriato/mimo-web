@@ -72,11 +72,6 @@ function ParaCriadorasContent() {
         setTooltipTimeoutId(id);
     };
 
-    useEffect(() => {
-        if (isSignedIn) {
-            router.replace('/chats');
-        }
-    }, [isSignedIn, router]);
 
     const clerkError = (err: unknown, fallback: string): string => {
         const e = err as any;

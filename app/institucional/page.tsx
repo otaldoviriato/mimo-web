@@ -98,7 +98,7 @@ export default function InstitucionalPage() {
                             Quero Criar Meu Perfil
                         </Link>
                         <Link
-                            href="/para-criadoras"
+                            href="/como-funciona"
                             className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 text-base font-bold text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50 border border-gray-200 rounded-2xl transition-all duration-300 shadow-xs"
                         >
                             Como Funciona (Monetização)
@@ -135,7 +135,7 @@ export default function InstitucionalPage() {
                             </ul>
                         </div>
                         <Link 
-                            href="/para-criadoras" 
+                            href="/como-funciona"
                             className="inline-flex items-center gap-2 text-sm font-bold text-purple-600 hover:text-purple-700 transition-colors"
                         >
                             Como monetizar suas conversas →
