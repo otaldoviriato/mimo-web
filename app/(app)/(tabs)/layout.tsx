@@ -8,6 +8,7 @@ import { BalanceDisplay } from '@/components/BalanceDisplay';
 import { Avatar } from '@/components/Avatar';
 import { useUser } from '@clerk/nextjs';
 import { PWAPromoModal } from '@/components/PWAPromoModal';
+import { NotifPromoModal } from '@/components/NotifPromoModal';
 
 // As abas são geradas dinamicamente dentro do componente com base no tipo de perfil (profissional ou não)
 
@@ -127,6 +128,8 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
 
             {/* Modal de instalação PWA — aparece uma vez por sessão quando o Chrome libera o prompt */}
             <PWAPromoModal />
+            {/* Modal de notificações — aparece uma vez por sessão quando em modo standalone e permissão ainda não concedida */}
+            <NotifPromoModal />
 
             {/* Bottom nav (mobile) */}
             <nav className="md:hidden fixed bottom-0 left-0 right-0 h-[calc(72px+env(safe-area-inset-bottom))] bg-white border-t border-gray-200 flex items-start z-40 shadow-[0_-6px_18px_rgba(15,23,42,0.05)] pb-[env(safe-area-inset-bottom)]">
