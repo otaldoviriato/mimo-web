@@ -158,13 +158,9 @@ export default function SearchPage() {
                                             <h2 className="text-base font-semibold text-gray-900 truncate tracking-tight leading-snug">
                                                 {user.name || `@${user.username}`}
                                             </h2>
-                                            {user.isProfessional ? (
+                                            {user.isProfessional && (
                                                 <span className="bg-purple-50 border border-purple-100 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider scale-95 origin-left">
-                                                    Profissional
-                                                </span>
-                                            ) : (
-                                                <span className="bg-gray-50 border border-gray-200 text-gray-500 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider scale-95 origin-left">
-                                                    Cliente
+                                                    Perfil Monetizado
                                                 </span>
                                             )}
                                         </div>
@@ -173,7 +169,7 @@ export default function SearchPage() {
                                         </p>
                                         
                                         <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-500 font-medium flex-wrap">
-                                            <span>{user.isProfessional ? '💬 Pago' : '💬 Gratuito'}</span>
+                                            <span>{user.isProfessional ? '💬 Chat Monetizado' : '💬 Chat Livre'}</span>
                                             {user.isProfessional && (
                                                 <>
                                                     <span className="w-1 h-1 rounded-full bg-gray-300" />

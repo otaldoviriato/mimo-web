@@ -18,6 +18,20 @@ function SkeletonField() {
     );
 }
 
+const formatDate = (dateString?: string | Date) => {
+    if (!dateString) return '';
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return '';
+        const day = String(date.getUTCDate()).padStart(2, '0');
+        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const year = date.getUTCFullYear();
+        return `${day}/${month}/${year}`;
+    } catch {
+        return '';
+    }
+};
+
 interface SettingsPageProps {
     isSubPage?: boolean;
     onBack?: () => void;
@@ -38,7 +52,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const [name, setName] = useState('');
     const [taxId, setTaxId] = useState('');
     const [phone, setPhone] = useState('');
-    const [pixKey, setPixKey] = useState('');
     const [subscriptionPrice, setSubscriptionPrice] = useState('');
     const [isSubscriptionEnabled, setIsSubscriptionEnabled] = useState(false);
     const [bio, setBio] = useState('');
@@ -51,6 +64,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const [isAboutExpanded, setIsAboutExpanded] = useState(false);
     const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(false);
     const [savingEmailPref, setSavingEmailPref] = useState(false);
+    const [isSecurityExpanded, setIsSecurityExpanded] = useState(false);
     const [accountAction, setAccountAction] = useState<'suspend' | 'delete' | null>(null);
     const [accountActionLoading, setAccountActionLoading] = useState(false);
     const [accountActionError, setAccountActionError] = useState('');
@@ -71,7 +85,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             setName(userData.name || '');
             setTaxId(userData.taxId ? formatCPF(userData.taxId) : '');
             setPhone(userData.phone ? formatPhone(userData.phone) : '');
-            setPixKey(userData.pixKey || '');
             setSubscriptionPrice(userData.subscriptionPrice?.toString() ?? '0');
             setIsSubscriptionEnabled(userData.isSubscriptionEnabled ?? false);
             setBio(userData.bio || '');
@@ -129,7 +142,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                 updateData.isSubscriptionEnabled = isSubscriptionEnabled;
                 updateData.subscriptionPrice = price;
                 updateData.bio = bio;
-                updateData.pixKey = pixKey;
                 updateData.chargePerCharNonSubscribers = charPrice;
                 updateData.chargePerCharSubscribers = Number(chargePerCharSubscribers) || 0;
             } else {
@@ -237,6 +249,17 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
 
     const profileIsProfessional = !!userData?.isProfessional;
 
+    const initialName = userData?.name || '';
+    const initialUsername = userData?.username || '';
+    const initialPhone = userData?.phone ? formatPhone(userData?.phone) : '';
+    const initialBio = userData?.bio || '';
+
+    const hasPersonalChanges =
+        name !== initialName ||
+        username !== initialUsername ||
+        phone !== initialPhone ||
+        (profileIsProfessional && (bio !== initialBio));
+
     const layoutClass = isSubPage
         ? 'w-full h-full'
         : 'min-h-screen w-full';
@@ -279,87 +302,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                     </div>
                 ) : (
                     <>
-                        {/* ── INTEGRIDADE DA CONTA (Apenas para Profissionais) ── */}
-                        {profileIsProfessional && (
-                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-                                <div className="flex items-center justify-between mb-3">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-7 h-7 rounded-lg bg-green-50 border border-green-100 flex items-center justify-center">
-                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-600"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs font-semibold text-gray-800">Integridade da Conta</p>
-                                            <p className="text-[10px] text-gray-400">Complete seu perfil para maior segurança</p>
-                                        </div>
-                                    </div>
-                                    {(() => {
-                                        const minPublicPhotos = userData?.minPublicPhotos ?? 6;
-                                        const maxPublicPhotos = userData?.maxPublicPhotos ?? 12;
-                                        const minExclusivePhotos = userData?.minExclusivePhotos ?? 2;
-                                        const maxExclusivePhotos = userData?.maxExclusivePhotos ?? 4;
-                                        const publicItemsCount = galleryData?.publicItems?.length ?? galleryData?.items?.length ?? 0;
-                                        const publicExclusiveCount = (galleryData?.publicItems ?? galleryData?.items ?? []).filter((item: any) => item.visibility === 'subscribers').length;
-                                        const publicGalleryIsComplete = 
-                                            publicItemsCount >= minPublicPhotos && 
-                                            publicItemsCount <= maxPublicPhotos && 
-                                            publicExclusiveCount >= minExclusivePhotos && 
-                                            publicExclusiveCount <= maxExclusivePhotos;
 
-                                        const checks = [!!userData?.photoUrl, !!taxId, !!pixKey, !!phone, publicGalleryIsComplete];
-                                        const done = checks.filter(Boolean).length;
-                                        const total = checks.length;
-                                        return (
-                                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                                                done === total ? 'text-green-700 bg-green-50' : done >= Math.ceil(total / 2) ? 'text-amber-700 bg-amber-50' : 'text-red-600 bg-red-50'
-                                            }`}>{done}/{total}</span>
-                                        );
-                                    })()}
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    {(() => {
-                                        const minPublicPhotos = userData?.minPublicPhotos ?? 6;
-                                        const maxPublicPhotos = userData?.maxPublicPhotos ?? 12;
-                                        const minExclusivePhotos = userData?.minExclusivePhotos ?? 2;
-                                        const maxExclusivePhotos = userData?.maxExclusivePhotos ?? 4;
-                                        const publicItemsCount = galleryData?.publicItems?.length ?? galleryData?.items?.length ?? 0;
-                                        const publicExclusiveCount = (galleryData?.publicItems ?? galleryData?.items ?? []).filter((item: any) => item.visibility === 'subscribers').length;
-                                        const publicGalleryIsComplete = 
-                                            publicItemsCount >= minPublicPhotos && 
-                                            publicItemsCount <= maxPublicPhotos && 
-                                            publicExclusiveCount >= minExclusivePhotos && 
-                                            publicExclusiveCount <= maxExclusivePhotos;
-
-                                        return [
-                                            { label: 'Foto de perfil cadastrada', done: !!userData?.photoUrl, action: () => router.push('/profile') },
-                                            { label: 'CPF informado', done: !!taxId, action: () => document.getElementById('settings-cpf-input')?.focus() },
-                                            { label: 'Chave Pix cadastrada', done: !!pixKey, action: () => document.getElementById('settings-pix-input')?.focus() },
-                                            { label: 'Telefone cadastrado', done: !!phone, action: () => document.getElementById('settings-phone-input')?.focus() },
-                                            { label: `Galeria pública completa (${publicItemsCount} fotos, ${publicExclusiveCount} exclusivas)`, done: publicGalleryIsComplete, action: () => router.push('/profile') },
-                                        ].map((item, i) => (
-                                            <div key={i} className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
-                                                        item.done ? 'bg-green-100' : 'bg-gray-100'
-                                                    }`}>
-                                                        {item.done ? (
-                                                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-green-600"><polyline points="20 6 9 17 4 12"/></svg>
-                                                        ) : (
-                                                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-gray-400"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                                        )}
-                                                    </div>
-                                                    <span className={`text-xs ${item.done ? 'text-gray-700' : 'text-gray-400'}`}>{item.label}</span>
-                                                </div>
-                                                {!item.done && (
-                                                    <button type="button" onClick={item.action} className="text-[10px] font-semibold text-purple-600 hover:text-purple-700">
-                                                        Completar
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ));
-                                    })()}
-                                </div>
-                            </div>
-                        )}
 
                         {/* ── SEÇÃO: DADOS DO PERFIL ── */}
                         <div>
@@ -390,17 +333,37 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                         />
                                     </div>
                                 </div>
+                                {/* E-mail */}
+                                <div className="px-4 py-3.5 border-b border-gray-50 bg-gray-50/50">
+                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">E-mail</label>
+                                    <input
+                                        className="w-full text-sm text-gray-500 font-medium bg-transparent focus:outline-none cursor-not-allowed"
+                                        value={userData?.email || ''}
+                                        readOnly
+                                        disabled
+                                    />
+                                </div>
                                 {/* CPF */}
-                                <div className="px-4 py-3.5 border-b border-gray-50">
+                                <div className="px-4 py-3.5 border-b border-gray-50 bg-gray-50/50">
                                     <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">CPF</label>
                                     <input
                                         id="settings-cpf-input"
-                                        className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
-                                        placeholder="000.000.000-00"
+                                        className="w-full text-sm text-gray-500 font-medium bg-transparent focus:outline-none cursor-not-allowed"
+                                        placeholder="Não informado"
                                         value={taxId}
-                                        onChange={(e) => setTaxId(formatCPF(e.target.value))}
-                                        maxLength={14}
-                                        inputMode="numeric"
+                                        readOnly
+                                        disabled
+                                    />
+                                </div>
+                                {/* Data de Nascimento */}
+                                <div className="px-4 py-3.5 border-b border-gray-50 bg-gray-50/50">
+                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Data de Nascimento</label>
+                                    <input
+                                        className="w-full text-sm text-gray-500 font-medium bg-transparent focus:outline-none cursor-not-allowed"
+                                        placeholder="Não informada"
+                                        value={userData?.birthDate ? formatDate(userData.birthDate) : ''}
+                                        readOnly
+                                        disabled
                                     />
                                 </div>
                                 {/* Telefone */}
@@ -416,19 +379,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                         type="tel"
                                     />
                                 </div>
-                                {/* Chave Pix (apenas profissionais) */}
-                                {profileIsProfessional && (
-                                    <div className="px-4 py-3.5 border-b border-gray-50">
-                                        <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Chave Pix</label>
-                                        <input
-                                            id="settings-pix-input"
-                                            className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
-                                            placeholder="CPF, E-mail, Telefone ou Aleatória"
-                                            value={pixKey}
-                                            onChange={(e) => setPixKey(e.target.value)}
-                                        />
-                                    </div>
-                                )}
                                 {/* Biografia (apenas profissionais) */}
                                 {profileIsProfessional && (
                                     <div className="px-4 py-3.5">
@@ -451,6 +401,34 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                         />
                                     </div>
                                 )}
+
+                                {/* Botão Salvar (e alertas) */}
+                                <div className="px-4 pb-5 pt-2 flex flex-col gap-2">
+                                    {saveError && (
+                                        <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-100 rounded-xl">
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                            <p className="text-xs text-red-600 font-medium">{saveError}</p>
+                                        </div>
+                                    )}
+                                    {saveSuccess && (
+                                        <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-100 rounded-xl">
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-600 shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
+                                            <p className="text-xs text-green-700 font-medium">Perfil atualizado com sucesso</p>
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={handleSaveAll}
+                                        disabled={loading || !hasPersonalChanges}
+                                        className="w-full h-10 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors active:scale-[0.98] flex items-center justify-center gap-2"
+                                    >
+                                        {loading ? (
+                                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                        ) : (
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                        )}
+                                        Salvar Alterações
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -525,7 +503,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                             </p>
                                         </div>
 
-                                        <div className="flex items-center justify-between bg-gray-50 rounded-xl p-2.5 border border-gray-150 mt-1">
+                                        <div className="flex items-center justify-between bg-gray-50 rounded-xl p-2.5 border border-gray-100 mt-1">
                                             <span className="text-xs font-semibold text-gray-500">Valor Base</span>
                                             
                                             <div className="flex items-center gap-2">
@@ -620,7 +598,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                             <div className="min-w-0">
                                                 <p className="text-sm font-medium text-gray-800">Alertas de nova conversa</p>
                                                 <p className="text-[10px] text-gray-400 leading-snug">
-                                                    Receba um e-mail quando um cliente iniciar uma nova sessão de chat com você
+                                                    Receba um e-mail quando iniciarem uma nova conversa com você
                                                 </p>
                                             </div>
                                         </div>
@@ -664,33 +642,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                             </div>
                         )}
 
-                        {/* ── BOTÃO SALVAR ── */}
-                        <div className="flex flex-col gap-2">
-                            {saveError && (
-                                <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-100 rounded-xl">
-                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                                    <p className="text-xs text-red-600 font-medium">{saveError}</p>
-                                </div>
-                            )}
-                            {saveSuccess && (
-                                <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-100 rounded-xl">
-                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-600 shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
-                                    <p className="text-xs text-green-700 font-medium">Perfil atualizado com sucesso</p>
-                                </div>
-                            )}
-                            <button
-                                onClick={handleSaveAll}
-                                disabled={loading}
-                                className="w-full h-10 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white text-sm font-semibold transition-colors active:scale-[0.98] flex items-center justify-center gap-2"
-                            >
-                                {loading ? (
-                                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                                ) : (
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                                )}
-                                Salvar Alterações
-                            </button>
-                        </div>
+
 
                         {/* ── SEÇÃO: PREFERÊNCIAS DO DISPOSITIVO ── */}
                         {mounted && (notificationPermission !== 'granted' || (isInstallable && !isStandalone)) && (
@@ -877,33 +829,57 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                     <span className="text-sm font-medium text-gray-800">Sair da conta</span>
                                 </button>
                                 <button
-                                    onClick={() => setAccountAction('suspend')}
-                                    className="w-full px-4 py-3.5 flex items-center gap-3 hover:bg-amber-50 active:bg-amber-100 transition-colors border-b border-gray-50"
+                                    onClick={() => setIsSecurityExpanded(!isSecurityExpanded)}
+                                    className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
                                 >
-                                    <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-600">
-                                            <circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/>
-                                        </svg>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
+                                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                            </svg>
+                                        </div>
+                                        <span className="text-sm font-medium text-gray-800">Segurança da conta</span>
                                     </div>
-                                    <div className="min-w-0 text-left">
-                                        <span className="block text-sm font-medium text-gray-800">Suspender conta</span>
-                                        <span className="block text-[10px] text-gray-400">Desativa o acesso até reativação manual</span>
-                                    </div>
+                                    <svg
+                                        width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                                        className={`text-gray-400 transition-transform duration-200 ${isSecurityExpanded ? 'rotate-180' : ''}`}
+                                    >
+                                        <polyline points="6 9 12 15 18 9"/>
+                                    </svg>
                                 </button>
-                                <button
-                                    onClick={() => setAccountAction('delete')}
-                                    className="w-full px-4 py-3.5 flex items-center gap-3 hover:bg-red-50 active:bg-red-100 transition-colors"
-                                >
-                                    <div className="w-8 h-8 rounded-lg bg-red-50 border border-red-100 flex items-center justify-center shrink-0">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500">
-                                            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
-                                        </svg>
+                                {isSecurityExpanded && (
+                                    <div className="border-t border-gray-100 bg-gray-50/50 animate-in fade-in slide-in-from-top-1 duration-150">
+                                        <button
+                                            onClick={() => setAccountAction('suspend')}
+                                            className="w-full pl-12 pr-4 py-2.5 flex items-center gap-3 hover:bg-amber-50/60 active:bg-amber-100 transition-colors border-b border-gray-100"
+                                        >
+                                            <div className="w-7 h-7 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-600">
+                                                    <circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/>
+                                                </svg>
+                                            </div>
+                                            <div className="min-w-0 text-left">
+                                                <span className="block text-[13px] font-medium text-gray-700">Suspender conta</span>
+                                                <span className="block text-[9.5px] text-gray-400">Desativa o acesso até reativação manual</span>
+                                            </div>
+                                        </button>
+                                        <button
+                                            onClick={() => setAccountAction('delete')}
+                                            className="w-full pl-12 pr-4 py-2.5 flex items-center gap-3 hover:bg-red-50/60 active:bg-red-100 transition-colors"
+                                        >
+                                            <div className="w-7 h-7 rounded-lg bg-red-50 border border-red-100 flex items-center justify-center shrink-0">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500">
+                                                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+                                                </svg>
+                                            </div>
+                                            <div className="min-w-0 text-left">
+                                                <span className="block text-[13px] font-medium text-red-500">Excluir conta</span>
+                                                <span className="block text-[9.5px] text-red-400">Remove seu usuário do banco de dados</span>
+                                            </div>
+                                        </button>
                                     </div>
-                                    <div className="min-w-0 text-left">
-                                        <span className="block text-sm font-medium text-red-500">Excluir conta</span>
-                                        <span className="block text-[10px] text-red-400">Remove seu usuário do banco de dados</span>
-                                    </div>
-                                </button>
+                                )}
                             </div>
                         </div>
 

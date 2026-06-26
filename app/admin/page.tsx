@@ -454,8 +454,8 @@ export default function AdminPage() {
     // Mapeamento de títulos para o Header
     const tabTitles: { [key: string]: string } = {
         dashboard: 'Painel Geral',
-        clients: 'Gerenciamento de Clientes',
-        professionals: 'Gerenciamento de Profissionais',
+        clients: 'Gerenciamento de Usuários',
+        professionals: 'Gerenciamento de Perfis Monetizados',
         rooms: 'Auditoria de Conversas',
         financial: 'Movimentações Financeiras',
         withdrawals: 'Solicitações de Saque',
@@ -463,7 +463,7 @@ export default function AdminPage() {
         coupons: 'Gerenciamento de Cupons de Desconto',
         'help-tickets': 'Tickets de Ajuda',
         'institutional-emails': 'E-mails Institucionais',
-        'creator-applications': 'Inscrições de Criadoras',
+        'creator-applications': 'Solicitações de Monetização',
     };
 
     // Período comparativo selecionado na Dashboard
@@ -2602,8 +2602,8 @@ export default function AdminPage() {
                                                             coupon.targetAudience === 'professional' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' :
                                                             'bg-slate-50 text-slate-700 border-slate-100'
                                                         }`}>
-                                                            {coupon.targetAudience === 'client' ? 'Clientes' :
-                                                             coupon.targetAudience === 'professional' ? 'Profissionais' : 'Todos'}
+                                                            {coupon.targetAudience === 'client' ? 'Usuários' :
+                                                             coupon.targetAudience === 'professional' ? 'Perfis Monetizados' : 'Todos'}
                                                         </span>
                                                     </td>
                                                     {/* Usos / Limite */}
@@ -3655,7 +3655,7 @@ export default function AdminPage() {
                                             type="email"
                                             value={newEmailTo}
                                             onChange={(e) => setNewEmailTo(e.target.value)}
-                                            placeholder="ex: cliente-destino@gmail.com"
+                                            placeholder="ex: usuario-destino@gmail.com"
                                             className="w-full p-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-semibold text-slate-700 placeholder-slate-400 transition-all"
                                         />
                                     </div>
@@ -3876,7 +3876,7 @@ export default function AdminPage() {
                                         type="text"
                                         value={cpDescription}
                                         onChange={(e) => setCpDescription(e.target.value)}
-                                        placeholder="EX: Cupom promocional de R$ 50 para novos clientes"
+                                        placeholder="EX: Cupom promocional de R$ 50 para novos usuários"
                                         className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700"
                                     />
                                 </div>
@@ -3890,8 +3890,8 @@ export default function AdminPage() {
                                             className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-semibold text-slate-700 cursor-pointer"
                                         >
                                             <option value="all">Todos os usuários</option>
-                                            <option value="client">Apenas Clientes (compradores)</option>
-                                            <option value="professional">Apenas Profissionais</option>
+                                            <option value="client">Apenas Usuários (compradores)</option>
+                                            <option value="professional">Apenas Perfis Monetizados</option>
                                         </select>
                                     </div>
                                     <div className="space-y-1.5">

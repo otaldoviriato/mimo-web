@@ -218,7 +218,7 @@ export default function WalletPage() {
 
     if (loadingDashboard) {
         return (
-            <div className="flex flex-col h-full bg-slate-50 overflow-y-auto pb-16 animate-pulse">
+            <div className="flex flex-col h-full bg-slate-50 overflow-y-auto pb-24 animate-pulse">
                 {/* Header */}
                 <div className="bg-white border-b border-gray-100 px-5 h-[72px] shrink-0 flex items-center">
                     <div className="h-6 w-32 bg-gray-150 rounded-lg" />
@@ -272,7 +272,7 @@ export default function WalletPage() {
     const getPercent = (val: number) => {
         return ((val / totalEarningsSum) * 100).toFixed(0) + '%';
     };    return (
-        <div className="flex flex-col h-full bg-slate-50 text-gray-850 overflow-y-auto pb-24 md:pb-6 relative no-scrollbar">
+        <div className="flex flex-col h-full bg-slate-50 text-gray-850 overflow-y-auto pb-28 md:pb-6 relative no-scrollbar">
             
             {/* Header */}
             <div className="shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between z-20 sticky top-0 shadow-md">
@@ -427,8 +427,7 @@ export default function WalletPage() {
                             <div className="h-10 bg-slate-50 rounded-xl" />
                         </div>
                     ) : (withdrawalsData.withdrawals || []).length === 0 ? (
-                        <div className="flex flex-col items-center justify-center border border-dashed border-gray-150 rounded-xl py-8 gap-2 bg-slate-50/50">
-                            <span className="text-xl">💸</span>
+                        <div className="flex flex-col items-center justify-center py-8 gap-2 bg-slate-50/50 rounded-xl">
                             <p className="text-xs text-gray-400">Nenhum saque realizado ainda.</p>
                         </div>
                     ) : (
@@ -554,7 +553,7 @@ export default function WalletPage() {
                         </div>
                     ) : (
                         <div className="h-32 flex items-center justify-center text-xs text-gray-400 border border-dashed border-gray-200 rounded-xl">
-                            Nenhum faturamento registrado nos últimos 15 dias.
+                            Nenhum ganho registrado nos últimos 15 dias.
                         </div>
                     )}
                 </div>
@@ -592,7 +591,6 @@ export default function WalletPage() {
                         </div>
                     ) : (
                         <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-gray-100 rounded-xl gap-1 py-6 bg-slate-50/50">
-                            <span className="text-base">👑</span>
                             <p className="text-xs text-gray-400">Nenhum VIP listado ainda.</p>
                         </div>
                     )}

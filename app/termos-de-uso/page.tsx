@@ -51,7 +51,7 @@ export default function TermosDeUsoPage() {
                     <section className="space-y-3">
                         <h2 className="text-xl font-bold text-gray-900 border-l-4 border-purple-500 pl-3">3. Enquadramento e Natureza do Serviço</h2>
                         <p className="text-sm sm:text-base leading-relaxed">
-                            O MimoChat é uma plataforma tecnológica de rede social baseada em mensagens assíncronas e hospedagem de conteúdo digital. Nossa atividade consiste na intermediação da comunicação digital e na facilitação técnica de envio de interações ("mimos") ou assinaturas de galerias privadas criadas e geradas de forma autônoma pelos Criadores de Conteúdo (Profissionais) aos seus Usuários (Clientes).
+                            O MimoChat é uma plataforma tecnológica de rede social baseada em mensagens assíncronas e hospedagem de conteúdo digital. Nossa atividade consiste na intermediação da comunicação digital e na facilitação técnica de envio de interações ("mimos") ou assinaturas de galerias privadas criadas e geradas de forma autônoma pelos Produtores de Conteúdo Independentes (Perfis Monetizados) aos seus Usuários.
                         </p>
                         <p className="text-sm sm:text-base leading-relaxed font-medium text-gray-800">
                             A plataforma atua unicamente como provedor de hospedagem de aplicações de internet nos termos do Artigo 19 da Lei nº 12.965/2014 (Marco Civil da Internet), não exercendo controle editorial prévio, curadoria ou ingerência no conteúdo trocado em canais de chat privado.
@@ -94,7 +94,7 @@ export default function TermosDeUsoPage() {
                             A plataforma utiliza gateways de pagamentos terceirizados (incluindo <strong>Asaas</strong> e <strong>Abacate Pay</strong>) para o processamento de Pix e cartões de crédito. 
                         </p>
                         <p className="text-sm sm:text-base leading-relaxed">
-                            Os pagamentos enviados na forma de "mimos" (créditos virtuais voluntários) caracterizam-se legalmente como doações por liberalidade dos Usuários aos Criadores, não constituindo obrigação de contraprestação específica de serviços físicos e sendo, portanto, <strong>não reembolsáveis</strong>.
+                            Os pagamentos enviados na forma de "mimos" (créditos virtuais voluntários) caracterizam-se legalmente como doações por liberalidade dos Usuários aos Perfis Monetizados, não constituindo obrigação de contraprestação específica de serviços físicos e sendo, portanto, <strong>não reembolsáveis</strong>.
                         </p>
                     </section>
 

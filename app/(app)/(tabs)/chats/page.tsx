@@ -599,7 +599,7 @@ export default function ChatsPage() {
                             </div>
                             <h2 className="text-xl font-bold text-gray-900 mb-2">Conta Verificada!</h2>
                             <p className="text-sm text-gray-600 leading-relaxed mb-6">
-                                Parabéns! Sua identidade foi validada pelo nosso time. Seu perfil já está público e pronto para receber mensagens e assinaturas de fãs. Hora de faturar! 💸🚀
+                                Parabéns! Sua identidade foi validada pelo nosso time. Seu perfil já está público e pronto para receber mensagens e mimos. Hora de faturar! 💸🚀
                             </p>
                             <button
                                 onClick={() => setShowSuccessToast(false)}
@@ -689,7 +689,7 @@ export default function ChatsPage() {
             )}
 
             {/* List */}
-            <PullToRefresh onRefresh={onRefresh} className="pb-16 md:pb-0">
+            <PullToRefresh onRefresh={onRefresh} className="pb-24 md:pb-0">
                 {isLoading ? (
                     <ChatListSkeleton />
                 ) : rooms.length === 0 ? (
@@ -698,15 +698,9 @@ export default function ChatsPage() {
                             <MessageCircle className="w-6 h-6 text-purple-400" />
                         </div>
                         <h2 className="text-base font-bold text-slate-800 mb-1">Sem conversas ainda</h2>
-                        {myProfile?.isProfessional ? (
-                            <p className="text-slate-500 text-xs max-w-[260px] leading-relaxed">
-                                Compartilhe seu nome de usuário <strong className="text-slate-700 font-semibold">@{myProfile?.username}</strong> para que outras pessoas possam te mandar mensagens.
-                            </p>
-                        ) : (
-                            <p className="text-slate-500 text-xs max-w-[240px] leading-relaxed">
-                                Quando você começar a conversar com alguém, elas aparecerão aqui.
-                            </p>
-                        )}
+                        <p className="text-slate-500 text-xs max-w-[240px] leading-relaxed">
+                            Suas novas mensagens aparecerão aqui.
+                        </p>
                     </div>
                 ) : (
                     <ul>
@@ -770,7 +764,7 @@ export default function ChatsPage() {
                                                         {room.otherUser?.name || room.otherUser?.username || `Usuário ${otherUserId?.substring(0, 8)}`}
                                                     </span>
                                                     {myProfile?.isProfessional && room.otherUser?.isHighSpender && (
-                                                        <span title="Cliente VIP" className="shrink-0 flex items-center justify-center">
+                                                        <span title="VIP" className="shrink-0 flex items-center justify-center">
                                                             <Crown className="w-4 h-4 text-amber-500" />
                                                         </span>
                                                     )}

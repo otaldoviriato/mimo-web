@@ -125,7 +125,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
             </div>
 
             {/* Bottom nav (mobile) */}
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex items-center z-40">
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 h-[calc(72px+env(safe-area-inset-bottom))] bg-white border-t border-gray-200 flex items-start z-40 shadow-[0_-6px_18px_rgba(15,23,42,0.05)] pb-[env(safe-area-inset-bottom)]">
                 {resolvedTabs.map((tab) => {
                     const isActive = pathname === tab.href || (tab.href === '/chats' && pathname === '/');
                     return (
@@ -133,7 +133,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                             key={tab.href}
                             href={tab.href}
                             replace={tab.href !== '/chats'}
-                            className={`flex-1 flex flex-col items-center justify-center py-3 gap-1 text-xs font-medium transition-colors
+                            className={`flex-1 h-[72px] flex flex-col items-center justify-center gap-1 px-2 text-xs font-semibold transition-colors
                                 ${isActive ? 'text-purple-600' : 'text-gray-400'}`}
                         >
                             {tab.icon(isActive)}

@@ -42,7 +42,7 @@ export default function AjudaPage() {
     const faqs: FAQItem[] = [
         {
             question: "Como funciona o MimoChat?",
-            answer: "O MimoChat é uma plataforma que conecta criadores de conteúdo profissionais e seus fãs. Os fãs podem assinar perfis para ver galerias privadas, iniciar sessões de chat privadas e enviar 'Mimos' (apoios financeiros voluntários) diretamente nas conversas.",
+            answer: "O MimoChat é uma plataforma que conecta pessoas interessantes e permite interações privadas. Os usuários podem acessar perfis para ver galerias privadas, iniciar conversas e enviar 'Mimos' (apoios financeiros voluntários) diretamente no chat.",
             icon: HelpCircle
         },
         {
@@ -56,8 +56,8 @@ export default function AjudaPage() {
             icon: Shield
         },
         {
-            question: "Como funcionam as assinaturas de perfis?",
-            answer: "As assinaturas dão acesso ilimitado à galeria exclusiva de fotos e vídeos da profissional durante o período contratado (mensal). O valor é definido diretamente pela profissional em seu perfil dentro dos limites permitidos.",
+            question: "Como funcionam os acessos às galerias?",
+            answer: "O acesso dá direito a ver a galeria exclusiva de fotos e vídeos de um perfil durante o período contratado. O valor é definido diretamente por quem gerencia o perfil dentro dos limites permitidos.",
             icon: Lock
         },
         {

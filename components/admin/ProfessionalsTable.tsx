@@ -46,7 +46,7 @@ export function ProfessionalsTable() {
 
     // Ação: Excluir Usuário permanentemente do banco e do Clerk
     const handleDeleteUser = async (clerkId: string, name: string) => {
-        if (!confirm(`ATENÇÃO: Você tem certeza que deseja EXCLUIR permanentemente a profissional "${name}"?\nEsta ação apagará a conta do banco de dados e do Clerk de forma definitiva. Esta ação não poderá ser desfeita.`)) {
+        if (!confirm(`ATENÇÃO: Você tem certeza que deseja EXCLUIR permanentemente o perfil monetizado "${name}"?\nEsta ação apagará a conta do banco de dados e do Clerk de forma definitiva. Esta ação não poderá ser desfeita.`)) {
             return;
         }
 
@@ -56,7 +56,7 @@ export function ProfessionalsTable() {
             });
 
             if (res.ok) {
-                toast.success('Profissional excluída com sucesso!', {
+                toast.success('Perfil monetizado excluído com sucesso!', {
                     style: { borderRadius: '12px', background: '#1E293B', color: '#FFF' }
                 });
                 setUsers(prev => prev.filter(u => u.clerkId !== clerkId));
@@ -71,7 +71,7 @@ export function ProfessionalsTable() {
         }
     };
 
-    // Ação rápida: Alterar tipo de perfil para Cliente (Tornar Cliente)
+    // Ação rápida: Alterar tipo de perfil para Comum (Tornar Comum)
     const handleDemoteToClient = async (clerkId: string) => {
         try {
             const res = await fetch(`/api/admin/users/${clerkId}`, {
@@ -81,7 +81,7 @@ export function ProfessionalsTable() {
             });
 
             if (res.ok) {
-                toast.success('Perfil alterado para Cliente!', {
+                toast.success('Perfil alterado para Comum!', {
                     style: { borderRadius: '12px', background: '#1E293B', color: '#FFF' }
                 });
                 setUsers(prev => prev.filter(u => u.clerkId !== clerkId));
@@ -126,10 +126,10 @@ export function ProfessionalsTable() {
             <div className="p-6 border-b border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h3 className="text-lg font-bold text-slate-800 tracking-tight">
-                        Profissionais Cadastradas
+                        Perfis Monetizados
                     </h3>
                     <p className="text-xs text-slate-500 font-medium">
-                        Pesquise profissionais, defina chaves PIX, gerencie assinaturas ou gerencie as contas e fotos de galeria.
+                        Pesquise perfis monetizados, defina chaves PIX, gerencie assinaturas ou gerencie as contas e fotos de galeria.
                     </p>
                 </div>
 
@@ -154,13 +154,13 @@ export function ProfessionalsTable() {
                 {loading ? (
                     <div className="py-20 flex flex-col items-center justify-center gap-3">
                         <div className="animate-spin h-8 w-8 text-purple-600 rounded-full border-4 border-slate-200 border-t-purple-600" />
-                        <span className="text-sm font-semibold text-slate-500">Buscando profissionais no banco...</span>
+                        <span className="text-sm font-semibold text-slate-500">Buscando perfis monetizados no banco...</span>
                     </div>
                 ) : (
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                                <th className="py-4 px-6">Profissional</th>
+                                <th className="py-4 px-6">Perfil Monetizado</th>
                                 <th className="py-4 px-6">Saldo a Receber</th>
                                 <th className="py-4 px-6">Chave PIX</th>
                                 <th className="py-4 px-6">Telefone</th>
@@ -301,7 +301,7 @@ export function ProfessionalsTable() {
                                                                 className="w-full flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer text-left"
                                                             >
                                                                 <UserCheck size={14} className="text-indigo-500" />
-                                                                Tornar Cliente
+                                                                Tornar Comum
                                                             </button>
                                                         </div>
 
@@ -326,7 +326,7 @@ export function ProfessionalsTable() {
                             ) : (
                                 <tr>
                                     <td colSpan={6} className="py-20 text-center text-sm font-semibold text-slate-400">
-                                        Nenhuma profissional encontrada.
+                                        Nenhum perfil monetizado encontrado.
                                     </td>
                                 </tr>
                             )}
@@ -337,8 +337,8 @@ export function ProfessionalsTable() {
 
             {/* Rodapé / Informações */}
             <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 font-bold bg-slate-50/50 mt-auto">
-                <span>Total de profissionais mostradas: {users.length}</span>
-                <span className="text-[10px] text-purple-500 uppercase tracking-widest font-black">MimoAdmin Profissionais</span>
+                <span>Total de perfis monetizados mostrados: {users.length}</span>
+                <span className="text-[10px] text-purple-500 uppercase tracking-widest font-black">MimoAdmin Perfis Monetizados</span>
             </div>
         </div>
     );

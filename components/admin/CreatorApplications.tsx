@@ -144,7 +144,7 @@ export function CreatorApplications() {
         if (!selected) return;
 
         if (newStatus === 'approved') {
-            const confirmed = window.confirm(`Deseja realmente aprovar a candidatura de criadora de ${selected.fullName}? Esta ação liberará a conta imediatamente.`);
+            const confirmed = window.confirm(`Deseja realmente aprovar a solicitação de monetização de ${selected.fullName}? Esta ação liberará a conta imediatamente.`);
             if (!confirmed) return;
         }
 
@@ -174,7 +174,7 @@ export function CreatorApplications() {
 
     async function handleDelete() {
         if (!selected) return;
-        if (!window.confirm(`⚠️ ATENÇÃO: Esta ação irá EXCLUIR permanentemente o usuário correspondente no Clerk e no MongoDB, junto com a sua inscrição! A criadora perderá todo o acesso à conta dela no Mimo.\n\nTem certeza que deseja excluir a criadora "${selected.fullName}" e deletar o seu usuário do sistema definitivamente?`)) {
+        if (!window.confirm(`⚠️ ATENÇÃO: Esta ação irá EXCLUIR permanentemente o usuário correspondente no Clerk e no MongoDB, junto com a sua inscrição! O perfil perderá todo o acesso à conta dele no Mimo.\n\nTem certeza que deseja excluir o perfil "${selected.fullName}" e deletar o seu usuário do sistema definitivamente?`)) {
             return;
         }
         setDeleting(true);
@@ -254,8 +254,8 @@ export function CreatorApplications() {
             ) : applications.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-20 text-center">
                     <UserRound className="mx-auto h-10 w-10 text-slate-300" />
-                    <h3 className="mt-4 font-bold text-slate-700">Nenhuma inscrição encontrada</h3>
-                    <p className="mt-1 text-sm text-slate-500">Ajuste os filtros ou aguarde novas candidaturas.</p>
+                    <h3 className="mt-4 font-bold text-slate-700">Nenhuma solicitação encontrada</h3>
+                    <p className="mt-1 text-sm text-slate-500">Ajuste os filtros ou aguarde novas solicitações.</p>
                 </div>
             ) : (
                 <>
@@ -263,7 +263,7 @@ export function CreatorApplications() {
                         <table className="w-full text-left">
                             <thead className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                                 <tr>
-                                    <th className="px-5 py-4">Criadora</th>
+                                    <th className="px-5 py-4">Perfil</th>
                                     <th className="px-5 py-4">Contato</th>
                                     <th className="px-5 py-4">E-mail</th>
                                     <th className="px-5 py-4">Status</th>
@@ -444,7 +444,7 @@ export function CreatorApplications() {
                                                 className="w-full flex items-center justify-center gap-2 py-3.5 px-4 text-sm font-extrabold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 rounded-xl shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98] transition-all duration-150 disabled:opacity-60 cursor-pointer"
                                             >
                                                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                                                Aprovar Criadora
+                                                Aprovar Monetização
                                             </button>
                                             
                                             <div className="grid grid-cols-2 gap-3">
@@ -496,7 +496,7 @@ export function CreatorApplications() {
                                 <section className="rounded-2xl border border-rose-200 bg-rose-50/20 p-5">
                                     <h3 className="text-xs font-bold uppercase tracking-wider text-rose-600">Zona de Perigo</h3>
                                     <p className="mt-1 text-xs text-slate-500">
-                                        Excluir permanentemente o registro e a conta de usuário correspondente no Clerk e MongoDB. A criadora perderá todo o acesso.
+                                        Excluir permanentemente o registro e a conta de usuário correspondente no Clerk e MongoDB. O perfil perderá todo o acesso.
                                     </p>
                                     <button
                                         type="button"

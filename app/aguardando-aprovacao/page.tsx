@@ -216,7 +216,7 @@ export default function AguardandoAprovacaoPage() {
                                 Olá, {name}! 💜
                             </h1>
                             <p className="text-sm font-semibold text-slate-500 leading-relaxed px-2">
-                                Recebemos seu cadastro. Sua conta de criadora profissional está pendente de aprovação pela nossa equipe.
+                                Recebemos seu cadastro. Seu cadastro de perfil monetizado está pendente de aprovação pela nossa equipe.
                             </p>
                         </div>
 
@@ -264,7 +264,7 @@ export default function AguardandoAprovacaoPage() {
                                 Inscrição Não Aprovada
                             </h1>
                             <p className="text-sm font-semibold text-slate-500 leading-relaxed px-2">
-                                Lamentamos, {name}, mas sua inscrição para perfil profissional não pôde ser aprovada no momento.
+                                Lamentamos, {name}, mas sua inscrição para perfil monetizado não pôde ser aprovada no momento.
                             </p>
                         </div>
 

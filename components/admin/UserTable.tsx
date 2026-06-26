@@ -8,7 +8,7 @@ export function UserTable() {
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [roleFilter, setRoleFilter] = useState<'Todos' | 'Cliente' | 'Profissional'>('Todos');
+    const [roleFilter, setRoleFilter] = useState<'Todos' | 'Comum' | 'Monetizado'>('Todos');
     const [selectedUserMenu, setSelectedUserMenu] = useState<string | null>(null);
 
     // Estados da Modal de Edição
@@ -53,8 +53,8 @@ export function UserTable() {
     const filteredUsers = useMemo(() => {
         return users.filter(user => {
             if (roleFilter === 'Todos') return true;
-            if (roleFilter === 'Profissional') return user.isProfessional;
-            if (roleFilter === 'Cliente') return !user.isProfessional;
+            if (roleFilter === 'Monetizado') return user.isProfessional;
+            if (roleFilter === 'Comum') return !user.isProfessional;
             return true;
         });
     }, [users, roleFilter]);
@@ -100,7 +100,7 @@ export function UserTable() {
             });
 
             if (res.ok) {
-                toast.success(newIsProfessional ? 'Usuário promovido a Profissional!' : 'Usuário alterado para Cliente!', {
+                toast.success(newIsProfessional ? 'Perfil alterado para Monetizado!' : 'Perfil alterado para Comum!', {
                     style: { borderRadius: '12px', background: '#1E293B', color: '#FFF' }
                 });
                 setUsers(prev => prev.map(u => u.clerkId === clerkId ? { ...u, isProfessional: newIsProfessional } : u));
@@ -212,7 +212,7 @@ export function UserTable() {
 
                     {/* Filtro de Tipo */}
                     <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 w-full sm:w-auto">
-                        {(['Todos', 'Cliente', 'Profissional'] as const).map((filter) => (
+                        {(['Todos', 'Comum', 'Monetizado'] as const).map((filter) => (
                             <button
                                 key={filter}
                                 onClick={() => setRoleFilter(filter)}
@@ -281,7 +281,7 @@ export function UserTable() {
                                                     : 'bg-slate-100 text-slate-600 border border-slate-200'
                                             }`}>
                                                 {user.isProfessional && <ShieldCheck size={12} />}
-                                                {user.isProfessional ? 'Profissional' : 'Cliente'}
+                                                {user.isProfessional ? 'Monetizado' : 'Comum'}
                                             </span>
                                         </td>
 
@@ -332,7 +332,7 @@ export function UserTable() {
                                                                 className="w-full flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer text-left"
                                                             >
                                                                 <UserCheck size={14} className="text-indigo-500" />
-                                                                {user.isProfessional ? 'Tornar Cliente' : 'Tornar Profissional'}
+                                                                {user.isProfessional ? 'Tornar Comum' : 'Tornar Monetizado'}
                                                             </button>
                                                         </div>
 
@@ -481,9 +481,9 @@ export function UserTable() {
                                         className="accent-purple-600 rounded cursor-pointer w-4 h-4"
                                     />
                                     <div>
-                                        <span className="text-xs font-bold text-slate-700 group-hover:text-purple-600 transition-colors block">Perfil Profissional</span>
-                                        <span className="text-[10px] text-slate-400 font-medium block">Pode definir preços por caractere e receber pagamentos.</span>
-                                    </div>
+                                                                        <span className="text-xs font-bold text-slate-700 group-hover:text-purple-600 transition-colors block">Perfil Monetizado</span>
+                                                                        <span className="text-[10px] text-slate-400 font-medium block">Pode definir preços por caractere e receber pagamentos.</span>
+                                                                    </div>
                                 </label>
                             </div>
 

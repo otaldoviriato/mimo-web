@@ -82,30 +82,7 @@ export async function POST(request: NextRequest) {
             console.error('[init-professional] Erro ao atualizar metadados no Clerk:', clerkErr);
         }
 
-        // Notifica os administradores por e-mail via Resend (apenas informativo de criação de conta)
-        try {
-            await resend.emails.send({
-                from: 'Mimo Cadastro <onboarding@resend.dev>',
-                to: 'viriatoceo@gmail.com',
-                subject: `Nova Conta de Criadora Criada - @${user.username}`,
-                html: `
-                    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                        <h2 style="color: #6d28d9; margin-top: 0;">Nova Profissional Cadastrada</h2>
-                        <p style="color: #475569; font-size: 16px;">Uma nova conta de criadora foi criada e está pendente de verificação de identidade/documentos.</p>
-                        <ul style="background-color: #f8fafc; padding: 15px 25px; border-radius: 6px; list-style-type: none; margin: 20px 0;">
-                            <li style="margin-bottom: 8px;"><strong>Nome:</strong> ${user.name || user.username}</li>
-                            <li style="margin-bottom: 8px;"><strong>E-mail:</strong> ${user.email}</li>
-                            <li style="margin-bottom: 8px;"><strong>Username:</strong> @${user.username}</li>
-                            <li style="margin-bottom: 0;"><strong>Data de Cadastro:</strong> ${new Date().toLocaleString('pt-BR')}</li>
-                        </ul>
-                        <p style="color: #475569;">O perfil só aparecerá no painel de moderação de documentos após o envio de fotos do documento e selfie de maioridade (+18) pela própria criadora.</p>
-                    </div>
-                `
-            });
-            console.log(`[init-professional] E-mail de notificação enviado para viriatoceo@gmail.com`);
-        } catch (emailErr) {
-            console.error('[init-professional] Erro ao enviar e-mail de notificação:', emailErr);
-        }
+        // Envio de e-mail de notificação para viriatoceo@gmail.com desativado conforme solicitado
 
         return NextResponse.json({ success: true, status: 'pending' });
     } catch (error) {

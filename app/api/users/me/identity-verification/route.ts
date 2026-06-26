@@ -225,6 +225,7 @@ export async function POST(request: NextRequest) {
                     taxId: cpfClean,
                     birthDate: birthDateObj,
                     professionalStatus: 'approved',
+                    isProfessional: true, // Define como profissional no final do fluxo step-by-step
                     notes: ''
                 }
             },
@@ -235,36 +236,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Erro ao atualizar o perfil do usuário' }, { status: 404 });
         }
 
-        // Enviar e-mail informativo para a administração
-        try {
-            const verificationSource = infoSimplesRecord.mock
-                ? 'validação local de desenvolvimento'
-                : 'consulta real na Receita Federal';
-
-            await resend.emails.send({
-                from: 'Mimo Cadastro <onboarding@resend.dev>',
-                to: 'viriatoceo@gmail.com',
-                subject: `Criadora Aprovada Automaticamente - @${updatedUser.username}`,
-                html: `
-                    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                        <h2 style="color: #6d28d9; margin-top: 0;">Cadastro Aprovado</h2>
-                        <p style="color: #475569; font-size: 16px;">A profissional <strong>@${updatedUser.username}</strong> foi aprovada de forma automatizada via ${verificationSource}.</p>
-                        <ul style="background-color: #f8fafc; padding: 15px 25px; border-radius: 6px; list-style-type: none; margin: 20px 0;">
-                            <li style="margin-bottom: 8px;"><strong>Nome:</strong> ${updatedUser.name || updatedUser.username}</li>
-                            <li style="margin-bottom: 8px;"><strong>Nome Receita Federal:</strong> ${infoSimplesRecord.nome || '-'}</li>
-                            <li style="margin-bottom: 8px;"><strong>Username:</strong> @${updatedUser.username}</li>
-                            <li style="margin-bottom: 8px;"><strong>E-mail:</strong> ${updatedUser.email}</li>
-                            <li style="margin-bottom: 8px;"><strong>CPF:</strong> ***.${updatedUser.taxId?.substring(3, 6)}.${updatedUser.taxId?.substring(6, 9)}-**</li>
-                            <li style="margin-bottom: 8px;"><strong>Situação cadastral:</strong> ${infoSimplesRecord.situacao_cadastral || '-'}</li>
-                            <li style="margin-bottom: 0;"><strong>Aprovado em:</strong> ${new Date().toLocaleString('pt-BR')}</li>
-                        </ul>
-                    </div>
-                `
-            });
-            console.log(`Email notification sent to admin for auto-approved identity: ${updatedUser.email}`);
-        } catch (emailErr) {
-            console.error('Erro ao enviar e-mail de notificação para o admin:', emailErr);
-        }
+        // Envio de e-mail de notificação para a administração desativado conforme solicitado
 
         return NextResponse.json({
             success: true,

@@ -161,13 +161,13 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                     @{user.username}
                 </p>
 
-                {/* Painel de Relacionamento Exclusivo para Profissionais */}
+                {/* Painel de Estatísticas de Interação */}
                 {me?.isProfessional && !user.isProfessional && (user as any).relationshipStats && (
                     <div className="w-full max-w-md mt-6 bg-white/85 backdrop-blur-md border border-purple-100 rounded-2xl p-5 shadow-lg shadow-purple-950/5 z-10 animate-in fade-in slide-in-from-bottom-3 duration-500">
                         <div className="flex items-center justify-between border-b border-purple-50 pb-3 mb-4">
                             <div className="flex items-center gap-2">
                                 <Briefcase className="w-4 h-4 text-purple-600 shrink-0" />
-                                <h3 className="font-black text-slate-800 text-sm tracking-tight uppercase">Informações do Cliente</h3>
+                                <h3 className="font-black text-slate-800 text-sm tracking-tight uppercase">Estatísticas da Conversa</h3>
                             </div>
                             <span className="text-[10px] bg-purple-100 text-purple-700 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                                 Privado

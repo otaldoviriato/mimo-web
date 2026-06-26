@@ -8,7 +8,8 @@ import { useMyProfile, useUploadPhoto, useUploadCover, useMyGallery, useUploadTo
 import { ImageCropper } from '@/components/ImageCropper';
 import { usePayment } from '@/context/PaymentContext';
 import { PullToRefresh } from '@/components';
-import { Settings, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, ShieldAlert, Heart, Globe, Crown, Camera, Gift, CreditCard, QrCode } from 'lucide-react';
+import { Settings, Share2, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, ShieldAlert, Heart, Globe, Crown, Camera, Gift, CreditCard, QrCode } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export default function ProfilePage() {
     const { user } = useUser();
@@ -58,6 +59,38 @@ export default function ProfilePage() {
             if (userData.coverUrl) setLocalCoverUrl(userData.coverUrl);
         }
     }, [userData]);
+
+    const handleShare = async () => {
+        if (typeof window === 'undefined' || !userData?.username) return;
+
+        const profileUrl = `${window.location.origin}/${userData.username}`;
+        const name       = userData.name || `@${userData.username}`;
+        const shareText  = `Ei! Esse é meu perfil no MimoChat — ${name}. Me manda uma mensagem, adoro conversar! 💬`;
+
+        // Web Share API: abre o sheet nativo do Android/iOS (requer HTTPS em produção)
+        if (typeof navigator !== 'undefined' && navigator.share) {
+            try {
+                await navigator.share({
+                    title: `${name} no MimoChat`,
+                    text: shareText,
+                    url: profileUrl,
+                });
+                return;
+            } catch (err: any) {
+                // AbortError = usuário fechou o sheet sem compartilhar — comportamento normal
+                if (err?.name === 'AbortError') return;
+                // Qualquer outro erro cai no fallback abaixo
+            }
+        }
+
+        // Fallback: copia o link para a área de transferência e mostra feedback
+        try {
+            await navigator.clipboard.writeText(`${shareText}\n\n${profileUrl}`);
+            toast.success('Link copiado! Cole no WhatsApp, e-mail ou onde preferir.');
+        } catch {
+            // sem permissão de clipboard — ignora silenciosamente
+        }
+    };
 
     const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -269,7 +302,16 @@ export default function ProfilePage() {
                         <input ref={coverInputRef} type="file" accept="image/jpeg, image/png, image/gif, image/heic, image/webp" className="hidden" onChange={handleCoverChange} />
                     </div>
 
-                    {/* Botão de Configurações no Topo */}
+                    {/* Compartilhar — canto superior esquerdo da capa */}
+                    <button
+                        onClick={handleShare}
+                        className="absolute top-4 left-4 w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/35 transition-all active:scale-90 z-20"
+                        title="Compartilhar perfil"
+                    >
+                        <Share2 className="w-5 h-5" />
+                    </button>
+
+                    {/* Configurações — canto superior direito da capa */}
                     <button
                         onClick={() => router.push('/settings')}
                         className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/35 transition-all active:scale-90 z-20"
@@ -403,20 +445,6 @@ export default function ProfilePage() {
                     </div>
 
                     {/* Avisos/Alertas de Validação */}
-                    {activeGalleryTab === 'public' && !publicGalleryIsComplete && (
-                        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-3 flex items-start gap-2.5">
-                            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                            <div className="text-[11px] text-amber-800 font-medium leading-snug">
-                                <p className="font-bold">Galeria Pública Incompleta</p>
-                                <p className="mt-0.5">
-                                    Insira de {minPublicPhotos} a {maxPublicPhotos} fotos. No mínimo {minExclusivePhotos} e no máximo {maxExclusivePhotos} delas devem ser exclusivas para assinantes.
-                                </p>
-                                <p className="mt-1 font-semibold text-amber-900">
-                                    Atual: {publicItemsCount} fotos ({publicExclusiveCount} exclusivas).
-                                </p>
-                            </div>
-                        </div>
-                    )}
                     {activeGalleryTab === 'private' && (
                         <div className="bg-purple-50/50 border border-purple-100/60 rounded-2xl p-3 flex items-start gap-2.5">
                             <Lock className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
@@ -659,7 +687,7 @@ export default function ProfilePage() {
                             {userData?.name || userData?.username || user?.username || ''}
                         </h2>
                         <p className="text-xs text-purple-600 font-medium">@{userData?.username || ''}</p>
-                        <p className="text-[10px] text-gray-400 mt-1">Conta de Cliente Ativa</p>
+                        <p className="text-[10px] text-gray-400 mt-1">Conta Ativa</p>
                     </div>
                 </div>
 

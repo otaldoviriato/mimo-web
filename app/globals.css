@@ -241,3 +241,63 @@ html.transition-forward, html.transition-backward {
 .animate-media-earnings-out {
   animation: mediaEarningsSlideOut 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+/* --- TRANSIÇÕES DE STEP DO ONBOARDING --- */
+/*
+ * Carrossel horizontal: entrada e saída percorrem 100% do viewport,
+ * sem parallax. As duas layers deslizam lado a lado ao mesmo tempo,
+ * criando um pager fluido — não uma pilha de telas sobreposta.
+ */
+
+/* Avanço — entra da direita */
+@keyframes onboardEnterForward {
+  from { transform: translate3d(100%, 0, 0); }
+  to   { transform: translate3d(0, 0, 0); }
+}
+
+/* Avanço — sai pela esquerda (100%, não parallax) */
+@keyframes onboardExitForward {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-100%, 0, 0); }
+}
+
+/* Retrocesso — entra da esquerda */
+@keyframes onboardEnterBackward {
+  from { transform: translate3d(-100%, 0, 0); }
+  to   { transform: translate3d(0, 0, 0); }
+}
+
+/* Retrocesso — sai pela direita */
+@keyframes onboardExitBackward {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(100%, 0, 0); }
+}
+
+.animate-onboard-enter-forward {
+  animation: onboardEnterForward 320ms cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+.animate-onboard-exit-forward {
+  animation: onboardExitForward 320ms cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+.animate-onboard-enter-backward {
+  animation: onboardEnterBackward 320ms cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+.animate-onboard-exit-backward {
+  animation: onboardExitBackward 320ms cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+/*
+ * Dismiss do onboarding: a tela desliza para cima e some,
+ * como se fosse retirada de cima da pilha — revelando o app abaixo.
+ */
+@keyframes onboardDismiss {
+  0%   { transform: translate3d(0, 0, 0);     opacity: 1; }
+  100% { transform: translate3d(0, -100%, 0); opacity: 0; }
+}
+
+.animate-onboard-dismiss {
+  animation: onboardDismiss 360ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}

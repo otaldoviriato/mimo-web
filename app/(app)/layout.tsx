@@ -5,7 +5,7 @@ import { useAuth, useUser } from '@clerk/nextjs';
 import { useRouter, usePathname } from 'next/navigation';
 import { setupAxiosInterceptors } from '@/services/api';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
-import { NotificationPromptModal, ProfileSelectionModal } from '@/components';
+import { NotificationPromptModal } from '@/components';
 import { StackNavigationProvider, useStackNavigation } from '@/context/StackNavigationContext';
 import { isReservedRoute } from '@/hooks/useTransitionRouter';
 import { useMyProfile } from '@/hooks/useQueries';
@@ -279,10 +279,26 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     }, [isSignedIn, user, getToken]);
 
     useEffect(() => {
-        if (professionalNeedsIdentity && pathname !== '/verificacao-identidade') {
-            router.replace('/verificacao-identidade');
+        // Redireciona para o onboarding em três casos:
+        // 1. Usuário ainda não escolheu seu papel (cliente ou profissional)
+        // 2. Profissional que precisa completar a verificação de identidade
+        // 3. Usuário no meio do onboarding (step salvo no localStorage) que tentou acessar outra rota
+        if (pathname === '/onboarding') return;
+        if (isProfileValid && userData?.isProfessional === undefined) {
+            router.replace('/onboarding');
+            return;
         }
-    }, [professionalNeedsIdentity, pathname, router]);
+        if (professionalNeedsIdentity) {
+            router.replace('/onboarding');
+            return;
+        }
+        if (isProfileValid && typeof window !== 'undefined') {
+            const step = localStorage.getItem('mimo_onboarding_step');
+            if (step === 'identity' || step === 'profile') {
+                router.replace('/onboarding');
+            }
+        }
+    }, [isProfileValid, userData?.isProfessional, professionalNeedsIdentity, pathname, router]);
 
     if (!isLoaded || (isSignedIn && !isNavInitialized)) {
         return (
@@ -359,17 +375,36 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
         );
     }
-
     if (!isSignedIn) return null;
 
-    // Se o perfil não foi selecionado (isProfessional está indefinido), exibe apenas a modal de escolha bloqueando o app
-    if (isProfileValid && userData.isProfessional === undefined) {
-        return (
-            <ProfileSelectionModal onSuccess={async () => { await refetchProfile(); }} />
-        );
+    // Permite que /onboarding renderize seus próprios filhos — ele gerencia todo o fluxo de cadastro.
+    if (pathname === '/onboarding') {
+        return <>{children}</>;
     }
 
-    if (professionalNeedsIdentity && pathname !== '/verificacao-identidade') {
+    // ── Guard de onboarding síncrono ────────────────────────────────────────
+    //
+    // Verifica NO CORPO DO RENDER (não em useEffect) se o onboarding precisa
+    // ser concluído. O useEffect de redirect abaixo vai disparar logo em seguida,
+    // mas sem este guard síncrono o app renderizaria brevemente antes do redirect
+    // (flash visual). A leitura de localStorage é segura aqui porque este componente
+    // é 'use client' e nunca executa no servidor.
+    //
+    // Três condições bloqueiam o acesso ao app:
+    //  1. isProfessional === undefined  → usuário nunca escolheu cliente/profissional
+    //  2. professionalNeedsIdentity     → profissional sem verificação de identidade
+    //  3. mimo_onboarding_step no localStorage → no meio do fluxo de cadastro
+    const hasPendingOnboardingStep =
+        isProfileValid &&
+        typeof window !== 'undefined' &&
+        (['identity', 'profile'].includes(localStorage.getItem('mimo_onboarding_step') ?? ''));
+
+    const needsOnboarding =
+        (isProfileValid && userData?.isProfessional === undefined) ||
+        professionalNeedsIdentity ||
+        hasPendingOnboardingStep;
+
+    if (needsOnboarding) {
         return (
             <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gradient-to-br from-[#4C1D95] via-[#6D28D9] to-[#8B5CF6] select-none">
                 <div className="relative w-24 h-24 rounded-3xl overflow-hidden shadow-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 animate-pulse">
@@ -381,10 +416,6 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                 </div>
             </div>
         );
-    }
-
-    if (isProfileValid && userData.isProfessional === true && pathname === '/verificacao-identidade') {
-        return <>{children}</>;
     }
 
     return (

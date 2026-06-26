@@ -44,7 +44,7 @@ export function ClientsTable() {
 
     // Ação: Excluir Usuário permanentemente do banco e do Clerk
     const handleDeleteUser = async (clerkId: string, name: string) => {
-        if (!confirm(`ATENÇÃO: Você tem certeza que deseja EXCLUIR permanentemente o cliente "${name}"?\nEsta ação apagará a conta do banco de dados e do Clerk de forma definitiva. Esta ação não poderá ser desfeita.`)) {
+        if (!confirm(`ATENÇÃO: Você tem certeza que deseja EXCLUIR permanentemente o usuário "${name}"?\nEsta ação apagará a conta do banco de dados e do Clerk de forma definitiva. Esta ação não poderá ser desfeita.`)) {
             return;
         }
 
@@ -54,7 +54,7 @@ export function ClientsTable() {
             });
 
             if (res.ok) {
-                toast.success('Cliente excluído com sucesso!', {
+                toast.success('Usuário excluído com sucesso!', {
                     style: { borderRadius: '12px', background: '#1E293B', color: '#FFF' }
                 });
                 setUsers(prev => prev.filter(u => u.clerkId !== clerkId));
@@ -101,10 +101,10 @@ export function ClientsTable() {
             <div className="p-6 border-b border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h3 className="text-lg font-bold text-slate-800 tracking-tight">
-                        Clientes Cadastrados
+                        Usuários Cadastrados
                     </h3>
                     <p className="text-xs text-slate-500 font-medium">
-                        Pesquise clientes, acesse suas configurações de perfil ou gerencie suas contas.
+                        Pesquise usuários, acesse suas configurações de perfil ou gerencie suas contas.
                     </p>
                 </div>
 
@@ -128,7 +128,7 @@ export function ClientsTable() {
                 {loading ? (
                     <div className="py-20 flex flex-col items-center justify-center gap-3">
                         <div className="animate-spin h-8 w-8 text-purple-600 rounded-full border-4 border-slate-200 border-t-purple-600" />
-                        <span className="text-sm font-semibold text-slate-500">Buscando clientes no banco...</span>
+                        <span className="text-sm font-semibold text-slate-500">Buscando usuários no banco...</span>
                     </div>
                 ) : (
                     <table className="w-full text-left border-collapse">
@@ -265,7 +265,7 @@ export function ClientsTable() {
                                                                 className="w-full flex items-center gap-2 px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 cursor-pointer text-left"
                                                             >
                                                                 <Trash2 size={14} className="text-rose-500" />
-                                                                Excluir Cliente
+                                                                Excluir Usuário
                                                             </button>
                                                         </div>
                                                     </div>
@@ -277,7 +277,7 @@ export function ClientsTable() {
                             ) : (
                                 <tr>
                                     <td colSpan={5} className="py-20 text-center text-sm font-semibold text-slate-400">
-                                        Nenhum cliente encontrado.
+                                        Nenhum usuário encontrado.
                                     </td>
                                 </tr>
                             )}
@@ -288,8 +288,8 @@ export function ClientsTable() {
 
             {/* Rodapé / Informações */}
             <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 font-bold bg-slate-50/50 mt-auto">
-                <span>Total de clientes mostrados: {users.length}</span>
-                <span className="text-[10px] text-purple-500 uppercase tracking-widest font-black">MimoAdmin Clientes</span>
+                <span>Total de usuários mostrados: {users.length}</span>
+                <span className="text-[10px] text-purple-500 uppercase tracking-widest font-black">MimoAdmin Usuários</span>
             </div>
         </div>
     );

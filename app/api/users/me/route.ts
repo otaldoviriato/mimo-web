@@ -57,30 +57,7 @@ export async function GET() {
 
                 user = await User.create(userFields);
 
-                if (isProfessional) {
-                    try {
-                        await resend.emails.send({
-                            from: 'Mimo Cadastro <onboarding@resend.dev>',
-                            to: 'viriatoceo@gmail.com',
-                            subject: `Nova Conta de Criadora Criada (Lazy) - @${username}`,
-                            html: `
-                                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                                    <h2 style="color: #6d28d9; margin-top: 0;">Nova Profissional Cadastrada</h2>
-                                    <p style="color: #475569; font-size: 16px;">Uma nova conta de criadora foi criada e está pendente de verificação de identidade/documentos.</p>
-                                    <ul style="background-color: #f8fafc; padding: 15px 25px; border-radius: 6px; list-style-type: none; margin: 20px 0;">
-                                        <li style="margin-bottom: 8px;"><strong>Nome:</strong> ${user.name}</li>
-                                        <li style="margin-bottom: 8px;"><strong>E-mail:</strong> ${email}</li>
-                                        <li style="margin-bottom: 8px;"><strong>Username:</strong> @${username}</li>
-                                        <li style="margin-bottom: 0;"><strong>Data de Cadastro:</strong> ${new Date().toLocaleString('pt-BR')}</li>
-                                    </ul>
-                                    <p style="color: #475569;">O perfil só aparecerá no painel de moderação de documentos após o envio de fotos do documento e selfie de maioridade (+18) pela própria criadora.</p>
-                                </div>
-                            `
-                        });
-                    } catch (e) {
-                        console.error('Erro ao enviar email lazy create:', e);
-                    }
-                }
+                // Envio de e-mail de notificação para o admin desativado conforme solicitado
             } catch (createError: any) {
                 if (createError.code === 11000) {
                     user = await User.findOne({ clerkId: userId });
@@ -117,29 +94,7 @@ export async function GET() {
                     await user.save();
                     console.log(`[GET /api/users/me] Sincronizado status profissional para o usuário ${userId} baseado nos metadados do Clerk.`);
 
-                    // Envia email de notificação se for promovido aqui
-                    try {
-                        await resend.emails.send({
-                            from: 'Mimo Cadastro <onboarding@resend.dev>',
-                            to: 'viriatoceo@gmail.com',
-                            subject: `Nova Conta de Criadora Criada (Sync GET) - @${user.username}`,
-                            html: `
-                                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                                    <h2 style="color: #6d28d9; margin-top: 0;">Nova Profissional Cadastrada</h2>
-                                    <p style="color: #475569; font-size: 16px;">Uma nova conta de criadora foi criada e está pendente de verificação de identidade/documentos.</p>
-                                    <ul style="background-color: #f8fafc; padding: 15px 25px; border-radius: 6px; list-style-type: none; margin: 20px 0;">
-                                        <li style="margin-bottom: 8px;"><strong>Nome:</strong> ${user.name || user.username}</li>
-                                        <li style="margin-bottom: 8px;"><strong>E-mail:</strong> ${user.email}</li>
-                                        <li style="margin-bottom: 8px;"><strong>Username:</strong> @${user.username}</li>
-                                        <li style="margin-bottom: 0;"><strong>Data de Cadastro:</strong> ${new Date().toLocaleString('pt-BR')}</li>
-                                    </ul>
-                                    <p style="color: #475569;">O perfil só aparecerá no painel de moderação de documentos após o envio de fotos do documento e selfie de maioridade (+18) pela própria criadora.</p>
-                                </div>
-                            `
-                        });
-                    } catch (e) {
-                        console.error('Erro ao enviar email de sincronização GET:', e);
-                    }
+                    // Envio de e-mail de notificação para o admin desativado conforme solicitado
                 }
             } catch (syncErr) {
                 console.warn('[GET /api/users/me] Falha ao sincronizar metadados do Clerk:', syncErr);
@@ -360,34 +315,11 @@ export async function PATCH(request: NextRequest) {
                 console.error('[PATCH /api/users/me] Erro ao atualizar metadados no Clerk:', clerkErr);
             }
 
-            // Se mudou para profissional, dispara o e-mail administrativo e define professionalStatus = null
+            // Se mudou para profissional, define professionalStatus = null e salva
             if (isProfessional) {
                 user.professionalStatus = null;
                 await user.save();
-
-                try {
-                    await resend.emails.send({
-                        from: 'Mimo Cadastro <onboarding@resend.dev>',
-                        to: 'viriatoceo@gmail.com',
-                        subject: `Nova Conta de Criadora Criada - @${user.username}`,
-                        html: `
-                            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                                <h2 style="color: #6d28d9; margin-top: 0;">Nova Profissional Cadastrada</h2>
-                                <p style="color: #475569; font-size: 16px;">Uma nova conta de criadora foi criada e está pendente de verificação de identidade/documentos.</p>
-                                <ul style="background-color: #f8fafc; padding: 15px 25px; border-radius: 6px; list-style-type: none; margin: 20px 0;">
-                                    <li style="margin-bottom: 8px;"><strong>Nome:</strong> ${user.name || user.username}</li>
-                                    <li style="margin-bottom: 8px;"><strong>E-mail:</strong> ${user.email}</li>
-                                    <li style="margin-bottom: 8px;"><strong>Username:</strong> @${user.username}</li>
-                                    <li style="margin-bottom: 0;"><strong>Data de Cadastro:</strong> ${new Date().toLocaleString('pt-BR')}</li>
-                                </ul>
-                                <p style="color: #475569;">O perfil só aparecerá no painel de moderação de documentos após o envio de fotos do documento e selfie de maioridade (+18) pela própria criadora.</p>
-                            </div>
-                        `
-                    });
-                    console.log(`[PATCH /api/users/me] E-mail de notificação de profissional enviado.`);
-                } catch (emailErr) {
-                    console.error('[PATCH /api/users/me] Erro ao enviar e-mail de notificação:', emailErr);
-                }
+                // Envio de e-mail de notificação para o admin desativado conforme solicitado
             }
         }
 

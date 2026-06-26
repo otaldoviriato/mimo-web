@@ -2560,7 +2560,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                     onChange={handlePriceChange}
                                 />
                                 <p className="text-[10px] text-center text-gray-400 mt-2 font-medium">
-                                    Defina o valor em reais que o cliente pagará para desbloquear a mídia.
+                                    Defina o valor em reais para desbloquear esta mídia.
                                 </p>
                             </div>
                         )}

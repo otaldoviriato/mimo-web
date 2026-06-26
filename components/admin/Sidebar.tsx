@@ -31,15 +31,15 @@ interface SidebarProps {
 export function Sidebar({ activeTab, setActiveTab, isOpen = false, onClose }: SidebarProps) {
     const menuItems = [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { id: 'clients', label: 'Clientes', icon: Users },
-        { id: 'professionals', label: 'Profissionais', icon: UserCheck },
+        { id: 'clients', label: 'Usuários', icon: Users },
+        { id: 'professionals', label: 'Perfis Monetizados', icon: UserCheck },
         { id: 'rooms', label: 'Conversas', icon: MessageSquare },
         { id: 'financial', label: 'Financeiro', icon: DollarSign },
         { id: 'withdrawals', label: 'Solicitações de Saque', icon: Wallet },
         { id: 'coupons', label: 'Cupons de Desconto', icon: Ticket },
         { id: 'help-tickets', label: 'Tickets de Ajuda', icon: LifeBuoy },
         { id: 'institutional-emails', label: 'E-mails Institucionais', icon: Mail },
-        { id: 'creator-applications', label: 'Inscrições de Criadoras', icon: ClipboardList },
+        { id: 'creator-applications', label: 'Solicitações de Monetização', icon: ClipboardList },
     ];
 
     const handleTabChange = (tab: string) => {

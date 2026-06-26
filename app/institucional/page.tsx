@@ -87,7 +87,7 @@ export default function InstitucionalPage() {
                     </h1>
                     
                     <p className="text-base sm:text-lg text-gray-500 leading-relaxed max-w-2xl mx-auto">
-                        O MimoChat une criadores de conteúdo independentes e seus fãs através de conversas dinâmicas, galerias exclusivas e interações com mimos digitais. Tudo de forma simples, transparente e com total segurança.
+                        O MimoChat conecta pessoas interessantes através de conversas dinâmicas, galerias exclusivas e interações com mimos digitais. Tudo de forma simples, transparente e com total segurança.
                     </p>
 
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
@@ -101,7 +101,7 @@ export default function InstitucionalPage() {
                             href="/para-criadoras"
                             className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 text-base font-bold text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50 border border-gray-200 rounded-2xl transition-all duration-300 shadow-xs"
                         >
-                            Descobrir Como Funciona (Criadoras)
+                            Como Funciona (Monetização)
                         </Link>
 
                     </div>
@@ -115,7 +115,7 @@ export default function InstitucionalPage() {
                             <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-purple-50 text-purple-600 mb-6 group-hover:scale-105 transition-transform border border-purple-100/50">
                                 <Zap className="w-6 h-6" />
                             </div>
-                            <h3 className="text-2xl font-bold text-gray-950 mb-4">Para Criadores</h3>
+                            <h3 className="text-2xl font-bold text-gray-950 mb-4">Para quem quer receber</h3>
                             <p className="text-gray-500 text-sm sm:text-base leading-relaxed mb-6">
                                 Tenha controle total. Hospede sua galeria privada de fotos e vídeos, envie mídias exclusivas diretamente no chat e monetize através de interações diretas e assinaturas periódicas com facilidade e privacidade.
                             </p>
@@ -138,7 +138,7 @@ export default function InstitucionalPage() {
                             href="/para-criadoras" 
                             className="inline-flex items-center gap-2 text-sm font-bold text-purple-600 hover:text-purple-700 transition-colors"
                         >
-                            Ver como funciona para Criadoras →
+                            Como monetizar suas conversas →
                         </Link>
                     </div>
 
@@ -148,9 +148,9 @@ export default function InstitucionalPage() {
                             <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-indigo-50 text-indigo-600 mb-6 group-hover:scale-105 transition-transform border border-indigo-100/50">
                                 <Users className="w-6 h-6" />
                             </div>
-                            <h3 className="text-2xl font-bold text-gray-950 mb-4">Para Fãs</h3>
+                            <h3 className="text-2xl font-bold text-gray-950 mb-4">Para quem quer conversar</h3>
                             <p className="text-gray-500 text-sm sm:text-base leading-relaxed mb-6">
-                                Apoie quem inspira você. Converse em tempo real com seus criadores favoritos, envie doações voluntárias em forma de "Mimos" e acesse conteúdos exclusivos com rapidez e praticidade.
+                                Apoie quem inspira você. Converse em tempo real com seus perfis preferidos, envie doações voluntárias em forma de "Mimos" e acesse conteúdos exclusivos com rapidez e praticidade.
                             </p>
                             <ul className="space-y-3 mb-8 text-sm text-gray-600">
                                 <li className="flex items-center gap-2.5">
@@ -171,7 +171,7 @@ export default function InstitucionalPage() {
                             href="/login" 
                             className="inline-flex items-center gap-2 text-sm font-bold text-indigo-600 hover:text-indigo-700 transition-colors"
                         >
-                            Acessar como fã →
+                            Começar a conversar →
                         </Link>
                     </div>
                 </section>
@@ -264,7 +264,7 @@ export default function InstitucionalPage() {
                                 <span className="text-lg font-bold text-gray-900">MimoChat</span>
                             </div>
                             <p className="text-xs text-gray-500 max-w-sm leading-relaxed">
-                                Infraestrutura inteligente de hospedagem de conteúdo e rede social privada para criadores e fãs, focada na segurança operacional e privacidade de dados.
+                                Infraestrutura inteligente de hospedagem de conteúdo e rede social privada, focada na segurança operacional e privacidade de dados.
                             </p>
                         </div>
 
