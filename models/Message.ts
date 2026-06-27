@@ -20,6 +20,9 @@ export interface IMessage extends Document {
     thumbnailUrl?: string;
     isGift?: boolean;
     deletedFor?: string[];
+    replyToId?: string | null;
+    replyToContent?: string | null;
+    replyToSenderId?: string | null;
 }
 
 const MessageSchema = new Schema<IMessage>({
@@ -102,6 +105,18 @@ const MessageSchema = new Schema<IMessage>({
     deletedFor: {
         type: [String],
         default: [],
+    },
+    replyToId: {
+        type: String,
+        default: null,
+    },
+    replyToContent: {
+        type: String,
+        default: null,
+    },
+    replyToSenderId: {
+        type: String,
+        default: null,
     },
 });
 

@@ -143,13 +143,24 @@ class SocketService {
         console.log('[SocketService] Saindo da sala', roomId);
     }
 
-    sendMessage(content: string, toUserId: string, roomId: string, tempId?: string) {
+    sendMessage(
+        content: string,
+        toUserId: string,
+        roomId: string,
+        tempId?: string,
+        replyToId?: string,
+        replyToContent?: string,
+        replyToSenderId?: string
+    ) {
         if (!this.socket) return;
         this.socket.emit('send_message', {
             content,
             receiverId: toUserId,
             roomId,
             tempId,
+            replyToId,
+            replyToContent,
+            replyToSenderId,
         });
     }
 

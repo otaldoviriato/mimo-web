@@ -32,6 +32,9 @@ interface Message {
     receiverEarnings?: number;
     status?: 'sending' | 'sent' | 'error';
     tempId?: string;
+    replyToId?: string | null;
+    replyToContent?: string | null;
+    replyToSenderId?: string | null;
 }
 
 interface UploadTask {
@@ -318,6 +321,13 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const [hasMore, setHasMore] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
     const [messageText, setMessageText] = useState('');
+    const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+
+    // Refs para o gesto de swipe para responder
+    const swipingMessage = useRef<Message | null>(null);
+    const swipingElement = useRef<HTMLElement | null>(null);
+    const swipeDistance = useRef<number>(0);
+    const swipeTriggered = useRef<boolean>(false);
     const [sending, setSending] = useState(false);
     const [newIncomingMessageIds, setNewIncomingMessageIds] = useState<Set<string>>(new Set());
     const [showNewMessagesBadge, setShowNewMessagesBadge] = useState(false);
@@ -1364,8 +1374,12 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         setMediaPriceStr(numberValue.toFixed(2));
     };
 
-    const handleStartPress = (msgId: string, e: React.TouchEvent | React.MouseEvent) => {
+    const handleStartPress = (msg: Message, e: React.TouchEvent | React.MouseEvent) => {
         longPressActivated.current = false;
+        swipingMessage.current = msg;
+        swipingElement.current = e.currentTarget.querySelector('.reply-swipe-balloon') as HTMLElement;
+        swipeDistance.current = 0;
+        swipeTriggered.current = false;
 
         let clientX = 0;
         let clientY = 0;
@@ -1384,16 +1398,17 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
         pressTimer.current = setTimeout(() => {
             longPressActivated.current = true;
+            if (swipeDistance.current > 10) return;
             setSelectedMessageIds(prev => {
                 const next = new Set(prev);
-                next.add(msgId);
+                next.add(msg._id);
                 return next;
             });
         }, 500);
     };
 
     const handleMovePress = (e: React.TouchEvent | React.MouseEvent) => {
-        if (!touchStartCoords.current || !pressTimer.current) return;
+        if (!touchStartCoords.current) return;
 
         let clientX = 0;
         let clientY = 0;
@@ -1411,21 +1426,89 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         const deltaY = clientY - touchStartCoords.current.y;
         const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
-        // Se mover mais de 10 pixels, cancelamos o temporizador do long press
         if (distance > 10) {
             if (pressTimer.current) {
                 clearTimeout(pressTimer.current);
                 pressTimer.current = null;
             }
         }
+
+        if (selectedMessageIds.size === 0 && deltaX > 5 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
+            if (pressTimer.current) {
+                clearTimeout(pressTimer.current);
+                pressTimer.current = null;
+            }
+
+            if (swipingElement.current) {
+                const currentDistance = Math.min(deltaX, 60);
+                swipeDistance.current = currentDistance;
+                swipingElement.current.style.transform = `translateX(${currentDistance}px)`;
+                swipingElement.current.style.transition = 'none';
+
+                const replyIcon = e.currentTarget.querySelector('.reply-icon-indicator') as HTMLElement;
+                if (replyIcon) {
+                    const ratio = Math.min(deltaX / 45, 1);
+                    replyIcon.style.opacity = `${ratio}`;
+                    replyIcon.style.transform = `translateY(-50%) scale(${0.75 + ratio * 0.25})`;
+                    
+                    if (deltaX >= 45) {
+                        replyIcon.style.color = '#7c3aed';
+                        const innerDiv = replyIcon.querySelector('div');
+                        if (innerDiv) {
+                            innerDiv.style.backgroundColor = '#ede9fe';
+                            innerDiv.style.borderColor = '#c084fc';
+                        }
+                        
+                        if (!swipeTriggered.current) {
+                            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                                navigator.vibrate(10);
+                            }
+                            swipeTriggered.current = true;
+                        }
+                    } else {
+                        replyIcon.style.color = '#9ca3af';
+                        const innerDiv = replyIcon.querySelector('div');
+                        if (innerDiv) {
+                            innerDiv.style.backgroundColor = '#f3f4f6';
+                            innerDiv.style.borderColor = '#e5e7eb';
+                        }
+                        swipeTriggered.current = false;
+                    }
+                }
+            }
+        }
     };
 
-    const handleEndPress = () => {
+    const handleEndPress = (e: React.TouchEvent | React.MouseEvent) => {
         if (pressTimer.current) {
             clearTimeout(pressTimer.current);
             pressTimer.current = null;
         }
         touchStartCoords.current = null;
+
+        if (swipingElement.current) {
+            swipingElement.current.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
+            swipingElement.current.style.transform = 'translateX(0px)';
+
+            const replyIcon = e.currentTarget.querySelector('.reply-icon-indicator') as HTMLElement;
+            if (replyIcon) {
+                replyIcon.style.transition = 'all 0.2s ease';
+                replyIcon.style.opacity = '0';
+                replyIcon.style.transform = 'translateY(-50%) scale(0.75)';
+            }
+
+            if (swipeDistance.current >= 45 && swipingMessage.current) {
+                setReplyingTo(swipingMessage.current);
+                setTimeout(() => {
+                    inputRef.current?.focus();
+                }, 50);
+            }
+        }
+
+        swipingMessage.current = null;
+        swipingElement.current = null;
+        swipeDistance.current = 0;
+        swipeTriggered.current = false;
     };
 
     // Click em modo de seleção: toggle da mensagem no set
@@ -1570,7 +1653,12 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             charCount: charCount,
             cost: costInCents,
             timestamp: new Date().toISOString(),
-            status: 'sending'
+            status: 'sending',
+            ...(replyingTo ? {
+                replyToId: replyingTo._id,
+                replyToContent: replyingTo.isGift ? '🎁 Presente' : (replyingTo.isLockedImage ? '📸 Imagem bloqueada' : (replyingTo.originalImageUrl ? '📸 Imagem' : (replyingTo.isVideo ? '🎥 Vídeo' : replyingTo.content))),
+                replyToSenderId: replyingTo.senderId
+            } : {})
         };
 
         console.log('[handleSend] Inserindo mensagem otimista e limpando input. tempId:', tempId);
@@ -1582,7 +1670,16 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         inputRef.current?.focus();
         
         // setSending(true); // Removido para permitir múltiplas mensagens rápidas
-        socketService.sendMessage(messageText.trim(), otherUserId, roomId, tempId);
+        socketService.sendMessage(
+            messageText.trim(),
+            otherUserId,
+            roomId,
+            tempId,
+            replyingTo?._id,
+            replyingTo ? (replyingTo.isGift ? '🎁 Presente' : (replyingTo.isLockedImage ? '📸 Imagem bloqueada' : (replyingTo.originalImageUrl ? '📸 Imagem' : (replyingTo.isVideo ? '🎥 Vídeo' : replyingTo.content)))) : undefined,
+            replyingTo?.senderId
+        );
+        setReplyingTo(null);
         socket.emit('mark_as_read', { roomId });
 
         // Atualiza cache local de rooms
@@ -1999,107 +2096,174 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     return (
                         <React.Fragment key={item._id}>
                             <div
-                                className={`flex ${isMine ? 'justify-end' : 'justify-start'} items-end ${isText ? 'mb-0.5' : 'mb-2'} -mx-4 px-4 py-0.5 transition-colors duration-300 ${selectedMessageIds.has(item._id) ? 'bg-purple-100/50' : ''} select-none no-select`}
-                            onMouseDown={(e) => handleStartPress(item._id, e)}
-                            onMouseMove={handleMovePress}
-                            onMouseUp={handleEndPress}
-                            onMouseLeave={handleEndPress}
-                            onTouchStart={(e) => handleStartPress(item._id, e)}
-                            onTouchMove={handleMovePress}
-                            onTouchEnd={handleEndPress}
-                            onClick={() => handleMessageClick(item._id)}
-                        >
-                            {item.isGift ? (
-                                <div
-                                    className={`max-w-[85%] rounded-[2rem] overflow-hidden shadow-md border-2 ${
-                                        isMine 
-                                            ? 'bg-purple-600 border-purple-500 rounded-br-none' 
-                                            : 'bg-white border-purple-50 border-2 rounded-bl-none'
-                                    }`}
-                                >
-                                    <div className="px-6 py-6 flex flex-col items-center gap-4">
-                                        <div className="relative group">
-                                            <div className={`absolute inset-0 blur-2xl opacity-20 ${isMine ? 'bg-white' : 'bg-purple-600'}`} />
-                                            <img 
-                                                src="/assets/gift.png" 
-                                                alt="Gift" 
-                                                className="w-24 h-24 object-contain relative drop-shadow-xl animate-bounce" 
-                                                style={{ animationDuration: '4s' }} 
-                                            />
-                                        </div>
-                                        
-                                        <div className="text-center">
-                                            <p className={`text-[11px] font-black uppercase tracking-[0.2em] mb-2 ${isMine ? 'text-purple-200' : 'text-purple-500'}`}>
-                                                {isMine ? 'Mimo Enviado' : 'Você recebeu um presente'}
-                                            </p>
-                                            <p className={`text-4xl font-black tracking-tight ${isMine ? 'text-white' : 'text-gray-900'}`}>
-                                                R$ {(item.cost / 100).toFixed(2)}
-                                            </p>
-                                        </div>
+                                id={`msg-${item._id}`}
+                                className={`flex ${isMine ? 'justify-end' : 'justify-start'} items-end ${isText ? 'mb-0.5' : 'mb-2'} -mx-4 px-4 py-0.5 transition-colors duration-300 ${selectedMessageIds.has(item._id) ? 'bg-purple-100/50' : ''} select-none no-select relative`}
+                                onMouseDown={(e) => handleStartPress(item, e)}
+                                onMouseMove={handleMovePress}
+                                onMouseUp={(e) => handleEndPress(e)}
+                                onMouseLeave={(e) => handleEndPress(e)}
+                                onTouchStart={(e) => handleStartPress(item, e)}
+                                onTouchMove={handleMovePress}
+                                onTouchEnd={(e) => handleEndPress(e)}
+                                onClick={() => handleMessageClick(item._id)}
+                            >
+                                {/* Ícone de resposta revelado pelo swipe */}
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center justify-center opacity-0 scale-75 transition-all duration-150 reply-icon-indicator pointer-events-none z-0">
+                                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 shadow-sm border border-gray-200">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="9 17 4 12 9 7" />
+                                            <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+                                        </svg>
+                                    </div>
+                                </div>
 
-                                        {!isMine && (
-                                            <div className="mt-2 px-4 py-1.5 bg-green-500/10 rounded-full border border-green-500/20 flex items-center gap-2">
-                                                <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
-                                                <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">
-                                                    Saldo Adicionado
+                                {item.isGift ? (
+                                    <div
+                                        className={`reply-swipe-balloon max-w-[85%] rounded-[2rem] overflow-hidden shadow-md border-2 relative z-10 ${
+                                            isMine 
+                                                ? 'bg-purple-600 border-purple-500 rounded-br-none' 
+                                                : 'bg-white border-purple-50 border-2 rounded-bl-none'
+                                        }`}
+                                    >
+                                        {/* Balão de mensagem respondida em Presente */}
+                                        {item.replyToId && (
+                                            <div 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const targetEl = document.getElementById(`msg-${item.replyToId}`);
+                                                    if (targetEl) {
+                                                        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                        targetEl.classList.add('bg-purple-100/50');
+                                                        setTimeout(() => {
+                                                            targetEl.classList.remove('bg-purple-100/50');
+                                                        }, 1500);
+                                                    }
+                                                }}
+                                                className={`cursor-pointer m-3 mb-1 p-2 rounded-lg text-[11px] border-l-4 ${
+                                                    isMine 
+                                                        ? 'bg-purple-750/30 border-purple-300 text-purple-100' 
+                                                        : 'bg-gray-100 border-purple-500 text-gray-600'
+                                                } flex flex-col gap-0.5 max-w-full`}
+                                            >
+                                                <span className={`font-black ${isMine ? 'text-purple-200' : 'text-purple-700'}`}>
+                                                    {item.replyToSenderId === user?.id ? 'Você' : (receiver?.name || receiver?.username || 'Usuário')}
+                                                </span>
+                                                <span className="truncate max-w-full">
+                                                    {item.replyToContent}
                                                 </span>
                                             </div>
                                         )}
-                                    </div>
-
-                                    <div className={`px-5 py-3 flex items-end justify-between gap-4 ${isMine ? 'bg-purple-700/40' : 'bg-gray-50/50'}`}>
-                                        <div className="flex-1" />
-                                        <div className="flex items-center gap-2 mb-[-1px]">
-                                            <span className={`text-[10px] font-medium ${isMine ? 'text-purple-200/70' : 'text-gray-400'}`}>
-                                                {(() => {
-                                                    try {
-                                                        return new Date(item.timestamp).toLocaleTimeString('pt-BR', {
-                                                            hour: '2-digit',
-                                                            minute: '2-digit',
-                                                        });
-                                                    } catch { return ''; }
-                                                })()}
-                                            </span>
-                                            {isMine && (
-                                                <span className={`text-[11px] ${item.isRead ? 'text-blue-300' : (item.status === 'sending' ? 'text-purple-300 animate-pulse' : 'text-purple-300')}`}>
-                                                    {item.status === 'sending' ? (
-                                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                                            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                                                        </svg>
-                                                    ) : item.isRead ? (
-                                                        <div className="inline-flex items-center">
-                                                            <span className="relative">✓</span>
-                                                            <span className="relative -ml-1.5">✓</span>
-                                                        </div>
-                                                    ) : item.isDelivered ? (
-                                                        <div className="inline-flex items-center">
-                                                            <span className="relative">✓</span>
-                                                            <span className="relative -ml-1.5">✓</span>
-                                                        </div>
-                                                    ) : '✓'}
-                                                </span>
+                                        <div className="px-6 py-6 flex flex-col items-center gap-4">
+                                            <div className="relative group">
+                                                <div className={`absolute inset-0 blur-2xl opacity-20 ${isMine ? 'bg-white' : 'bg-purple-600'}`} />
+                                                <img 
+                                                    src="/assets/gift.png" 
+                                                    alt="Gift" 
+                                                    className="w-24 h-24 object-contain relative drop-shadow-xl animate-bounce" 
+                                                    style={{ animationDuration: '4s' }} 
+                                                />
+                                            </div>
+                                            
+                                            <div className="text-center">
+                                                <p className={`text-[11px] font-black uppercase tracking-[0.2em] mb-2 ${isMine ? 'text-purple-200' : 'text-purple-500'}`}>
+                                                    {isMine ? 'Mimo Enviado' : 'Você recebeu um presente'}
+                                                </p>
+                                                <p className={`text-4xl font-black tracking-tight ${isMine ? 'text-white' : 'text-gray-900'}`}>
+                                                    R$ {(item.cost / 100).toFixed(2)}
+                                                </p>
+                                            </div>
+    
+                                            {!isMine && (
+                                                <div className="mt-2 px-4 py-1.5 bg-green-500/10 rounded-full border border-green-500/20 flex items-center gap-2">
+                                                    <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                                                    <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">
+                                                        Saldo Adicionado
+                                                    </span>
+                                                </div>
                                             )}
                                         </div>
+    
+                                        <div className={`px-5 py-3 flex items-end justify-between gap-4 ${isMine ? 'bg-purple-700/40' : 'bg-gray-50/50'}`}>
+                                            <div className="flex-1" />
+                                            <div className="flex items-center gap-2 mb-[-1px]">
+                                                <span className={`text-[10px] font-medium ${isMine ? 'text-purple-200/70' : 'text-gray-400'}`}>
+                                                    {(() => {
+                                                        try {
+                                                            return new Date(item.timestamp).toLocaleTimeString('pt-BR', {
+                                                                hour: '2-digit',
+                                                                minute: '2-digit',
+                                                            });
+                                                        } catch { return ''; }
+                                                    })()}
+                                                </span>
+                                                {isMine && (
+                                                    <span className={`text-[11px] ${item.isRead ? 'text-blue-300' : (item.status === 'sending' ? 'text-purple-300 animate-pulse' : 'text-purple-300')}`}>
+                                                        {item.status === 'sending' ? (
+                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                                                            </svg>
+                                                        ) : item.isRead ? (
+                                                            <div className="inline-flex items-center">
+                                                                <span className="relative">✓</span>
+                                                                <span className="relative -ml-1.5">✓</span>
+                                                            </div>
+                                                        ) : item.isDelivered ? (
+                                                            <div className="inline-flex items-center">
+                                                                <span className="relative">✓</span>
+                                                                <span className="relative -ml-1.5">✓</span>
+                                                            </div>
+                                                        ) : '✓'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            ) : (
-                                <>
-                                    {isMine && userData?.isProfessional && item.lockedImagePrice! > 0 && !isLocked && (
-                                        <MediaEarningsIndicator
-                                            messageId={item._id}
-                                            receiverEarnings={item.receiverEarnings}
-                                            cost={item.lockedImagePrice || 0}
-                                            isSelected={selectedMessageIds.has(item._id)}
-                                            isNew={newUnlockedMediaIds.has(item._id)}
-                                        />
-                                    )}
-                                    <div
-                                        className={`relative z-10 max-w-[75%] ${isLocked || item.originalImageUrl || item.isVideo ? 'p-1 bg-transparent' : 'px-3 py-1.5'} rounded-2xl ${
-                                        (!isLocked && !item.originalImageUrl && !item.isVideo) 
-                                    ? (isMine ? 'bg-purple-600 text-white rounded-br-sm' : 'bg-white text-gray-900 shadow-sm rounded-bl-sm')
-                                            : (isMine ? 'rounded-br-sm' : 'rounded-bl-sm')
-                                        }`}
-                                >
+                                ) : (
+                                    <>
+                                        {isMine && userData?.isProfessional && item.lockedImagePrice! > 0 && !isLocked && (
+                                            <MediaEarningsIndicator
+                                                messageId={item._id}
+                                                receiverEarnings={item.receiverEarnings}
+                                                cost={item.lockedImagePrice || 0}
+                                                isSelected={selectedMessageIds.has(item._id)}
+                                                isNew={newUnlockedMediaIds.has(item._id)}
+                                            />
+                                        )}
+                                        <div
+                                            className={`reply-swipe-balloon relative z-10 max-w-[75%] ${isLocked || item.originalImageUrl || item.isVideo ? 'p-1 bg-transparent' : 'px-3 py-1.5'} rounded-2xl ${
+                                            (!isLocked && !item.originalImageUrl && !item.isVideo) 
+                                        ? (isMine ? 'bg-purple-600 text-white rounded-br-sm' : 'bg-white text-gray-900 shadow-sm rounded-bl-sm')
+                                                : (isMine ? 'rounded-br-sm' : 'rounded-bl-sm')
+                                            }`}
+                                        >
+                                            {/* Balão de mensagem respondida em Mensagem Comum */}
+                                            {item.replyToId && (
+                                                <div 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const targetEl = document.getElementById(`msg-${item.replyToId}`);
+                                                        if (targetEl) {
+                                                            targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                            targetEl.classList.add('bg-purple-100/50');
+                                                            setTimeout(() => {
+                                                                targetEl.classList.remove('bg-purple-100/50');
+                                                            }, 1500);
+                                                        }
+                                                    }}
+                                                    className={`cursor-pointer mb-1.5 p-2 rounded-lg text-[11px] border-l-4 ${
+                                                        isMine 
+                                                            ? 'bg-purple-750/30 border-purple-300 text-purple-100' 
+                                                            : 'bg-purple-50 border-purple-500 text-gray-600'
+                                                    } flex flex-col gap-0.5 max-w-full`}
+                                                >
+                                                    <span className={`font-black ${isMine ? 'text-purple-200' : 'text-purple-700'}`}>
+                                                        {item.replyToSenderId === user?.id ? 'Você' : (receiver?.name || receiver?.username || 'Usuário')}
+                                                    </span>
+                                                    <span className="truncate max-w-full">
+                                                        {item.replyToContent}
+                                                    </span>
+                                                </div>
+                                            )}
                                     {isLocked || item.originalImageUrl || item.isVideo ? (
                                         <>
                                             {isLocked ? (
@@ -2444,6 +2608,27 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
             {/* Input area */}
             <div className="bg-white border-t border-gray-200 px-4 py-3 shrink-0">
+                {replyingTo && (
+                    <div className="flex items-center justify-between bg-purple-50 border-l-4 border-purple-600 rounded-r-xl p-3 mb-3 animate-in slide-in-from-bottom-2 duration-150">
+                        <div className="flex-1 min-w-0 pr-4">
+                            <p className="text-[11px] font-black text-purple-700 uppercase tracking-wider mb-0.5">
+                                Respondendo a {replyingTo.senderId === user?.id ? 'Você' : (receiver?.name || receiver?.username || 'Usuário')}
+                            </p>
+                            <p className="text-xs text-gray-600 truncate">
+                                {replyingTo.isGift ? '🎁 Presente' : (replyingTo.isLockedImage ? '📸 Imagem bloqueada' : (replyingTo.originalImageUrl ? '📸 Imagem' : (replyingTo.isVideo ? '🎥 Vídeo' : replyingTo.content)))}
+                            </p>
+                        </div>
+                        <button 
+                            onClick={() => setReplyingTo(null)}
+                            className="p-1 hover:bg-purple-100 rounded-full transition-colors text-purple-700 active:scale-95 shrink-0"
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                        </button>
+                    </div>
+                )}
                 <div className="flex items-end gap-3">
                     <div className="relative shrink-0">
                         <button
