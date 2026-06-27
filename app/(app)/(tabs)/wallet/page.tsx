@@ -27,6 +27,15 @@ import {
     XCircle
 } from 'lucide-react';
 
+const formatCPF = (cpf?: string) => {
+    if (!cpf) return '';
+    const clean = cpf.replace(/\D/g, '');
+    if (clean.length === 11) {
+        return `${clean.substring(0, 3)}.${clean.substring(3, 6)}.${clean.substring(6, 9)}-${clean.substring(9, 11)}`;
+    }
+    return cpf;
+};
+
 interface CustomerRanking {
     clerkId: string;
     totalSpent: number;
@@ -73,10 +82,7 @@ export default function WalletPage() {
     const { data: pendingWithdrawal, refetch: refetchPendingWithdrawal } = usePendingWithdrawal();
     const { data: withdrawalsData, refetch: refetchWithdrawals } = useWithdrawalHistory();
 
-    const [pixKey, setPixKey] = useState('');
-    const [pixModalOpen, setPixModalOpen] = useState(false);
     const [withdrawConfirmModalOpen, setWithdrawConfirmModalOpen] = useState(false);
-    const [loading, setLoading] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
     const [withdrawFeedback, setWithdrawFeedback] = useState<'created' | 'approved' | 'failed' | null>(null);
     const [lastSeenWithdrawalStatus, setLastSeenWithdrawalStatus] = useState<string | null>(null);
@@ -111,27 +117,6 @@ export default function WalletPage() {
         },
         refetchInterval: 30 * 1000
     });
-
-    useEffect(() => {
-        if (userData?.pixKey) {
-            setPixKey(userData.pixKey);
-        }
-    }, [userData]);
-
-    const handleSavePix = async () => {
-        if (!pixKey.trim()) return;
-        setLoading(true);
-        try {
-            await updateProfileMutation.mutateAsync({ pixKey });
-            await refetchProfile();
-            setPixModalOpen(false);
-            setWithdrawConfirmModalOpen(true);
-        } catch {
-            alert('Erro ao salvar chave Pix');
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const handleRequestWithdraw = async () => {
         try {
@@ -327,13 +312,13 @@ export default function WalletPage() {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4 pt-4 border-t border-purple-100/50">
                         <p className="text-[11px] text-slate-450 max-w-xs flex items-center gap-1.5 leading-snug">
                             <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                            Saques via Pix transferidos para a chave PIX cadastrada.
+                            Saques via Pix transferidos diretamente para o CPF cadastrado.
                         </p>
                         
                         <button
                             onClick={() => {
-                                if (!userData?.pixKey) {
-                                    setPixModalOpen(true);
+                                if (!userData?.taxId) {
+                                    toast.error('Você precisa ter o CPF cadastrado e verificado para solicitar saques.');
                                 } else {
                                     setWithdrawConfirmModalOpen(true);
                                 }
@@ -652,48 +637,6 @@ export default function WalletPage() {
 
             </div>
 
-            {/* ── MODAL: CADASTRAR CHAVE PIX ─────────────────────────── */}
-            {pixModalOpen && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm flex flex-col gap-4 animate-in fade-in zoom-in duration-300 border border-gray-100">
-                        <div className="flex flex-col items-center text-center gap-2.5">
-                            <div className="w-12 h-12 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shrink-0 shadow-sm">
-                                <Key className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <h2 className="text-base font-bold text-gray-900">Configurar Chave PIX</h2>
-                                <p className="text-xs text-gray-400 mt-1">
-                                    Cadastre a sua chave Pix para receber os saques.
-                                </p>
-                            </div>
-                        </div>
-
-                        <Input
-                            label="Chave Pix"
-                            placeholder="CPF, E-mail, Telefone ou Aleatória"
-                            value={pixKey}
-                            onChange={(e) => setPixKey(e.target.value)}
-                        />
-
-                        <div className="flex gap-2.5 mt-1">
-                            <button
-                                onClick={() => setPixModalOpen(false)}
-                                className="flex-1 h-9 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-655 font-bold text-xs"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleSavePix}
-                                disabled={loading || !pixKey.trim()}
-                                className="flex-1 h-9 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center disabled:opacity-50"
-                            >
-                                {loading ? 'Salvando...' : 'Confirmar'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {/* ── MODAL: CONFIRMAR SAQUE ────────────────────────────────── */}
             {withdrawConfirmModalOpen && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
@@ -718,12 +661,18 @@ export default function WalletPage() {
                                 </span>
                             </div>
                             <div className="flex justify-between items-center border-t border-gray-200 pt-2">
-                                <span className="text-gray-400 font-medium">Chave PIX:</span>
-                                <span className="font-bold text-gray-900">{pixKey}</span>
+                                <span className="text-gray-400 font-medium">CPF de Destino:</span>
+                                <span className="font-bold text-gray-900">{formatCPF(userData?.taxId)}</span>
                             </div>
-                            <div className="bg-amber-50 border border-amber-100 rounded-lg p-2 flex items-start gap-1.5 mt-1">
+                            <div className="bg-blue-50/70 border border-blue-100 rounded-lg p-2 flex items-start gap-1.5 mt-1 text-blue-800">
+                                <AlertCircle className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                                <p className="text-[9px] leading-snug">
+                                    O Pix será enviado obrigatoriamente ao CPF cadastrado na verificação de identidade.
+                                </p>
+                            </div>
+                            <div className="bg-amber-50 border border-amber-100 rounded-lg p-2 flex items-start gap-1.5 mt-1 text-amber-700">
                                 <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                                <p className="text-[9px] text-amber-700 leading-snug">
+                                <p className="text-[9px] leading-snug">
                                     O prazo de transferência bancária via Pix é de até 24 horas úteis.
                                 </p>
                             </div>

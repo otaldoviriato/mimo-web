@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
                 createdAt: u.createdAt ? new Date(u.createdAt).toLocaleDateString('pt-BR') : 'N/A',
                 taxId: u.taxId || '',
                 phone: u.phone || '',
-                pixKey: u.pixKey || '',
+                pixKey: u.taxId || u.pixKey || '',
                 subscriptionPrice: u.subscriptionPrice || 0,
                 lastSeen: u.lastSeen ? new Date(u.lastSeen).toISOString() : null,
                 isOnline: u.isOnline || false,

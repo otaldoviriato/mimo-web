@@ -26,8 +26,8 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        if (!user.pixKey) {
-            return NextResponse.json({ error: 'Chave Pix não configurada' }, { status: 400 });
+        if (!user.taxId) {
+            return NextResponse.json({ error: 'CPF não cadastrado. É necessário ter um CPF verificado para realizar saques.' }, { status: 400 });
         }
 
         if (user.balance <= 0) {
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
         // 1. Iniciar transferência Pix automática no Asaas
         let asaasTransferId = undefined;
         try {
-            const transfer = await createAsaasPixTransfer(amountToWithdraw, user.pixKey);
+            const transfer = await createAsaasPixTransfer(amountToWithdraw, user.taxId);
             asaasTransferId = transfer.id;
         } catch (apiError: any) {
             console.error('Erro ao chamar API do Asaas para transferência na criação do saque:', apiError);
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
         const withdrawRequest = await WithdrawRequest.create({
             userId: user.clerkId,
             amount: amountToWithdraw,
-            pixKey: user.pixKey,
+            pixKey: user.taxId,
             status: 'processando',
             asaasTransferId,
         });
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
                         <p style="color: #475569; font-size: 16px;">O usuário <strong>${user.name || user.username}</strong> (@${user.username}) solicitou um saque.</p>
                         <ul style="background-color: #f8fafc; padding: 15px 25px; border-radius: 6px; list-style-type: none; margin: 20px 0;">
                             <li style="margin-bottom: 8px;"><strong>Valor:</strong> ${(amountToWithdraw / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</li>
-                            <li style="margin-bottom: 8px;"><strong>Chave PIX:</strong> ${user.pixKey}</li>
+                            <li style="margin-bottom: 8px;"><strong>CPF / Chave PIX:</strong> ${withdrawRequest.pixKey}</li>
                             <li style="margin-bottom: 8px;"><strong>ID do Pedido:</strong> ${withdrawRequest._id}</li>
                             <li style="margin-bottom: 0;"><strong>Data:</strong> ${new Date().toLocaleString('pt-BR')}</li>
                         </ul>

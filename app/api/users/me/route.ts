@@ -147,7 +147,7 @@ export async function GET() {
                 chargePerCharSubscribers: user.chargePerCharSubscribers ?? 0.002,
                 chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? 0.005,
                 subscribers: user.subscribers || [],
-                pixKey: user.pixKey,
+                pixKey: user.taxId || user.pixKey,
                 savedCards: (user.savedCards || []).map((card: ICard) => ({
                     id: card.id,
                     label: card.label,
@@ -185,7 +185,7 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { username, name, photoUrl, coverUrl, phone, taxId, pixKey, isProfessional, subscriptionPrice, isSubscriptionEnabled, chargePerCharSubscribers, chargePerCharNonSubscribers, bio, emailNotificationsEnabled } = body;
+        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, subscriptionPrice, isSubscriptionEnabled, chargePerCharSubscribers, chargePerCharNonSubscribers, bio, emailNotificationsEnabled } = body;
 
         await connectToDatabase();
 
@@ -219,7 +219,6 @@ export async function PATCH(request: NextRequest) {
         if (coverUrl !== undefined) updateData.coverUrl = coverUrl;
         if (phone !== undefined) updateData.phone = phone;
         if (taxId !== undefined) updateData.taxId = taxId;
-        if (pixKey !== undefined) updateData.pixKey = pixKey;
         
         if (isProfessional !== undefined) updateData.isProfessional = isProfessional;
         
@@ -343,7 +342,7 @@ export async function PATCH(request: NextRequest) {
                 chargePerCharSubscribers: user.chargePerCharSubscribers ?? 0.002,
                 chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? 0.005,
                 subscribers: user.subscribers || [],
-                pixKey: user.pixKey,
+                pixKey: user.taxId || user.pixKey,
                 savedCards: (user.savedCards || []).map((card: ICard) => ({
                     id: card.id,
                     label: card.label,

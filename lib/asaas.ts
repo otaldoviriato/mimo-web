@@ -238,6 +238,36 @@ export type AsaasTransfer = {
     transactionReceiptUrl: string | null;
 };
 
+function isValidCPF(cpf: string): boolean {
+    const cleanCPF = cpf.replace(/\D/g, '');
+    if (cleanCPF.length !== 11) return false;
+    
+    // Elimina CPFs conhecidos que passam no cálculo do dígito verificador mas são inválidos
+    if (/^(\d)\1{10}$/.test(cleanCPF)) return false;
+    
+    let sum = 0;
+    let remainder;
+    
+    for (let i = 1; i <= 9; i++) {
+        sum = sum + parseInt(cleanCPF.substring(i - 1, i)) * (11 - i);
+    }
+    remainder = (sum * 10) % 11;
+    
+    if (remainder === 10 || remainder === 11) remainder = 0;
+    if (remainder !== parseInt(cleanCPF.substring(9, 10))) return false;
+    
+    sum = 0;
+    for (let i = 1; i <= 10; i++) {
+        sum = sum + parseInt(cleanCPF.substring(i - 1, i)) * (12 - i);
+    }
+    remainder = (sum * 10) % 11;
+    
+    if (remainder === 10 || remainder === 11) remainder = 0;
+    if (remainder !== parseInt(cleanCPF.substring(10, 11))) return false;
+    
+    return true;
+}
+
 export function detectPixKeyType(pixKey: string): 'CPF' | 'CNPJ' | 'EMAIL' | 'PHONE' | 'EVP' {
     const cleanKey = pixKey.trim();
 
@@ -253,7 +283,7 @@ export function detectPixKeyType(pixKey: string): 'CPF' | 'CNPJ' | 'EMAIL' | 'PH
 
     const digitsOnly = cleanKey.replace(/\D/g, '');
 
-    if (digitsOnly.length === 11) {
+    if (digitsOnly.length === 11 && isValidCPF(digitsOnly)) {
         return 'CPF';
     }
 
@@ -273,12 +303,12 @@ export function normalizePixKey(pixKey: string, type: 'CPF' | 'CNPJ' | 'EMAIL' |
     if (type === 'PHONE') {
         const digitsOnly = cleanKey.replace(/\D/g, '');
         if (cleanKey.startsWith('+')) {
-            return `+${digitsOnly}`;
+            return digitsOnly;
         }
         if (digitsOnly.length === 10 || digitsOnly.length === 11) {
-            return `+55${digitsOnly}`;
+            return `55${digitsOnly}`;
         }
-        return `+${digitsOnly}`;
+        return digitsOnly;
     }
     if (type === 'CPF' || type === 'CNPJ') {
         return cleanKey.replace(/\D/g, '');

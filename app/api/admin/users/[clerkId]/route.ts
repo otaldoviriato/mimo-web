@@ -103,7 +103,6 @@ export async function PATCH(
             balance, 
             taxId, 
             phone, 
-            pixKey,
             subscriptionPrice,
             chargePerCharSubscribers,
             chargePerCharNonSubscribers,
@@ -119,7 +118,6 @@ export async function PATCH(
         if (balance !== undefined) updateFields.balance = Number(balance);
         if (taxId !== undefined) updateFields.taxId = taxId;
         if (phone !== undefined) updateFields.phone = phone;
-        if (pixKey !== undefined) updateFields.pixKey = pixKey;
         if (subscriptionPrice !== undefined) updateFields.subscriptionPrice = Number(subscriptionPrice);
         if (chargePerCharSubscribers !== undefined) updateFields.chargePerCharSubscribers = Number(chargePerCharSubscribers);
         if (chargePerCharNonSubscribers !== undefined) updateFields.chargePerCharNonSubscribers = Number(chargePerCharNonSubscribers);
