@@ -8,7 +8,10 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { NotificationPromptModal } from '@/components';
 import { StackNavigationProvider, useStackNavigation } from '@/context/StackNavigationContext';
 import { isReservedRoute } from '@/hooks/useTransitionRouter';
-import { useMyProfile } from '@/hooks/useQueries';
+import { useMyProfile, useChatRooms, QueryKeys } from '@/hooks/useQueries';
+import { useQueryClient } from '@tanstack/react-query';
+import { useSocket } from '@/hooks/useSocket';
+import { usePageTitleNotifications } from '@/hooks/usePageTitleNotifications';
 import ChatPage from './chat/[userId]/page';
 import UserProfilePage from './[username]/page';
 import SettingsPage from './settings/page';
@@ -38,6 +41,121 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const [isNavInitialized, setIsNavInitialized] = React.useState(false);
     const [isProfessionalReleased, setIsProfessionalReleased] = React.useState<boolean | null>(null);
     const [fadeOutRelease, setFadeOutRelease] = React.useState(false);
+
+    const queryClient = useQueryClient();
+    const { socket, connected, socketVersion } = useSocket(user?.id);
+    const { data: rooms = [] } = useChatRooms();
+
+    // ─── Socket Listeners Globais para Sincronização de Estado ──────────────────
+    useEffect(() => {
+        if (!socket || !user?.id) return;
+
+        // 1. Atualiza o saldo via socket (balance_update)
+        const handleBalanceUpdate = (data: { userId: string; balance: number }) => {
+            if (data.userId === user.id) {
+                queryClient.setQueryData(QueryKeys.me, (old: any) =>
+                    old ? { ...old, balance: data.balance } : old
+                );
+            }
+        };
+
+        // 2. Atualiza a lista de salas quando uma nova mensagem chega
+        const handleRoomUpdated = (data: {
+            roomId: string;
+            mongoRoomId?: string;
+            lastMessage: string;
+            lastMessageTime: string;
+            senderId: string;
+        }) => {
+            let matchedRoom = false;
+            queryClient.setQueryData(
+                QueryKeys.rooms(user.id!),
+                (old: any[] | undefined) => {
+                    if (!old) return old;
+                    const updated = old.map((room) => {
+                        const derivedRoomId = room.roomId ?? [...room.participants].sort().join('_');
+                        const match = room._id === data.mongoRoomId
+                            || derivedRoomId === data.roomId;
+                        if (match) {
+                            matchedRoom = true;
+                            const currentUnread = room.unreadCount?.[user.id!] ?? 0;
+                            const isMe = data.senderId === user.id;
+                            return {
+                                ...room,
+                                lastMessage: data.lastMessage,
+                                lastMessageTime: data.lastMessageTime,
+                                updatedAt: data.lastMessageTime,
+                                unreadCount: {
+                                    ...room.unreadCount,
+                                    [user.id!]: isMe ? currentUnread : currentUnread + 1,
+                                },
+                            };
+                        }
+                        return room;
+                    });
+                    // Reordena por mensagem mais recente
+                    return [...updated].sort(
+                        (a, b) =>
+                            new Date(b.lastMessageTime ?? b.updatedAt).getTime() -
+                            new Date(a.lastMessageTime ?? a.updatedAt).getTime()
+                    );
+                }
+            );
+            if (!matchedRoom) {
+                queryClient.invalidateQueries({ queryKey: QueryKeys.rooms(user.id!) });
+            }
+        };
+
+        // 3. Marca sala como lida
+        const handleRoomRead = (data: { roomId: string; userId: string }) => {
+            queryClient.setQueryData(
+                QueryKeys.rooms(user.id!),
+                (old: any[] | undefined) => {
+                    if (!old) return old;
+                    return old.map((room) => {
+                        const derivedRoomId = room.roomId ?? [...room.participants].sort().join('_');
+                        if (derivedRoomId === data.roomId) {
+                            return {
+                                ...room,
+                                unreadCount: {
+                                    ...room.unreadCount,
+                                    [user.id!]: 0,
+                                },
+                            };
+                        }
+                        return room;
+                    });
+                }
+            );
+        };
+
+        // 4. Invalida salas quando uma sala é excluída
+        const handleRoomDeletedOnSocket = (data: { roomId: string }) => {
+            queryClient.invalidateQueries({ queryKey: QueryKeys.rooms(user.id!) });
+        };
+
+        socket.on('balance_update', handleBalanceUpdate);
+        socket.on('room_updated', handleRoomUpdated);
+        socket.on('room_read', handleRoomRead);
+        socket.on('room_deleted', handleRoomDeletedOnSocket);
+
+        return () => {
+            socket.off('balance_update', handleBalanceUpdate);
+            socket.off('room_updated', handleRoomUpdated);
+            socket.off('room_read', handleRoomRead);
+            socket.off('room_deleted', handleRoomDeletedOnSocket);
+        };
+    }, [socket, socketVersion, user?.id, queryClient]);
+
+    // ─── Título de Notificação no Navegador ──────────────────────────────────
+    const totalUnreads = React.useMemo(() => {
+        if (!user?.id) return 0;
+        return rooms.reduce((sum: number, room: any) => {
+            return sum + (room.unreadCount?.[user.id] ?? 0);
+        }, 0);
+    }, [rooms, user?.id]);
+
+    usePageTitleNotifications(totalUnreads);
 
     useEffect(() => {
         if (typeof window !== 'undefined') {

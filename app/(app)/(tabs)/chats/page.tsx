@@ -193,57 +193,7 @@ export default function ChatsPage() {
             queryClient.invalidateQueries({ queryKey: ['earnings', 'recent'] });
         };
 
-        // 2. Atualiza a última mensagem da sala em tempo real
-        // Disparado pelo servidor quando alguém envia uma mensagem para este usuário
-        const handleRoomUpdated = (data: {
-            roomId: string;
-            mongoRoomId?: string;
-            lastMessage: string;
-            lastMessageTime: string;
-            senderId: string;
-        }) => {
-            let matchedRoom = false;
-            queryClient.setQueryData(
-                QueryKeys.rooms(user.id!),
-                (old: Room[] | undefined) => {
-                    if (!old) return old;
-                    // Usa mongoRoomId (ObjectId) para encontrar a sala no cache
-                    // pois room._id vem do MongoDB como string ObjectId
-                    const updated = old.map((room) => {
-                        const derivedRoomId = room.roomId ?? [...room.participants].sort().join('_');
-                        const match = room._id === data.mongoRoomId
-                            || derivedRoomId === data.roomId;
-                        if (match) {
-                            matchedRoom = true;
-                            const currentUnread = room.unreadCount?.[user.id!] ?? 0;
-                            const isMe = data.senderId === user.id;
-                            return {
-                                ...room,
-                                lastMessage: data.lastMessage,
-                                lastMessageTime: data.lastMessageTime,
-                                updatedAt: data.lastMessageTime,
-                                unreadCount: {
-                                    ...room.unreadCount,
-                                    [user.id!]: isMe ? currentUnread : currentUnread + 1,
-                                },
-                            };
-                        }
-                        return room;
-                    });
-                    // Reordena: sala com mensagem mais recente primeiro
-                    return [...updated].sort(
-                        (a, b) =>
-                            new Date(b.lastMessageTime ?? b.updatedAt).getTime() -
-                            new Date(a.lastMessageTime ?? a.updatedAt).getTime()
-                    );
-                }
-            );
-            if (!matchedRoom) {
-                queryClient.invalidateQueries({ queryKey: QueryKeys.rooms(user.id!) });
-            }
-        };
-
-        // 3. Exibe "digitando..." por sala na lista
+        // 2. Exibe "digitando..." por sala na lista
         // O servidor emite global_typing para user:${receiverId} sempre que alguém digita
         const handleGlobalTyping = (data: { roomId: string; userId: string; isTyping: boolean }) => {
             // Limpa qualquer timeout ativo anterior para esta sala (de exibição ou ocultação)
@@ -271,46 +221,12 @@ export default function ChatsPage() {
             }
         };
 
-        // 4. Marca sala como lida
-        const handleRoomRead = (data: { roomId: string; userId: string }) => {
-            queryClient.setQueryData(
-                QueryKeys.rooms(user.id!),
-                (old: Room[] | undefined) => {
-                    if (!old) return old;
-                    return old.map((room) => {
-                        const derivedRoomId = room.roomId ?? [...room.participants].sort().join('_');
-                        if (derivedRoomId === data.roomId) {
-                            return {
-                                ...room,
-                                unreadCount: {
-                                    ...room.unreadCount,
-                                    [user.id!]: 0,
-                                },
-                            };
-                        }
-                        return room;
-                    });
-                }
-            );
-        };
-
-        // 5. Atualiza quando uma sala é excluída (soft-delete)
-        const handleRoomDeletedOnSocket = (data: { roomId: string }) => {
-            queryClient.invalidateQueries({ queryKey: QueryKeys.rooms(user.id!) });
-        };
-
         socket.on('balance_update', handleBalanceUpdate);
-        socket.on('room_updated', handleRoomUpdated);
         socket.on('global_typing', handleGlobalTyping);
-        socket.on('room_read', handleRoomRead);
-        socket.on('room_deleted', handleRoomDeletedOnSocket);
 
         return () => {
             socket.off('balance_update', handleBalanceUpdate);
-            socket.off('room_updated', handleRoomUpdated);
             socket.off('global_typing', handleGlobalTyping);
-            socket.off('room_read', handleRoomRead);
-            socket.off('room_deleted', handleRoomDeletedOnSocket);
 
             // Limpa todos os timeouts de typing ativos
             Object.values(typingTimeouts.current).forEach(clearTimeout);
