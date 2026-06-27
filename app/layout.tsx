@@ -26,9 +26,9 @@ export const metadata: Metadata = {
         siteName: 'Mimo Chat',
         images: [
             {
-                url: 'https://www.mimochat.com.br/icon-512x512.png',
-                width: 512,
-                height: 512,
+                url: 'https://www.mimochat.com.br/assets/og-image.png',
+                width: 1200,
+                height: 630,
                 alt: 'Mimo Chat - Monetize suas Mensagens e Interações com Fãs',
             },
         ],
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
         card: 'summary_large_image',
         title: 'Mimo Chat | Monetize suas Mensagens e Interações com Fãs',
         description: 'Cansada de responder direct de graça? No Mimo você cobra por mensagem e recebe direto no Pix.',
-        images: ['https://www.mimochat.com.br/icon-512x512.png'],
+        images: ['https://www.mimochat.com.br/assets/og-image.png'],
     },
     appleWebApp: {
         capable: true,
