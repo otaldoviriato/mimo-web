@@ -150,9 +150,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     // ─── Título de Notificação no Navegador ──────────────────────────────────
     const totalUnreads = React.useMemo(() => {
         if (!user?.id) return 0;
-        return rooms.reduce((sum: number, room: any) => {
-            return sum + (room.unreadCount?.[user.id] ?? 0);
-        }, 0);
+        // Filtra e conta a quantidade de salas (conversas) que possuem mensagens não lidas
+        return rooms.filter((room: any) => (room.unreadCount?.[user.id!] ?? 0) > 0).length;
     }, [rooms, user?.id]);
 
     usePageTitleNotifications(totalUnreads);
