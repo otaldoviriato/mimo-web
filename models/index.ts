@@ -29,3 +29,7 @@ export type {
 export { ProfessionalEmail } from './ProfessionalEmail';
 export type { IProfessionalEmail } from './ProfessionalEmail';
 
+export { Subscription } from './Subscription';
+export type { ISubscription } from './Subscription';
+
+

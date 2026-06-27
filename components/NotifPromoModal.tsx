@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { usePWA } from '@/context/PWAContext';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { SESSION_KEYS, NEW_SESSION_EVENT } from '@/services/socket';
+import { useMyProfile } from '@/hooks/useQueries';
 
 const COOLDOWN_MS = 10 * 60 * 1000;
 const SHOWN_KEY   = 'notif_promo_shown';
@@ -43,6 +44,7 @@ const benefits = [
 export function NotifPromoModal() {
     const { isStandalone } = usePWA();
     const { permission, handleRequestPermission } = usePushNotifications();
+    const { data: user } = useMyProfile();
     const [visible, setVisible] = useState(false);
     const [animating, setAnimating] = useState(false);
 
@@ -50,8 +52,8 @@ export function NotifPromoModal() {
         if (typeof window === 'undefined') return;
 
         const tryShow = (intentional: boolean) => {
-            // Só exibe dentro do PWA instalado (standalone) E sem permissão concedida
-            if (!isStandalone || permission === 'granted') return;
+            // Só exibe dentro do PWA instalado (standalone), sem permissão concedida E sem token de push ativo
+            if (!isStandalone || permission === 'granted' || user?.hasPushToken) return;
             const lastShown = Number(localStorage.getItem(SHOWN_KEY) ?? '0');
             if (!intentional && Date.now() - lastShown < COOLDOWN_MS) return;
             localStorage.setItem(SHOWN_KEY, String(Date.now()));
@@ -73,7 +75,7 @@ export function NotifPromoModal() {
 
         window.addEventListener(NEW_SESSION_EVENT, onNewSession);
         return () => window.removeEventListener(NEW_SESSION_EVENT, onNewSession);
-    }, [isStandalone, permission]);
+    }, [isStandalone, permission, user?.hasPushToken]);
 
     const dismiss = () => {
         setAnimating(false);
@@ -85,7 +87,7 @@ export function NotifPromoModal() {
         await handleRequestPermission();
     };
 
-    if (!visible) return null;
+    if (!visible || user?.hasPushToken) return null;
 
     return (
         <div

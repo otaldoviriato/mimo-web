@@ -28,6 +28,17 @@ export async function GET(
         const publicItems = allItems.filter(item => !item.galleryType || item.galleryType === 'public');
         const privateItems = allItems.filter(item => item.galleryType === 'private');
 
+        // Sanitizar a URL das fotos públicas exclusivas de assinante para evitar vazamento
+        const sanitizedPublicItems = publicItems.map(item => {
+            const isLocked = item.visibility === 'subscribers' && !isSubscriber && !isOwner;
+            if (isLocked) {
+                const itemObj = item.toObject();
+                itemObj.imageUrl = ''; // Remove a URL real da imagem exclusiva para não-assinantes
+                return itemObj;
+            }
+            return item;
+        });
+
         const privatePhotosCount = privateItems.filter(item => !item.mediaType || item.mediaType === 'photo').length;
         const privateVideosCount = privateItems.filter(item => item.mediaType === 'video').length;
 
@@ -35,8 +46,8 @@ export async function GET(
         const visiblePrivateItems = (isSubscriber || isOwner) ? privateItems : [];
 
         return NextResponse.json({ 
-            items: publicItems,
-            publicItems,
+            items: sanitizedPublicItems,
+            publicItems: sanitizedPublicItems,
             privateItems: visiblePrivateItems,
             privatePhotosCount,
             privateVideosCount,

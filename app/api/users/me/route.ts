@@ -167,6 +167,7 @@ export async function GET() {
                 minExclusivePhotos: settings?.minExclusivePhotos ?? 2,
                 maxExclusivePhotos: settings?.maxExclusivePhotos ?? 4,
                 emailNotificationsEnabled: user.emailNotificationsEnabled ?? false,
+                hasPushToken: Boolean(user.fcmToken || (user.fcmTokens && user.fcmTokens.length > 0)),
             },
         });
     } catch (error: any) {
@@ -361,6 +362,7 @@ export async function PATCH(request: NextRequest) {
                 minExclusivePhotos: settings?.minExclusivePhotos ?? 2,
                 maxExclusivePhotos: settings?.maxExclusivePhotos ?? 4,
                 emailNotificationsEnabled: user.emailNotificationsEnabled ?? false,
+                hasPushToken: Boolean(user.fcmToken || (user.fcmTokens && user.fcmTokens.length > 0)),
             },
         });
     } catch (error: any) {

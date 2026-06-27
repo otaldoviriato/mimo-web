@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Bell, X } from 'lucide-react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { usePWA } from '@/context/PWAContext';
+import { useMyProfile } from '@/hooks/useQueries';
 
 const INACTIVITY_THRESHOLD = 12 * 60 * 60 * 1000; // 12 horas
 const COOLDOWN_THRESHOLD = 24 * 60 * 60 * 1000; // 24 horas (não incomodar se fechar)
@@ -11,6 +12,7 @@ const COOLDOWN_THRESHOLD = 24 * 60 * 60 * 1000; // 24 horas (não incomodar se f
 export function NotificationPromptModal() {
     const { isStandalone } = usePWA();
     const { permission, handleRequestPermission } = usePushNotifications();
+    const { data: user } = useMyProfile();
     const [isVisible, setIsVisible] = useState(false);
     const [isAnimating, setIsAnimating] = useState(false);
 
@@ -22,6 +24,9 @@ export function NotificationPromptModal() {
 
         // Se já foi concedida a permissão, não precisamos fazer nada
         if (permission === 'granted') return;
+
+        // Se o usuário já possui um token de push ativo no banco de dados, não exibe o prompt
+        if (user?.hasPushToken) return;
 
         const checkInactivityAndPrompt = () => {
             const now = Date.now();
@@ -77,7 +82,7 @@ export function NotificationPromptModal() {
             if (initTimer) clearTimeout(initTimer);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [permission, isStandalone]);
+    }, [permission, isStandalone, user?.hasPushToken]);
 
     const handleClose = () => {
         setIsAnimating(false);
@@ -98,7 +103,7 @@ export function NotificationPromptModal() {
         await handleRequestPermission();
     };
 
-    if (!isVisible) return null;
+    if (!isVisible || user?.hasPushToken) return null;
 
     return (
         <div className={`fixed inset-0 z-[150] flex items-center justify-center p-4 transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0'}`}>

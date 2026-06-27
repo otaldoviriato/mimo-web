@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
-import { User, Transaction } from '@/models';
+import { User, Transaction, Subscription } from '@/models';
 
 export async function POST(
     request: NextRequest,
@@ -81,6 +81,20 @@ export async function POST(
                 }
             ]);
         }
+
+        // Criar ou atualizar a validade da assinatura na coleção Subscription
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 30); // 30 dias de validade
+
+        await Subscription.findOneAndUpdate(
+            { subscriberId: requesterId, professionalId: ownerId },
+            {
+                status: 'ACTIVE',
+                priceInCents: price,
+                expiresAt,
+            },
+            { upsert: true, new: true }
+        );
 
         // Adicionar à lista de assinantes
         await User.updateOne(
