@@ -358,6 +358,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const [isLeaving, setIsLeaving] = useState(false);
     const [useNativeTransition, setUseNativeTransition] = useState(false);
     const [viewportStyle, setViewportStyle] = useState<React.CSSProperties>({});
+    const chatRootRef = useRef<HTMLDivElement>(null);
 
     const isViewerOpen = fullscreenIndex !== null || fullscreenLockedMessage !== null;
 
@@ -455,6 +456,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             setUseNativeTransition(true);
         }
     }, []);
+
     const pressTimer = useRef<any>(null);
     const longPressActivated = useRef(false);
     const touchStartCoords = useRef<{ x: number; y: number } | null>(null);
@@ -544,6 +546,66 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const [couponClaimModal, setCouponClaimModal] = useState(false);
     const [couponClaimAmount, setCouponClaimAmount] = useState<number | null>(null);
     const couponClaimedRef = useRef(false);
+
+    useEffect(() => {
+        const root = chatRootRef.current;
+        if (!root) return;
+
+        const handleTouchMove = (e: TouchEvent) => {
+            // Se algum modal ou visualizador de imagem interno estiver aberto, não impedimos o toque
+            const isAnyModalOrViewerOpen = 
+                (fullscreenIndex !== null || fullscreenLockedMessage !== null) || 
+                giftModalVisible || 
+                detailsModalVisible || 
+                unlockModalVisible || 
+                couponClaimModal || 
+                galleryVisible;
+
+            if (isAnyModalOrViewerOpen) return;
+
+            const container = messagesContainerRef.current;
+            if (!container) return;
+
+            // Verifica se o toque se originou dentro do container de mensagens ou seus filhos
+            const isTouchInsideMessages = container.contains(e.target as Node);
+
+            if (isTouchInsideMessages) {
+                // Se está dentro das mensagens, permitimos a rolagem apenas se houver overflow vertical
+                const hasOverflow = container.scrollHeight > container.clientHeight;
+                if (!hasOverflow) {
+                    // Sem overflow (poucas mensagens), previne o scroll elástico do viewport/body
+                    e.preventDefault();
+                }
+            } else {
+                // Se o toque está fora (header, fundo vazio da sala, input area)
+                // Permitimos touchmove apenas se o target for um input, textarea ou elementos interativos
+                const target = e.target as HTMLElement;
+                const isInteractive = 
+                    target.tagName === 'TEXTAREA' || 
+                    target.tagName === 'INPUT' || 
+                    target.closest('input, textarea, select');
+                
+                if (!isInteractive) {
+                    e.preventDefault();
+                }
+            }
+        };
+
+        // Registramos o event listener como passive: false para podermos chamar e.preventDefault()
+        root.addEventListener('touchmove', handleTouchMove, { passive: false });
+
+        return () => {
+            root.removeEventListener('touchmove', handleTouchMove);
+        };
+    }, [
+        fullscreenIndex, 
+        fullscreenLockedMessage, 
+        giftModalVisible, 
+        detailsModalVisible, 
+        unlockModalVisible, 
+        couponClaimModal, 
+        galleryVisible
+    ]);
 
     // Efeito para resgatar cupom na tela de chat
     useEffect(() => {
@@ -1734,8 +1796,9 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
     return (
         <div 
+            ref={chatRootRef}
             className={`flex flex-col bg-gray-50 overflow-hidden ${layoutClass} ${animationClass}`}
-            style={viewportStyle}
+            style={{ ...viewportStyle, overscrollBehaviorY: 'none' }}
         >
             {/* Header */}
             <div className="shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 z-20 sticky top-0 shadow-md flex items-center gap-2">
@@ -1889,7 +1952,12 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             {/* Messages Container Wrapper */}
             <div className="flex-1 relative overflow-hidden flex flex-col">
                 {/* Messages */}
-                <div ref={messagesContainerRef} onScroll={handleScroll} className={`flex-1 overflow-y-auto flex flex-col ${loadingMessages ? '' : 'flex-col-reverse'} gap-1`}>
+                <div 
+                    ref={messagesContainerRef} 
+                    onScroll={handleScroll} 
+                    className={`flex-1 overflow-y-auto flex flex-col ${loadingMessages ? '' : 'flex-col-reverse'} gap-1`}
+                    style={{ overscrollBehaviorY: 'contain' }}
+                >
                 {loadingMessages ? (
                     <MessageSkeleton />
                 ) : (
