@@ -40,7 +40,7 @@ export function ProfileSelectionModal({ onSuccess }: ProfileSelectionModalProps)
                 await onSuccess();
             } else {
                 // Se for profissional, avançamos para o passo 2 (verificação) sem salvar no banco ainda
-                router.replace('/verificacao-identidade?role=professional');
+                router.replace('/onboarding');
             }
         } catch (err: any) {
             console.error('[ProfileSelectionModal] Erro ao selecionar perfil:', err);

@@ -21,7 +21,6 @@ export const RESERVED_BASE_ROUTES = [
     '/wallet',
     '/api',
     '/admin',
-    '/verificacao-identidade',
     '/onboarding',
 ] as const;
 

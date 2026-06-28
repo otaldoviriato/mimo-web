@@ -9,7 +9,6 @@ import { StatsCard } from '@/components/admin/StatsCard';
 import { ActivityChart } from '@/components/admin/ActivityChart';
 import { ClientsTable } from '@/components/admin/ClientsTable';
 import { ProfessionalsTable } from '@/components/admin/ProfessionalsTable';
-import { CreatorApplications } from '@/components/admin/CreatorApplications';
 import { RoomsTab } from '@/components/admin/RoomsTab';
 import { FinancialTab } from '@/components/admin/FinancialTab';
 import { WithdrawalsTab } from '@/components/admin/WithdrawalsTab';
@@ -40,7 +39,6 @@ const TAB_TITLES: Record<string, string> = {
     coupons: 'Gerenciamento de Cupons de Desconto',
     'help-tickets': 'Tickets de Ajuda',
     'institutional-emails': 'E-mails Institucionais',
-    'creator-applications': 'Solicitações de Monetização',
     'settings-platform': 'Configurações — Plataforma & Operação',
     'settings-chat': 'Configurações — Chat & Sessões',
     'settings-pricing': 'Configurações — Precificação & Assinaturas',
@@ -263,8 +261,6 @@ export default function AdminPage() {
                     {activeTab === 'coupons' && <CouponsTab />}
                     {activeTab === 'help-tickets' && <HelpTicketsTab />}
                     {activeTab === 'institutional-emails' && <InstitutionalEmailsTab />}
-                    {activeTab === 'creator-applications' && <CreatorApplications />}
-
                     {/* Settings sub-pages */}
                     {activeTab === 'settings-platform' && (
                         <SettingsPlatformPage

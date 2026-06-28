@@ -160,18 +160,18 @@ export default function ChatsPage() {
                             <div className="min-w-0">
                                 <h3 className="font-bold text-red-950 text-xs md:text-sm">Verificação recusada ❌</h3>
                                 <p className="text-[11px] md:text-xs text-red-700 mt-1 leading-snug max-w-xl">
-                                    {myProfile.notes || 'Infelizmente sua documentação foi recusada. Por favor, reenvie suas fotos.'}
+                                    {myProfile.notes || 'Infelizmente sua verificação de identidade não foi aprovada. Entre em contato com o suporte para mais informações.'}
                                 </p>
                             </div>
                         </div>
                         <div className="shrink-0 flex justify-end">
-                            <button
-                                onClick={() => router.push('/verificacao-identidade')}
+                            <a
+                                href="mailto:suporte@mimochat.com.br"
                                 className="w-full sm:w-auto inline-flex items-center justify-center gap-1 bg-red-600 hover:bg-red-700 active:scale-[0.98] transition-all text-white text-[11px] font-extrabold px-3 py-2 rounded-xl shadow-md shadow-red-600/10 cursor-pointer"
                             >
-                                Refazer verificação
+                                Contatar Suporte
                                 <ChevronRight className="w-3.5 h-3.5" />
-                            </button>
+                            </a>
                         </div>
                     </div>
                 </div>
