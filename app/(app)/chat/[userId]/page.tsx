@@ -1511,6 +1511,15 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         swipeTriggered.current = false;
     };
 
+    const handleMessageDoubleClick = (msg: Message, e: React.MouseEvent) => {
+        if (selectedMessageIds.size > 0) return;
+        e.stopPropagation();
+        setReplyingTo(msg);
+        setTimeout(() => {
+            inputRef.current?.focus();
+        }, 50);
+    };
+
     // Click em modo de seleção: toggle da mensagem no set
     const handleMessageClick = (msgId: string) => {
         // Se foi um long press, ignora o click disparado logo após soltar
@@ -2106,6 +2115,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                 onTouchMove={handleMovePress}
                                 onTouchEnd={(e) => handleEndPress(e)}
                                 onClick={() => handleMessageClick(item._id)}
+                                onDoubleClick={(e) => handleMessageDoubleClick(item, e)}
                             >
                                 {/* Ícone de resposta revelado pelo swipe */}
                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center justify-center opacity-0 scale-75 transition-all duration-150 reply-icon-indicator pointer-events-none z-0">
