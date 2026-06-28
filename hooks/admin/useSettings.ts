@@ -163,6 +163,15 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         return () => clearTimeout(delay);
     }, [adminSearch]);
 
+    // Recalcula dinamicamente o preço para assinantes com base no preço de não-assinantes e desconto
+    useEffect(() => {
+        const calculated = defaultPricePerCharNonSubscribers * (1 - subscriberDiscountPercentage / 100);
+        const rounded = parseFloat(calculated.toFixed(4));
+        if (rounded !== defaultPricePerCharSubscribers) {
+            setDefaultPricePerCharSubscribers(rounded);
+        }
+    }, [defaultPricePerCharNonSubscribers, subscriberDiscountPercentage, defaultPricePerCharSubscribers]);
+
     const saveSettings = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         setSaving(true);

@@ -78,10 +78,10 @@ export function SettingsPricingPage({
                 </SettingField>
 
                 <SettingField
-                    title="Preço Padrão por Caractere — Não-Assinantes (R$)"
+                    title="Preço Padrão por Caractere (Não-Assinantes) (R$)"
                     description={
                         <span>
-                            Valor pré-preenchido como padrão no campo de preço por caractere para usuários <strong className="text-slate-600">sem assinatura ativa</strong> do profissional. Cada profissional pode alterar esse valor individualmente no seu perfil — este é apenas o valor inicial sugerido no cadastro. Representa o preço &quot;cheio&quot;, sem desconto. Deve ser maior ou igual ao preço para assinantes.
+                            Valor pré-preenchido como padrão no campo de preço por caractere para usuários <strong className="text-slate-600">sem assinatura ativa</strong> do profissional. Cada profissional pode alterar esse valor individualmente no seu perfil — este é apenas o valor inicial sugerido no cadastro. Representa o preço cheio, sem desconto.
                         </span>
                     }
                     unit="R$ / char"
@@ -97,10 +97,10 @@ export function SettingsPricingPage({
                 </SettingField>
 
                 <SettingField
-                    title="Preço Padrão por Caractere — Assinantes (R$)"
+                    title="Preço Padrão por Caractere (Assinantes) (R$)"
                     description={
                         <span>
-                            Valor pré-preenchido como padrão para usuários <strong className="text-slate-600">com assinatura ativa</strong> do profissional. Deve ser menor que o preço para não-assinantes, recompensando quem mantém assinatura com um custo reduzido por mensagem. Este desconto em si não é o mesmo que o &quot;Desconto de Assinante&quot; abaixo — são mecanismos independentes que podem coexistir.
+                            Valor pré-preenchido como padrão para usuários <strong className="text-slate-600">com assinatura ativa</strong> do profissional. Este valor é calculado automaticamente aplicando o Desconto Automático para Assinantes (%) sobre o preço padrão de não-assinantes.
                         </span>
                     }
                     unit="R$ / char"
@@ -109,9 +109,8 @@ export function SettingsPricingPage({
                         type="number"
                         step="0.0001"
                         value={defaultPricePerCharSubscribers}
-                        onChange={(e) => setDefaultPricePerCharSubscribers(Number(e.target.value))}
-                        min={0}
-                        className={inputCls}
+                        disabled
+                        className={`${inputCls} opacity-60 bg-slate-50 cursor-not-allowed`}
                     />
                 </SettingField>
 
