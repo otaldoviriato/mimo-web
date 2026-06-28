@@ -2151,11 +2151,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                 }}
                                                 className={`cursor-pointer m-3 mb-1 p-2 rounded-lg text-[11px] border-l-4 ${
                                                     isMine 
-                                                        ? 'bg-purple-750/30 border-purple-300 text-purple-100' 
-                                                        : 'bg-gray-100 border-purple-500 text-gray-600'
+                                                        ? 'bg-white/15 border-white/50 text-white/95' 
+                                                        : 'bg-purple-50/70 border-purple-600 text-gray-600'
                                                 } flex flex-col gap-0.5 max-w-full`}
                                             >
-                                                <span className={`font-black ${isMine ? 'text-purple-200' : 'text-purple-700'}`}>
+                                                <span className={`font-black ${isMine ? 'text-white' : 'text-purple-700'}`}>
                                                     {item.replyToSenderId === user?.id ? 'Você' : (receiver?.name || receiver?.username || 'Usuário')}
                                                 </span>
                                                 <span className="truncate max-w-full">
@@ -2262,11 +2262,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                     }}
                                                     className={`cursor-pointer mb-1.5 p-2 rounded-lg text-[11px] border-l-4 ${
                                                         isMine 
-                                                            ? 'bg-purple-750/30 border-purple-300 text-purple-100' 
-                                                            : 'bg-purple-50 border-purple-500 text-gray-600'
+                                                            ? 'bg-white/15 border-white/50 text-white/95' 
+                                                            : 'bg-purple-50/70 border-purple-600 text-gray-600'
                                                     } flex flex-col gap-0.5 max-w-full`}
                                                 >
-                                                    <span className={`font-black ${isMine ? 'text-purple-200' : 'text-purple-700'}`}>
+                                                    <span className={`font-black ${isMine ? 'text-white' : 'text-purple-700'}`}>
                                                         {item.replyToSenderId === user?.id ? 'Você' : (receiver?.name || receiver?.username || 'Usuário')}
                                                     </span>
                                                     <span className="truncate max-w-full">
