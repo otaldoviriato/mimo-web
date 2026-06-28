@@ -3,6 +3,8 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IWithdrawRequest extends Document {
     userId: string; // clerkId do usuário
     amount: number;
+    fee?: number;
+    netAmount?: number;
     pixKey: string;
     status: 'pendente' | 'processando' | 'concluido' | 'rejeitado';
     asaasTransferId?: string;
@@ -22,6 +24,14 @@ const WithdrawRequestSchema = new Schema<IWithdrawRequest>({
     amount: {
         type: Number,
         required: true,
+    },
+    fee: {
+        type: Number,
+        default: 0,
+    },
+    netAmount: {
+        type: Number,
+        required: false,
     },
     pixKey: {
         type: String,

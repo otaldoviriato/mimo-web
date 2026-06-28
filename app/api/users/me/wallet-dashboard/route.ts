@@ -46,7 +46,8 @@ export async function GET(request: NextRequest) {
                 monthlyMessagesCount: 0,
                 monthlyAverageEarningPerMessage: 0,
                 monthlyImageUnlockEarnings: 0,
-                monthlyImageUnlocksCount: 0
+                monthlyImageUnlocksCount: 0,
+                monthlyWithdrawalsCount: 0
             });
         }
 
@@ -66,7 +67,16 @@ export async function GET(request: NextRequest) {
             status: 'concluido',
             hiddenFromUser: { $ne: true },
         });
-        const totalWithdrawn = completedWithdrawals.reduce((sum, req) => sum + req.amount, 0);
+        const totalWithdrawn = completedWithdrawals.reduce((sum, req: any) => sum + (req.netAmount !== undefined ? req.netAmount : req.amount), 0);
+
+        // 3.5 Contagem de saques realizados no mês atual (para verificação de limite gratuito)
+        const now = new Date();
+        const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const monthlyWithdrawalsCount = await WithdrawRequest.countDocuments({
+            userId: user.clerkId,
+            status: { $ne: 'rejeitado' },
+            createdAt: { $gte: startOfCurrentMonth }
+        });
 
         // 4. Ganhos recorrentes mensais previstos (em centavos)
         // quantidade de assinantes * valor da assinatura (que está em reais) * 100
@@ -261,7 +271,8 @@ export async function GET(request: NextRequest) {
             monthlyMessagesCount,
             monthlyAverageEarningPerMessage,
             monthlyImageUnlockEarnings,
-            monthlyImageUnlocksCount
+            monthlyImageUnlocksCount,
+            monthlyWithdrawalsCount
         });
 
     } catch (error: any) {

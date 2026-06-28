@@ -34,12 +34,34 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Saldo insuficiente' }, { status: 400 });
         }
 
-        const amountToWithdraw = user.balance;
+        // 1. Contabiliza a quantidade de saques do mês corrente (não rejeitados)
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const monthlyWithdrawalsCount = await WithdrawRequest.countDocuments({
+            userId: user.clerkId,
+            status: { $ne: 'rejeitado' },
+            createdAt: { $gte: startOfMonth }
+        });
 
-        // 1. Iniciar transferência Pix automática no Asaas
+        // 2. Determina a taxa aplicável (R$ 2,00 a partir do 6º saque do mês)
+        let fee = 0;
+        if (monthlyWithdrawalsCount >= 5) {
+            fee = 200; // R$ 2,00 em centavos
+        }
+
+        const amountToWithdraw = user.balance; // Valor bruto a debitar
+
+        // 3. Validação do saldo suficiente para cobrir a taxa
+        if (fee > 0 && amountToWithdraw <= fee) {
+            return NextResponse.json({ error: 'Saldo insuficiente para cobrir a taxa de saque de R$ 2,00.' }, { status: 400 });
+        }
+
+        const netAmount = amountToWithdraw - fee; // Valor líquido que será transferido
+
+        // 4. Iniciar transferência Pix automática no Asaas com valor líquido (netAmount)
         let asaasTransferId = undefined;
         try {
-            const transfer = await createAsaasPixTransfer(amountToWithdraw, user.taxId);
+            const transfer = await createAsaasPixTransfer(netAmount, user.taxId);
             asaasTransferId = transfer.id;
         } catch (apiError: any) {
             console.error('Erro ao chamar API do Asaas para transferência na criação do saque:', apiError);
@@ -54,20 +76,22 @@ export async function POST(request: NextRequest) {
             }, { status: 400 });
         }
 
-        // 2. Cria o pedido de saque como processando
+        // 5. Cria o pedido de saque como processando (com fee e netAmount registrados)
         const withdrawRequest = await WithdrawRequest.create({
             userId: user.clerkId,
-            amount: amountToWithdraw,
+            amount: amountToWithdraw, // Guarda o bruto debitado
+            fee,
+            netAmount,
             pixKey: user.taxId,
             status: 'processando',
             asaasTransferId,
         });
 
-        // 3. Zera o saldo na carteira
+        // 6. Zera o saldo na carteira
         user.balance = 0;
         await user.save();
 
-        // 3. Envia e-mail de notificação para viriatoceo@gmail.com
+        // 7. Envia e-mail de notificação para viriatoceo@gmail.com com detalhes da taxa
         try {
             const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.mimochat.com.br';
             await resend.emails.send({
@@ -79,7 +103,9 @@ export async function POST(request: NextRequest) {
                         <h2 style="color: #1e293b; margin-top: 0;">Novo Pedido de Saque</h2>
                         <p style="color: #475569; font-size: 16px;">O usuário <strong>${user.name || user.username}</strong> (@${user.username}) solicitou um saque.</p>
                         <ul style="background-color: #f8fafc; padding: 15px 25px; border-radius: 6px; list-style-type: none; margin: 20px 0;">
-                            <li style="margin-bottom: 8px;"><strong>Valor:</strong> ${(amountToWithdraw / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</li>
+                            <li style="margin-bottom: 8px;"><strong>Valor Bruto Debitado:</strong> ${(amountToWithdraw / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</li>
+                            <li style="margin-bottom: 8px;"><strong>Taxa de Saque Cobrada:</strong> ${(fee / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</li>
+                            <li style="margin-bottom: 8px;"><strong>Valor Líquido Enviado:</strong> ${(netAmount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</li>
                             <li style="margin-bottom: 8px;"><strong>CPF / Chave PIX:</strong> ${withdrawRequest.pixKey}</li>
                             <li style="margin-bottom: 8px;"><strong>ID do Pedido:</strong> ${withdrawRequest._id}</li>
                             <li style="margin-bottom: 0;"><strong>Data:</strong> ${new Date().toLocaleString('pt-BR')}</li>
@@ -122,9 +148,11 @@ export async function GET(request: NextRequest) {
                 .lean();
 
             return NextResponse.json({
-                withdrawals: withdrawals.map((withdrawal) => ({
+                withdrawals: withdrawals.map((withdrawal: any) => ({
                     id: withdrawal._id?.toString(),
                     amount: withdrawal.amount,
+                    fee: withdrawal.fee || 0,
+                    netAmount: withdrawal.netAmount ?? withdrawal.amount,
                     status: withdrawal.status,
                     createdAt: withdrawal.createdAt,
                 })),

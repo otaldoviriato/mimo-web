@@ -72,6 +72,7 @@ interface WalletDashboardData {
     monthlyAverageEarningPerMessage: number;
     monthlyImageUnlockEarnings: number;
     monthlyImageUnlocksCount: number;
+    monthlyWithdrawalsCount?: number;
 }
 
 export default function WalletPage() {
@@ -156,12 +157,16 @@ export default function WalletPage() {
         monthlyMessagesCount: 0,
         monthlyAverageEarningPerMessage: 0,
         monthlyImageUnlockEarnings: 0,
-        monthlyImageUnlocksCount: 0
+        monthlyImageUnlocksCount: 0,
+        monthlyWithdrawalsCount: 0
     };
 
     const formatCurrency = (amountInCentavos: number) => {
         return (amountInCentavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     };
+
+    const monthlyWithdrawalsCount = data.monthlyWithdrawalsCount || 0;
+    const isBalanceInsufficientForFee = monthlyWithdrawalsCount >= 5 && data.balance <= 200;
 
     const latestWithdrawal = withdrawalsData?.withdrawals?.[0] || null;
     const activeWithdrawal = pendingWithdrawal || (
@@ -676,6 +681,51 @@ export default function WalletPage() {
                                     O prazo de transferência bancária via Pix é de até 24 horas úteis.
                                 </p>
                             </div>
+
+                            {/* Alertas e Informações sobre Limite de Saques Gratuitos */}
+                            {monthlyWithdrawalsCount < 3 ? (
+                                <div className="text-[10px] text-slate-500 mt-1 flex items-center gap-1.5 leading-snug border-t border-gray-200/50 pt-2">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                    <span>Você tem 5 saques gratuitos por mês (realizados este mês: {monthlyWithdrawalsCount}/5).</span>
+                                </div>
+                            ) : monthlyWithdrawalsCount < 5 ? (
+                                <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-2 flex items-start gap-1.5 mt-1.5">
+                                    <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                                    <div className="flex-1">
+                                        <p className="text-[9.5px] font-bold">Aviso de Limite de Saques</p>
+                                        <p className="text-[9px] leading-snug mt-0.5">
+                                            Você está chegando próximo do seu limite de 5 saques gratuitos por mês (este será o seu {monthlyWithdrawalsCount + 1}º saque). Após os 5 saques, será cobrado <strong>R$ 2,00 por saque</strong>.
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="bg-red-50 border border-red-200 text-red-900 rounded-lg p-2 flex flex-col gap-1.5 mt-1.5">
+                                    <div className="flex items-start gap-1.5">
+                                        <AlertCircle className="w-3.5 h-3.5 text-red-650 shrink-0 mt-0.5" />
+                                        <div className="flex-1">
+                                            <p className="text-[9.5px] font-bold text-red-950">Limite de Saques Excedido</p>
+                                            <p className="text-[9px] leading-snug mt-0.5">
+                                                Você já realizou {monthlyWithdrawalsCount} saques este mês. Para este saque, será cobrada uma taxa de <strong>R$ 2,00</strong>.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between items-center text-[9.5px] border-t border-red-200/60 pt-1.5 font-medium">
+                                        <span className="text-red-750">Valor Líquido Enviado:</span>
+                                        <span className="font-extrabold text-red-950 text-xs">
+                                            {formatCurrency(Math.max(0, data.balance - 200))}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {isBalanceInsufficientForFee && (
+                                <div className="bg-red-50 border border-red-250 text-red-800 rounded-lg p-2 flex items-start gap-1.5 mt-1">
+                                    <AlertCircle className="w-3.5 h-3.5 text-red-650 shrink-0 mt-0.5" />
+                                    <p className="text-[9px] leading-snug">
+                                        Seu saldo atual ({formatCurrency(data.balance)}) é menor ou igual à taxa de saque (R$ 2,00). É necessário acumular mais saldo para realizar este saque.
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex gap-2.5">
@@ -688,7 +738,7 @@ export default function WalletPage() {
                             </button>
                             <button
                                 onClick={handleRequestWithdraw}
-                                disabled={requestWithdrawMutation.isPending || data.balance <= 0}
+                                disabled={requestWithdrawMutation.isPending || data.balance <= 0 || isBalanceInsufficientForFee}
                                 className="flex-1 h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center disabled:opacity-50"
                             >
                                 {requestWithdrawMutation.isPending ? (
