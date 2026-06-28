@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
+import { AppSettings } from '@/models/AppSettings';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -51,6 +52,10 @@ export async function GET(request: NextRequest) {
             return 0;
         });
 
+        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers').lean();
+        const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
+        const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
+
         return NextResponse.json({
             users: sortedUsers.map(u => ({
                 id: u._id,
@@ -62,8 +67,8 @@ export async function GET(request: NextRequest) {
                 coverUrl: u.coverUrl,
                 isProfessional: u.isProfessional,
                 subscriptionPrice: u.subscriptionPrice || 0,
-                chargePerCharSubscribers: u.chargePerCharSubscribers ?? 0.002,
-                chargePerCharNonSubscribers: u.chargePerCharNonSubscribers ?? 0.005,
+                chargePerCharSubscribers: u.chargePerCharSubscribers ?? defaultSub,
+                chargePerCharNonSubscribers: u.chargePerCharNonSubscribers ?? defaultNonSub,
             })),
         });
     } catch (error: any) {

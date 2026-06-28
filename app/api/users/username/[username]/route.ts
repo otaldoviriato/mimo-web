@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
+import { AppSettings } from '@/models/AppSettings';
 import { MicroTransaction } from '@/models/MicroTransaction';
 import { Room } from '@/models/Room';
 import { Message } from '@/models/Message';
@@ -149,6 +150,10 @@ export async function GET(
             }
         }
 
+        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers').lean();
+        const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
+        const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
+
         return NextResponse.json({
             user: {
                 id: user._id,
@@ -161,8 +166,8 @@ export async function GET(
                 isProfessional: user.isProfessional,
                 subscriptionPrice: user.subscriptionPrice || 0,
                 isSubscriptionEnabled: user.isSubscriptionEnabled ?? false,
-                chargePerCharSubscribers: user.chargePerCharSubscribers ?? 0.002,
-                chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? 0.005,
+                chargePerCharSubscribers: user.chargePerCharSubscribers ?? defaultSub,
+                chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? defaultNonSub,
                 subscribers: user.subscribers || [],
                 bio: user.bio || '',
                 balance: shouldShowBalance ? (user.balance || 0) : undefined,

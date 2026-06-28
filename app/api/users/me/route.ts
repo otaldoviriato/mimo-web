@@ -41,6 +41,9 @@ export async function GET() {
                 const isProfessional = roleMetadata === 'professional' ? true : (roleMetadata === 'client' ? false : undefined);
                 const professionalStatus = null; // Inicializa como null (verificação pendente de envio)
 
+                const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
+                const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
+
                 const userFields: any = {
                     clerkId: userId,
                     email: email,
@@ -48,8 +51,8 @@ export async function GET() {
                     name: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' '),
                     balance: 0,
                     professionalStatus,
-                    chargePerCharSubscribers: 0.002,
-                    chargePerCharNonSubscribers: 0.005,
+                    chargePerCharSubscribers: defaultSub,
+                    chargePerCharNonSubscribers: defaultNonSub,
                 };
                 if (isProfessional !== undefined) {
                     userFields.isProfessional = isProfessional;
@@ -144,8 +147,8 @@ export async function GET() {
                 professionalStatus: user.professionalStatus,
                 subscriptionPrice: user.subscriptionPrice || 0,
                 isSubscriptionEnabled: user.isSubscriptionEnabled ?? false,
-                chargePerCharSubscribers: user.chargePerCharSubscribers ?? 0.002,
-                chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? 0.005,
+                chargePerCharSubscribers: user.chargePerCharSubscribers ?? (settings?.defaultPricePerCharSubscribers ?? 0.002),
+                chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? (settings?.defaultPricePerCharNonSubscribers ?? 0.005),
                 subscribers: user.subscribers || [],
                 pixKey: user.taxId || user.pixKey,
                 savedCards: (user.savedCards || []).map((card: ICard) => ({
@@ -340,8 +343,8 @@ export async function PATCH(request: NextRequest) {
                 professionalStatus: user.professionalStatus,
                 subscriptionPrice: user.subscriptionPrice || 0,
                 isSubscriptionEnabled: user.isSubscriptionEnabled ?? false,
-                chargePerCharSubscribers: user.chargePerCharSubscribers ?? 0.002,
-                chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? 0.005,
+                chargePerCharSubscribers: user.chargePerCharSubscribers ?? (settings?.defaultPricePerCharSubscribers ?? 0.002),
+                chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? (settings?.defaultPricePerCharNonSubscribers ?? 0.005),
                 subscribers: user.subscribers || [],
                 pixKey: user.taxId || user.pixKey,
                 savedCards: (user.savedCards || []).map((card: ICard) => ({

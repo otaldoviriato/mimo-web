@@ -22,6 +22,8 @@ export interface IAppSettings extends Document {
     chatSessionTimeoutMinutes: number;
     institutionalEmails: string[];
     emailRedirections: { sourceEmail: string; targetEmail: string; displayName?: string }[];
+    defaultPricePerCharSubscribers: number;
+    defaultPricePerCharNonSubscribers: number;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -148,6 +150,18 @@ const AppSettingsSchema = new Schema<IAppSettings>({
         required: true,
         default: 30,
         min: 1,
+    },
+    defaultPricePerCharSubscribers: {
+        type: Number,
+        required: true,
+        default: 0.002,
+        min: 0,
+    },
+    defaultPricePerCharNonSubscribers: {
+        type: Number,
+        required: true,
+        default: 0.005,
+        min: 0,
     },
 }, {
     timestamps: true,

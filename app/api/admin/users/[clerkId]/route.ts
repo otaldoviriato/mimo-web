@@ -41,13 +41,17 @@ export async function GET(
             return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
         }
 
-        // Buscar galeria do usuário
         const galleryItems = await GalleryItem.find({ ownerId: clerkId }).sort({ createdAt: -1 }).lean();
         const withdrawals = await WithdrawRequest.find({ userId: clerkId }).sort({ createdAt: -1 }).lean() as any[];
+
+        const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
+        const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
 
         return NextResponse.json({
             user: {
                 ...userObj,
+                chargePerCharSubscribers: userObj.chargePerCharSubscribers ?? defaultSub,
+                chargePerCharNonSubscribers: userObj.chargePerCharNonSubscribers ?? defaultNonSub,
                 createdAt: userObj.createdAt ? new Date(userObj.createdAt).toLocaleDateString('pt-BR') : 'N/A',
             },
             gallery: galleryItems,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
+import { AppSettings } from '@/models/AppSettings';
 import { Resend } from 'resend';
 import { buildProfileRoleMetadata } from '@/lib/profileRole';
 
@@ -44,6 +45,10 @@ export async function POST(request: NextRequest) {
                 const cleanId = userId.startsWith('user_') ? userId.slice(5) : userId;
                 const username = clerkUser.username || `user_${cleanId.substring(Math.max(0, cleanId.length - 8))}`;
 
+                const settings = await AppSettings.findOne({ key: 'global' });
+                const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
+                const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
+
                 user = await User.create({
                     clerkId: userId,
                     email: email,
@@ -52,8 +57,8 @@ export async function POST(request: NextRequest) {
                     balance: 0,
                     isProfessional: true,
                     professionalStatus: null,
-                    chargePerCharSubscribers: 0.002,
-                    chargePerCharNonSubscribers: 0.005,
+                    chargePerCharSubscribers: defaultSub,
+                    chargePerCharNonSubscribers: defaultNonSub,
                 });
             } catch (err) {
                 console.error('[init-professional] Erro ao lazy-criar usuário:', err);

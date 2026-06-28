@@ -26,6 +26,8 @@ async function getOrCreateSettings() {
             maxPublicPhotos: 12,
             minExclusivePhotos: 2,
             maxExclusivePhotos: 4,
+            defaultPricePerCharSubscribers: 0.002,
+            defaultPricePerCharNonSubscribers: 0.005,
         });
     } else {
         // Garantir que novos campos sejam populados se não existirem
@@ -40,6 +42,8 @@ async function getOrCreateSettings() {
         if (settings.chatSessionTimeoutMinutes === undefined) { settings.chatSessionTimeoutMinutes = 30; updated = true; }
         if (settings.minSubscriptionPrice === undefined) { settings.minSubscriptionPrice = 10; updated = true; }
         if (settings.institutionalEmails === undefined) { settings.institutionalEmails = ['viriatoceo@mimochat.com.br']; updated = true; }
+        if (settings.defaultPricePerCharSubscribers === undefined) { settings.defaultPricePerCharSubscribers = 0.002; updated = true; }
+        if (settings.defaultPricePerCharNonSubscribers === undefined) { settings.defaultPricePerCharNonSubscribers = 0.005; updated = true; }
         if (updated) {
             await settings.save();
         }
@@ -138,6 +142,8 @@ export async function PUT(request: NextRequest) {
             creditCardEnabled,
             couponsEnabled,
             chatSessionTimeoutMinutes,
+            defaultPricePerCharSubscribers,
+            defaultPricePerCharNonSubscribers,
         } = body;
 
         // Validações básicas
@@ -250,6 +256,22 @@ export async function PUT(request: NextRequest) {
                 return NextResponse.json({ error: 'Tempo de sessão deve ser de pelo menos 1 minuto' }, { status: 400 });
             }
             settings.chatSessionTimeoutMinutes = timeout;
+        }
+
+        if (defaultPricePerCharSubscribers !== undefined) {
+            const val = Number(defaultPricePerCharSubscribers);
+            if (isNaN(val) || val < 0) {
+                return NextResponse.json({ error: 'Preço por caractere padrão para assinantes inválido' }, { status: 400 });
+            }
+            settings.defaultPricePerCharSubscribers = val;
+        }
+
+        if (defaultPricePerCharNonSubscribers !== undefined) {
+            const val = Number(defaultPricePerCharNonSubscribers);
+            if (isNaN(val) || val < 0) {
+                return NextResponse.json({ error: 'Preço por caractere padrão para não-assinantes inválido' }, { status: 400 });
+            }
+            settings.defaultPricePerCharNonSubscribers = val;
         }
 
         // Validação de consistência

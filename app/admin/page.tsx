@@ -68,6 +68,8 @@ interface SettingsData {
     creditCardEnabled: boolean;
     couponsEnabled: boolean;
     chatSessionTimeoutMinutes: number;
+    defaultPricePerCharSubscribers: number;
+    defaultPricePerCharNonSubscribers: number;
 }
 
 interface ChatMessage {
@@ -360,6 +362,8 @@ export default function AdminPage() {
     const [creditCardEnabled, setCreditCardEnabled] = useState(true);
     const [couponsEnabled, setCouponsEnabled] = useState(true);
     const [chatSessionTimeoutMinutes, setChatSessionTimeoutMinutes] = useState(30);
+    const [defaultPricePerCharSubscribers, setDefaultPricePerCharSubscribers] = useState(0.002);
+    const [defaultPricePerCharNonSubscribers, setDefaultPricePerCharNonSubscribers] = useState(0.005);
     const [saving, setSaving] = useState(false);
 
     // Estados de Gerenciamento de Administradores Ricos
@@ -513,6 +517,8 @@ export default function AdminPage() {
                     setCreditCardEnabled(s.creditCardEnabled !== undefined ? s.creditCardEnabled : true);
                     setCouponsEnabled(s.couponsEnabled !== undefined ? s.couponsEnabled : true);
                     setChatSessionTimeoutMinutes(s.chatSessionTimeoutMinutes !== undefined ? s.chatSessionTimeoutMinutes : 30);
+                    setDefaultPricePerCharSubscribers(s.defaultPricePerCharSubscribers !== undefined ? s.defaultPricePerCharSubscribers : 0.002);
+                    setDefaultPricePerCharNonSubscribers(s.defaultPricePerCharNonSubscribers !== undefined ? s.defaultPricePerCharNonSubscribers : 0.005);
                     setIsAuthorized(true);
                 } else if (response.status === 403) {
                     setIsAuthorized(false);
@@ -1487,6 +1493,8 @@ export default function AdminPage() {
                     creditCardEnabled,
                     couponsEnabled,
                     chatSessionTimeoutMinutes,
+                    defaultPricePerCharSubscribers,
+                    defaultPricePerCharNonSubscribers,
                 }),
             });
 
@@ -1510,6 +1518,8 @@ export default function AdminPage() {
                 setMaxPublicPhotos(data.settings.maxPublicPhotos);
                 setMinExclusivePhotos(data.settings.minExclusivePhotos);
                 setMaxExclusivePhotos(data.settings.maxExclusivePhotos);
+                setDefaultPricePerCharSubscribers(data.settings.defaultPricePerCharSubscribers !== undefined ? data.settings.defaultPricePerCharSubscribers : 0.002);
+                setDefaultPricePerCharNonSubscribers(data.settings.defaultPricePerCharNonSubscribers !== undefined ? data.settings.defaultPricePerCharNonSubscribers : 0.005);
             } else {
                 const errData = await response.json();
                 toast.error(errData.error || 'Erro ao salvar configurações.');
@@ -2224,6 +2234,28 @@ export default function AdminPage() {
                                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700" 
                                             />
                                         </div>
+                                         <div className="space-y-2">
+                                             <label className="text-xs font-bold text-slate-600 uppercase block">Preço Padrão por Char (Não-Assinantes) (R$)</label>
+                                             <input 
+                                                 type="number" 
+                                                 step="0.0001"
+                                                 value={defaultPricePerCharNonSubscribers} 
+                                                 onChange={(e) => setDefaultPricePerCharNonSubscribers(Number(e.target.value))} 
+                                                 min={0}
+                                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700" 
+                                             />
+                                         </div>
+                                         <div className="space-y-2">
+                                             <label className="text-xs font-bold text-slate-600 uppercase block">Preço Padrão por Char (Assinantes) (R$)</label>
+                                             <input 
+                                                 type="number" 
+                                                 step="0.0001"
+                                                 value={defaultPricePerCharSubscribers} 
+                                                 onChange={(e) => setDefaultPricePerCharSubscribers(Number(e.target.value))} 
+                                                 min={0}
+                                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700" 
+                                             />
+                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-xs font-bold text-slate-600 uppercase block">Preço Mínimo da Assinatura (R$)</label>
                                             <input 

@@ -3,6 +3,7 @@ import { Webhook } from 'svix';
 import { headers } from 'next/headers';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
+import { AppSettings } from '@/models/AppSettings';
 import { Resend } from 'resend';
 import { getCreatorLandingProfileRole } from '@/lib/profileRole';
 
@@ -70,14 +71,18 @@ export async function POST(req: Request) {
             updateSet.isProfessional = isProfessional;
         }
 
+        const settings = await AppSettings.findOne({ key: 'global' });
+        const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
+        const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
+
         await User.findOneAndUpdate(
             { clerkId: id },
             {
                 $set: updateSet,
                 $setOnInsert: {
                     balance: 0, 
-                    chargePerCharSubscribers: 0.002,
-                    chargePerCharNonSubscribers: 0.005,
+                    chargePerCharSubscribers: defaultSub,
+                    chargePerCharNonSubscribers: defaultNonSub,
                 }
             },
             { upsert: true, new: true }
