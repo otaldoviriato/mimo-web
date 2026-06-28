@@ -7,7 +7,7 @@ import { Button } from '@/components/Button';
 import { Avatar } from '@/components/Avatar';
 import { userApi } from '@/services/api';
 import { useMyProfile } from '@/hooks/useQueries';
-import { Crown, ShieldAlert } from 'lucide-react';
+import { ShieldAlert } from 'lucide-react';
 
 export default function SearchPage() {
     const router = useRouter();
@@ -15,7 +15,28 @@ export default function SearchPage() {
     const [username, setUsername] = useState('');
     const [loading, setLoading] = useState(false);
     const [foundUsers, setFoundUsers] = useState<any[]>([]);
+    const [featuredUsers, setFeaturedUsers] = useState<any[]>([]);
+    const [loadingFeatured, setLoadingFeatured] = useState(false);
     const [error, setError] = useState('');
+    const [lightbox, setLightbox] = useState<{ photos: string[]; index: number } | null>(null);
+
+    const openLightbox = (e: React.MouseEvent, photos: string[], index: number) => {
+        e.stopPropagation();
+        setLightbox({ photos, index });
+    };
+
+    const closeLightbox = () => setLightbox(null);
+
+    const lightboxPrev = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setLightbox(prev => prev ? { ...prev, index: (prev.index - 1 + prev.photos.length) % prev.photos.length } : null);
+    };
+
+    const lightboxNext = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setLightbox(prev => prev ? { ...prev, index: (prev.index + 1) % prev.photos.length } : null);
+    };
+
 
     // Resolve a transição de visualização imediatamente para não travar a animação de volta
     useEffect(() => {
@@ -23,6 +44,23 @@ export default function SearchPage() {
             (window as any).__resolveTransition();
             (window as any).__resolveTransition = null;
         }
+    }, []);
+
+    // Carregar usuários profissionais em destaque ao montar
+    useEffect(() => {
+        const fetchFeatured = async () => {
+            setLoadingFeatured(true);
+            try {
+                const data = await userApi.getFeaturedUsers();
+                setFeaturedUsers(data.users || []);
+            } catch (err) {
+                console.error('Erro ao buscar criadores em destaque:', err);
+            } finally {
+                setLoadingFeatured(false);
+            }
+        };
+
+        fetchFeatured();
     }, []);
 
     const handleSearch = async () => {
@@ -71,9 +109,157 @@ export default function SearchPage() {
         return () => clearTimeout(timer);
     }, [username]);
 
+    const renderUserCard = (user: any) => {
+        const mockResponseTimes = ["5 min", "10 min", "15 min", "30 min", "1 hora"];
+        const idCharCodeSum = user.clerkId.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
+        const responseTime = mockResponseTimes[idCharCodeSum % mockResponseTimes.length];
+        const photos: string[] = user.publicPhotos || [];
+
+        return (
+            <div
+                key={user.clerkId}
+                onClick={() => router.push(`/${user.username}`)}
+                className="bg-white rounded-3xl border border-slate-100/80 shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:border-purple-100/50 transition-all duration-300 overflow-hidden flex flex-col p-4 gap-3.5 animate-in fade-in slide-in-from-bottom-4 duration-500 cursor-pointer active:scale-[0.99]"
+            >
+                {/* Top Section: Avatar e Informações */}
+                <div className="flex items-start gap-3.5">
+                    {/* Avatar com Badge "Novo" sobreposta */}
+                    <div className="shrink-0 relative">
+                        <Avatar uri={user.photoUrl} size={64} />
+                        {user.isNew && (
+                            <span className="absolute -top-1 -right-1 bg-slate-500 text-white text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shadow-sm border border-white z-10">
+                                Novo
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Nome, Bio e Tempo de Resposta */}
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                        <div>
+                            <h2 className="text-sm font-extrabold text-slate-800 truncate hover:text-purple-700 tracking-tight leading-snug">
+                                {user.name || `@${user.username}`}
+                            </h2>
+                            {user.bio && (
+                                <p className="text-slate-500 text-[11px] leading-relaxed font-normal mt-0.5 line-clamp-2">
+                                    {user.bio}
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Indicador de Tempo Médio de Resposta */}
+                        <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200/60 px-2 py-0.5 rounded-full w-fit">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                                <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+                            </svg>
+                            <span>Responde em média em {responseTime}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Galeria Pública Compacta com Scroll Horizontal */}
+                {photos.length > 0 && (
+                    <div className="mt-0.5">
+                        <div className="flex overflow-x-auto gap-2.5 pb-1 no-scrollbar scroll-smooth snap-x">
+                            {photos.map((photoUrl: string, idx: number) => (
+                                <div
+                                    key={idx}
+                                    onClick={(e) => openLightbox(e, photos, idx)}
+                                    className="w-24 h-24 aspect-square rounded-2xl overflow-hidden cursor-pointer relative group bg-slate-50 border border-slate-100 shrink-0 snap-start shadow-sm hover:border-purple-200 transition-all duration-300"
+                                >
+                                    <img
+                                        src={photoUrl}
+                                        alt={`Foto pública de ${user.name || user.username}`}
+                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Rodapé: Botão Conversar */}
+                <div className="pt-0.5">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); handleStartChat(user.clerkId); }}
+                        className="w-full h-9 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold tracking-wide text-xs shadow-sm hover:shadow-md hover:shadow-purple-600/20 transition-all active:scale-[0.98] flex items-center justify-center gap-1.5"
+                    >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        Conversar
+                    </button>
+                </div>
+            </div>
+        );
+    };
+
     return (
-        <div className="flex flex-col h-full bg-white">
+        <div className="flex flex-col h-full bg-slate-50">
+            {/* Lightbox de Imagem em Tela Cheia */}
+            {lightbox && (
+                <div
+                    className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center"
+                    onClick={closeLightbox}
+                >
+                    {/* Imagem Principal */}
+                    <img
+                        src={lightbox.photos[lightbox.index]}
+                        alt="Foto"
+                        className="max-w-full max-h-full object-contain select-none"
+                        onClick={(e) => e.stopPropagation()}
+                    />
+
+                    {/* Botão Fechar */}
+                    <button
+                        onClick={closeLightbox}
+                        className="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all backdrop-blur-sm"
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M18 6 6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+
+                    {/* Navegação: Anterior */}
+                    {lightbox.photos.length > 1 && (
+                        <button
+                            onClick={lightboxPrev}
+                            className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all backdrop-blur-sm"
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M15 18l-6-6 6-6"/>
+                            </svg>
+                        </button>
+                    )}
+
+                    {/* Navegação: Próximo */}
+                    {lightbox.photos.length > 1 && (
+                        <button
+                            onClick={lightboxNext}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all backdrop-blur-sm"
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M9 18l6-6-6-6"/>
+                            </svg>
+                        </button>
+                    )}
+
+                    {/* Contador de imagens */}
+                    {lightbox.photos.length > 1 && (
+                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-1.5">
+                            {lightbox.photos.map((_, i) => (
+                                <button
+                                    key={i}
+                                    onClick={(e) => { e.stopPropagation(); setLightbox(prev => prev ? { ...prev, index: i } : null); }}
+                                    className={`w-1.5 h-1.5 rounded-full transition-all ${i === lightbox.index ? 'bg-white w-4' : 'bg-white/40'}`}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Header */}
+
             <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between z-10 sticky top-0 shadow-md">
                 <div className="flex items-center gap-3">
                     <img
@@ -145,74 +331,54 @@ export default function SearchPage() {
                     </div>
                 )}
 
-                <div className="flex flex-col gap-3">
-                    {foundUsers.map((user) => (
-                        <div key={user.clerkId} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm hover:shadow-md hover:border-purple-100/70 transition-all duration-300 flex items-center justify-between gap-4">
-                                <div className="flex items-center gap-3.5 min-w-0">
-                                    <div className="shrink-0 relative">
-                                        <Avatar uri={user.photoUrl} size={56} />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <h2 className="text-base font-semibold text-gray-900 truncate tracking-tight leading-snug">
-                                                {user.name || `@${user.username}`}
-                                            </h2>
-                                            {user.isProfessional && (
-                                                <span className="bg-purple-50 border border-purple-100 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider scale-95 origin-left">
-                                                    Perfil Monetizado
-                                                </span>
-                                            )}
-                                        </div>
-                                        <p className="text-purple-600 font-semibold text-xs tracking-wide mt-0.5">
-                                            @{user.username}
-                                        </p>
-                                        
-                                        <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-500 font-medium flex-wrap">
-                                            <span>{user.isProfessional ? '💬 Chat Monetizado' : '💬 Chat Livre'}</span>
-                                            {user.isProfessional && (
-                                                <>
-                                                    <span className="w-1 h-1 rounded-full bg-gray-300" />
-                                                    <span className="text-purple-600 font-bold">
-                                                        R$ {(user.chargePerCharNonSubscribers ?? 0.005).toFixed(4)}/carac.
-                                                    </span>
-                                                </>
-                                            )}
-                                        </div>
-                                        {user.isProfessional && user.chargePerCharSubscribers !== undefined && (
-                                            <p className="text-[10px] font-semibold text-purple-500 mt-0.5 flex items-center gap-1">
-                                                <Crown className="w-3 h-3 text-amber-500 shrink-0" />
-                                                <span>R$ {(user.chargePerCharSubscribers).toFixed(4)} para assinantes</span>
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
+                {/* Exibição de Resultados da Busca */}
+                {username.trim().length > 0 && (
+                    <div className="flex flex-col gap-4">
+                        {foundUsers.map((user) => renderUserCard(user))}
+                    </div>
+                )}
 
-                                <button 
-                                    onClick={() => handleStartChat(user.clerkId)}
-                                    className="shrink-0 h-10 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold tracking-wide text-xs shadow-sm hover:shadow-md shadow-purple-600/10 transition-all active:scale-[0.98] flex items-center justify-center gap-1.5"
-                                >
-                                    Conversar
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M5 12h14M12 5l7 7-7 7"/>
-                                    </svg>
-                                </button>
+                {/* Seção Explorar */}
+                {!username.trim() && (
+                    <div className="flex flex-col gap-4 animate-in fade-in duration-500 pt-1">
+                        <div className="mb-2">
+                            <h2 className="text-lg font-black text-gray-900 tracking-tight">Explorar</h2>
+                            <p className="text-gray-400 text-xs">Conecte-se com novos perfis disponíveis no MimoChat.</p>
+                        </div>
+
+                        {loadingFeatured ? (
+                            <div className="flex flex-col gap-4 animate-pulse">
+                                {[1, 2, 3].map((n) => (
+                                    <div key={n} className="bg-white rounded-2xl border border-gray-100 p-4 flex flex-col gap-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-14 h-14 bg-gray-200 rounded-full" />
+                                                <div className="space-y-2">
+                                                    <div className="h-4 w-32 bg-gray-200 rounded" />
+                                                    <div className="h-3 w-20 bg-gray-200 rounded" />
+                                                </div>
+                                            </div>
+                                            <div className="h-9 w-24 bg-gray-200 rounded-xl" />
+                                        </div>
+                                        <div className="grid grid-cols-4 gap-2">
+                                            {[1, 2, 3, 4].map((m) => (
+                                                <div key={m} className="aspect-square bg-gray-200 rounded-xl" />
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                        </div>
-                    ))}
-                </div>
-
-                {foundUsers.length === 0 && !loading && !error && (
-                    <div className="flex flex-col items-center justify-center h-[40vh] text-center px-10 animate-in fade-in duration-700">
-                        <div className="w-16 h-16 bg-gradient-to-tr from-purple-50 to-indigo-50 border border-purple-100/50 rounded-2xl flex items-center justify-center mb-5 shadow-sm">
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-purple-600">
-                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                            </svg>
-                        </div>
-                        <h2 className="text-lg font-semibold text-gray-800 mb-1.5 tracking-tight">Buscar Pessoas</h2>
-                        <p className="text-gray-400 text-xs font-normal leading-relaxed">
-                            Digite o @username acima para encontrar<br/>outros usuários na rede.
-                        </p>
+                        ) : (
+                            <div className="flex flex-col gap-4">
+                                {featuredUsers.map((user) => renderUserCard(user))}
+                                
+                                {featuredUsers.length === 0 && (
+                                    <div className="text-center py-10 text-gray-400 text-xs">
+                                        Nenhum perfil sugerido encontrado no momento.
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
