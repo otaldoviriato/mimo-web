@@ -24,6 +24,8 @@ export interface IAppSettings extends Document {
     emailRedirections: { sourceEmail: string; targetEmail: string; displayName?: string }[];
     defaultPricePerCharSubscribers: number;
     defaultPricePerCharNonSubscribers: number;
+    pwaShowAgainIntervalDays: number;
+    newProfileDaysThreshold: number;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -161,6 +163,18 @@ const AppSettingsSchema = new Schema<IAppSettings>({
         type: Number,
         required: true,
         default: 0.005,
+        min: 0,
+    },
+    pwaShowAgainIntervalDays: {
+        type: Number,
+        required: true,
+        default: 7,
+        min: 0,
+    },
+    newProfileDaysThreshold: {
+        type: Number,
+        required: true,
+        default: 15,
         min: 0,
     },
 }, {

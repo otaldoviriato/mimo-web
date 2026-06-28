@@ -110,9 +110,16 @@ export default function SearchPage() {
     }, [username]);
 
     const renderUserCard = (user: any) => {
-        const mockResponseTimes = ["5 min", "10 min", "15 min", "30 min", "1 hora"];
-        const idCharCodeSum = user.clerkId.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
-        const responseTime = mockResponseTimes[idCharCodeSum % mockResponseTimes.length];
+        const formatResponseTime = (minutes: number | null | undefined): string => {
+            if (minutes == null) return '';
+            if (minutes < 1) return 'menos de 1 min';
+            if (minutes < 60) return `${Math.round(minutes)} min`;
+            const hours = Math.floor(minutes / 60);
+            const mins = Math.round(minutes % 60);
+            if (mins === 0) return `${hours}h`;
+            return `${hours}h ${mins}min`;
+        };
+        const responseTime = formatResponseTime(user.avgResponseTimeMinutes);
         const photos: string[] = user.publicPhotos || [];
 
         return (
@@ -123,36 +130,40 @@ export default function SearchPage() {
             >
                 {/* Top Section: Avatar e Informações */}
                 <div className="flex items-start gap-3.5">
-                    {/* Avatar com Badge "Novo" sobreposta */}
-                    <div className="shrink-0 relative">
+                    {/* Avatar simples, sem badge */}
+                    <div className="shrink-0">
                         <Avatar uri={user.photoUrl} size={64} />
-                        {user.isNew && (
-                            <span className="absolute -top-1 -right-1 bg-slate-500 text-white text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shadow-sm border border-white z-10">
-                                Novo
-                            </span>
-                        )}
                     </div>
 
-                    {/* Nome, Bio e Tempo de Resposta */}
+                    {/* Nome (com badge Novo inline), Bio e Tempo de Resposta */}
                     <div className="min-w-0 flex-1 space-y-1.5">
                         <div>
-                            <h2 className="text-sm font-extrabold text-slate-800 truncate hover:text-purple-700 tracking-tight leading-snug">
-                                {user.name || `@${user.username}`}
-                            </h2>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                                <h2 className="text-sm font-extrabold text-slate-800 truncate hover:text-purple-700 tracking-tight leading-snug">
+                                    {user.name || `@${user.username}`}
+                                </h2>
+                                {user.isNew && (
+                                    <span className="shrink-0 bg-purple-600 text-white text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shadow-sm">
+                                        Novo
+                                    </span>
+                                )}
+                            </div>
                             {user.bio && (
-                                <p className="text-slate-500 text-[11px] leading-relaxed font-normal mt-0.5 line-clamp-2">
+                                <p className="text-slate-500 text-[11px] leading-relaxed font-normal mt-0.5 line-clamp-1">
                                     {user.bio}
                                 </p>
                             )}
                         </div>
 
                         {/* Indicador de Tempo Médio de Resposta */}
+                        {user.avgResponseTimeMinutes != null && (
                         <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200/60 px-2 py-0.5 rounded-full w-fit">
                             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
                                 <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
                             </svg>
                             <span>Responde em média em {responseTime}</span>
                         </div>
+                        )}
                     </div>
                 </div>
 
@@ -177,18 +188,16 @@ export default function SearchPage() {
                     </div>
                 )}
 
-                {/* Rodapé: Botão Conversar */}
-                <div className="pt-0.5">
-                    <button
-                        onClick={(e) => { e.stopPropagation(); handleStartChat(user.clerkId); }}
-                        className="w-full h-9 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold tracking-wide text-xs shadow-sm hover:shadow-md hover:shadow-purple-600/20 transition-all active:scale-[0.98] flex items-center justify-center gap-1.5"
-                    >
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                {/* Rodapé: Indicador de clique para o perfil */}
+                <div className="flex items-center justify-end pt-0.5 border-t border-slate-50">
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-purple-500 group-hover:text-purple-700 transition-colors">
+                        Ver perfil
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M5 12h14M12 5l7 7-7 7"/>
                         </svg>
-                        Conversar
-                    </button>
+                    </span>
                 </div>
+
             </div>
         );
     };

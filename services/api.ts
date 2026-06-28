@@ -92,6 +92,11 @@ export const userApi = {
         return response.data;
     },
 
+    getFeaturedUsers: async () => {
+        const response = await api.get('/api/users/featured');
+        return response.data;
+    },
+
     getUserById: async (userId: string) => {
         const response = await api.get(`/api/users/${userId}`);
         return response.data;

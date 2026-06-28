@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { usePWA } from '@/context/PWAContext';
+import { useMyProfile } from '@/hooks/useQueries';
 import { SESSION_KEYS, NEW_SESSION_EVENT } from '@/services/socket';
 
 // Cooldown entre exibições: 10 min para reconexões automáticas,
@@ -44,6 +45,7 @@ const benefits = [
 
 export function PWAPromoModal() {
     const { hasDeferredPrompt, isStandalone, promptInstall } = usePWA();
+    const { data: userData } = useMyProfile();
     const [visible, setVisible] = useState(false);
     const [animating, setAnimating] = useState(false);
 
@@ -53,9 +55,17 @@ export function PWAPromoModal() {
         const tryShow = (intentional: boolean) => {
             // Só exibe se o Chrome confirmou que pode instalar E app não está instalado
             if (!hasDeferredPrompt || isStandalone) return;
+
+            // Verifica o cooldown de fechamento (recusa) configurado no back office
+            const lastDismissed = Number(localStorage.getItem('pwa_promo_dismissed_at') ?? '0');
+            const pwaShowAgainIntervalDays = userData?.pwaShowAgainIntervalDays ?? 7;
+            const dismissCooldownMs = pwaShowAgainIntervalDays * 24 * 60 * 60 * 1000;
+            if (Date.now() - lastDismissed < dismissCooldownMs) return;
+
             const lastShown = Number(localStorage.getItem(SHOWN_KEY) ?? '0');
-            // Sessões intencionais (logout/troca de conta) ignoram o cooldown
+            // Sessões intencionais (logout/troca de conta) ignoram o cooldown de 10 min
             if (!intentional && Date.now() - lastShown < COOLDOWN_MS) return;
+
             localStorage.setItem(SHOWN_KEY, String(Date.now()));
             setTimeout(() => {
                 setVisible(true);
@@ -76,11 +86,14 @@ export function PWAPromoModal() {
 
         window.addEventListener(NEW_SESSION_EVENT, onNewSession);
         return () => window.removeEventListener(NEW_SESSION_EVENT, onNewSession);
-    }, [hasDeferredPrompt, isStandalone]);
+    }, [hasDeferredPrompt, isStandalone, userData?.pwaShowAgainIntervalDays]);
 
     const dismiss = () => {
         setAnimating(false);
         setTimeout(() => setVisible(false), 300);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('pwa_promo_dismissed_at', String(Date.now()));
+        }
     };
 
     const handleInstall = async () => {

@@ -47,6 +47,7 @@ export interface IUser extends Document {
     identityDocumentUrl?: string;
     identitySelfieUrl?: string;
     identityDocumentType?: string;
+    avgResponseTimeMinutes?: number | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -196,6 +197,10 @@ const UserSchema = new Schema<IUser>({
     identityDocumentType: {
         type: String,
         default: '',
+    },
+    avgResponseTimeMinutes: {
+        type: Number,
+        default: null,
     },
 }, {
     timestamps: true,
