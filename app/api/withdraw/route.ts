@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { WithdrawRequest } from '@/models/WithdrawRequest';
+import { Transaction } from '@/models/Transaction';
 import { Resend } from 'resend';
 import { createAsaasPixTransfer } from '@/lib/asaas';
 
@@ -60,20 +61,27 @@ export async function POST(request: NextRequest) {
 
         // 4. Iniciar transferência Pix automática no Asaas com valor líquido (netAmount)
         let asaasTransferId = undefined;
-        try {
-            const transfer = await createAsaasPixTransfer(netAmount, user.taxId);
-            asaasTransferId = transfer.id;
-        } catch (apiError: any) {
-            console.error('Erro ao chamar API do Asaas para transferência na criação do saque:', apiError);
-            
-            let message = 'Falha ao iniciar transferência no Asaas';
-            if (apiError.payload?.errors && apiError.payload.errors.length > 0) {
-                message = apiError.payload.errors.map((e: any) => e.description).join(', ');
+        const isDev = process.env.NODE_ENV === 'development' || process.env.MOCK_ASAAS === 'true';
+
+        if (isDev) {
+            asaasTransferId = `transfer_mock_${Math.random().toString(36).substring(2, 11)}`;
+            console.log(`[MOCK_ASAAS] Simulando transferência de R$ ${netAmount / 100} para a chave ${user.taxId}. ID: ${asaasTransferId}`);
+        } else {
+            try {
+                const transfer = await createAsaasPixTransfer(netAmount, user.taxId);
+                asaasTransferId = transfer.id;
+            } catch (apiError: any) {
+                console.error('Erro ao chamar API do Asaas para transferência na criação do saque:', apiError);
+                
+                let message = 'Falha ao iniciar transferência no Asaas';
+                if (apiError.payload?.errors && apiError.payload.errors.length > 0) {
+                    message = apiError.payload.errors.map((e: any) => e.description).join(', ');
+                }
+                
+                return NextResponse.json({ 
+                    error: `Erro na API do Asaas: ${message}` 
+                }, { status: 400 });
             }
-            
-            return NextResponse.json({ 
-                error: `Erro na API do Asaas: ${message}` 
-            }, { status: 400 });
         }
 
         // 5. Cria o pedido de saque como processando (com fee e netAmount registrados)
@@ -118,6 +126,40 @@ export async function POST(request: NextRequest) {
         } catch (emailError) {
             console.error('Erro ao enviar email via Resend:', emailError);
             // Continua, pois o saque já foi registrado no banco.
+        }
+
+        // 8. Se for ambiente de desenvolvimento, simula a aprovação automática do saque após 5 segundos em background
+        if (isDev) {
+            setTimeout(async () => {
+                try {
+                    await connectToDatabase();
+                    const withdraw = await WithdrawRequest.findById(withdrawRequest._id);
+                    if (withdraw && withdraw.status === 'processando') {
+                        withdraw.status = 'concluido';
+                        await withdraw.save();
+
+                        const existingTx = await Transaction.findOne({ 'metadata.withdrawRequestId': withdraw._id.toString() });
+                        if (!existingTx) {
+                            await Transaction.create({
+                                userId: withdraw.userId,
+                                amount: withdraw.amount / 100, // em reais
+                                status: 'COMPLETED',
+                                type: 'debit',
+                                source: 'withdrawal',
+                                timestamp: new Date(),
+                                metadata: {
+                                    withdrawRequestId: withdraw._id.toString(),
+                                    pixKey: withdraw.pixKey,
+                                    asaasTransferId: withdraw.asaasTransferId
+                                }
+                            });
+                        }
+                        console.log(`[MOCK_ASAAS] Simulação de saque concluída com sucesso para o ID: ${withdraw._id}`);
+                    }
+                } catch (simError) {
+                    console.error('[MOCK_ASAAS] Erro ao processar simulação de conclusão de saque:', simError);
+                }
+            }, 5000); // 5 segundos de delay
         }
 
         return NextResponse.json({ success: true, withdrawRequest }, { status: 201 });
