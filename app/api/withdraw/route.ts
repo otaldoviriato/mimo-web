@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
 
         // 3. Validação do saldo suficiente para cobrir a taxa
         if (fee > 0 && amountToWithdraw <= fee) {
-            return NextResponse.json({ error: 'Saldo insuficiente para cobrir a taxa de saque de R$ 2,00.' }, { status: 400 });
+            return NextResponse.json({ error: 'Você não pode realizar o saque porque, a partir do quinto saque, é cobrado R$ 2 no saque e você não tem nem R$ 2 pra poder sacar.' }, { status: 400 });
         }
 
         const netAmount = amountToWithdraw - fee; // Valor líquido que será transferido

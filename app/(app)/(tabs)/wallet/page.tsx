@@ -84,6 +84,8 @@ export default function WalletPage() {
     const { data: withdrawalsData, refetch: refetchWithdrawals } = useWithdrawalHistory();
 
     const [withdrawConfirmModalOpen, setWithdrawConfirmModalOpen] = useState(false);
+    const [withdrawTaxWarningModalOpen, setWithdrawTaxWarningModalOpen] = useState(false);
+    const [withdrawErrorModalOpen, setWithdrawErrorModalOpen] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
     const [withdrawFeedback, setWithdrawFeedback] = useState<'created' | 'approved' | 'failed' | null>(null);
     const [lastSeenWithdrawalStatus, setLastSeenWithdrawalStatus] = useState<string | null>(null);
@@ -324,6 +326,8 @@ export default function WalletPage() {
                             onClick={() => {
                                 if (!userData?.taxId) {
                                     toast.error('Você precisa ter o CPF cadastrado e verificado para solicitar saques.');
+                                } else if (isBalanceInsufficientForFee) {
+                                    setWithdrawErrorModalOpen(true);
                                 } else {
                                     setWithdrawConfirmModalOpen(true);
                                 }
@@ -737,7 +741,14 @@ export default function WalletPage() {
                                 Cancelar
                             </button>
                             <button
-                                onClick={handleRequestWithdraw}
+                                onClick={() => {
+                                    if (monthlyWithdrawalsCount >= 5) {
+                                        setWithdrawConfirmModalOpen(false);
+                                        setWithdrawTaxWarningModalOpen(true);
+                                    } else {
+                                        handleRequestWithdraw();
+                                    }
+                                }}
                                 disabled={requestWithdrawMutation.isPending || data.balance <= 0 || isBalanceInsufficientForFee}
                                 className="flex-1 h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center disabled:opacity-50"
                             >
@@ -751,6 +762,80 @@ export default function WalletPage() {
                                 )}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── MODAL: AVISO TAXA DE SAQUE (EXCEDEU LIMITE) ────────────────── */}
+            {withdrawTaxWarningModalOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm flex flex-col gap-5 border border-gray-100 animate-in zoom-in duration-300">
+                        <div className="flex flex-col items-center text-center gap-2.5">
+                            <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0 shadow-sm">
+                                <AlertCircle className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h2 className="text-base font-bold text-gray-900">Aviso de Taxa de Saque</h2>
+                            </div>
+                        </div>
+
+                        <div className="bg-amber-50/50 border border-amber-100 p-4 rounded-xl text-center text-xs text-amber-900 leading-relaxed font-medium">
+                            Atenção: esse saque por exceder o limite de cinco saques. Você terá um custo de R$ 2 e cinco saques mensais.
+                        </div>
+
+                        <div className="flex gap-2.5">
+                            <button
+                                onClick={() => setWithdrawTaxWarningModalOpen(false)}
+                                className="flex-1 h-9 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-650 font-bold text-xs"
+                                disabled={requestWithdrawMutation.isPending}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    await handleRequestWithdraw();
+                                    setWithdrawTaxWarningModalOpen(false);
+                                }}
+                                disabled={requestWithdrawMutation.isPending}
+                                className="flex-1 h-9 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center justify-center disabled:opacity-50"
+                            >
+                                {requestWithdrawMutation.isPending ? (
+                                    <span className="flex items-center gap-1.5">
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        Processando...
+                                    </span>
+                                ) : (
+                                    'Confirmar e Sacar'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── MODAL: ERRO SALDO INSUFICIENTE PARA TAXA ────────────────── */}
+            {withdrawErrorModalOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm flex flex-col gap-5 border border-gray-100 animate-in zoom-in duration-300">
+                        <div className="flex flex-col items-center text-center gap-2.5">
+                            <div className="w-12 h-12 rounded-xl bg-red-50 border border-red-100 flex items-center justify-center text-red-650 shrink-0 shadow-sm">
+                                <AlertCircle className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h2 className="text-base font-bold text-gray-900">Saldo Insuficiente</h2>
+                            </div>
+                        </div>
+
+                        <div className="bg-red-50/50 border border-red-100 p-4 rounded-xl text-center text-xs text-red-955 leading-relaxed font-medium">
+                            Você não pode realizar o saque porque, a partir do quinto saque, é cobrado R$ 2 no saque e você não tem nem R$ 2 pra poder sacar.
+                        </div>
+
+                        <button
+                            onClick={() => setWithdrawErrorModalOpen(false)}
+                            className="w-full h-9 rounded-xl bg-red-650 hover:bg-red-700 text-white font-bold text-xs transition-colors"
+                        >
+                            Entendido
+                        </button>
                     </div>
                 </div>
             )}
