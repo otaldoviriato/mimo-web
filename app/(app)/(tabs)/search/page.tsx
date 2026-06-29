@@ -112,12 +112,11 @@ export default function SearchPage() {
     const renderUserCard = (user: any) => {
         const formatResponseTime = (minutes: number | null | undefined): string => {
             if (minutes == null) return '';
-            if (minutes < 1) return 'menos de 1 min';
-            if (minutes < 60) return `${Math.round(minutes)} min`;
-            const hours = Math.floor(minutes / 60);
-            const mins = Math.round(minutes % 60);
-            if (mins === 0) return `${hours}h`;
-            return `${hours}h ${mins}min`;
+            if (minutes <= 2.5) return '1 minuto';
+            if (minutes <= 7.5) return '5 minutos';
+            if (minutes <= 20) return '10 minutos';
+            if (minutes <= 45) return '30 minutos';
+            return 'mais de uma hora';
         };
         const responseTime = formatResponseTime(user.avgResponseTimeMinutes);
         const photos: string[] = user.publicPhotos || [];
