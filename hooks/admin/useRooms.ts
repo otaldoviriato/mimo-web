@@ -28,19 +28,20 @@ export function useRooms() {
         }
     };
 
-    const handleOpenAuditModal = async (chat: ChatRoom) => {
+    const handleOpenAuditModal = async (chat: ChatRoom, reason: string) => {
         setSelectedAuditChat({ ...chat, history: [] });
         setAuditHasMore(true);
         setIsFirstAuditLoad(true);
         try {
-            const response = await fetch(`/api/admin/rooms/${chat.id}/messages?limit=50`);
+            const response = await fetch(`/api/admin/rooms/${chat.id}/messages?limit=50&reason=${encodeURIComponent(reason)}`);
             if (response.ok) {
                 const data = await response.json();
                 const history = data.history || [];
                 setSelectedAuditChat({ ...chat, history });
                 setAuditHasMore(history.length === 50);
             } else {
-                toast.error('Erro ao buscar mensagens do chat.');
+                const errData = await response.json().catch(() => ({}));
+                toast.error(errData.error || 'Erro ao buscar mensagens do chat.');
             }
         } catch {
             toast.error('Erro de conexão com o servidor.');

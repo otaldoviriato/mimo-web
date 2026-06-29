@@ -45,6 +45,9 @@ export interface IUser extends Document {
     isSuspended?: boolean;
     suspendedAt?: Date;
     avgResponseTimeMinutes?: number | null;
+    identityDocumentUrl?: string;
+    identitySelfieUrl?: string;
+    identityDocumentType?: string;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -186,6 +189,15 @@ const UserSchema = new Schema<IUser>({
     avgResponseTimeMinutes: {
         type: Number,
         default: null,
+    },
+    identityDocumentUrl: {
+        type: String,
+    },
+    identitySelfieUrl: {
+        type: String,
+    },
+    identityDocumentType: {
+        type: String,
     },
 }, {
     timestamps: true,

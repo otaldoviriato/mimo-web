@@ -32,4 +32,8 @@ export type { IProfessionalEmail } from './ProfessionalEmail';
 export { Subscription } from './Subscription';
 export type { ISubscription } from './Subscription';
 
+export { AuditLog } from './AuditLog';
+export type { IAuditLog } from './AuditLog';
+
+
 

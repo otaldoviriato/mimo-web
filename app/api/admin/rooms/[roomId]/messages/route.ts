@@ -3,6 +3,8 @@ import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { Message } from '@/models/Message';
 import { AppSettings } from '@/models/AppSettings';
+import { User } from '@/models/User';
+import { AuditLog } from '@/models/AuditLog';
 import mongoose from 'mongoose';
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
@@ -37,26 +39,66 @@ export async function GET(
             return NextResponse.json({ error: 'Acesso proibido. Apenas administradores.' }, { status: 403 });
         }
 
-        // 2. Buscar as mensagens da sala com paginação
+        // 2. Extrair parâmetros da URL
         const { searchParams } = new URL(request.url);
         const before = searchParams.get('before');
         const limitStr = searchParams.get('limit');
+        const reason = searchParams.get('reason');
         const limit = limitStr ? parseInt(limitStr, 10) : 50;
 
+        // Se before não for fornecido, trata-se do acesso inicial à auditoria.
+        // Nesse caso, a justificativa (reason) é obrigatória.
+        if (!before) {
+            if (!reason || reason.trim() === '') {
+                return NextResponse.json({ error: 'A justificativa de auditoria é obrigatória para acessar as mensagens desta conversa.' }, { status: 400 });
+            }
+        }
+
         let resolvedRoomIdStr = roomId;
+        let participants: string[] = [];
+
+        // Buscar a sala no banco para obter participantes reais
+        const { Room } = await import('@/models/Room');
         if (mongoose.Types.ObjectId.isValid(roomId)) {
-            const { Room } = await import('@/models/Room');
             const room = await Room.findById(roomId).lean() as any;
             if (room) {
                 const sortedParticipants = [...room.participants].sort();
                 resolvedRoomIdStr = sortedParticipants.join('_');
+                participants = room.participants;
             }
+        } else {
+            const room = await Room.findOne({ participants: { $all: roomId.split('_') } }).lean() as any;
+            if (room) {
+                participants = room.participants;
+                const sortedParticipants = [...participants].sort();
+                resolvedRoomIdStr = sortedParticipants.join('_');
+            } else {
+                participants = roomId.split('_');
+            }
+        }
+
+        // Se for o acesso inicial e a justificativa for informada, salvar no log de auditoria
+        if (!before && reason) {
+            const adminUser = await User.findOne({ clerkId: userId }).select('name username email').lean();
+            const adminName = adminUser?.name || adminUser?.username || `Admin (${userId.substring(0, 8)})`;
+            const adminEmail = adminUser?.email;
+
+            await AuditLog.create({
+                adminClerkId: userId,
+                adminName,
+                adminEmail,
+                roomId: resolvedRoomIdStr,
+                participants,
+                reason: reason.trim(),
+            });
+            console.log(`[AUDIT] Admin ${adminName} (${userId}) accessed room ${resolvedRoomIdStr} messages. Reason: "${reason.trim()}"`);
         }
 
         const filter: any = { roomId: resolvedRoomIdStr };
         if (before) {
             filter.timestamp = { $lt: new Date(before) };
         }
+
 
         const messages = await Message.find(filter)
             .sort({ timestamp: -1 }) // Mais recente primeiro para buscar corretamente o final da conversa

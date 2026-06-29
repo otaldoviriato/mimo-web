@@ -23,6 +23,9 @@ export function RoomsTab() {
         handleAuditScroll,
     } = useRooms();
 
+    const [pendingAuditChat, setPendingAuditChat] = React.useState<any | null>(null);
+    const [justificationText, setJustificationText] = React.useState('');
+
     useEffect(() => {
         fetchRooms();
     }, []);
@@ -98,7 +101,10 @@ export function RoomsTab() {
                                         <td className="py-4 px-6 text-xs text-slate-500 font-semibold">{chat.time}</td>
                                         <td className="py-4 px-6 text-center">
                                             <button
-                                                onClick={() => handleOpenAuditModal(chat)}
+                                                onClick={() => {
+                                                    setPendingAuditChat(chat);
+                                                    setJustificationText('');
+                                                }}
                                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-600 text-xs font-bold rounded-lg transition-all border border-purple-100 cursor-pointer group-hover:scale-105"
                                             >
                                                 <Eye size={12} />
@@ -183,6 +189,66 @@ export function RoomsTab() {
                                     Bloquear Conversa
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Modal de justificativa de auditoria */}
+            {pendingAuditChat && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+                    <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 animate-fade-in-up">
+                        <div className="flex items-center gap-3">
+                            <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl border border-purple-100">
+                                <ShieldAlert size={22} />
+                            </div>
+                            <div>
+                                <h3 className="text-slate-900 text-base font-bold tracking-tight">Justificativa de Auditoria</h3>
+                                <p className="text-slate-500 text-xs font-medium">
+                                    Auditoria entre <strong>{pendingAuditChat.userA.name}</strong> e <strong>{pendingAuditChat.userB.name}</strong>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                                Motivo do Acesso
+                            </label>
+                            <textarea
+                                value={justificationText}
+                                onChange={(e) => setJustificationText(e.target.value)}
+                                placeholder="Descreva brevemente por que você precisa acessar o histórico de mensagens desta conversa..."
+                                className="w-full px-3 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-medium text-slate-700 placeholder:text-slate-400 min-h-[100px] resize-none"
+                            />
+                            <span className="text-[9px] text-slate-400 font-medium block">
+                                Mínimo de 5 caracteres. Este acesso será registrado para auditoria de segurança.
+                            </span>
+                        </div>
+
+                        <div className="flex gap-2.5 pt-2 justify-end">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setPendingAuditChat(null);
+                                    setJustificationText('');
+                                }}
+                                className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (justificationText.trim().length >= 5) {
+                                        handleOpenAuditModal(pendingAuditChat, justificationText.trim());
+                                        setPendingAuditChat(null);
+                                        setJustificationText('');
+                                    }
+                                }}
+                                disabled={justificationText.trim().length < 5}
+                                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-600/10 transition-all cursor-pointer"
+                            >
+                                Confirmar Acesso
+                            </button>
                         </div>
                     </div>
                 </div>

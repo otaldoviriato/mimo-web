@@ -112,6 +112,8 @@ export default function UserDetailPage() {
     const [isFirstAuditLoad, setIsFirstAuditLoad] = useState(false);
     const auditContainerRef = useRef<HTMLDivElement>(null);
     const [galleryExpanded, setGalleryExpanded] = useState(false);
+    const [pendingAuditChat, setPendingAuditChat] = useState<ChatRoom | null>(null);
+    const [justificationText, setJustificationText] = useState('');
 
     // Inputs
     const [name, setName] = useState('');
@@ -152,7 +154,7 @@ export default function UserDetailPage() {
     };
 
     // Abre o modal de auditoria buscando o histórico de mensagens reais
-    const handleOpenAuditModal = async (chat: ChatRoom) => {
+    const handleOpenAuditModal = async (chat: ChatRoom, reason: string) => {
         setSelectedAuditChat({
             ...chat,
             history: []
@@ -161,7 +163,7 @@ export default function UserDetailPage() {
         setIsFirstAuditLoad(true);
 
         try {
-            const response = await fetch(`/api/admin/rooms/${chat.id}/messages?limit=50`);
+            const response = await fetch(`/api/admin/rooms/${chat.id}/messages?limit=50&reason=${encodeURIComponent(reason)}`);
             if (response.ok) {
                 const data = await response.json();
                 const history = data.history || [];
@@ -171,7 +173,8 @@ export default function UserDetailPage() {
                 });
                 setAuditHasMore(history.length === 50);
             } else {
-                toast.error('Erro ao buscar mensagens do chat.');
+                const errData = await response.json().catch(() => ({}));
+                toast.error(errData.error || 'Erro ao buscar mensagens do chat.');
             }
         } catch (error) {
             console.error('Erro de conexão ao buscar mensagens:', error);
@@ -1087,7 +1090,10 @@ export default function UserDetailPage() {
                                                     <td className="py-4 px-6 text-center" onClick={(e) => e.stopPropagation()}>
                                                         <div className="flex justify-center gap-2">
                                                             <button
-                                                                onClick={() => handleOpenAuditModal(chat)}
+                                                                onClick={() => {
+                                                                    setPendingAuditChat(chat);
+                                                                    setJustificationText('');
+                                                                }}
                                                                 className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-100 text-purple-600 text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-sm active:scale-95"
                                                             >
                                                                 <Eye size={12} />
@@ -1208,6 +1214,66 @@ export default function UserDetailPage() {
                             </div>
                         </div>
 
+                    </div>
+                </div>
+            )}
+            {/* Modal de justificativa de auditoria */}
+            {pendingAuditChat && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+                    <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 animate-fade-in-up">
+                        <div className="flex items-center gap-3">
+                            <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl border border-purple-100">
+                                <ShieldAlert size={22} />
+                            </div>
+                            <div>
+                                <h3 className="text-slate-900 text-base font-bold tracking-tight">Justificativa de Auditoria</h3>
+                                <p className="text-slate-500 text-xs font-medium">
+                                    Auditoria entre <strong>{pendingAuditChat.userA.name}</strong> e <strong>{pendingAuditChat.userB.name}</strong>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                                Motivo do Acesso
+                            </label>
+                            <textarea
+                                value={justificationText}
+                                onChange={(e) => setJustificationText(e.target.value)}
+                                placeholder="Descreva brevemente por que você precisa acessar o histórico de mensagens desta conversa..."
+                                className="w-full px-3 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-medium text-slate-700 placeholder:text-slate-400 min-h-[100px] resize-none"
+                            />
+                            <span className="text-[9px] text-slate-400 font-medium block">
+                                Mínimo de 5 caracteres. Este acesso será registrado para auditoria de segurança.
+                            </span>
+                        </div>
+
+                        <div className="flex gap-2.5 pt-2 justify-end">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setPendingAuditChat(null);
+                                    setJustificationText('');
+                                }}
+                                className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (justificationText.trim().length >= 5) {
+                                        handleOpenAuditModal(pendingAuditChat, justificationText.trim());
+                                        setPendingAuditChat(null);
+                                        setJustificationText('');
+                                    }
+                                }}
+                                disabled={justificationText.trim().length < 5}
+                                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-600/10 transition-all cursor-pointer"
+                            >
+                                Confirmar Acesso
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
