@@ -274,6 +274,7 @@ export default function AdminPage() {
                     {activeTab === 'settings-chat' && (
                         <SettingsChatPage
                             chatSessionTimeoutMinutes={settings.chatSessionTimeoutMinutes} setChatSessionTimeoutMinutes={settings.setChatSessionTimeoutMinutes}
+                            onlineDelayMinutes={settings.onlineDelayMinutes} setOnlineDelayMinutes={settings.setOnlineDelayMinutes}
                             isDirtyChat={settings.isDirtyChat}
                             saving={settings.saving} saveSettings={settings.saveSettings}
                         />

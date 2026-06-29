@@ -19,6 +19,7 @@ export interface SettingsData {
     creditCardEnabled: boolean;
     couponsEnabled: boolean;
     chatSessionTimeoutMinutes: number;
+    onlineDelayMinutes?: number;
     defaultPricePerCharSubscribers: number;
     defaultPricePerCharNonSubscribers: number;
     pwaShowAgainIntervalDays: number;

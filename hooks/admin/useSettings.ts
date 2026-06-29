@@ -18,6 +18,7 @@ interface SettingsSnapshot {
     creditCardEnabled: boolean;
     couponsEnabled: boolean;
     chatSessionTimeoutMinutes: number;
+    onlineDelayMinutes: number;
     defaultPricePerCharSubscribers: number;
     defaultPricePerCharNonSubscribers: number;
     pwaShowAgainIntervalDays: number;
@@ -48,6 +49,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     const [creditCardEnabled, setCreditCardEnabled] = useState(true);
     const [couponsEnabled, setCouponsEnabled] = useState(true);
     const [chatSessionTimeoutMinutes, setChatSessionTimeoutMinutes] = useState(30);
+    const [onlineDelayMinutes, setOnlineDelayMinutes] = useState(2);
     const [defaultPricePerCharSubscribers, setDefaultPricePerCharSubscribers] = useState(0.002);
     const [defaultPricePerCharNonSubscribers, setDefaultPricePerCharNonSubscribers] = useState(0.005);
     const [pwaShowAgainIntervalDays, setPwaShowAgainIntervalDays] = useState(7);
@@ -76,6 +78,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         creditCardEnabled: s.creditCardEnabled ?? true,
         couponsEnabled: s.couponsEnabled ?? true,
         chatSessionTimeoutMinutes: s.chatSessionTimeoutMinutes ?? 30,
+        onlineDelayMinutes: s.onlineDelayMinutes ?? 2,
         defaultPricePerCharSubscribers: s.defaultPricePerCharSubscribers ?? 0.002,
         defaultPricePerCharNonSubscribers: s.defaultPricePerCharNonSubscribers ?? 0.005,
         pwaShowAgainIntervalDays: s.pwaShowAgainIntervalDays ?? 7,
@@ -116,6 +119,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     setCreditCardEnabled(s.creditCardEnabled ?? true);
                     setCouponsEnabled(s.couponsEnabled ?? true);
                     setChatSessionTimeoutMinutes(s.chatSessionTimeoutMinutes ?? 30);
+                    setOnlineDelayMinutes(s.onlineDelayMinutes ?? 2);
                     setDefaultPricePerCharSubscribers(s.defaultPricePerCharSubscribers ?? 0.002);
                     setDefaultPricePerCharNonSubscribers(s.defaultPricePerCharNonSubscribers ?? 0.005);
                     setPwaShowAgainIntervalDays(s.pwaShowAgainIntervalDays ?? 7);
@@ -198,6 +202,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     creditCardEnabled,
                     couponsEnabled,
                     chatSessionTimeoutMinutes,
+                    onlineDelayMinutes,
                     defaultPricePerCharSubscribers,
                     defaultPricePerCharNonSubscribers,
                     pwaShowAgainIntervalDays,
@@ -222,6 +227,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                 setMaxPublicPhotos(s.maxPublicPhotos);
                 setMinExclusivePhotos(s.minExclusivePhotos);
                 setMaxExclusivePhotos(s.maxExclusivePhotos);
+                setOnlineDelayMinutes(s.onlineDelayMinutes ?? 2);
                 setDefaultPricePerCharSubscribers(s.defaultPricePerCharSubscribers ?? 0.002);
                 setDefaultPricePerCharNonSubscribers(s.defaultPricePerCharNonSubscribers ?? 0.005);
                 setPwaShowAgainIntervalDays(s.pwaShowAgainIntervalDays ?? 7);
@@ -263,8 +269,10 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         uploadLimit !== savedSnapshot.uploadLimit ||
         comparisonPeriod !== savedSnapshot.comparisonPeriod
     );
-    const isDirtyChat = savedSnapshot !== null &&
-        chatSessionTimeoutMinutes !== savedSnapshot.chatSessionTimeoutMinutes;
+    const isDirtyChat = savedSnapshot !== null && (
+        chatSessionTimeoutMinutes !== savedSnapshot.chatSessionTimeoutMinutes ||
+        onlineDelayMinutes !== savedSnapshot.onlineDelayMinutes
+    );
     const isDirtyPricing = savedSnapshot !== null && (
         maxPricePerChar !== savedSnapshot.maxPricePerChar ||
         maxSubscriptionPrice !== savedSnapshot.maxSubscriptionPrice ||
@@ -311,6 +319,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         creditCardEnabled, setCreditCardEnabled,
         couponsEnabled, setCouponsEnabled,
         chatSessionTimeoutMinutes, setChatSessionTimeoutMinutes,
+        onlineDelayMinutes, setOnlineDelayMinutes,
         defaultPricePerCharSubscribers, setDefaultPricePerCharSubscribers,
         defaultPricePerCharNonSubscribers, setDefaultPricePerCharNonSubscribers,
         pwaShowAgainIntervalDays, setPwaShowAgainIntervalDays,

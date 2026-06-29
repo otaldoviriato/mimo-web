@@ -7,11 +7,13 @@ import type { UseSettingsReturn } from '@/hooks/admin/useSettings';
 
 type Props = Pick<UseSettingsReturn,
     | 'chatSessionTimeoutMinutes' | 'setChatSessionTimeoutMinutes'
+    | 'onlineDelayMinutes' | 'setOnlineDelayMinutes'
     | 'isDirtyChat' | 'saving' | 'saveSettings'
 >;
 
 export function SettingsChatPage({
     chatSessionTimeoutMinutes, setChatSessionTimeoutMinutes,
+    onlineDelayMinutes, setOnlineDelayMinutes,
     isDirtyChat, saving, saveSettings,
 }: Props) {
     const inputCls = 'w-full max-w-xs px-3.5 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700 shadow-sm';
@@ -62,6 +64,43 @@ export function SettingsChatPage({
                             <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
                                 <p className="text-[11px] text-blue-700 font-semibold">
                                     Configuração atual: mensagens com intervalo ≥ <strong>{chatSessionTimeoutMinutes} minutos</strong> iniciam uma nova sessão e disparam notificação ao profissional.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="border-t border-slate-100 my-6" />
+
+                <div className="py-6">
+                    <div className="flex flex-col md:flex-row md:items-start gap-4 md:gap-8">
+                        <div className="md:w-1/2 space-y-1">
+                            <h4 className="text-sm font-bold text-slate-800">Tempo de Atraso para Status Offline (minutos)</h4>
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                                Define o intervalo de espera, em minutos, após o usuário fechar a aba, mudar de guia ou se desconectar temporariamente, para que o sistema altere seu status de "Online" para "Visto por último".
+                            </p>
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2">
+                                <strong className="text-slate-600">Como funciona na prática:</strong> isso evita que o status do usuário oscile muito rápido para offline quando ele muda rapidamente de guia ou perde a conexão momentaneamente. Ele continuará aparecendo como "Online" para os outros usuários até que esse tempo expire.
+                            </p>
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2">
+                                O valor padrão recomendado é de <strong className="text-slate-600">2 minutos</strong>. Se configurado como 0, o status mudará para offline imediatamente após a desconexão.
+                            </p>
+                        </div>
+                        <div className="md:w-1/2 space-y-4">
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="number"
+                                    value={onlineDelayMinutes}
+                                    onChange={(e) => setOnlineDelayMinutes(Number(e.target.value))}
+                                    min={0}
+                                    max={1440}
+                                    className={inputCls}
+                                />
+                                <span className="text-sm font-bold text-slate-500">min</span>
+                            </div>
+                            <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+                                <p className="text-[11px] text-blue-700 font-semibold">
+                                    Configuração atual: o status offline será ativado apenas após <strong>{onlineDelayMinutes} minutos</strong> de inatividade total da conexão.
                                 </p>
                             </div>
                         </div>
