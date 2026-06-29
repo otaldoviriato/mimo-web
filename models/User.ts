@@ -48,6 +48,7 @@ export interface IUser extends Document {
     identityDocumentUrl?: string;
     identitySelfieUrl?: string;
     identityDocumentType?: string;
+    hideFromExplore?: boolean;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -198,6 +199,10 @@ const UserSchema = new Schema<IUser>({
     },
     identityDocumentType: {
         type: String,
+    },
+    hideFromExplore: {
+        type: Boolean,
+        default: false,
     },
 }, {
     timestamps: true,

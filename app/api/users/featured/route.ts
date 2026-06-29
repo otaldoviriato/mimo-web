@@ -18,12 +18,13 @@ export async function GET(request: NextRequest) {
 
         await connectToDatabase();
 
-        // Encontrar criadores profissionais aprovados (excluindo a si mesmo e suspensos)
+        // Encontrar criadores profissionais aprovados (excluindo a si mesmo e suspensos, e quem optou por ocultar do explorar)
         const featuredUsers = await User.find({
             clerkId: { $ne: userId },
             isProfessional: true,
             professionalStatus: 'approved',
-            isSuspended: { $ne: true }
+            isSuspended: { $ne: true },
+            hideFromExplore: { $ne: true }
         })
         .select('clerkId username name email photoUrl coverUrl isProfessional subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers bio createdAt avgResponseTimeMinutes')
         .limit(30)

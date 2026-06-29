@@ -57,6 +57,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const [bio, setBio] = useState('');
     const [chargePerCharSubscribers, setChargePerCharSubscribers] = useState('');
     const [chargePerCharNonSubscribers, setChargePerCharNonSubscribers] = useState('');
+    const [hideFromExplore, setHideFromExplore] = useState(false);
 
     const [loading, setLoading] = useState(false);
     const [saveError, setSaveError] = useState('');
@@ -91,6 +92,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             setEmailNotificationsEnabled(userData.emailNotificationsEnabled ?? false);
             setChargePerCharSubscribers(userData.chargePerCharSubscribers?.toString() ?? '0.002');
             setChargePerCharNonSubscribers(userData.chargePerCharNonSubscribers?.toString() ?? '0.005');
+            setHideFromExplore(userData.hideFromExplore ?? false);
             hasPopulated.current = true;
         }
     }, [userData]);
@@ -144,8 +146,10 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                 updateData.bio = bio;
                 updateData.chargePerCharNonSubscribers = charPrice;
                 updateData.chargePerCharSubscribers = Number(chargePerCharSubscribers) || 0;
+                updateData.hideFromExplore = hideFromExplore;
             } else {
                 updateData.bio = '';
+                updateData.hideFromExplore = false;
             }
 
             await updateProfileMutation.mutateAsync(updateData);
@@ -258,7 +262,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
         name !== initialName ||
         username !== initialUsername ||
         phone !== initialPhone ||
-        (profileIsProfessional && (bio !== initialBio));
+        (profileIsProfessional && (bio !== initialBio || hideFromExplore !== (userData?.hideFromExplore ?? false)));
 
     const layoutClass = isSubPage
         ? 'w-full h-full'
@@ -638,6 +642,46 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                             </p>
                                         </div>
                                     )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── SEÇÃO: PRIVACIDADE (Profissionais) ── */}
+                        {profileIsProfessional && (
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Privacidade</p>
+                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                                    <div className="px-4 py-3.5 flex items-center justify-between">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-8 h-8 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-500">
+                                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                                                    <line x1="1" y1="1" x2="23" y2="23"/>
+                                                </svg>
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium text-gray-800">Ocultar do explorar</p>
+                                                <p className="text-[10px] text-gray-400 leading-snug">
+                                                    Não exibir seu perfil na aba Explorar (sugestões de criadores)
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            id="hide-from-explore-toggle"
+                                            type="button"
+                                            onClick={() => setHideFromExplore(!hideFromExplore)}
+                                            className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${
+                                                hideFromExplore ? 'bg-purple-600' : 'bg-gray-200'
+                                            }`}
+                                            aria-label="Ocultar perfil do explorar"
+                                            role="switch"
+                                            aria-checked={hideFromExplore}
+                                        >
+                                            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                                                hideFromExplore ? 'translate-x-5' : 'translate-x-0'
+                                            }`} />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         )}

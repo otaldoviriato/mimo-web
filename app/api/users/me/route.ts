@@ -172,6 +172,7 @@ export async function GET() {
                 pwaShowAgainIntervalDays: settings?.pwaShowAgainIntervalDays ?? 7,
                 emailNotificationsEnabled: user.emailNotificationsEnabled ?? false,
                 hasPushToken: Boolean(user.fcmToken || (user.fcmTokens && user.fcmTokens.length > 0)),
+                hideFromExplore: user.hideFromExplore ?? false,
             },
         });
     } catch (error: any) {
@@ -190,7 +191,7 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, subscriptionPrice, isSubscriptionEnabled, chargePerCharSubscribers, chargePerCharNonSubscribers, bio, emailNotificationsEnabled } = body;
+        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, subscriptionPrice, isSubscriptionEnabled, chargePerCharSubscribers, chargePerCharNonSubscribers, bio, emailNotificationsEnabled, hideFromExplore } = body;
 
         await connectToDatabase();
 
@@ -283,6 +284,10 @@ export async function PATCH(request: NextRequest) {
             updateData.emailNotificationsEnabled = Boolean(emailNotificationsEnabled);
         }
 
+        if (hideFromExplore !== undefined) {
+            updateData.hideFromExplore = Boolean(hideFromExplore);
+        }
+
         const user = await User.findOneAndUpdate(
             { clerkId: userId },
             {
@@ -368,6 +373,7 @@ export async function PATCH(request: NextRequest) {
                 pwaShowAgainIntervalDays: settings?.pwaShowAgainIntervalDays ?? 7,
                 emailNotificationsEnabled: user.emailNotificationsEnabled ?? false,
                 hasPushToken: Boolean(user.fcmToken || (user.fcmTokens && user.fcmTokens.length > 0)),
+                hideFromExplore: user.hideFromExplore ?? false,
             },
         });
     } catch (error: any) {
