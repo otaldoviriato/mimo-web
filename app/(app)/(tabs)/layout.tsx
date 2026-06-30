@@ -132,7 +132,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
             <NotifPromoModal />
 
             {/* Bottom nav (mobile) */}
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 h-[calc(72px+env(safe-area-inset-bottom))] bg-white border-t border-gray-200 flex items-start z-40 shadow-[0_-6px_18px_rgba(15,23,42,0.05)] pb-[env(safe-area-inset-bottom)]">
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 h-[calc(56px+env(safe-area-inset-bottom))] bg-white border-t border-gray-200 flex z-40 shadow-[0_-6px_18px_rgba(15,23,42,0.05)]">
                 {resolvedTabs.map((tab) => {
                     const isActive = pathname === tab.href || (tab.href === '/chats' && pathname === '/');
                     return (
@@ -140,7 +140,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                             key={tab.href}
                             href={tab.href}
                             replace={tab.href !== '/chats'}
-                            className={`flex-1 h-18 flex flex-col items-center justify-center gap-1 px-2 text-xs font-semibold transition-colors
+                            className={`flex-1 h-full flex flex-col items-center justify-center gap-0.5 px-2 text-[11px] font-semibold transition-colors pb-[env(safe-area-inset-bottom)]
                                 ${isActive ? 'text-purple-600' : 'text-gray-400'}`}
                         >
                             {tab.icon(isActive)}

@@ -302,7 +302,7 @@ export default function ProfilePage() {
                             <Camera className="w-3.5 h-3.5 text-white" />
                             Alterar Capa
                         </button>
-                        <input ref={coverInputRef} type="file" accept="image/jpeg, image/png, image/gif, image/heic, image/webp" className="hidden" onChange={handleCoverChange} />
+                        <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverChange} />
                     </div>
 
                     {/* Compartilhar — canto superior esquerdo da capa */}
@@ -335,7 +335,7 @@ export default function ProfilePage() {
                                 <Plus className="w-6 h-6 text-white" />
                             </div>
                         </button>
-                        <input ref={fileInputRef} type="file" accept="image/jpeg, image/png, image/gif, image/heic, image/webp" className="hidden" onChange={handlePhotoChange} />
+                        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
                     </div>
                 </div>
 
@@ -419,8 +419,8 @@ export default function ProfilePage() {
                             </button>
                         )}
                         
-                        <input ref={galleryInputRef} type="file" accept="image/jpeg, image/png, image/gif, image/heic, image/webp" className="hidden" onChange={handleGalleryFileChange} />
-                        <input ref={privateGalleryInputRef} type="file" accept="image/jpeg, image/png, image/gif, image/heic, image/webp, video/mp4, video/quicktime, video/x-m4v" className="hidden" onChange={handlePrivateGalleryFileChange} />
+                        <input ref={galleryInputRef} type="file" accept="image/*" className="hidden" onChange={handleGalleryFileChange} />
+                        <input ref={privateGalleryInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={handlePrivateGalleryFileChange} />
                     </div>
 
                     {/* Seletor de Abas */}
@@ -810,7 +810,7 @@ export default function ProfilePage() {
                             <Camera className="w-3 h-3 text-white" />
                         </div>
                     </button>
-                    <input ref={fileInputRef} type="file" accept="image/jpeg, image/png, image/gif, image/heic, image/webp" className="hidden" onChange={handlePhotoChange} />
+                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
                     
                     <div className="min-w-0">
                         <h2 className="text-base font-bold text-gray-900 truncate">

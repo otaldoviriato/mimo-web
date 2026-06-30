@@ -2061,7 +2061,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 <div 
                     ref={messagesContainerRef} 
                     onScroll={handleScroll} 
-                    className={`flex-1 overflow-y-auto flex flex-col ${loadingMessages ? '' : 'flex-col-reverse'} gap-1`}
+                    className={`flex-1 overflow-y-auto overflow-x-hidden flex flex-col ${loadingMessages ? '' : 'flex-col-reverse'} gap-1`}
                     style={{ overscrollBehaviorY: 'contain' }}
                 >
                 {loadingMessages ? (
@@ -2107,6 +2107,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                             <div
                                 id={`msg-${item._id}`}
                                 className={`flex ${isMine ? 'justify-end' : 'justify-start'} items-end ${isText ? 'mb-0.5' : 'mb-2'} -mx-4 px-4 py-0.5 transition-colors duration-300 ${selectedMessageIds.has(item._id) ? 'bg-purple-100/50' : ''} select-none no-select relative`}
+                                style={{ touchAction: 'pan-y' }}
                                 onMouseDown={(e) => handleStartPress(item, e)}
                                 onMouseMove={handleMovePress}
                                 onMouseUp={(e) => handleEndPress(e)}
@@ -2617,7 +2618,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             </div>
 
             {/* Input area */}
-            <div className="bg-white border-t border-gray-200 px-4 py-3 shrink-0">
+            <div className="bg-white border-t border-gray-200 px-4 pt-3 pb-[calc(16px+env(safe-area-inset-bottom))] shrink-0">
                 {replyingTo && (
                     <div className="flex items-center justify-between bg-purple-50 border-l-4 border-purple-600 rounded-r-xl p-3 mb-3 animate-in slide-in-from-bottom-2 duration-150">
                         <div className="flex-1 min-w-0 pr-4">
@@ -2700,7 +2701,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                             </>
                         )}
                     </div>
-                    <input type="file" className="hidden" ref={fileInputRef} accept="image/jpeg, image/png, image/gif, image/heic, image/webp, video/mp4, video/quicktime, video/x-m4v" onChange={(e) => {
+                    <input type="file" className="hidden" ref={fileInputRef} accept="image/*,video/*" onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file?.type.startsWith('video/')) handleFileSelect(e, 'video');
                         else handleFileSelect(e, 'image');

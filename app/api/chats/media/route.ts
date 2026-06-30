@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { uploadToGCS } from '@/lib/gcs';
+import { uploadToGCS, uploadBufferToGCS } from '@/lib/gcs';
 import { v4 as uuidv4 } from 'uuid';
 import sharp from 'sharp';
 
@@ -56,26 +56,88 @@ export async function POST(request: NextRequest) {
             if (thumbnail) {
                 const thumbBuffer = await thumbnail.arrayBuffer();
                 
-                // Sempre upamos a thumb original
-                thumbnailUrl = await uploadToGCS(thumbnail, `chats/${roomId}/${fileId}_thumb.jpg`);
+                // Converter a thumbnail original para WebP para otimizar
+                let processedThumb: any = Buffer.from(thumbBuffer);
+                let thumbExtension = 'webp';
+                let thumbContentType = 'image/webp';
+                
+                try {
+                    processedThumb = await sharp(Buffer.from(thumbBuffer))
+                        .webp({ quality: 80 })
+                        .toBuffer();
+                } catch (err) {
+                    console.error('Failed to convert video thumb to WebP, uploading original:', err);
+                    thumbExtension = 'jpg';
+                    thumbContentType = 'image/jpeg';
+                }
+                
+                thumbnailUrl = await uploadBufferToGCS(processedThumb, `chats/${roomId}/${fileId}_thumb.${thumbExtension}`, thumbContentType);
 
                 if (isLocked) {
                     // Se estiver bloqueado, geramos e upamos uma versão borrada em blurredImageUrl
-                    const blurredThumb = await sharp(Buffer.from(thumbBuffer)).blur(60).toBuffer();
-                    const blurredFile = new File([new Uint8Array(blurredThumb)], 'blurred.jpg', { type: 'image/jpeg' });
-                    blurredUrl = await uploadToGCS(blurredFile, `chats/${roomId}/${fileId}_blurred_thumb.jpg`);
+                    let blurredThumbBuffer: any;
+                    let blurredThumbExtension = 'webp';
+                    let blurredThumbContentType = 'image/webp';
+                    
+                    try {
+                        blurredThumbBuffer = await sharp(processedThumb).blur(60).webp({ quality: 60 }).toBuffer();
+                    } catch (err) {
+                        console.error('Failed to blur video thumb to WebP, falling back:', err);
+                        try {
+                            blurredThumbBuffer = await sharp(Buffer.from(thumbBuffer)).blur(60).toBuffer();
+                            blurredThumbExtension = 'jpg';
+                            blurredThumbContentType = 'image/jpeg';
+                        } catch (innerErr) {
+                            blurredThumbBuffer = Buffer.from(thumbBuffer);
+                            blurredThumbExtension = 'jpg';
+                            blurredThumbContentType = 'image/jpeg';
+                        }
+                    }
+                    
+                    blurredUrl = await uploadBufferToGCS(blurredThumbBuffer, `chats/${roomId}/${fileId}_blurred_thumb.${blurredThumbExtension}`, blurredThumbContentType);
                 }
             }
         } else if (file) {
             // Se for imagem, 'file' é a imagem original
-            const extension = file.name.split('.').pop() || 'jpg';
             const buffer = Buffer.from(await file.arrayBuffer());
-            originalUrl = await uploadToGCS(file, `chats/${roomId}/${fileId}_original.${extension}`);
+            let processedBuffer: any = buffer;
+            let fileExtension = 'webp';
+            let contentType = 'image/webp';
+            
+            try {
+                processedBuffer = await sharp(buffer)
+                    .resize(1600, null, { withoutEnlargement: true }) // Redimensionar se for foto gigante (largura max 1600px)
+                    .webp({ quality: 80 })
+                    .toBuffer();
+            } catch (err) {
+                console.error('Failed to convert chat image to WebP, uploading original:', err);
+                fileExtension = file.name.split('.').pop() || 'jpg';
+                contentType = file.type;
+            }
+            
+            originalUrl = await uploadBufferToGCS(processedBuffer, `chats/${roomId}/${fileId}_original.${fileExtension}`, contentType);
             
             if (isLocked) {
-                const blurredBuffer = await sharp(buffer).blur(60).toBuffer();
-                const blurredFile = new File([new Uint8Array(blurredBuffer)], 'blurred.jpg', { type: 'image/jpeg' });
-                blurredUrl = await uploadToGCS(blurredFile, `chats/${roomId}/${fileId}_blurred.${extension}`);
+                let blurredBuffer: any;
+                let blurredExtension = 'webp';
+                let blurredContentType = 'image/webp';
+                
+                try {
+                    blurredBuffer = await sharp(processedBuffer).blur(60).webp({ quality: 60 }).toBuffer();
+                } catch (err) {
+                    console.error('Failed to blur chat image to WebP, falling back:', err);
+                    try {
+                        blurredBuffer = await sharp(buffer).blur(60).toBuffer();
+                        blurredExtension = fileExtension;
+                        blurredContentType = contentType;
+                    } catch (innerErr) {
+                        blurredBuffer = buffer;
+                        blurredExtension = file.name.split('.').pop() || 'jpg';
+                        blurredContentType = file.type;
+                    }
+                }
+                
+                blurredUrl = await uploadBufferToGCS(blurredBuffer, `chats/${roomId}/${fileId}_blurred.${blurredExtension}`, blurredContentType);
             }
         }
 

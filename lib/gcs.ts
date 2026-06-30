@@ -14,7 +14,7 @@ function getStorage() {
   });
 }
 
-export async function uploadToGCS(file: File, path: string): Promise<string> {
+export async function uploadBufferToGCS(buffer: Buffer, path: string, contentType: string): Promise<string> {
   const bucketName = process.env.GCS_BUCKET_NAME;
   
   if (!bucketName) {
@@ -24,15 +24,19 @@ export async function uploadToGCS(file: File, path: string): Promise<string> {
   const storage = getStorage();
   const bucket = storage.bucket(bucketName);
   const blob = bucket.file(path);
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
 
   await blob.save(buffer, {
-    contentType: file.type,
+    contentType,
     resumable: false,
   });
 
   return `https://storage.googleapis.com/${bucketName}/${path}`;
+}
+
+export async function uploadToGCS(file: File, path: string): Promise<string> {
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  return uploadBufferToGCS(buffer, path, file.type);
 }
 export async function getSignedUploadURL(path: string, contentType: string): Promise<string> {
   const bucketName = process.env.GCS_BUCKET_NAME;

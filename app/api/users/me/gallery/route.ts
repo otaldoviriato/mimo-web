@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User, GalleryItem } from '@/models';
-import { uploadToGCS } from '@/lib/gcs';
+import { uploadToGCS, uploadBufferToGCS } from '@/lib/gcs';
 import { v4 as uuidv4 } from 'uuid';
+import sharp from 'sharp';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,12 +78,32 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // Gerar um nome de arquivo único
-        const fileExtension = file.name.split('.').pop() || (isVideo ? 'mp4' : 'jpg');
-        const fileName = `galleries/${userId}/${uuidv4()}.${fileExtension}`;
+        // Fazer upload de mídias (foto ou vídeo)
+        let imageUrl = '';
+        if (isVideo) {
+            const fileExtension = file.name.split('.').pop() || 'mp4';
+            const fileName = `galleries/${userId}/${uuidv4()}.${fileExtension}`;
+            imageUrl = await uploadToGCS(file, fileName);
+        } else {
+            const buffer = Buffer.from(await file.arrayBuffer());
+            let processedBuffer: any = buffer;
+            let fileExtension = 'webp';
+            let contentType = 'image/webp';
 
-        // Fazer upload para GCS
-        const imageUrl = await uploadToGCS(file, fileName);
+            try {
+                processedBuffer = await sharp(buffer)
+                    .resize(1600, null, { withoutEnlargement: true }) // Redimensionar fotos muito gigantes (largura max 1600px)
+                    .webp({ quality: 80 })
+                    .toBuffer();
+            } catch (err) {
+                console.error('Failed to convert gallery image to WebP, uploading original:', err);
+                fileExtension = file.name.split('.').pop() || 'jpg';
+                contentType = file.type;
+            }
+
+            const fileName = `galleries/${userId}/${uuidv4()}.${fileExtension}`;
+            imageUrl = await uploadBufferToGCS(processedBuffer, fileName, contentType);
+        }
 
         // Criar item na galeria
         const newItem = await GalleryItem.create({

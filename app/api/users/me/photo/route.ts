@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
-import { uploadToGCS } from '@/lib/gcs';
+import { uploadBufferToGCS } from '@/lib/gcs';
 import { v4 as uuidv4 } from 'uuid';
+import sharp from 'sharp';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,12 +30,29 @@ export async function POST(request: NextRequest) {
 
         await connectToDatabase();
 
+        const buffer = Buffer.from(await file.arrayBuffer());
+
+        // Converter e otimizar para WebP usando sharp
+        let processedBuffer: any = buffer;
+        let fileExtension = 'webp';
+        let contentType = 'image/webp';
+        
+        try {
+            processedBuffer = await sharp(buffer)
+                .resize(800, 800, { fit: 'cover', withoutEnlargement: true })
+                .webp({ quality: 80 })
+                .toBuffer();
+        } catch (err) {
+            console.error('Failed to convert image to WebP with sharp, uploading original:', err);
+            fileExtension = file.name.split('.').pop() || 'jpg';
+            contentType = file.type;
+        }
+
         // Gerar um nome de arquivo único
-        const fileExtension = file.name.split('.').pop();
         const fileName = `profiles/${userId}/${uuidv4()}.${fileExtension}`;
 
         // Fazer upload para GCS
-        const photoUrl = await uploadToGCS(file, fileName);
+        const photoUrl = await uploadBufferToGCS(processedBuffer, fileName, contentType);
 
         // Atualizar usuário no banco de dados
         await User.findOneAndUpdate(
