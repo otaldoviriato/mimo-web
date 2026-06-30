@@ -247,11 +247,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
             // 2. Caso seja rota de configurações: /settings
             if (currentPath === '/settings') {
-                router.replace('/profile');
-                pushVirtual('settings', {});
-                setTimeout(() => {
-                    setIsNavInitialized(true);
-                }, 150);
+                router.replace('/profile?openSettings=true');
+                setIsNavInitialized(true);
                 return;
             }
 
@@ -262,11 +259,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             // Ignora caminhos com sub-segmentos (ex: juaccioli/chat) — a página cuida disso
             if (cleanedPath.length > 0 && !cleanedPath.includes('/') && !isReservedRoute(currentPath)) {
                 const username = cleanedPath.replace(/^@/, '');
-                router.replace('/chats');
-                pushVirtual('profile', { username });
-                setTimeout(() => {
-                    setIsNavInitialized(true);
-                }, 150);
+                router.replace(`/chats?openProfile=${username}`);
+                setIsNavInitialized(true);
                 return;
             }
 
@@ -277,12 +271,14 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         initDeepLinkRoute();
     }, [isLoaded, isSignedIn]);
 
-    // Escuta parâmetros de busca (query params) para abrir salas de chat virtuais
+    // Escuta parâmetros de busca (query params) para abrir salas de chat ou perfis virtuais
     useEffect(() => {
         if (typeof window === 'undefined' || !isNavInitialized) return;
 
         const params = new URLSearchParams(window.location.search);
         const openChatId = params.get('openChat');
+        const openProfileUsername = params.get('openProfile');
+        const openSettings = params.get('openSettings');
         const giftCode = params.get('gift');
 
         if (openChatId) {
@@ -293,6 +289,20 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             window.history.replaceState({}, '', url.pathname + url.search);
 
             pushVirtual('chat', { userId: openChatId, giftCode: giftCode || undefined });
+        } else if (openProfileUsername) {
+            // Remove os query params da URL silenciosamente para não reabrir o perfil ao atualizar a página
+            const url = new URL(window.location.href);
+            url.searchParams.delete('openProfile');
+            window.history.replaceState({}, '', url.pathname + url.search);
+
+            pushVirtual('profile', { username: openProfileUsername });
+        } else if (openSettings) {
+            // Remove os query params da URL silenciosamente para não reabrir as configurações ao atualizar a página
+            const url = new URL(window.location.href);
+            url.searchParams.delete('openSettings');
+            window.history.replaceState({}, '', url.pathname + url.search);
+
+            pushVirtual('settings', {});
         }
     }, [pathname, isNavInitialized, pushVirtual]);
 
