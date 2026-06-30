@@ -359,6 +359,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const [touchOffset, setTouchOffset] = useState(0);
     const touchOffsetRef = useRef(0);
     const [isDragging, setIsDragging] = useState(false);
+    const [isInputFocused, setIsInputFocused] = useState(false);
     const swipeLockedRef = useRef<'horizontal' | 'vertical' | null>(null);
     const [controlsVisible, setControlsVisible] = useState(true);
     const [detailsModalVisible, setDetailsModalVisible] = useState(false);
@@ -2618,7 +2619,9 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             </div>
 
             {/* Input area */}
-            <div className="bg-white border-t border-gray-200 px-4 pt-3 pb-[calc(16px+env(safe-area-inset-bottom))] shrink-0">
+            <div className={`bg-white border-t border-gray-200 px-4 pt-3 shrink-0 ${
+                isInputFocused ? 'pb-3' : 'pb-[calc(16px+env(safe-area-inset-bottom))]'
+            }`}>
                 {replyingTo && (
                     <div className="flex items-center justify-between bg-purple-50 border-l-4 border-purple-600 rounded-r-xl p-3 mb-3 animate-in slide-in-from-bottom-2 duration-150">
                         <div className="flex-1 min-w-0 pr-4">
@@ -2713,6 +2716,8 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                             value={messageText}
                             onChange={(e) => handleTyping(e.target.value)}
                             onKeyDown={handleKeyDown}
+                            onFocus={() => setIsInputFocused(true)}
+                            onBlur={() => setIsInputFocused(false)}
                             placeholder="Digite sua mensagem..."
                             rows={1}
                             maxLength={500}
