@@ -4,11 +4,11 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Avatar } from '@/components/Avatar';
-import { useMyProfile, useUploadPhoto, useUploadCover, useMyGallery, useUploadToGallery, useDeleteFromGallery, useDepositHistory, useChatRooms } from '@/hooks/useQueries';
+import { useMyProfile, useUploadPhoto, useUploadCover, useMyGallery, useUploadToGallery, useDeleteFromGallery, useDepositHistory, useChatRooms, useUpdateGalleryItemVisibility } from '@/hooks/useQueries';
 import { ImageCropper } from '@/components/ImageCropper';
 import { usePayment } from '@/context/PaymentContext';
 import { PullToRefresh } from '@/components';
-import { Settings, Share2, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, ShieldAlert, Heart, Globe, Crown, Camera, Gift, CreditCard, QrCode } from 'lucide-react';
+import { Settings, Share2, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, ShieldAlert, Heart, Globe, Crown, Camera, Gift, CreditCard, QrCode, Star, Info, CheckCircle2, X, MoreVertical } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function ProfilePage() {
@@ -27,6 +27,7 @@ export default function ProfilePage() {
     const uploadCoverMutation = useUploadCover();
     const uploadGalleryMutation = useUploadToGallery();
     const deleteGalleryMutation = useDeleteFromGallery();
+    const updateGalleryItemVisibilityMutation = useUpdateGalleryItemVisibility();
     const { data: depositHistory, isLoading: loadingHistory, refetch: refetchHistory } = useDepositHistory();
     const { data: rooms = [], refetch: refetchRooms } = useChatRooms();
 
@@ -52,6 +53,8 @@ export default function ProfilePage() {
     const [selectedVisibility, setSelectedVisibility] = useState<'public' | 'subscribers'>('public');
     const [visibilityModal, setVisibilityModal] = useState<{ open: boolean, file?: File }>({ open: false });
     const [cropperState, setCropperState] = useState<{ open: boolean; imageSrc: string; type: 'photo' | 'cover' } | null>(null);
+    const [selectedItem, setSelectedItem] = useState<any | null>(null);
+    const [showItemOptionsMenu, setShowItemOptionsMenu] = useState(false);
 
     useEffect(() => {
         if (userData) {
@@ -294,7 +297,7 @@ export default function ProfilePage() {
                         <button
                             onClick={() => coverInputRef.current?.click()}
                             disabled={uploadCoverMutation.isPending}
-                            className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/40 hover:bg-black/60 active:scale-95 text-white text-[10px] font-bold rounded-xl border border-white/20 backdrop-blur-md transition-all flex items-center gap-1.5"
+                            className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/40 hover:bg-black/60 active:scale-90 active:bg-black/70 text-white text-[10px] font-bold rounded-xl border border-white/20 backdrop-blur-md transition-all duration-75 flex items-center gap-1.5"
                         >
                             <Camera className="w-3.5 h-3.5 text-white" />
                             Alterar Capa
@@ -305,7 +308,7 @@ export default function ProfilePage() {
                     {/* Compartilhar — canto superior esquerdo da capa */}
                     <button
                         onClick={handleShare}
-                        className="absolute top-4 left-4 w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/35 transition-all active:scale-90 z-20"
+                        className="absolute top-4 left-4 w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/35 transition-all duration-75 active:scale-75 active:bg-black/40 z-20"
                         title="Compartilhar perfil"
                     >
                         <Share2 className="w-5 h-5" />
@@ -314,18 +317,18 @@ export default function ProfilePage() {
                     {/* Configurações — canto superior direito da capa */}
                     <button
                         onClick={() => router.push('/settings')}
-                        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/35 transition-all active:scale-90 z-20"
+                        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/35 transition-all duration-75 active:scale-75 active:bg-black/40 z-20"
                         title="Configurações"
                     >
                         <Settings className="w-5 h-5" />
                     </button>
                     
                     {/* Avatar Centralizado e Upload */}
-                    <div className="px-6 -mt-14 flex flex-col items-center relative z-10">
+                    <div className="px-6 -mt-14 flex flex-col items-center relative z-10 w-fit mx-auto pointer-events-none">
                         <button
                             onClick={() => fileInputRef.current?.click()}
                             disabled={uploadPhotoMutation.isPending}
-                            className="relative group p-1 bg-white rounded-full shadow-2xl transition-transform active:scale-95 border-2 border-purple-100"
+                            className="relative group p-1 bg-white rounded-full shadow-2xl transition-transform duration-75 active:scale-90 border-2 border-purple-100 pointer-events-auto"
                         >
                             <Avatar uri={localPhotoUrl} size={100} />
                             <div className="absolute inset-1 rounded-full bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
@@ -358,7 +361,7 @@ export default function ProfilePage() {
                     {/* Botão de Edição de Perfil */}
                     <button
                         onClick={() => router.push('/settings')}
-                        className="mt-5 w-full max-w-xs h-9 bg-purple-50 hover:bg-purple-100/80 border border-purple-100/80 font-bold text-xs text-purple-700 rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                        className="mt-5 w-full max-w-xs h-9 bg-purple-50 hover:bg-purple-100/80 border border-purple-100/80 font-bold text-xs text-purple-700 rounded-xl transition-all duration-75 active:scale-95 active:bg-purple-200/50 flex items-center justify-center gap-2"
                     >
                         <Settings className="w-3.5 h-3.5 text-purple-400" />
                         Editar Perfil
@@ -401,7 +404,7 @@ export default function ProfilePage() {
                         {activeGalleryTab === 'public' ? (
                             <button
                                 onClick={() => galleryInputRef.current?.click()}
-                                className="h-7 px-3 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition-all flex items-center gap-1 active:scale-95"
+                                className="h-7 px-3 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition-all duration-75 flex items-center gap-1 active:scale-90 active:bg-slate-100"
                             >
                                 <Plus className="w-3.5 h-3.5 text-slate-400" />
                                 Adicionar Foto
@@ -409,7 +412,7 @@ export default function ProfilePage() {
                         ) : (
                             <button
                                 onClick={() => privateGalleryInputRef.current?.click()}
-                                className="h-7 px-3 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition-all flex items-center gap-1 active:scale-95"
+                                className="h-7 px-3 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition-all duration-75 flex items-center gap-1 active:scale-90 active:bg-slate-100"
                             >
                                 <Plus className="w-3.5 h-3.5 text-slate-400" />
                                 Adicionar Mídia
@@ -424,7 +427,7 @@ export default function ProfilePage() {
                     <div className="flex border-b border-gray-150">
                         <button
                             onClick={() => setActiveGalleryTab('public')}
-                            className={`flex-1 pb-2.5 text-xs font-bold transition-all border-b-2 text-center ${
+                            className={`flex-1 pb-2.5 text-xs font-bold transition-all duration-75 border-b-2 text-center active:scale-95 active:bg-slate-100/50 ${
                                 activeGalleryTab === 'public'
                                     ? 'border-purple-600 text-purple-600'
                                     : 'border-transparent text-gray-400'
@@ -434,7 +437,7 @@ export default function ProfilePage() {
                         </button>
                         <button
                             onClick={() => setActiveGalleryTab('private')}
-                            className={`flex-1 pb-2.5 text-xs font-bold transition-all border-b-2 text-center ${
+                            className={`flex-1 pb-2.5 text-xs font-bold transition-all duration-75 border-b-2 text-center active:scale-95 active:bg-slate-100/50 ${
                                 activeGalleryTab === 'private'
                                     ? 'border-purple-600 text-purple-600'
                                     : 'border-transparent text-gray-400'
@@ -467,7 +470,11 @@ export default function ProfilePage() {
                         ) : (
                             <div className="grid grid-cols-3 gap-1.5">
                                 {(galleryData?.publicItems ?? galleryData?.items ?? []).map((item: any) => (
-                                    <div key={item._id} className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 group">
+                                    <div 
+                                        key={item._id} 
+                                        onClick={() => setSelectedItem(item)}
+                                        className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 group cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform duration-75"
+                                    >
                                         <img src={item.imageUrl} alt="Gallery" className="w-full h-full object-cover" />
                                         <div className="absolute top-1.5 left-1.5 p-1 rounded-lg bg-black/50 text-white backdrop-blur-md flex items-center justify-center border border-white/10" title={item.visibility === 'public' ? 'Pública' : 'Exclusiva para Assinantes'}>
                                             {item.visibility === 'public' ? (
@@ -476,13 +483,6 @@ export default function ProfilePage() {
                                                 <Crown className="w-3 h-3 text-amber-300" />
                                             )}
                                         </div>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleDeleteGalleryItem(item._id); }}
-                                            disabled={deleteGalleryMutation.isPending}
-                                            className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100"
-                                        >
-                                            <Trash2 className="w-5 h-5 text-white" />
-                                        </button>
                                     </div>
                                 ))}
                             </div>
@@ -496,7 +496,11 @@ export default function ProfilePage() {
                         ) : (
                             <div className="grid grid-cols-3 gap-1.5">
                                 {galleryData?.privateItems?.map((item: any) => (
-                                    <div key={item._id} className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 group">
+                                    <div 
+                                        key={item._id} 
+                                        onClick={() => setSelectedItem(item)}
+                                        className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 group cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform duration-75"
+                                    >
                                         {item.mediaType === 'video' ? (
                                             <div className="w-full h-full relative">
                                                 <video src={item.imageUrl} preload="metadata" className="w-full h-full object-cover" />
@@ -510,13 +514,6 @@ export default function ProfilePage() {
                                         <div className="absolute top-1.5 left-1.5 p-1 rounded-lg bg-black/50 text-white backdrop-blur-md flex items-center justify-center border border-white/10" title="Privada">
                                             <Lock className="w-3 h-3 text-purple-300" />
                                         </div>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleDeleteGalleryItem(item._id); }}
-                                            disabled={deleteGalleryMutation.isPending}
-                                            className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100"
-                                        >
-                                            <Trash2 className="w-5 h-5 text-white" />
-                                        </button>
                                     </div>
                                 ))}
                             </div>
@@ -524,82 +521,215 @@ export default function ProfilePage() {
                     )}
                 </div>
 
-                {/* Modais de Visibilidade e Corte */}
-                {visibilityModal.open && visibilityModal.file && (
-                    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
-                        <div className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-sm flex flex-col gap-4 animate-in fade-in zoom-in duration-300">
-                            <div className="text-center">
-                                <h2 className="text-lg font-bold text-gray-900">Visibilidade da Foto</h2>
-                                <p className="text-xs text-gray-400 mt-1">Escolha quem pode ver esta foto na sua galeria.</p>
-                            </div>
-                            
-                            <div className="w-full aspect-video rounded-2xl overflow-hidden bg-gray-150 border border-gray-100">
-                                <img src={URL.createObjectURL(visibilityModal.file)} className="w-full h-full object-cover" alt="Preview" />
-                            </div>
+            {/* Modais de Visibilidade e Corte */}
+            {visibilityModal.open && visibilityModal.file && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-sm flex flex-col gap-4 animate-in fade-in zoom-in duration-300">
+                        <div className="text-center">
+                            <h2 className="text-lg font-bold text-gray-900">Visibilidade da Foto</h2>
+                            <p className="text-xs text-gray-400 mt-1">Escolha quem pode ver esta foto na sua galeria.</p>
+                        </div>
+                        
+                        <div className="w-full aspect-video rounded-2xl overflow-hidden bg-gray-150 border border-gray-100">
+                            <img src={URL.createObjectURL(visibilityModal.file)} className="w-full h-full object-cover" alt="Preview" />
+                        </div>
 
-                            <div className="flex flex-col gap-2.5">
-                                <button
-                                    onClick={() => setSelectedVisibility('public')}
-                                    className={`w-full p-3 rounded-2xl border-2 transition-all flex items-center gap-3 text-left ${
-                                        selectedVisibility === 'public' 
-                                            ? 'border-purple-600 bg-purple-50/20 text-purple-900' 
-                                            : 'border-slate-100 bg-slate-50 text-slate-600 hover:bg-slate-100/50'
-                                    }`}
-                                >
-                                    <div className={`p-1.5 rounded-lg flex items-center justify-center ${selectedVisibility === 'public' ? 'bg-purple-100 text-purple-700' : 'bg-slate-200/60 text-slate-500'}`}>
-                                        <Globe className="w-4 h-4" />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-black text-slate-800">Pública</p>
-                                        <p className="text-[9px] text-slate-400 mt-0.5">Visível para qualquer visitante do seu perfil</p>
-                                    </div>
-                                </button>
-                                <button
-                                    onClick={() => setSelectedVisibility('subscribers')}
-                                    className={`w-full p-3 rounded-2xl border-2 transition-all flex items-center gap-3 text-left ${
-                                        selectedVisibility === 'subscribers' 
-                                            ? 'border-purple-600 bg-purple-50/20 text-purple-900' 
-                                            : 'border-slate-100 bg-slate-50 text-slate-600 hover:bg-slate-100/50'
-                                    }`}
-                                >
-                                    <div className={`p-1.5 rounded-lg flex items-center justify-center ${selectedVisibility === 'subscribers' ? 'bg-amber-100 text-amber-700' : 'bg-slate-200/60 text-slate-500'}`}>
-                                        <Crown className="w-4 h-4" />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-black text-slate-800">Somente Assinantes</p>
-                                        <p className="text-[9px] text-slate-400 mt-0.5">Apenas assinantes do seu canal</p>
-                                    </div>
-                                </button>
-                            </div>
+                        <div className="flex flex-col gap-2.5">
+                            <button
+                                onClick={() => setSelectedVisibility('public')}
+                                className={`w-full p-3 rounded-2xl border-2 transition-all duration-75 active:scale-95 flex items-center gap-3 text-left ${
+                                    selectedVisibility === 'public' 
+                                        ? 'border-purple-600 bg-purple-50/20 text-purple-900' 
+                                        : 'border-slate-100 bg-slate-50 text-slate-600 hover:bg-slate-100/50'
+                                }`}
+                            >
+                                <div className={`p-1.5 rounded-lg flex items-center justify-center ${selectedVisibility === 'public' ? 'bg-purple-100 text-purple-700' : 'bg-slate-200/60 text-slate-500'}`}>
+                                    <Globe className="w-4 h-4" />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-black text-slate-800">Pública</p>
+                                    <p className="text-[9px] text-slate-400 mt-0.5">Visível para qualquer visitante do seu perfil</p>
+                                </div>
+                            </button>
+                            <button
+                                onClick={() => setSelectedVisibility('subscribers')}
+                                className={`w-full p-3 rounded-2xl border-2 transition-all duration-75 active:scale-95 flex items-center gap-3 text-left ${
+                                    selectedVisibility === 'subscribers' 
+                                        ? 'border-purple-600 bg-purple-50/20 text-purple-900' 
+                                        : 'border-slate-100 bg-slate-50 text-slate-600 hover:bg-slate-100/50'
+                                }`}
+                            >
+                                <div className={`p-1.5 rounded-lg flex items-center justify-center ${selectedVisibility === 'subscribers' ? 'bg-amber-100 text-amber-700' : 'bg-slate-200/60 text-slate-500'}`}>
+                                    <Crown className="w-4 h-4" />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-black text-slate-800">Somente Assinantes</p>
+                                    <p className="text-[9px] text-slate-400 mt-0.5">Apenas assinantes do seu canal</p>
+                                </div>
+                            </button>
+                        </div>
 
-                            <div className="flex gap-2.5 mt-1">
-                                <button
-                                    onClick={() => setVisibilityModal({ open: false })}
-                                    className="flex-1 h-9 rounded-xl border border-gray-250 font-bold text-xs text-gray-600"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={() => confirmGalleryUpload(selectedVisibility)}
-                                    disabled={uploadingGallery}
-                                    className="flex-1 h-9 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center"
-                                >
-                                    {uploadingGallery ? 'Enviando...' : 'Confirmar'}
-                                </button>
-                            </div>
+                        <div className="flex gap-2.5 mt-1">
+                            <button
+                                onClick={() => setVisibilityModal({ open: false })}
+                                className="flex-1 h-9 rounded-xl border border-gray-250 font-bold text-xs text-gray-600 transition-all duration-75 active:scale-95 active:bg-gray-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => confirmGalleryUpload(selectedVisibility)}
+                                disabled={uploadingGallery}
+                                className="flex-1 h-9 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center transition-all duration-75 active:scale-95 active:bg-purple-800"
+                            >
+                                {uploadingGallery ? 'Enviando...' : 'Confirmar'}
+                            </button>
                         </div>
                     </div>
-                )}
+                </div>
+            )}
 
-                {cropperState && cropperState.open && (
-                    <ImageCropper
-                        imageSrc={cropperState.imageSrc}
-                        circular={cropperState.type === 'photo'}
-                        aspectRatio={cropperState.type === 'photo' ? 1 : 2.75}
-                        onCrop={handleCropConfirm}
-                        onCancel={() => setCropperState(null)}
-                    />
-                )}
+            {cropperState && cropperState.open && (
+                <ImageCropper
+                    imageSrc={cropperState.imageSrc}
+                    circular={cropperState.type === 'photo'}
+                    aspectRatio={cropperState.type === 'photo' ? 1 : 2.75}
+                    onCrop={handleCropConfirm}
+                    onCancel={() => setCropperState(null)}
+                />
+            )}
+
+            {/* Modal de Imagem em Tela Cheia */}
+            {selectedItem && (
+                <div className="fixed inset-0 z-50 flex flex-col justify-between bg-black animate-in fade-in duration-200">
+                    {/* Cabeçalho do Modal */}
+                    <div className="h-16 px-5 flex items-center justify-between border-b border-white/10 bg-black/60 backdrop-blur-md z-10 shrink-0">
+                        <button
+                            onClick={() => {
+                                setSelectedItem(null);
+                                setShowItemOptionsMenu(false);
+                            }}
+                            className="w-10 h-10 rounded-full hover:bg-white/10 active:scale-75 flex items-center justify-center text-white transition-all duration-75"
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
+                        <div className="text-center">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                                {selectedItem.galleryType === 'public' ? 'Galeria Pública' : 'Galeria Privada'}
+                            </span>
+                            <span className="text-xs font-bold text-white flex items-center justify-center gap-1">
+                                {selectedItem.galleryType === 'public' ? (
+                                    selectedItem.visibility === 'public' ? (
+                                        <>
+                                            <Globe className="w-3.5 h-3.5 text-slate-300" />
+                                            Pública
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Crown className="w-3.5 h-3.5 text-amber-400" />
+                                            Assinantes
+                                        </>
+                                    )
+                                ) : (
+                                    <>
+                                        <Lock className="w-3.5 h-3.5 text-purple-400" />
+                                        Privada (Assinantes)
+                                    </>
+                                )}
+                            </span>
+                        </div>
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowItemOptionsMenu(!showItemOptionsMenu)}
+                                className="w-10 h-10 rounded-full hover:bg-white/10 active:scale-75 flex items-center justify-center text-white transition-all duration-75"
+                            >
+                                <MoreVertical className="w-6 h-6" />
+                            </button>
+
+                            {/* Dropdown de Opções */}
+                            {showItemOptionsMenu && (
+                                <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white border border-slate-200 shadow-xl py-2 z-20 animate-in fade-in slide-in-from-top-1 duration-150">
+                                    {selectedItem.galleryType === 'public' && (
+                                        <button
+                                            onClick={async () => {
+                                                const newVisibility = selectedItem.visibility === 'public' ? 'subscribers' : 'public';
+                                                try {
+                                                    await updateGalleryItemVisibilityMutation.mutateAsync({
+                                                        itemId: selectedItem._id,
+                                                        visibility: newVisibility,
+                                                    });
+                                                    setSelectedItem({
+                                                        ...selectedItem,
+                                                        visibility: newVisibility,
+                                                    });
+                                                    toast.success(`Visibilidade alterada para ${newVisibility === 'public' ? 'Pública' : 'Assinantes'}`);
+                                                } catch (err: any) {
+                                                    toast.error(err.message || 'Erro ao alterar visibilidade');
+                                                } finally {
+                                                    setShowItemOptionsMenu(false);
+                                                }
+                                            }}
+                                            className="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 active:scale-95 transition-all duration-75 flex items-center gap-2.5"
+                                        >
+                                            {selectedItem.visibility === 'public' ? (
+                                                <>
+                                                    <Crown className="w-4 h-4 text-amber-500" />
+                                                    Mudar para Assinantes
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Globe className="w-4 h-4 text-slate-500" />
+                                                    Mudar para Pública
+                                                </>
+                                            )}
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={async () => {
+                                            if (confirm('Tem certeza que deseja excluir esta foto da sua galeria?')) {
+                                                try {
+                                                    await deleteGalleryMutation.mutateAsync(selectedItem._id);
+                                                    toast.success('Item excluído com sucesso');
+                                                    setSelectedItem(null);
+                                                } catch (err: any) {
+                                                    toast.error(err.message || 'Erro ao excluir item');
+                                                } finally {
+                                                    setShowItemOptionsMenu(false);
+                                                }
+                                            }
+                                        }}
+                                        disabled={deleteGalleryMutation.isPending}
+                                        className="w-full px-4 py-2.5 text-left text-xs font-bold text-red-600 hover:bg-red-50/50 active:bg-red-100/50 active:scale-95 transition-all duration-75 flex items-center gap-2.5"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                        Excluir Foto
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Visualização Central */}
+                    <div className="flex-1 flex items-center justify-center bg-black">
+                        {selectedItem.mediaType === 'video' ? (
+                            <video
+                                src={selectedItem.imageUrl}
+                                controls
+                                autoPlay
+                                className="w-full h-full max-h-[80vh] object-contain bg-black"
+                            />
+                        ) : (
+                            <img
+                                src={selectedItem.imageUrl}
+                                alt="Gallery item in fullscreen"
+                                className="w-full h-full max-h-[80vh] object-contain"
+                            />
+                        )}
+                    </div>
+                    
+                    {/* Rodapé Vazio para Balanço Visual */}
+                    <div className="h-16 bg-black shrink-0" />
+                </div>
+            )}
                 </PullToRefresh>
             </div>
         );
@@ -650,7 +780,7 @@ export default function ProfilePage() {
                     {userData?.isAdmin && (
                         <button
                             onClick={() => router.push('/admin')}
-                            className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center"
+                            className="p-2 hover:bg-white/10 active:bg-white/20 active:scale-75 rounded-full transition-all duration-75 text-white flex items-center justify-center"
                             title="Painel Admin"
                         >
                             <ShieldAlert className="w-5 h-5" />
@@ -658,7 +788,7 @@ export default function ProfilePage() {
                     )}
                     <button
                         onClick={() => router.push('/settings')}
-                        className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center"
+                        className="p-2 hover:bg-white/10 active:bg-white/20 active:scale-75 rounded-full transition-all duration-75 text-white flex items-center justify-center"
                         title="Configurações"
                     >
                         <Settings className="w-5 h-5" />
@@ -672,7 +802,7 @@ export default function ProfilePage() {
                     <button
                         onClick={() => fileInputRef.current?.click()}
                         disabled={uploadPhotoMutation.isPending}
-                        className="relative shrink-0 block p-0.5 bg-purple-50 rounded-full border border-purple-100 shadow-sm transition-all active:scale-95"
+                        className="relative shrink-0 block p-0.5 bg-purple-50 rounded-full border border-purple-100 shadow-sm transition-all duration-75 active:scale-90"
                     >
                         <Avatar uri={localPhotoUrl} size={64} />
                         {/* Ícone indicador de edição de foto */}
@@ -702,7 +832,7 @@ export default function ProfilePage() {
                         </div>
                         <button
                             onClick={openRechargeModal}
-                            className="h-9 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-all active:scale-95 shadow-sm shadow-purple-600/10 flex items-center gap-1.5"
+                            className="h-9 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-all duration-75 active:scale-95 active:bg-purple-800 shadow-sm shadow-purple-600/10 flex items-center gap-1.5"
                         >
                             <Plus className="w-3.5 h-3.5" />
                             Recarregar

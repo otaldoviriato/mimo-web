@@ -450,6 +450,29 @@ export function useDeleteFromGallery() {
     });
 }
 
+export function useUpdateGalleryItemVisibility() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ itemId, visibility }: { itemId: string; visibility: 'public' | 'subscribers' }) => {
+            const response = await fetch('/api/users/me/gallery', {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ itemId, visibility }),
+            });
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Erro ao atualizar visibilidade');
+            }
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['gallery', 'me'] });
+        },
+    });
+}
+
 export function useSubscribe() {
     const queryClient = useQueryClient();
     return useMutation({

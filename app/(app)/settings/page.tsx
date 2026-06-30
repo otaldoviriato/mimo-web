@@ -57,11 +57,14 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const [bio, setBio] = useState('');
     const [chargePerCharSubscribers, setChargePerCharSubscribers] = useState('');
     const [chargePerCharNonSubscribers, setChargePerCharNonSubscribers] = useState('');
-    const [hideFromExplore, setHideFromExplore] = useState(false);
+    const [showInExplore, setShowInExplore] = useState(true);
 
     const [loading, setLoading] = useState(false);
     const [saveError, setSaveError] = useState('');
     const [saveSuccess, setSaveSuccess] = useState(false);
+    const [loadingSubscription, setLoadingSubscription] = useState(false);
+    const [saveSubscriptionError, setSaveSubscriptionError] = useState('');
+    const [saveSubscriptionSuccess, setSaveSubscriptionSuccess] = useState(false);
     const [isAboutExpanded, setIsAboutExpanded] = useState(false);
     const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(false);
     const [savingEmailPref, setSavingEmailPref] = useState(false);
@@ -92,7 +95,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             setEmailNotificationsEnabled(userData.emailNotificationsEnabled ?? false);
             setChargePerCharSubscribers(userData.chargePerCharSubscribers?.toString() ?? '0.002');
             setChargePerCharNonSubscribers(userData.chargePerCharNonSubscribers?.toString() ?? '0.005');
-            setHideFromExplore(userData.hideFromExplore ?? false);
+            setShowInExplore(userData.hideFromExplore === true ? false : true);
             hasPopulated.current = true;
         }
     }, [userData]);
@@ -146,7 +149,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                 updateData.bio = bio;
                 updateData.chargePerCharNonSubscribers = charPrice;
                 updateData.chargePerCharSubscribers = Number(chargePerCharSubscribers) || 0;
-                updateData.hideFromExplore = hideFromExplore;
+                updateData.hideFromExplore = !showInExplore;
             } else {
                 updateData.bio = '';
                 updateData.hideFromExplore = false;
@@ -163,6 +166,66 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             }
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleSaveSubscription = async () => {
+        setLoadingSubscription(true);
+        setSaveSubscriptionError('');
+        setSaveSubscriptionSuccess(false);
+
+        try {
+            const limitMax = userData?.maxSubscriptionPrice ?? 200;
+            const limitMin = userData?.minSubscriptionPrice ?? 10;
+            const price = Number(subscriptionPrice) || 0;
+
+            if (isSubscriptionEnabled) {
+                if (price <= 0) {
+                    setSaveSubscriptionError('O preço da assinatura deve ser maior que zero');
+                    setLoadingSubscription(false);
+                    return;
+                }
+                if (price < limitMin) {
+                    setSaveSubscriptionError(`O preço da assinatura não pode ser menor que o valor mínimo de R$ ${limitMin.toFixed(2)}`);
+                    setLoadingSubscription(false);
+                    return;
+                }
+            }
+
+            if (price > limitMax) {
+                setSaveSubscriptionError(`O preço da assinatura não pode ser maior que R$ ${limitMax.toFixed(2)}`);
+                setLoadingSubscription(false);
+                return;
+            }
+            
+            const limitMaxPrice = userData?.maxPricePerChar ?? 0.2;
+            const charPrice = Number(chargePerCharNonSubscribers) || 0;
+            if (charPrice > limitMaxPrice) {
+                setSaveSubscriptionError(`O preço máximo por caractere é R$ ${limitMaxPrice.toFixed(2)}`);
+                setLoadingSubscription(false);
+                return;
+            }
+
+            const updateData: any = {
+                name,
+                username,
+                taxId: taxId.replace(/\D/g, ''),
+                phone: phone.replace(/\D/g, ''),
+                isSubscriptionEnabled,
+                subscriptionPrice: price,
+                bio,
+                chargePerCharNonSubscribers: charPrice,
+                chargePerCharSubscribers: Number(chargePerCharSubscribers) || 0,
+                hideFromExplore: !showInExplore
+            };
+
+            await updateProfileMutation.mutateAsync(updateData);
+            setSaveSubscriptionSuccess(true);
+            setTimeout(() => setSaveSubscriptionSuccess(false), 3000);
+        } catch (error: any) {
+            setSaveSubscriptionError('Erro ao salvar alterações de assinatura');
+        } finally {
+            setLoadingSubscription(false);
         }
     };
 
@@ -262,7 +325,18 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
         name !== initialName ||
         username !== initialUsername ||
         phone !== initialPhone ||
-        (profileIsProfessional && (bio !== initialBio || hideFromExplore !== (userData?.hideFromExplore ?? false)));
+        (profileIsProfessional && (bio !== initialBio || showInExplore !== (userData?.hideFromExplore === true ? false : true)));
+
+    const initialSubscriptionPrice = userData?.subscriptionPrice?.toString() ?? '0';
+    const initialIsSubscriptionEnabled = userData?.isSubscriptionEnabled ?? false;
+    const initialChargePerCharNonSubscribers = userData?.chargePerCharNonSubscribers?.toString() ?? '0.005';
+
+    const hasSubscriptionChanges =
+        profileIsProfessional && (
+            subscriptionPrice !== initialSubscriptionPrice ||
+            isSubscriptionEnabled !== initialIsSubscriptionEnabled ||
+            chargePerCharNonSubscribers !== initialChargePerCharNonSubscribers
+        );
 
     const layoutClass = isSubPage
         ? 'w-full h-full'
@@ -547,6 +621,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                                 <button
                                                     type="button"
                                                     onClick={() => handleAdjustPrice(0.001)}
+                                                    disabled={Number(chargePerCharNonSubscribers) >= (userData?.maxPricePerChar ?? 0.2)}
                                                     className="w-7 h-7 rounded-lg bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-600 hover:bg-gray-50 active:scale-95 transition-all disabled:opacity-50"
                                                     title="Aumentar preço"
                                                 >
@@ -556,6 +631,12 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                                 </button>
                                             </div>
                                         </div>
+
+                                        {Number(chargePerCharNonSubscribers) >= (userData?.maxPricePerChar ?? 0.2) && (
+                                            <p className="text-[9px] text-amber-600 font-medium -mt-1 px-1">
+                                                Você atingiu o preço máximo permitido de R$ {(userData?.maxPricePerChar ?? 0.2).toFixed(2)} por caractere.
+                                            </p>
+                                        )}
 
                                         {/* Detalhes de cálculo dinâmico */}
                                         <div className="grid grid-cols-2 gap-2 bg-purple-50/40 rounded-xl p-2.5 border border-purple-50 text-[10px] mt-0.5">
@@ -582,6 +663,34 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                                 </span>
                                             </div>
                                         </div>
+                                    </div>
+
+                                    {/* Botão Salvar (e alertas) */}
+                                    <div className="px-4 pb-5 pt-3.5 flex flex-col gap-2 bg-white">
+                                        {saveSubscriptionError && (
+                                            <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-100 rounded-xl">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                                <p className="text-xs text-red-600 font-medium">{saveSubscriptionError}</p>
+                                            </div>
+                                        )}
+                                        {saveSubscriptionSuccess && (
+                                            <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-100 rounded-xl">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-600 shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
+                                                <p className="text-xs text-green-700 font-medium">Assinatura atualizada com sucesso</p>
+                                            </div>
+                                        )}
+                                        <button
+                                            onClick={handleSaveSubscription}
+                                            disabled={loadingSubscription || !hasSubscriptionChanges}
+                                            className="w-full h-10 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors active:scale-[0.98] flex items-center justify-center gap-2"
+                                        >
+                                            {loadingSubscription ? (
+                                                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                            ) : (
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                            )}
+                                            Salvar Alterações
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -645,44 +754,150 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                         </div>
 
                         {/* ── SEÇÃO: PRIVACIDADE (Profissionais) ── */}
-                        {profileIsProfessional && (
-                            <div>
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Privacidade</p>
-                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                                    <div className="px-4 py-3.5 flex items-center justify-between">
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <div className="w-8 h-8 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0">
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-500">
-                                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                                                    <line x1="1" y1="1" x2="23" y2="23"/>
-                                                </svg>
+                        {profileIsProfessional && (() => {
+                            const publicPhotosCount = galleryData?.publicItems?.length ?? galleryData?.items?.length ?? 0;
+                            const hasPhoto = !!userData?.photoUrl && userData.photoUrl.trim() !== '';
+                            const hasCover = !!userData?.coverUrl && userData.coverUrl.trim() !== '';
+                            const hasBio = !!userData?.bio && userData.bio.trim().length >= 10;
+                            const hasPhotos = publicPhotosCount >= 3;
+                            const isQualified = hasPhoto && hasCover && hasBio && hasPhotos;
+
+                            const activeShowInExplore = isQualified ? showInExplore : false;
+
+                            return (
+                                <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Privacidade</p>
+                                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col divide-y divide-gray-50">
+                                        
+                                        {/* Toggle Exibir no Explorar */}
+                                        <div className="px-4 py-3.5 flex items-center justify-between">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="w-8 h-8 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-500">
+                                                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                                                        <line x1="1" y1="1" x2="23" y2="23"/>
+                                                    </svg>
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-medium text-gray-800">Exibir no explorar</p>
+                                                    <p className="text-[10px] text-gray-400 leading-snug">
+                                                        Exibir seu perfil nas sugestões e buscas do aplicativo
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div className="min-w-0">
-                                                <p className="text-sm font-medium text-gray-800">Ocultar do explorar</p>
-                                                <p className="text-[10px] text-gray-400 leading-snug">
-                                                    Não exibir seu perfil na aba Explorar (sugestões de criadores)
-                                                </p>
-                                            </div>
+                                            <button
+                                                id="show-in-explore-toggle"
+                                                type="button"
+                                                onClick={() => {
+                                                    if (isQualified) {
+                                                        setShowInExplore(!showInExplore);
+                                                    }
+                                                }}
+                                                disabled={!isQualified}
+                                                className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${
+                                                    activeShowInExplore ? 'bg-purple-600' : 'bg-gray-200 opacity-60 cursor-not-allowed'
+                                                }`}
+                                                aria-label="Exibir perfil no explorar"
+                                                role="switch"
+                                                aria-checked={activeShowInExplore}
+                                            >
+                                                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                                                    activeShowInExplore ? 'translate-x-5' : 'translate-x-0'
+                                                }`} />
+                                            </button>
                                         </div>
-                                        <button
-                                            id="hide-from-explore-toggle"
-                                            type="button"
-                                            onClick={() => setHideFromExplore(!hideFromExplore)}
-                                            className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${
-                                                hideFromExplore ? 'bg-purple-600' : 'bg-gray-200'
-                                            }`}
-                                            aria-label="Ocultar perfil do explorar"
-                                            role="switch"
-                                            aria-checked={hideFromExplore}
-                                        >
-                                            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${
-                                                hideFromExplore ? 'translate-x-5' : 'translate-x-0'
-                                            }`} />
-                                        </button>
+
+                                        {/* Painel de Requisitos e Qualificação */}
+                                        <div className="px-4 py-4 bg-slate-50/50 flex flex-col gap-3">
+                                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                                Requisitos para exibição no explorar:
+                                            </p>
+
+                                            <div className="grid grid-cols-1 gap-2.5">
+                                                {/* Requisito: Foto Perfil */}
+                                                <div className="flex items-center gap-2 text-xs font-semibold text-gray-750">
+                                                    {hasPhoto ? (
+                                                        <div className="p-0.5 rounded bg-emerald-100 text-emerald-700 shrink-0">
+                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="p-0.5 rounded bg-red-100 text-red-700 shrink-0">
+                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                                        </div>
+                                                    )}
+                                                    <span className={hasPhoto ? 'text-gray-700' : 'text-gray-400'}>Foto de perfil preenchida</span>
+                                                </div>
+
+                                                {/* Requisito: Foto Capa */}
+                                                <div className="flex items-center gap-2 text-xs font-semibold text-gray-750">
+                                                    {hasCover ? (
+                                                        <div className="p-0.5 rounded bg-emerald-100 text-emerald-700 shrink-0">
+                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="p-0.5 rounded bg-red-100 text-red-700 shrink-0">
+                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                                        </div>
+                                                    )}
+                                                    <span className={hasCover ? 'text-gray-700' : 'text-gray-400'}>Foto de capa preenchida</span>
+                                                </div>
+
+                                                {/* Requisito: Bio */}
+                                                <div className="flex items-center gap-2 text-xs font-semibold text-gray-750">
+                                                    {hasBio ? (
+                                                        <div className="p-0.5 rounded bg-emerald-100 text-emerald-700 shrink-0">
+                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="p-0.5 rounded bg-red-100 text-red-700 shrink-0">
+                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                                        </div>
+                                                    )}
+                                                    <span className={hasBio ? 'text-gray-700' : 'text-gray-400'}>Biografia preenchida (min 10 caracteres)</span>
+                                                </div>
+
+                                                {/* Requisito: Galeria */}
+                                                <div className="flex items-center gap-2 text-xs font-semibold text-gray-750">
+                                                    {hasPhotos ? (
+                                                        <div className="p-0.5 rounded bg-emerald-100 text-emerald-700 shrink-0">
+                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="p-0.5 rounded bg-red-100 text-red-700 shrink-0">
+                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                                        </div>
+                                                    )}
+                                                    <span className={hasPhotos ? 'text-gray-700' : 'text-gray-400'}>
+                                                        Mínimo de 3 fotos públicas na galeria ({publicPhotosCount}/3)
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Mensagem Informativa de Qualificação */}
+                                            {isQualified ? (
+                                                <div className="flex items-start gap-1.5 mt-2 bg-emerald-100/30 border border-emerald-100 rounded-xl p-2.5">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-emerald-600 shrink-0 mt-0.5">
+                                                        <polyline points="20 6 9 17 4 12"/>
+                                                    </svg>
+                                                    <p className="text-[10px] text-emerald-700 font-bold leading-normal">
+                                                        Seu perfil está qualificado! Você aparecerá nos destaques do Explorar quando a exibição estiver ativa.
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-start gap-1.5 mt-2 bg-amber-50 border border-amber-100 rounded-xl p-2.5">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-amber-500 shrink-0 mt-0.5">
+                                                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                                                    </svg>
+                                                    <p className="text-[10px] text-amber-700 font-bold leading-normal">
+                                                        Seu perfil está oculto do explorar porque ainda não atende aos requisitos mínimos descritos acima.
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        )}
+                            );
+                        })()}
 
 
 

@@ -130,3 +130,44 @@ export async function DELETE(request: NextRequest) {
     }
 }
 
+export async function PATCH(request: NextRequest) {
+    try {
+        const { userId } = await auth();
+
+        if (!userId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const body = await request.json();
+        const { itemId, visibility } = body;
+
+        if (!itemId || !visibility) {
+            return NextResponse.json({ error: 'ID do item e visibilidade são obrigatórios' }, { status: 400 });
+        }
+
+        if (visibility !== 'public' && visibility !== 'subscribers') {
+            return NextResponse.json({ error: 'Visibilidade inválida' }, { status: 400 });
+        }
+
+        await connectToDatabase();
+
+        const galleryItem = await GalleryItem.findOne({ _id: itemId, ownerId: userId });
+
+        if (!galleryItem) {
+            return NextResponse.json({ error: 'Item não encontrado ou você não tem permissão' }, { status: 404 });
+        }
+
+        if (galleryItem.galleryType === 'private' && visibility !== 'subscribers') {
+            return NextResponse.json({ error: 'Itens da galeria privada devem ser sempre exclusivos para assinantes' }, { status: 400 });
+        }
+
+        galleryItem.visibility = visibility;
+        await galleryItem.save();
+
+        return NextResponse.json({ success: true, item: galleryItem });
+    } catch (error: any) {
+        console.error('Error updating gallery item visibility:', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
+}
+
