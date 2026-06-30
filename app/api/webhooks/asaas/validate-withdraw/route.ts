@@ -58,7 +58,8 @@ export async function POST(request: NextRequest) {
         }
 
         // Validar se o valor confere (no banco está em centavos, no Asaas em Reais)
-        const dbValueInReais = withdraw.amount / 100;
+        // Usamos netAmount (líquido) se estiver disponível para descontar a taxa, com fallback para amount (bruto)
+        const dbValueInReais = (withdraw.netAmount ?? withdraw.amount) / 100;
         // Permite uma margem pequena de erro de arredondamento por segurança
         if (Math.abs(dbValueInReais - valueInReais) > 0.01) {
             console.error(`[ASAAS_VALIDATE_WITHDRAW] Valores divergentes. Banco: R$ ${dbValueInReais}, Asaas: R$ ${valueInReais}`);
