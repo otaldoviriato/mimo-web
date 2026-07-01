@@ -367,7 +367,7 @@ export default function OnboardingPage() {
                 if (data.debugMessage) {
                     console.warn('[Identity verification] Detalhe técnico:', data.debugMessage);
                 }
-                const actionableErrorTypes = ['identity_mismatch', 'cpf_status'];
+                const actionableErrorTypes = ['identity_mismatch', 'cpf_status', 'cpf_already_registered'];
                 if (actionableErrorTypes.includes(data.errorType)) {
                     setIdStatus('needs_correction');
                     setIdStatusMsg(data.error || 'Confira o CPF e a data de nascimento e tente novamente.');

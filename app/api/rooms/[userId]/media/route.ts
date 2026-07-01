@@ -35,14 +35,25 @@ export async function GET(
 
         await connectToDatabase();
 
-        // Buscar mensagens com mídia da sala que não foram deletadas e não estão bloqueadas
+        // Buscar mensagens com mídia da sala que não foram deletadas, não estão bloqueadas e não expiraram
+        const now = new Date();
         const filter: any = {
             roomId,
             deletedFor: { $nin: [userId] },
             isLockedImage: { $ne: true },
-            $or: [
-                { originalImageUrl: { $ne: null, $exists: true } },
-                { isVideo: true, videoUrl: { $ne: null, $exists: true } }
+            $and: [
+                {
+                    $or: [
+                        { originalImageUrl: { $ne: null, $exists: true } },
+                        { isVideo: true, videoUrl: { $ne: null, $exists: true } }
+                    ]
+                },
+                {
+                    $or: [
+                        { isTemporary: { $ne: true } },
+                        { isTemporary: true, expiresAt: { $gt: now } }
+                    ]
+                }
             ]
         };
 

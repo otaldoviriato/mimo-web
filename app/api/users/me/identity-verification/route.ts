@@ -32,7 +32,8 @@ const INFO_SIMPLES_CPF_URL = 'https://api.infosimples.com/api/v2/consultas/recei
 const CPF_BIRTHDATE_MISMATCH_MESSAGE = 'Os dados informados não conferem com o cadastro da Receita Federal. Confira o CPF e a data de nascimento e tente novamente.';
 const TECHNICAL_VALIDATION_ERROR_MESSAGE = 'Identificamos um problema ao validar seus dados. Tente novamente mais tarde.';
 const CPF_STATUS_ERROR_MESSAGE = 'Este CPF não aparece como regular na Receita Federal. Confira a situação cadastral antes de continuar.';
-type IdentityVerificationErrorType = 'identity_mismatch' | 'cpf_status' | 'technical';
+const CPF_ALREADY_REGISTERED_MESSAGE = 'Esse CPF já está vinculado a uma conta no Mimo. Confira os dados ou acesse a conta cadastrada com esse CPF.';
+type IdentityVerificationErrorType = 'identity_mismatch' | 'cpf_status' | 'cpf_already_registered' | 'technical';
 
 // Função matemática para validar dígitos do CPF
 function isValidCPF(cpf: string): boolean {
@@ -74,6 +75,10 @@ function onlyDigits(value: string | null | undefined): string {
 function formatDateToBrazilian(date: string): string {
     const [year, month, day] = date.split('-');
     return `${day}/${month}/${year}`;
+}
+
+function formatCpf(cpf: string): string {
+    return `${cpf.slice(0, 3)}.${cpf.slice(3, 6)}.${cpf.slice(6, 9)}-${cpf.slice(9, 11)}`;
 }
 
 function shouldUseInfoSimplesMock(): boolean {
@@ -236,6 +241,21 @@ export async function POST(request: NextRequest) {
         const user = await User.findOne({ clerkId: userId });
         if (!user) {
             return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
+        }
+
+        const existingCpfUser = await User.findOne({
+            clerkId: { $ne: userId },
+            taxId: { $in: [cpfClean, formatCpf(cpfClean)] }
+        }).select('_id');
+
+        if (existingCpfUser) {
+            return NextResponse.json(
+                {
+                    error: CPF_ALREADY_REGISTERED_MESSAGE,
+                    errorType: 'cpf_already_registered'
+                },
+                { status: 400 }
+            );
         }
 
         let infoSimplesRecord: InfoSimplesCpfRecord;

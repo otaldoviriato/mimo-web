@@ -54,8 +54,23 @@ export async function GET(
             .limit(limit)
             .lean();
 
+        const now = new Date();
+        const processedMessages = messages.map((m: any) => {
+            if (m.isTemporary && m.expiresAt && new Date(m.expiresAt) < now) {
+                return {
+                    ...m,
+                    originalImageUrl: undefined,
+                    blurredImageUrl: undefined,
+                    videoUrl: undefined,
+                    thumbnailUrl: undefined,
+                    isExpired: true
+                };
+            }
+            return m;
+        });
+
         // Retorna em ordem cronológica (mais antiga primeiro)
-        return NextResponse.json(messages.reverse());
+        return NextResponse.json(processedMessages.reverse());
 
     } catch (error) {
         console.error('Error fetching messages:', error);

@@ -26,6 +26,12 @@ export async function POST(request: NextRequest) {
         const isVideo = formData.get('isVideo') === 'true';
         const preUploadedVideoUrl = formData.get('videoUrl') as string | null;
         const tempId = formData.get('tempId') as string | null;
+        const isTemporary = formData.get('isTemporary') === 'true';
+        const expiryMinutesStr = formData.get('expiryMinutes') as string | null;
+        let expiryMinutes = 0;
+        if (isTemporary && expiryMinutesStr) {
+            expiryMinutes = parseInt(expiryMinutesStr, 10);
+        }
 
         if ((!file && !preUploadedVideoUrl) || !roomId || !receiverId || !priceStr) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -156,6 +162,8 @@ export async function POST(request: NextRequest) {
                 videoUrl,
                 thumbnailUrl,
                 tempId,
+                isTemporary,
+                expiryMinutes,
             })
         });
 

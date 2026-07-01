@@ -20,6 +20,8 @@ export interface IMessage extends Document {
     thumbnailUrl?: string;
     isGift?: boolean;
     isSystem?: boolean;
+    isTemporary?: boolean;
+    expiresAt?: Date;
     deletedFor?: string[];
     replyToId?: string | null;
     replyToContent?: string | null;
@@ -106,6 +108,14 @@ const MessageSchema = new Schema<IMessage>({
     isSystem: {
         type: Boolean,
         default: false,
+    },
+    isTemporary: {
+        type: Boolean,
+        default: false,
+    },
+    expiresAt: {
+        type: Date,
+        default: null,
     },
     deletedFor: {
         type: [String],
