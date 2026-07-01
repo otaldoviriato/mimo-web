@@ -5,7 +5,7 @@
   "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#7A1FA2",
+  "theme_color": "#ffffff",
   "id": "com.mimochat.app",
   "icons": [
     {
