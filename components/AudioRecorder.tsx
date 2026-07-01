@@ -37,9 +37,9 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
     const isRecordingInitiatedRef = useRef(false);
     const isTouchActiveRef = useRef(false);
 
-    // Limiares de arrasto (pixels)
-    const CANCEL_THRESHOLD = -80; // arrastar para esquerda
-    const LOCK_THRESHOLD = -70;   // arrastar para cima
+    // Limiares de arrasto (pixels) — distância para acionar cancelar/travar
+    const CANCEL_THRESHOLD = -100; // arrastar para esquerda
+    const LOCK_THRESHOLD = -80;    // arrastar para cima
 
     // Limpeza de timers e áudios
     const cleanup = () => {
@@ -272,7 +272,7 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
         const deltaX = touch.clientX - touchStartCoords.current.x;
         const deltaY = touch.clientY - touchStartCoords.current.y;
 
-        // Limita movimento a valores negativos (esquerda / cima)
+        // Limita o movimento: esquerda (negativo) e cima (negativo)
         const clampedX = Math.min(0, deltaX);
         const clampedY = Math.min(0, deltaY);
 
@@ -341,8 +341,31 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
+    // Progresso do gesto para cima (0 = início, 1 = pronto para travar)
+    const lockProgress = status === 'recording'
+        ? Math.min(1, Math.abs(swipeOffset.y) / Math.abs(LOCK_THRESHOLD))
+        : 0;
+
+    // Progresso do gesto para esquerda (0 = início, 1 = pronto para cancelar)
+    const cancelProgress = status === 'recording'
+        ? Math.min(1, Math.abs(swipeOffset.x) / Math.abs(CANCEL_THRESHOLD))
+        : 0;
+
+    // O botão vai se mover junto com o dedo — translação 1:1 limitada pelos thresholds
+    const btnTranslateX = status === 'recording' ? Math.max(CANCEL_THRESHOLD, swipeOffset.x) : 0;
+    const btnTranslateY = status === 'recording' ? Math.max(LOCK_THRESHOLD, swipeOffset.y) : 0;
+
+    // A bolha do cadeado flutua ACIMA do botão, também acompanhando o eixo Y
+    // Começa 60px acima do botão e se move com ele
+    const lockBubbleY = status === 'recording' ? btnTranslateY : 0;
+
     return (
-        <div className={`flex items-center gap-3 ${status !== 'idle' ? 'flex-1 w-full' : ''}`}>
+        <div
+            className={`flex items-center gap-3 ${status !== 'idle' ? 'flex-1 w-full' : ''}`}
+            // Captura o movimento global do mouse enquanto o botão estiver em uso
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+        >
             {status !== 'idle' && (
                 <div className="flex-1 flex items-center gap-3 bg-slate-50 border border-gray-100 rounded-2xl px-4 py-1.5 min-h-[44px] animate-in fade-in duration-200">
                     
@@ -380,39 +403,96 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
                         />
                     </div>
 
-                    {/* Texto Deslize para Cancelar (se apenas gravando) */}
+                    {/* Dica de cancelar: se mover para esquerda */}
                     {status === 'recording' && (
-                        <div className="flex items-center gap-2 shrink-0 select-none pointer-events-none text-[11px] text-gray-450 font-medium">
-                            <div 
-                                className="flex items-center gap-1 transition-transform"
-                                style={{
-                                    transform: `translateX(${swipeOffset.x * 0.4}px)`,
-                                }}
-                            >
-                                <span>⟨ Deslize para cancelar</span>
-                            </div>
+                        <div
+                            className="flex items-center gap-1 shrink-0 select-none pointer-events-none transition-all"
+                            style={{
+                                // Desvanece conforme o usuário vai para esquerda
+                                opacity: cancelProgress > 0.1 ? Math.max(0, 1 - cancelProgress * 2) + cancelProgress : 1,
+                            }}
+                        >
+                            {cancelProgress > 0.15 ? (
+                                /* Mostra seta vermelha quando está indo para esquerda */
+                                <span className="text-[11px] font-bold text-red-500 transition-all">
+                                    ← Solte para cancelar
+                                </span>
+                            ) : (
+                                <span className="text-[11px] text-gray-400 font-medium">
+                                    ⟨ Deslize para cancelar
+                                </span>
+                            )}
                         </div>
                     )}
                 </div>
             )}
 
-            {/* O Botão do Microfone/Enviar flutuante à direita */}
-            <div className="relative shrink-0">
-                {/* Cadeado flutuante (se gravando por toque) */}
+            {/* Wrapper relativo para o botão e o cadeado flutuante */}
+            <div
+                className="relative shrink-0"
+                style={{ touchAction: 'none' }}
+            >
+                {/* ===== CADEADO FLUTUANTE (acompanha o dedo para cima) ===== */}
                 {status === 'recording' && (
-                    <div 
-                        className="absolute bottom-16 left-1/2 -translate-x-1/2 bg-white p-2 rounded-full border border-slate-100 shadow-md flex items-center justify-center animate-bounce text-purple-600 z-50"
+                    <div
+                        className="absolute left-1/2 pointer-events-none z-50"
                         style={{
-                            transform: `translateY(${Math.max(-20, swipeOffset.y * 0.3)}px)`,
+                            // Posicionado acima do botão (bottom: 100% + gap)
+                            bottom: 'calc(100% + 10px)',
+                            transform: `translateX(-50%) translateY(${lockBubbleY}px)`,
+                            transition: 'transform 0.05s linear',
                         }}
                     >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                        </svg>
+                        <div
+                            className="flex flex-col items-center gap-1"
+                            style={{
+                                // Opacidade aumenta conforme sobe
+                                opacity: lockProgress > 0 ? 0.4 + lockProgress * 0.6 : 0.5,
+                            }}
+                        >
+                            {/* Linha pontilhada guia para cima */}
+                            {lockProgress > 0.05 && (
+                                <div
+                                    className="w-px bg-gradient-to-t from-purple-400 to-transparent"
+                                    style={{ height: `${Math.min(40, lockProgress * 50)}px` }}
+                                />
+                            )}
+
+                            {/* Bolha do cadeado */}
+                            <div
+                                className="flex items-center justify-center rounded-full border shadow-lg transition-all duration-150"
+                                style={{
+                                    width: lockProgress > 0.8 ? '38px' : '32px',
+                                    height: lockProgress > 0.8 ? '38px' : '32px',
+                                    background: lockProgress > 0.8
+                                        ? 'linear-gradient(135deg, #7c3aed, #9333ea)'
+                                        : 'white',
+                                    borderColor: lockProgress > 0.8 ? '#7c3aed' : '#e2e8f0',
+                                    color: lockProgress > 0.8 ? 'white' : '#9333ea',
+                                    boxShadow: lockProgress > 0.8
+                                        ? '0 4px 12px rgba(124, 58, 237, 0.5)'
+                                        : '0 2px 8px rgba(0,0,0,0.1)',
+                                }}
+                            >
+                                {lockProgress > 0.8 ? (
+                                    /* Cadeado FECHADO (pronto para travar) */
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                    </svg>
+                                ) : (
+                                    /* Cadeado ABERTO (ainda arrastando) */
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                        <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                                    </svg>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 )}
 
+                {/* ===== BOTÃO DO MICROFONE / ENVIAR ===== */}
                 {status === 'locked' ? (
                     /* Botão de Enviar (se travado) */
                     <button
@@ -436,14 +516,24 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
                         onMouseUp={handleMouseUp}
                         onMouseLeave={handleMouseLeave}
                         disabled={!connected}
-                        className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shrink-0 ${
+                        className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${
                             status === 'recording'
-                                ? 'bg-red-500 text-white scale-125 shadow-lg animate-pulse'
+                                ? 'bg-red-500 text-white shadow-lg shadow-red-500/40'
                                 : 'bg-purple-600 text-white hover:bg-purple-700 active:scale-90 shadow-sm'
                         } disabled:opacity-50`}
                         style={{
-                            transform: status === 'recording' ? `translate(${swipeOffset.x * 0.1}px, ${swipeOffset.y * 0.1}px) scale(1.2)` : '',
-                            touchAction: 'none'
+                            // O botão acompanha o dedo 1:1 quando gravando
+                            transform: status === 'recording'
+                                ? `translate(${btnTranslateX}px, ${btnTranslateY}px) scale(${1.15 + lockProgress * 0.05})`
+                                : 'scale(1)',
+                            transition: status === 'recording' ? 'transform 0.05s linear, box-shadow 0.2s' : 'transform 0.2s, box-shadow 0.2s',
+                            touchAction: 'none',
+                            // Destaca em vermelho mais forte quando vai cancelar
+                            boxShadow: cancelProgress > 0.3
+                                ? `0 4px 16px rgba(239, 68, 68, ${0.3 + cancelProgress * 0.5})`
+                                : lockProgress > 0.3
+                                ? `0 4px 16px rgba(124, 58, 237, ${0.3 + lockProgress * 0.5})`
+                                : '0 4px 12px rgba(239, 68, 68, 0.4)',
                         }}
                         title="Segure para gravar áudio"
                     >
