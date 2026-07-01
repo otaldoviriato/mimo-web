@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     User, Crown, Check, CheckCircle2, ShieldCheck, CreditCard, Calendar,
-    Camera, ChevronLeft, UserCheck, Loader2, X, Plus
+    Camera, ChevronLeft, UserCheck, Loader2, X, Plus, AlertCircle
 } from 'lucide-react';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useMyProfile } from '@/hooks/useQueries';
@@ -118,7 +118,7 @@ export default function OnboardingPage() {
     // ── Estado do step "identity" ──
     const [cpf,         setCpf]         = useState('');
     const [birth,       setBirth]       = useState('');
-    const [idStatus,    setIdStatus]    = useState<'idle' | 'checking' | 'verified' | 'error'>('idle');
+    const [idStatus,    setIdStatus]    = useState<'idle' | 'checking' | 'verified' | 'needs_correction' | 'error'>('idle');
     const [idStatusMsg, setIdStatusMsg] = useState('');
     const idTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -366,6 +366,12 @@ export default function OnboardingPage() {
             if (!res.ok) {
                 if (data.debugMessage) {
                     console.warn('[Identity verification] Detalhe técnico:', data.debugMessage);
+                }
+                const actionableErrorTypes = ['identity_mismatch', 'cpf_status'];
+                if (actionableErrorTypes.includes(data.errorType)) {
+                    setIdStatus('needs_correction');
+                    setIdStatusMsg(data.error || 'Confira o CPF e a data de nascimento e tente novamente.');
+                    return;
                 }
                 throw new Error(data.error || 'Identificamos um problema ao validar seus dados. Tente novamente mais tarde.');
             }
@@ -620,6 +626,7 @@ export default function OnboardingPage() {
     const renderIdentity = () => {
         const isChecking  = idStatus === 'checking';
         const isVerified  = idStatus === 'verified';
+        const needsCorrection = idStatus === 'needs_correction';
 
         return (
             <div className="flex flex-col h-full bg-slate-50">
@@ -672,7 +679,11 @@ export default function OnboardingPage() {
                                     maxLength={14}
                                     inputMode="numeric"
                                     disabled={isChecking}
-                                    className="w-full pl-10 pr-4 py-3.5 bg-white border border-gray-200 focus:border-purple-500 focus:bg-white text-gray-900 rounded-2xl text-sm font-semibold transition-all outline-none disabled:opacity-50 shadow-sm"
+                                    className={`w-full pl-10 pr-4 py-3.5 border text-gray-900 rounded-2xl text-sm font-semibold transition-all outline-none disabled:opacity-50 shadow-sm ${
+                                        needsCorrection
+                                            ? 'bg-amber-50/40 border-amber-300 focus:border-amber-500'
+                                            : 'bg-white border-gray-200 focus:border-purple-500 focus:bg-white'
+                                    }`}
                                 />
                             </div>
                         </div>
@@ -702,7 +713,11 @@ export default function OnboardingPage() {
                                     maxLength={10}
                                     inputMode="numeric"
                                     disabled={isChecking}
-                                    className="w-full pl-10 pr-4 py-3.5 bg-white border border-gray-200 focus:border-purple-500 focus:bg-white text-gray-900 rounded-2xl text-sm font-semibold transition-all outline-none disabled:opacity-50 shadow-sm"
+                                    className={`w-full pl-10 pr-4 py-3.5 border text-gray-900 rounded-2xl text-sm font-semibold transition-all outline-none disabled:opacity-50 shadow-sm ${
+                                        needsCorrection
+                                            ? 'bg-amber-50/40 border-amber-300 focus:border-amber-500'
+                                            : 'bg-white border-gray-200 focus:border-purple-500 focus:bg-white'
+                                    }`}
                                 />
                             </div>
                         </div>
@@ -718,6 +733,12 @@ export default function OnboardingPage() {
                             <div className="flex items-center gap-2.5 px-1">
                                 <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
                                 <p className="text-[12px] font-semibold text-emerald-600">{idStatusMsg}</p>
+                            </div>
+                        )}
+                        {idStatus === 'needs_correction' && (
+                            <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+                                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                <p className="text-[11px] font-semibold leading-relaxed text-amber-800">{idStatusMsg}</p>
                             </div>
                         )}
                         {idStatus === 'error' && (
