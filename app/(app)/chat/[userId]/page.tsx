@@ -2400,8 +2400,8 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                             />
                                         )}
                                         <div
-                                            className={`reply-swipe-balloon relative z-10 max-w-[75%] ${isLocked || item.originalImageUrl || item.isVideo || isAudio ? 'p-0 bg-transparent shadow-none' : 'px-3 py-1.5'} rounded-2xl ${
-                                            (!isLocked && !item.originalImageUrl && !item.isVideo && !isAudio) 
+                                            className={`reply-swipe-balloon relative z-10 max-w-[75%] ${isLocked || item.originalImageUrl || item.isVideo ? 'p-0 bg-transparent shadow-none' : (isAudio ? 'p-3' : 'px-3 py-1.5')} rounded-2xl ${
+                                            (!isLocked && !item.originalImageUrl && !item.isVideo) 
                                         ? (isMine ? 'bg-purple-600 text-white rounded-br-sm' : 'bg-white text-gray-900 shadow-sm rounded-bl-sm')
                                                 : (isMine ? 'rounded-br-sm' : 'rounded-bl-sm')
                                             }`}
@@ -2668,7 +2668,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                             <div className="flex items-end justify-between mt-1.5 gap-3 px-2 pb-2">
                                                 <div className="flex-1 min-w-0" />
                                                 <div className="flex items-center gap-1.5 mb-[-1px]">
-                                                    <span className={`text-[10px] font-medium ${isMine ? 'text-gray-500' : 'text-gray-400'}`}>
+                                                    <span className={`text-[10px] font-medium ${isMine ? (isAudio ? 'text-purple-200/70' : 'text-gray-500') : 'text-gray-400'}`}>
                                                         {(() => {
                                                             try {
                                                                 return new Date(item.timestamp).toLocaleTimeString('pt-BR', {
@@ -2823,12 +2823,151 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                         </button>
                     </div>
                 )}
+
+                {/* Painel de Preview e Configuração da Mídia (Acoplado acima do input) */}
+                {selectedFile && userData?.isProfessional && (
+                    <div className="flex gap-4 p-3 bg-slate-50 border border-gray-200/80 rounded-2xl mb-3 animate-in slide-in-from-bottom-1 duration-150 shadow-sm">
+                        {/* Miniatura do Preview */}
+                        <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-gray-200 bg-gray-150 shrink-0 shadow-sm">
+                            {previewUrl ? (
+                                <img src={previewUrl} className={`w-full h-full object-cover transition-all duration-300 ${mediaPriceType === 'paid' ? 'blur-[1px]' : ''}`} />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-gray-50 animate-pulse">
+                                    <div className="w-4 h-4 rounded-full border border-purple-500 border-t-transparent animate-spin" />
+                                </div>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSelectedFile(null);
+                                    setPreviewUrl(null);
+                                    setMediaPriceStr('');
+                                    setMediaPriceFormatted('R$ 0,00');
+                                    setMediaPriceType('free');
+                                    setIsTemporary(false);
+                                    setCustomExpiryValue(5);
+                                    setCustomExpiryUnit('minutes');
+                                    setExpiryOption('permanent');
+                                }}
+                                className="absolute top-0.5 right-0.5 bg-black/60 hover:bg-black/80 text-white rounded-full w-4.5 h-4.5 flex items-center justify-center transition-all select-none scale-90"
+                            >
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18" />
+                                    <line x1="6" y1="6" x2="18" y2="18" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Configurações Inline da Mídia */}
+                        <div className="flex-1 flex flex-col justify-center gap-2">
+                            {/* Preço */}
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-gray-500 flex items-center gap-1 shrink-0 select-none">
+                                    <span className="text-[11px] font-black text-purple-650 bg-purple-100/50 rounded-lg w-5 h-5 flex items-center justify-center border border-purple-100/30">$</span>
+                                    Valor:
+                                </span>
+                                <div className="relative flex items-center bg-white border border-gray-200 rounded-lg px-2 h-6.5 w-24 shadow-sm focus-within:ring-1 focus-within:ring-purple-500/20 focus-within:border-purple-500 transition-all">
+                                    <span className="text-[10px] font-bold text-gray-400 mr-0.5">R$</span>
+                                    <input
+                                        type="text"
+                                        className="bg-transparent w-full text-xs font-bold focus:outline-none text-gray-900"
+                                        placeholder="Grátis"
+                                        value={mediaPriceFormatted.replace('R$', '').trim() === '0,00' ? '' : mediaPriceFormatted.replace('R$', '').trim()}
+                                        onChange={(e) => {
+                                            handlePriceChange(e);
+                                            const val = parseFloat(e.target.value.replace(',', '.')) || 0;
+                                            if (val > 0) {
+                                                setMediaPriceType('paid');
+                                            } else {
+                                                setMediaPriceType('free');
+                                            }
+                                        }}
+                                        onBlur={(e) => {
+                                            if (!e.target.value || e.target.value === '0,00') {
+                                                setMediaPriceType('free');
+                                                setMediaPriceStr('0');
+                                                setMediaPriceFormatted('R$ 0,00');
+                                            }
+                                        }}
+                                    />
+                                </div>
+                                {mediaPriceType === 'paid' && (
+                                    <span className="text-[9.5px] font-extrabold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded-md border border-purple-100/40 animate-in fade-in duration-100">
+                                        Cobrar
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* Duração */}
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-gray-500 flex items-center gap-1 shrink-0 select-none">
+                                    <span className="bg-purple-100/50 text-purple-650 rounded-lg w-5 h-5 flex items-center justify-center border border-purple-100/30">
+                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                            <circle cx="12" cy="12" r="10" />
+                                            <polyline points="12 6 12 12 16 14" />
+                                        </svg>
+                                    </span>
+                                    Tempo:
+                                </span>
+                                <select
+                                    className="bg-white border border-gray-200 rounded-lg px-1.5 h-6.5 text-xs font-bold text-gray-705 focus:outline-none cursor-pointer shadow-sm min-w-[100px]"
+                                    value={expiryOption}
+                                    onChange={(e) => {
+                                        const opt = e.target.value as any;
+                                        setExpiryOption(opt);
+                                        if (opt === 'permanent') {
+                                            setIsTemporary(false);
+                                        } else {
+                                            setIsTemporary(true);
+                                            if (opt === '1min') { setCustomExpiryValue(1); setCustomExpiryUnit('minutes'); }
+                                            else if (opt === '10min') { setCustomExpiryValue(10); setCustomExpiryUnit('minutes'); }
+                                            else if (opt === '1h') { setCustomExpiryValue(1); setCustomExpiryUnit('hours'); }
+                                            else if (opt === '24h') { setCustomExpiryValue(24); setCustomExpiryUnit('hours'); }
+                                            else if (opt === '3d') { setCustomExpiryValue(3); setCustomExpiryUnit('days'); }
+                                            else if (opt === '7d') { setCustomExpiryValue(7); setCustomExpiryUnit('days'); }
+                                        }
+                                    }}
+                                >
+                                    <option value="permanent">Permanente</option>
+                                    <option value="10min">10 min</option>
+                                    <option value="1h">1 hora</option>
+                                    <option value="24h">24 horas</option>
+                                    <option value="3d">3 dias</option>
+                                    <option value="7d">7 dias</option>
+                                    <option value="custom">Outro...</option>
+                                </select>
+
+                                {isTemporary && expiryOption === 'custom' && (
+                                    <div className="flex gap-1 items-center animate-in slide-in-from-left-1 duration-150 shrink-0">
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            className="bg-white border border-gray-200 rounded-lg w-8 h-6.5 text-center text-xs font-bold focus:outline-none text-gray-900 shadow-sm"
+                                            value={customExpiryValue}
+                                            onChange={(e) => setCustomExpiryValue(Math.max(1, parseInt(e.target.value) || 1))}
+                                        />
+                                        <select
+                                            className="bg-white border border-gray-200 rounded-lg px-0.5 h-6.5 text-[10px] font-bold text-gray-700 focus:outline-none cursor-pointer w-13 shadow-sm"
+                                            value={customExpiryUnit}
+                                            onChange={(e) => setCustomExpiryUnit(e.target.value as any)}
+                                        >
+                                            <option value="minutes">Min.</option>
+                                            <option value="hours">Hrs.</option>
+                                            <option value="days">Dias</option>
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <div className="flex items-end gap-3">
                     {audioRecordingStatus === 'idle' && (
                         <div className="relative shrink-0">
                             <button
                                 onClick={() => setAttachMenuVisible(!attachMenuVisible)}
-                                disabled={!connected}
+                                disabled={!connected || !!selectedFile}
                                 className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shrink-0 ${
                                     attachMenuVisible ? 'bg-purple-600 text-white rotate-45' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                                 }`}
@@ -2899,7 +3038,8 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                         <div className="flex-1 flex items-end bg-gray-100 rounded-2xl px-4 py-2 min-h-[44px] max-h-[120px]">
                             <textarea
                                 ref={inputRef}
-                                value={messageText}
+                                value={selectedFile ? "Mídia selecionada para envio..." : messageText}
+                                disabled={!!selectedFile}
                                 onChange={(e) => handleTyping(e.target.value)}
                                 onKeyDown={handleKeyDown}
                                 onFocus={() => setIsInputFocused(true)}
@@ -2907,7 +3047,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                 placeholder="Digite sua mensagem..."
                                 rows={1}
                                 maxLength={500}
-                                className="flex-1 bg-transparent text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none leading-5 py-1"
+                                className="flex-1 bg-transparent text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none leading-5 py-1 disabled:text-gray-400"
                                 style={{ maxHeight: '96px' }}
                                 onInput={(e) => {
                                     const el = e.currentTarget;
@@ -2918,237 +3058,10 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                         </div>
                     )}
                     
-                    {audioRecordingStatus === 'idle' && messageText.trim() ? (
+                    {(audioRecordingStatus === 'idle' && (messageText.trim() || selectedFile)) ? (
                         <button
-                            onClick={handleSend}
-                            disabled={!messageText.trim() || !connected}
-                            className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shrink-0 ${messageText.trim() && connected
-                                ? 'bg-purple-600 hover:bg-purple-700 shadow-sm'
-                                : 'bg-gray-200'
-                                }`}
-                        >
-                            {sending ? (
-                                <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                </svg>
-                            ) : (
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className={messageText.trim() && connected ? 'text-white' : 'text-gray-400'}>
-                                    <path d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                            )}
-                        </button>
-                    ) : (
-                        <AudioRecorder
-                            connected={connected}
-                            onSendAudio={handleSendAudio}
-                            onStatusChange={setAudioRecordingStatus}
-                        />
-                    )}
-                </div>
-            </div>
-
-            {selectedFile && userData?.isProfessional && (
-                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-[2.5rem] p-5 w-full max-w-sm flex flex-col shadow-2xl animate-in zoom-in duration-150">
-                        
-                        {/* Imagem de Preview Central com Overlays */}
-                        <div className="relative w-full aspect-square rounded-[2rem] overflow-hidden mb-5 bg-gray-100 border border-gray-200 shadow-md shrink-0 flex items-center justify-center">
-                            {previewUrl ? (
-                                <div className="relative w-full h-full">
-                                    <img 
-                                        src={previewUrl} 
-                                        className={`w-full h-full object-cover transition-all duration-300 ${mediaPriceType === 'paid' ? 'blur scale-102' : ''}`} 
-                                        alt="Preview" 
-                                    />
-                                    {isVideo && (
-                                        <div className="absolute inset-0 flex items-center justify-center bg-black/25">
-                                            <div className="w-12 h-12 rounded-full bg-white/30 backdrop-blur-md flex items-center justify-center text-white border border-white/40">
-                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                                                    <path d="M8 5v14l11-7z" />
-                                                </svg>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Overlay 1: Botão do Cadeado (Preço) */}
-                                    <button
-                                        type="button"
-                                        className={`absolute bottom-3 left-3 z-30 w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-md transition-all shadow-md active:scale-95 ${
-                                            mediaPriceType === 'paid'
-                                                ? 'bg-purple-600 border border-purple-500/20 text-white'
-                                                : 'bg-black/50 border border-white/10 text-white/90 hover:bg-black/70'
-                                        }`}
-                                        onClick={() => {
-                                            if (mediaPriceType === 'free') {
-                                                setMediaPriceType('paid');
-                                            } else {
-                                                setMediaPriceType('free');
-                                                setMediaPriceStr('0');
-                                                setMediaPriceFormatted('R$ 0,00');
-                                            }
-                                        }}
-                                    >
-                                        {mediaPriceType === 'paid' ? (
-                                            /* Cadeado Fechado */
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                                                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                                            </svg>
-                                        ) : (
-                                            /* Cadeado Aberto */
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                                                <path d="M7 11V7a5 5 0 0 1 9.9-1" />
-                                            </svg>
-                                        )}
-                                    </button>
-
-                                    {/* Overlay 2: Botão do Relógio (Duração) */}
-                                    <button
-                                        type="button"
-                                        className={`absolute bottom-3 right-3 z-30 w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-md transition-all shadow-md active:scale-95 ${
-                                            isTemporary
-                                                ? 'bg-purple-600 border border-purple-500/20 text-white'
-                                                : 'bg-black/50 border border-white/10 text-white/90 hover:bg-black/70'
-                                        }`}
-                                        onClick={() => {
-                                            const nextTemp = !isTemporary;
-                                            setIsTemporary(nextTemp);
-                                            if (nextTemp) {
-                                                setExpiryOption('1h');
-                                                setCustomExpiryValue(1);
-                                                setCustomExpiryUnit('hours');
-                                            } else {
-                                                setExpiryOption('permanent');
-                                            }
-                                        }}
-                                    >
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                            <circle cx="12" cy="12" r="10" />
-                                            <polyline points="12 6 12 12 16 14" />
-                                        </svg>
-                                    </button>
-
-                                    {/* Select Flutuante de Tempos Rápidos */}
-                                    {isTemporary && (
-                                        <select
-                                            className="absolute bottom-16 right-3 z-30 bg-black/75 backdrop-blur-md text-white text-[10px] font-black rounded-xl px-2 py-1.5 focus:outline-none border border-white/10 cursor-pointer shadow-lg max-w-[90px] text-center"
-                                            value={expiryOption}
-                                            onChange={(e) => {
-                                                const opt = e.target.value as any;
-                                                setExpiryOption(opt);
-                                                if (opt === '1min') { setCustomExpiryValue(1); setCustomExpiryUnit('minutes'); }
-                                                else if (opt === '10min') { setCustomExpiryValue(10); setCustomExpiryUnit('minutes'); }
-                                                else if (opt === '1h') { setCustomExpiryValue(1); setCustomExpiryUnit('hours'); }
-                                                else if (opt === '24h') { setCustomExpiryValue(24); setCustomExpiryUnit('hours'); }
-                                                else if (opt === '3d') { setCustomExpiryValue(3); setCustomExpiryUnit('days'); }
-                                                else if (opt === '7d') { setCustomExpiryValue(7); setCustomExpiryUnit('days'); }
-                                            }}
-                                        >
-                                            <option value="10min" className="bg-gray-900">10m</option>
-                                            <option value="1h" className="bg-gray-900">1h</option>
-                                            <option value="24h" className="bg-gray-900">24h</option>
-                                            <option value="3d" className="bg-gray-900">3d</option>
-                                            <option value="7d" className="bg-gray-900">7d</option>
-                                            <option value="custom" className="bg-gray-900">Outro...</option>
-                                        </select>
-                                    )}
-
-                                    {/* Modal Interno: Input de Preço */}
-                                    {mediaPriceType === 'paid' && (
-                                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[1px] p-4 animate-in fade-in duration-150 z-20">
-                                            <div className="bg-white/95 backdrop-blur border border-white/20 rounded-2xl p-3.5 flex flex-col items-center gap-1.5 w-40 shadow-xl">
-                                                <span className="text-[9px] font-black text-purple-700 uppercase tracking-wider">Definir Preço</span>
-                                                <div className="relative w-full">
-                                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">R$</span>
-                                                    <input
-                                                        type="text"
-                                                        className="bg-gray-50 border border-gray-200 rounded-xl py-1 pl-7 pr-1.5 w-full text-center text-xs font-black focus:outline-none focus:ring-1 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-gray-900"
-                                                        placeholder="0,00"
-                                                        value={mediaPriceFormatted.replace('R$', '').trim()}
-                                                        onChange={handlePriceChange}
-                                                    />
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    className="text-[9px] font-extrabold text-purple-600 hover:text-purple-700 transition-colors uppercase tracking-wider mt-0.5"
-                                                    onClick={() => {
-                                                        setMediaPriceType('free');
-                                                        setMediaPriceStr('0');
-                                                        setMediaPriceFormatted('R$ 0,00');
-                                                    }}
-                                                >
-                                                    Tornar Grátis
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Modal Interno: Tempo Customizado */}
-                                    {isTemporary && expiryOption === 'custom' && (
-                                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[1px] p-4 animate-in fade-in duration-150 z-20">
-                                            <div className="bg-white/95 backdrop-blur border border-white/20 rounded-2xl p-3.5 flex flex-col items-center gap-1.5 w-40 shadow-xl">
-                                                <span className="text-[9px] font-black text-purple-700 uppercase tracking-wider">Definir Tempo</span>
-                                                <div className="flex gap-1 w-full">
-                                                    <input
-                                                        type="number"
-                                                        min="1"
-                                                        className="bg-gray-50 border border-gray-200 rounded-xl py-1 w-11 text-center text-xs font-bold focus:outline-none focus:ring-1 focus:ring-purple-500/20 focus:border-purple-500 text-gray-900"
-                                                        value={customExpiryValue}
-                                                        onChange={(e) => setCustomExpiryValue(Math.max(1, parseInt(e.target.value) || 1))}
-                                                    />
-                                                    <select
-                                                        className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-1 text-[10px] font-bold text-gray-700 focus:outline-none cursor-pointer"
-                                                        value={customExpiryUnit}
-                                                        onChange={(e) => setCustomExpiryUnit(e.target.value as any)}
-                                                    >
-                                                        <option value="minutes">Min.</option>
-                                                        <option value="hours">Horas</option>
-                                                        <option value="days">Dias</option>
-                                                    </select>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    className="text-[9px] font-extrabold text-purple-600 hover:text-purple-700 transition-colors uppercase tracking-wider mt-0.5"
-                                                    onClick={() => setExpiryOption('custom')}
-                                                >
-                                                    Confirmar
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="animate-pulse flex flex-col items-center gap-1.5">
-                                     <div className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
-                                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Processando...</span>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Botões de Ação */}
-                        <div className="flex gap-3 w-full shrink-0">
-                            <button
-                                className="flex-1 h-12 bg-gray-100 hover:bg-gray-200 text-gray-750 rounded-2xl font-bold transition-all active:scale-98 text-sm"
-                                onClick={() => {
-                                    setSelectedFile(null);
-                                    setPreviewUrl(null);
-                                    setMediaPriceStr('');
-                                    setMediaPriceFormatted('R$ 0,00');
-                                    setMediaPriceType('free');
-                                    setIsTemporary(false);
-                                    setCustomExpiryValue(5);
-                                    setCustomExpiryUnit('minutes');
-                                    setExpiryOption('permanent');
-                                }}
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                disabled={isVideo && !previewUrl}
-                                className="flex-1 h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-bold flex justify-center items-center transition-all shadow-lg shadow-purple-600/20 active:scale-98 disabled:opacity-50 text-sm"
-                                onClick={() => {
+                            onClick={() => {
+                                if (selectedFile) {
                                     const price = parseFloat(mediaPriceStr || '0');
                                     if (mediaPriceType === 'paid' && (!price || price <= 0)) {
                                         alert('Por favor, defina um valor maior que R$ 0,00 para mídias pagas.');
@@ -3205,14 +3118,37 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                     setMessages(prev => [...prev, newMsg]);
 
                                     startMediaUpload(file, isVideoFile, priceInCents, tempId, preview, isTemporary, expiryMinutes);
-                                }}
-                            >
-                                Enviar
-                            </button>
-                        </div>
-                    </div>
+                                } else {
+                                    handleSend();
+                                }
+                            }}
+                            disabled={(!messageText.trim() && !selectedFile) || !connected}
+                            className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shrink-0 ${
+                                (messageText.trim() || selectedFile) && connected
+                                    ? 'bg-purple-600 hover:bg-purple-700 shadow-sm text-white'
+                                    : 'bg-gray-200 text-gray-400'
+                            }`}
+                        >
+                            {sending ? (
+                                <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                            ) : (
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="currentColor">
+                                    <path d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                            )}
+                        </button>
+                    ) : (
+                        <AudioRecorder
+                            connected={connected}
+                            onSendAudio={handleSendAudio}
+                            onStatusChange={setAudioRecordingStatus}
+                        />
+                    )}
                 </div>
-            )}
+            </div>
 
             {giftModalVisible && (
                 <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">

@@ -90,9 +90,7 @@ export function AudioPlayer({ src, duration = 0, isMine }: AudioPlayerProps) {
     const currentPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
 
     return (
-        <div className={`flex items-center gap-3 p-3 rounded-2xl w-72 ${
-            isMine ? 'bg-purple-600 text-white' : 'bg-white text-gray-900 border border-gray-100 shadow-sm'
-        }`}>
+        <div className="flex items-center gap-3 w-[260px] max-w-full select-none py-1">
             {/* Play/Pause Button */}
             <button
                 onClick={togglePlay}
@@ -142,8 +140,9 @@ export function AudioPlayer({ src, duration = 0, isMine }: AudioPlayerProps) {
                         max={duration || 100}
                         value={currentTime}
                         onChange={handleSeek}
-                        className={`w-full h-1 bg-transparent rounded-lg appearance-none cursor-pointer focus:outline-none accent-purple-600`}
+                        className="w-full h-1 bg-transparent rounded-lg appearance-none cursor-pointer focus:outline-none"
                         style={{
+                            accentColor: isMine ? '#ffffff' : '#9333ea',
                             background: isMine
                                 ? `linear-gradient(to right, #ffffff ${currentPercentage}%, rgba(255, 255, 255, 0.25) ${currentPercentage}%)`
                                 : `linear-gradient(to right, #9333ea ${currentPercentage}%, rgba(147, 51, 234, 0.1) ${currentPercentage}%)`,
