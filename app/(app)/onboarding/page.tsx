@@ -363,7 +363,12 @@ export default function OnboardingPage() {
                 body: JSON.stringify({ cpf: cleanCpf, birthDate: `${y}-${mo}-${d}` }),
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Erro na verificação');
+            if (!res.ok) {
+                if (data.debugMessage) {
+                    console.warn('[Identity verification] Detalhe técnico:', data.debugMessage);
+                }
+                throw new Error(data.error || 'Identificamos um problema ao validar seus dados. Tente novamente mais tarde.');
+            }
             await refetch().catch(() => {});
             verifiedIdentity.current = { cpf: cleanCpf, birth: birthVal };
             setIdStatus('verified');

@@ -29,6 +29,9 @@ type InfoSimplesCpfResponse = {
 };
 
 const INFO_SIMPLES_CPF_URL = 'https://api.infosimples.com/api/v2/consultas/receita-federal/cpf';
+const CPF_BIRTHDATE_MISMATCH_MESSAGE = 'Não conseguimos confirmar esse CPF com essa data de nascimento na Receita Federal. Confira os dados e tente novamente.';
+const TECHNICAL_VALIDATION_ERROR_MESSAGE = 'Identificamos um problema ao validar seus dados. Tente novamente mais tarde.';
+const CPF_STATUS_ERROR_MESSAGE = 'Não conseguimos validar este CPF porque ele não está regular na Receita Federal.';
 
 // Função matemática para validar dígitos do CPF
 function isValidCPF(cpf: string): boolean {
@@ -98,6 +101,34 @@ function getInfoSimplesErrorMessage(payload: InfoSimplesCpfResponse): string {
 
 function getErrorMessage(error: unknown, fallback: string): string {
     return error instanceof Error ? error.message : fallback;
+}
+
+function normalizeErrorMessage(message: string): string {
+    return message
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+}
+
+function getUserFacingIdentityErrorMessage(rawMessage: string): string {
+    const normalizedMessage = normalizeErrorMessage(rawMessage);
+
+    const mismatchPatterns = [
+        'parametros foram recusados',
+        'cpf ou data de nascimento nao conferem',
+        'cpf retornado pela receita federal nao confere',
+        'data de nascimento'
+    ];
+
+    if (mismatchPatterns.some((pattern) => normalizedMessage.includes(pattern))) {
+        return CPF_BIRTHDATE_MISMATCH_MESSAGE;
+    }
+
+    if (normalizedMessage.includes('situacao regular')) {
+        return CPF_STATUS_ERROR_MESSAGE;
+    }
+
+    return TECHNICAL_VALIDATION_ERROR_MESSAGE;
 }
 
 async function validateCpfWithInfoSimples(cpf: string, birthDate: string): Promise<InfoSimplesCpfRecord> {
@@ -210,9 +241,17 @@ export async function POST(request: NextRequest) {
         try {
             infoSimplesRecord = await validateCpfWithInfoSimples(cpfClean, birthDate);
         } catch (validationError: unknown) {
-            console.error('Erro na validação InfoSimples:', validationError);
+            const technicalMessage = getErrorMessage(validationError, 'CPF ou data de nascimento não conferem na Receita Federal.');
+            console.error('Erro na validação InfoSimples:', {
+                message: technicalMessage,
+                cpfLastDigits: cpfClean.slice(-4),
+                birthDate
+            });
             return NextResponse.json(
-                { error: getErrorMessage(validationError, 'CPF ou data de nascimento não conferem na Receita Federal.') },
+                {
+                    error: getUserFacingIdentityErrorMessage(technicalMessage),
+                    debugMessage: technicalMessage
+                },
                 { status: 400 }
             );
         }
