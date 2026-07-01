@@ -35,6 +35,7 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
     // Gestos
     const touchStartCoords = useRef<{ x: number; y: number } | null>(null);
     const isRecordingInitiatedRef = useRef(false);
+    const isTouchActiveRef = useRef(false);
 
     // Limiares de arrasto (pixels)
     const CANCEL_THRESHOLD = -80; // arrastar para esquerda
@@ -147,6 +148,15 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
 
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            
+            // Se o usuário soltou o botão enquanto esperava a permissão/inicialização do microfone
+            if (!isTouchActiveRef.current) {
+                stream.getTracks().forEach(track => track.stop());
+                cleanup();
+                setStatus('idle');
+                return;
+            }
+
             streamRef.current = stream;
 
             // Suporte para iOS Safari (audio/mp4) e outros navegadores (webm)
@@ -208,7 +218,7 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
             if (recordingDuration >= 1 && audioBlob.size > 100) {
                 onSendAudio(audioBlob, recordingDuration);
             } else {
-                alert('Áudio muito curto para ser enviado.');
+                console.log('Audio discard: too short or empty');
             }
             cleanup();
             setStatus('idle');
@@ -250,6 +260,7 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
     const handleTouchStart = (e: React.TouchEvent) => {
         if (!connected || status !== 'idle') return;
         e.preventDefault();
+        isTouchActiveRef.current = true;
         const touch = e.touches[0];
         touchStartCoords.current = { x: touch.clientX, y: touch.clientY };
         startRecording();
@@ -275,6 +286,7 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
     };
 
     const handleTouchEnd = () => {
+        isTouchActiveRef.current = false;
         touchStartCoords.current = null;
         if (status === 'recording') {
             stopAndSendRecording();
@@ -285,6 +297,7 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
     const handleMouseDown = (e: React.MouseEvent) => {
         if (!connected || status !== 'idle' || e.button !== 0) return; // apenas clique esquerdo
         e.preventDefault();
+        isTouchActiveRef.current = true;
         touchStartCoords.current = { x: e.clientX, y: e.clientY };
         startRecording();
     };
@@ -307,6 +320,7 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
     };
 
     const handleMouseUp = () => {
+        isTouchActiveRef.current = false;
         touchStartCoords.current = null;
         if (status === 'recording') {
             stopAndSendRecording();
@@ -314,6 +328,7 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
     };
 
     const handleMouseLeave = () => {
+        isTouchActiveRef.current = false;
         touchStartCoords.current = null;
         if (status === 'recording') {
             cancelRecording(); // Se o mouse sair do botão no desktop sem travar, cancela
