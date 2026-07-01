@@ -326,65 +326,67 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    if (status === 'idle') {
-        return (
-            <button
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseLeave}
-                disabled={!connected}
-                className="w-11 h-11 rounded-2xl bg-purple-600 text-white flex items-center justify-center transition-all hover:bg-purple-700 active:scale-90 shadow-sm shrink-0 disabled:opacity-50"
-                title="Segure para gravar áudio"
-            >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                    <line x1="12" y1="19" x2="12" y2="22" />
-                </svg>
-            </button>
-        );
-    }
-
-    // Se estiver gravando (segurando ou travado)
     return (
-        <div className="flex-1 flex items-center gap-3 bg-slate-50 border border-gray-100 rounded-2xl px-4 py-1.5 min-h-[44px] animate-in fade-in duration-200">
-            {/* Indicador Vermelho de Gravação */}
-            <div className="flex items-center gap-2 shrink-0">
-                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping absolute" />
-                <span className="w-2.5 h-2.5 rounded-full bg-red-500 relative" />
-                <span className="text-sm font-bold text-gray-700">{formatTimer(duration)}</span>
-            </div>
+        <div className={`flex items-center gap-3 ${status !== 'idle' ? 'flex-1 w-full' : ''}`}>
+            {status !== 'idle' && (
+                <div className="flex-1 flex items-center gap-3 bg-slate-50 border border-gray-100 rounded-2xl px-4 py-1.5 min-h-[44px] animate-in fade-in duration-200">
+                    
+                    {/* Botão de Lixeira se estiver Locked */}
+                    {status === 'locked' && (
+                        <button
+                            onClick={cancelRecording}
+                            className="w-8 h-8 rounded-full bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition-colors active:scale-95 shadow-sm shrink-0"
+                            title="Cancelar gravação"
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <polyline points="3 6 5 6 21 6" />
+                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                <path d="M10 11v6" />
+                                <path d="M14 11v6" />
+                                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                            </svg>
+                        </button>
+                    )}
 
-            {/* Onda Sonora Canvas em Tempo Real */}
-            <div className="flex-1 h-6 min-w-[50px] relative">
-                <canvas
-                    ref={canvasRef}
-                    className="w-full h-full"
-                    width={150}
-                    height={24}
-                />
-            </div>
-
-            {/* Layout dinâmico se estiver apenas gravando (segurando) */}
-            {status === 'recording' && (
-                <div className="flex items-center gap-2 shrink-0 select-none pointer-events-none text-[11px] text-gray-400 font-medium">
-                    {/* Animação suave deslizando para o cancelamento */}
-                    <div 
-                        className="flex items-center gap-1 transition-transform"
-                        style={{
-                            transform: `translateX(${swipeOffset.x * 0.4}px)`,
-                        }}
-                    >
-                        <span>⟨ Deslize para cancelar</span>
+                    {/* Indicador Vermelho de Gravação */}
+                    <div className="flex items-center gap-2 shrink-0">
+                        <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping absolute" />
+                        <span className="w-2.5 h-2.5 rounded-full bg-red-500 relative" />
+                        <span className="text-sm font-bold text-slate-700">{formatTimer(duration)}</span>
                     </div>
 
-                    {/* Ícone de Cadeado flutuante no topo indicando deslizar para cima */}
+                    {/* Onda Sonora Canvas */}
+                    <div className="flex-1 h-6 min-w-[50px] relative">
+                        <canvas
+                            ref={canvasRef}
+                            className="w-full h-full"
+                            width={150}
+                            height={24}
+                        />
+                    </div>
+
+                    {/* Texto Deslize para Cancelar (se apenas gravando) */}
+                    {status === 'recording' && (
+                        <div className="flex items-center gap-2 shrink-0 select-none pointer-events-none text-[11px] text-gray-450 font-medium">
+                            <div 
+                                className="flex items-center gap-1 transition-transform"
+                                style={{
+                                    transform: `translateX(${swipeOffset.x * 0.4}px)`,
+                                }}
+                            >
+                                <span>⟨ Deslize para cancelar</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* O Botão do Microfone/Enviar flutuante à direita */}
+            <div className="relative shrink-0">
+                {/* Cadeado flutuante (se gravando por toque) */}
+                {status === 'recording' && (
                     <div 
-                        className="absolute bottom-16 right-5 bg-white p-2 rounded-full border border-gray-100 shadow-md flex items-center justify-center animate-bounce text-purple-600"
+                        className="absolute bottom-16 left-1/2 -translate-x-1/2 bg-white p-2 rounded-full border border-slate-100 shadow-md flex items-center justify-center animate-bounce text-purple-600 z-50"
                         style={{
                             transform: `translateY(${Math.max(-20, swipeOffset.y * 0.3)}px)`,
                         }}
@@ -394,40 +396,50 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
                             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                         </svg>
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* Layout se estiver travado (locked) */}
-            {status === 'locked' && (
-                <div className="flex items-center gap-3 shrink-0">
-                    {/* Botão Cancelar/Excluir */}
-                    <button
-                        onClick={cancelRecording}
-                        className="w-8 h-8 rounded-full bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition-colors active:scale-95 shadow-sm"
-                        title="Cancelar gravação"
-                    >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                            <polyline points="3 6 5 6 21 6" />
-                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                            <path d="M10 11v6" />
-                            <path d="M14 11v6" />
-                            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                        </svg>
-                    </button>
-
-                    {/* Botão Enviar Áudio */}
+                {status === 'locked' ? (
+                    /* Botão de Enviar (se travado) */
                     <button
                         onClick={stopAndSendRecording}
-                        className="w-9 h-9 rounded-xl bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center transition-colors active:scale-95 shadow-md shadow-purple-600/20"
+                        className="w-11 h-11 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center transition-all active:scale-90 shadow-md shadow-purple-600/20 shrink-0"
                         title="Enviar áudio"
                     >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <line x1="22" y1="2" x2="11" y2="13" />
                             <polygon points="22 2 15 22 11 13 2 9 22 2" />
                         </svg>
                     </button>
-                </div>
-            )}
+                ) : (
+                    /* Botão de Microfone (se idle ou gravando/segurando) */
+                    <button
+                        onTouchStart={handleTouchStart}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleTouchEnd}
+                        onMouseDown={handleMouseDown}
+                        onMouseMove={handleMouseMove}
+                        onMouseUp={handleMouseUp}
+                        onMouseLeave={handleMouseLeave}
+                        disabled={!connected}
+                        className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shrink-0 ${
+                            status === 'recording'
+                                ? 'bg-red-500 text-white scale-125 shadow-lg animate-pulse'
+                                : 'bg-purple-600 text-white hover:bg-purple-700 active:scale-90 shadow-sm'
+                        } disabled:opacity-50`}
+                        style={{
+                            transform: status === 'recording' ? `translate(${swipeOffset.x * 0.1}px, ${swipeOffset.y * 0.1}px) scale(1.2)` : '',
+                            touchAction: 'none'
+                        }}
+                        title="Segure para gravar áudio"
+                    >
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                            <line x1="12" y1="19" x2="12" y2="22" />
+                        </svg>
+                    </button>
+                )}
+            </div>
         </div>
     );
 }

@@ -2950,13 +2950,10 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
             {selectedFile && userData?.isProfessional && (
                 <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-3xl p-5 w-full max-w-sm flex flex-col shadow-2xl animate-in zoom-in duration-150">
-                        <h3 className="font-extrabold text-sm text-gray-400 uppercase tracking-widest mb-3 text-center">
-                            Configurar Envio
-                        </h3>
-
-                        {/* Preview Horizontal Elegante */}
-                        <div className="w-full h-36 relative rounded-2xl overflow-hidden mb-4 bg-gray-100 border border-gray-200 shadow-sm shrink-0 flex items-center justify-center">
+                    <div className="bg-white rounded-[2.5rem] p-5 w-full max-w-sm flex flex-col shadow-2xl animate-in zoom-in duration-150">
+                        
+                        {/* Imagem de Preview Central com Overlays */}
+                        <div className="relative w-full aspect-square rounded-[2rem] overflow-hidden mb-5 bg-gray-100 border border-gray-200 shadow-md shrink-0 flex items-center justify-center">
                             {previewUrl ? (
                                 <div className="relative w-full h-full">
                                     <img 
@@ -2966,147 +2963,174 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                     />
                                     {isVideo && (
                                         <div className="absolute inset-0 flex items-center justify-center bg-black/25">
-                                            <div className="w-10 h-10 rounded-full bg-white/30 backdrop-blur-md flex items-center justify-center text-white border border-white/40">
-                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                            <div className="w-12 h-12 rounded-full bg-white/30 backdrop-blur-md flex items-center justify-center text-white border border-white/40">
+                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                                                     <path d="M8 5v14l11-7z" />
                                                 </svg>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Overlay 1: Botão do Cadeado (Preço) */}
+                                    <button
+                                        type="button"
+                                        className={`absolute bottom-3 left-3 z-30 w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-md transition-all shadow-md active:scale-95 ${
+                                            mediaPriceType === 'paid'
+                                                ? 'bg-purple-600 border border-purple-500/20 text-white'
+                                                : 'bg-black/50 border border-white/10 text-white/90 hover:bg-black/70'
+                                        }`}
+                                        onClick={() => {
+                                            if (mediaPriceType === 'free') {
+                                                setMediaPriceType('paid');
+                                            } else {
+                                                setMediaPriceType('free');
+                                                setMediaPriceStr('0');
+                                                setMediaPriceFormatted('R$ 0,00');
+                                            }
+                                        }}
+                                    >
+                                        {mediaPriceType === 'paid' ? (
+                                            /* Cadeado Fechado */
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                            </svg>
+                                        ) : (
+                                            /* Cadeado Aberto */
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                                <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                                            </svg>
+                                        )}
+                                    </button>
+
+                                    {/* Overlay 2: Botão do Relógio (Duração) */}
+                                    <button
+                                        type="button"
+                                        className={`absolute bottom-3 right-3 z-30 w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-md transition-all shadow-md active:scale-95 ${
+                                            isTemporary
+                                                ? 'bg-purple-600 border border-purple-500/20 text-white'
+                                                : 'bg-black/50 border border-white/10 text-white/90 hover:bg-black/70'
+                                        }`}
+                                        onClick={() => {
+                                            const nextTemp = !isTemporary;
+                                            setIsTemporary(nextTemp);
+                                            if (nextTemp) {
+                                                setExpiryOption('1h');
+                                                setCustomExpiryValue(1);
+                                                setCustomExpiryUnit('hours');
+                                            } else {
+                                                setExpiryOption('permanent');
+                                            }
+                                        }}
+                                    >
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <circle cx="12" cy="12" r="10" />
+                                            <polyline points="12 6 12 12 16 14" />
+                                        </svg>
+                                    </button>
+
+                                    {/* Select Flutuante de Tempos Rápidos */}
+                                    {isTemporary && (
+                                        <select
+                                            className="absolute bottom-16 right-3 z-30 bg-black/75 backdrop-blur-md text-white text-[10px] font-black rounded-xl px-2 py-1.5 focus:outline-none border border-white/10 cursor-pointer shadow-lg max-w-[90px] text-center"
+                                            value={expiryOption}
+                                            onChange={(e) => {
+                                                const opt = e.target.value as any;
+                                                setExpiryOption(opt);
+                                                if (opt === '1min') { setCustomExpiryValue(1); setCustomExpiryUnit('minutes'); }
+                                                else if (opt === '10min') { setCustomExpiryValue(10); setCustomExpiryUnit('minutes'); }
+                                                else if (opt === '1h') { setCustomExpiryValue(1); setCustomExpiryUnit('hours'); }
+                                                else if (opt === '24h') { setCustomExpiryValue(24); setCustomExpiryUnit('hours'); }
+                                                else if (opt === '3d') { setCustomExpiryValue(3); setCustomExpiryUnit('days'); }
+                                                else if (opt === '7d') { setCustomExpiryValue(7); setCustomExpiryUnit('days'); }
+                                            }}
+                                        >
+                                            <option value="10min" className="bg-gray-900">10m</option>
+                                            <option value="1h" className="bg-gray-900">1h</option>
+                                            <option value="24h" className="bg-gray-900">24h</option>
+                                            <option value="3d" className="bg-gray-900">3d</option>
+                                            <option value="7d" className="bg-gray-900">7d</option>
+                                            <option value="custom" className="bg-gray-900">Outro...</option>
+                                        </select>
+                                    )}
+
+                                    {/* Modal Interno: Input de Preço */}
+                                    {mediaPriceType === 'paid' && (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[1px] p-4 animate-in fade-in duration-150 z-20">
+                                            <div className="bg-white/95 backdrop-blur border border-white/20 rounded-2xl p-3.5 flex flex-col items-center gap-1.5 w-40 shadow-xl">
+                                                <span className="text-[9px] font-black text-purple-700 uppercase tracking-wider">Definir Preço</span>
+                                                <div className="relative w-full">
+                                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">R$</span>
+                                                    <input
+                                                        type="text"
+                                                        className="bg-gray-50 border border-gray-200 rounded-xl py-1 pl-7 pr-1.5 w-full text-center text-xs font-black focus:outline-none focus:ring-1 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-gray-900"
+                                                        placeholder="0,00"
+                                                        value={mediaPriceFormatted.replace('R$', '').trim()}
+                                                        onChange={handlePriceChange}
+                                                    />
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    className="text-[9px] font-extrabold text-purple-600 hover:text-purple-700 transition-colors uppercase tracking-wider mt-0.5"
+                                                    onClick={() => {
+                                                        setMediaPriceType('free');
+                                                        setMediaPriceStr('0');
+                                                        setMediaPriceFormatted('R$ 0,00');
+                                                    }}
+                                                >
+                                                    Tornar Grátis
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Modal Interno: Tempo Customizado */}
+                                    {isTemporary && expiryOption === 'custom' && (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[1px] p-4 animate-in fade-in duration-150 z-20">
+                                            <div className="bg-white/95 backdrop-blur border border-white/20 rounded-2xl p-3.5 flex flex-col items-center gap-1.5 w-40 shadow-xl">
+                                                <span className="text-[9px] font-black text-purple-700 uppercase tracking-wider">Definir Tempo</span>
+                                                <div className="flex gap-1 w-full">
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        className="bg-gray-50 border border-gray-200 rounded-xl py-1 w-11 text-center text-xs font-bold focus:outline-none focus:ring-1 focus:ring-purple-500/20 focus:border-purple-500 text-gray-900"
+                                                        value={customExpiryValue}
+                                                        onChange={(e) => setCustomExpiryValue(Math.max(1, parseInt(e.target.value) || 1))}
+                                                    />
+                                                    <select
+                                                        className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-1 text-[10px] font-bold text-gray-700 focus:outline-none cursor-pointer"
+                                                        value={customExpiryUnit}
+                                                        onChange={(e) => setCustomExpiryUnit(e.target.value as any)}
+                                                    >
+                                                        <option value="minutes">Min.</option>
+                                                        <option value="hours">Horas</option>
+                                                        <option value="days">Dias</option>
+                                                    </select>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    className="text-[9px] font-extrabold text-purple-600 hover:text-purple-700 transition-colors uppercase tracking-wider mt-0.5"
+                                                    onClick={() => setExpiryOption('custom')}
+                                                >
+                                                    Confirmar
+                                                </button>
                                             </div>
                                         </div>
                                     )}
                                 </div>
                             ) : (
                                 <div className="animate-pulse flex flex-col items-center gap-1.5">
-                                     <div className="w-6 h-6 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
-                                     <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Processando...</span>
+                                     <div className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
+                                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Processando...</span>
                                 </div>
                             )}
-                        </div>
-
-                        {/* Configurações em Duas Colunas */}
-                        <div className="grid grid-cols-2 gap-4 mb-5">
-                            {/* Coluna da Esquerda: Preço */}
-                            <div className="flex flex-col gap-1.5">
-                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
-                                    Preço
-                                </label>
-                                <div className="flex bg-gray-100 p-0.5 rounded-xl border border-gray-200 h-9">
-                                    <button
-                                        type="button"
-                                        className={`flex-1 text-[11px] font-bold rounded-lg transition-all ${
-                                            mediaPriceType === 'free'
-                                                ? 'bg-white text-purple-700 shadow-sm'
-                                                : 'text-gray-500 hover:text-gray-700'
-                                        }`}
-                                        onClick={() => {
-                                            setMediaPriceType('free');
-                                            setMediaPriceStr('0');
-                                            setMediaPriceFormatted('R$ 0,00');
-                                        }}
-                                    >
-                                        Grátis
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className={`flex-1 text-[11px] font-bold rounded-lg transition-all ${
-                                            mediaPriceType === 'paid'
-                                                ? 'bg-white text-purple-700 shadow-sm'
-                                                : 'text-gray-500 hover:text-gray-700'
-                                        }`}
-                                        onClick={() => {
-                                            setMediaPriceType('paid');
-                                        }}
-                                    >
-                                        Pago
-                                    </button>
-                                </div>
-
-                                {/* Campo condicional do preço */}
-                                {mediaPriceType === 'paid' ? (
-                                    <div className="relative animate-in slide-in-from-top-1 duration-150 h-9">
-                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">R$</span>
-                                        <input
-                                            type="text"
-                                            className="bg-gray-50 border border-gray-200 rounded-xl py-1.5 pl-7 pr-1.5 w-full text-center text-xs font-bold focus:outline-none focus:ring-1 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-gray-900 h-9"
-                                            placeholder="0,00"
-                                            value={mediaPriceFormatted.replace('R$', '').trim()}
-                                            onChange={handlePriceChange}
-                                        />
-                                    </div>
-                                ) : (
-                                    <div className="h-9 flex items-center justify-center">
-                                        <span className="text-[9.5px] text-gray-400 text-center font-medium leading-tight">Livre acesso</span>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Coluna da Direita: Duração */}
-                            <div className="flex flex-col gap-1.5 border-l border-gray-100 pl-4">
-                                <label className="text-[9px] font-black text-gray-450 uppercase tracking-widest">
-                                    Disponibilidade
-                                </label>
-                                <select
-                                    className="bg-gray-105 border border-gray-200 rounded-xl px-2 text-[11px] font-bold text-gray-700 focus:outline-none cursor-pointer h-9 shadow-sm"
-                                    value={expiryOption}
-                                    onChange={(e) => {
-                                        const opt = e.target.value as any;
-                                        setExpiryOption(opt);
-                                        if (opt === 'permanent') {
-                                            setIsTemporary(false);
-                                        } else {
-                                            setIsTemporary(true);
-                                            if (opt === '1min') { setCustomExpiryValue(1); setCustomExpiryUnit('minutes'); }
-                                            else if (opt === '10min') { setCustomExpiryValue(10); setCustomExpiryUnit('minutes'); }
-                                            else if (opt === '1h') { setCustomExpiryValue(1); setCustomExpiryUnit('hours'); }
-                                            else if (opt === '24h') { setCustomExpiryValue(24); setCustomExpiryUnit('hours'); }
-                                            else if (opt === '3d') { setCustomExpiryValue(3); setCustomExpiryUnit('days'); }
-                                            else if (opt === '7d') { setCustomExpiryValue(7); setCustomExpiryUnit('days'); }
-                                        }
-                                    }}
-                                >
-                                    <option value="permanent">Permanente</option>
-                                    <option value="1min">1 minuto</option>
-                                    <option value="10min">10 minutos</option>
-                                    <option value="1h">1 hora</option>
-                                    <option value="24h">24 horas</option>
-                                    <option value="3d">3 dias</option>
-                                    <option value="7d">7 dias</option>
-                                    <option value="custom">Personalizado...</option>
-                                </select>
-
-                                {/* Campo condicional do personalizado */}
-                                {expiryOption === 'custom' ? (
-                                    <div className="flex gap-1 animate-in slide-in-from-top-1 duration-150 h-9">
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            className="bg-gray-50 border border-gray-200 rounded-xl w-10 text-center text-xs font-bold focus:outline-none focus:ring-1 focus:ring-purple-500/20 focus:border-purple-500 text-gray-900 h-9"
-                                            value={customExpiryValue}
-                                            onChange={(e) => setCustomExpiryValue(Math.max(1, parseInt(e.target.value) || 1))}
-                                        />
-                                        <select
-                                            className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-1 text-[10px] font-bold text-gray-700 focus:outline-none cursor-pointer h-9"
-                                            value={customExpiryUnit}
-                                            onChange={(e) => setCustomExpiryUnit(e.target.value as any)}
-                                        >
-                                            <option value="minutes">Min.</option>
-                                            <option value="hours">Horas</option>
-                                            <option value="days">Dias</option>
-                                        </select>
-                                    </div>
-                                ) : (
-                                    <div className="h-9 flex items-center justify-center">
-                                        <span className="text-[9.5px] text-gray-400 text-center font-medium leading-tight">
-                                            {expiryOption === 'permanent' ? 'Fica para sempre' : 'Mídia temporária'}
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
                         </div>
 
                         {/* Botões de Ação */}
                         <div className="flex gap-3 w-full shrink-0">
                             <button
-                                className="flex-1 h-11 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-bold transition-all active:scale-98 text-xs"
+                                className="flex-1 h-12 bg-gray-100 hover:bg-gray-200 text-gray-750 rounded-2xl font-bold transition-all active:scale-98 text-sm"
                                 onClick={() => {
                                     setSelectedFile(null);
                                     setPreviewUrl(null);
@@ -3123,7 +3147,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                             </button>
                             <button
                                 disabled={isVideo && !previewUrl}
-                                className="flex-1 h-11 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-bold flex justify-center items-center transition-all shadow-lg shadow-purple-600/20 active:scale-98 disabled:opacity-50 text-xs"
+                                className="flex-1 h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-bold flex justify-center items-center transition-all shadow-lg shadow-purple-600/20 active:scale-98 disabled:opacity-50 text-sm"
                                 onClick={() => {
                                     const price = parseFloat(mediaPriceStr || '0');
                                     if (mediaPriceType === 'paid' && (!price || price <= 0)) {
