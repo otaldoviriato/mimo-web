@@ -41,6 +41,9 @@ interface Message {
     replyToId?: string | null;
     replyToContent?: string | null;
     replyToSenderId?: string | null;
+    isTemporary?: boolean;
+    expiresAt?: string | Date;
+    isExpired?: boolean;
 }
 
 interface UploadTask {
@@ -405,7 +408,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const [mediaPriceType, setMediaPriceType] = useState<'free' | 'paid'>('free');
     const [mediaPriceFormatted, setMediaPriceFormatted] = useState('R$ 0,00');
     const [isTemporary, setIsTemporary] = useState(false);
-    const [expiryOption, setExpiryOption] = useState<'1min' | '10min' | '1h' | '24h' | '3d' | '7d' | 'custom'>('1h');
+    const [expiryOption, setExpiryOption] = useState<'permanent' | '1min' | '10min' | '1h' | '24h' | '3d' | '7d' | 'custom'>('permanent');
     const [customExpiryValue, setCustomExpiryValue] = useState(5);
     const [customExpiryUnit, setCustomExpiryUnit] = useState<'minutes' | 'hours' | 'days'>('minutes');
     const [uploadTasks, setUploadTasks] = useState<Record<string, UploadTask>>({});
@@ -2946,49 +2949,25 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             </div>
 
             {selectedFile && userData?.isProfessional && (
-                <div className="fixed inset-0 bg-slate-50 z-50 flex flex-col animate-in slide-in-from-bottom duration-200">
-                    {/* Cabeçalho */}
-                    <div className="h-14 bg-white border-b border-slate-100 flex items-center justify-between px-4 shrink-0">
-                        <button
-                            className="p-2 -ml-2 text-slate-500 hover:text-slate-800 transition-colors"
-                            onClick={() => {
-                                setSelectedFile(null);
-                                setPreviewUrl(null);
-                                setMediaPriceStr('');
-                                setMediaPriceFormatted('R$ 0,00');
-                                setMediaPriceType('free');
-                                setIsTemporary(false);
-                                setCustomExpiryValue(5);
-                                setCustomExpiryUnit('minutes');
-                                setExpiryOption('1h');
-                            }}
-                        >
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
-                        </button>
-                        <h3 className="font-extrabold text-slate-800 text-base tracking-tight">
-                            Configurar Envio de Mídia
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-3xl p-5 w-full max-w-sm flex flex-col shadow-2xl animate-in zoom-in duration-150">
+                        <h3 className="font-extrabold text-sm text-gray-400 uppercase tracking-widest mb-3 text-center">
+                            Configurar Envio
                         </h3>
-                        <div className="w-10" /> {/* Espaçador */}
-                    </div>
 
-                    {/* Conteúdo Rolável */}
-                    <div className="flex-1 overflow-y-auto flex flex-col">
-                        {/* Preview Generoso */}
-                        <div className="w-full bg-slate-100 flex items-center justify-center p-4 shrink-0 min-h-[220px] max-h-[30vh]">
+                        {/* Preview Horizontal Elegante */}
+                        <div className="w-full h-36 relative rounded-2xl overflow-hidden mb-4 bg-gray-100 border border-gray-200 shadow-sm shrink-0 flex items-center justify-center">
                             {previewUrl ? (
-                                <div className="relative h-full max-h-[26vh] aspect-video sm:aspect-square rounded-2xl overflow-hidden shadow-md border border-white">
+                                <div className="relative w-full h-full">
                                     <img 
                                         src={previewUrl} 
-                                        className={`w-full h-full object-cover transition-all duration-300 ${mediaPriceType === 'paid' ? 'blur scale-105' : ''}`} 
+                                        className={`w-full h-full object-cover transition-all duration-300 ${mediaPriceType === 'paid' ? 'blur scale-102' : ''}`} 
                                         alt="Preview" 
                                     />
                                     {isVideo && (
-                                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                                            <div className="w-12 h-12 rounded-full bg-white/30 backdrop-blur-md flex items-center justify-center text-white border border-white/40">
-                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                        <div className="absolute inset-0 flex items-center justify-center bg-black/25">
+                                            <div className="w-10 h-10 rounded-full bg-white/30 backdrop-blur-md flex items-center justify-center text-white border border-white/40">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                                                     <path d="M8 5v14l11-7z" />
                                                 </svg>
                                             </div>
@@ -2996,28 +2975,27 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                     )}
                                 </div>
                             ) : (
-                                <div className="flex flex-col items-center gap-2">
-                                     <div className="w-8 h-8 rounded-full border-2 border-purple-600 border-t-transparent animate-spin" />
-                                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Processando Mídia...</span>
+                                <div className="animate-pulse flex flex-col items-center gap-1.5">
+                                     <div className="w-6 h-6 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
+                                     <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Processando...</span>
                                 </div>
                             )}
                         </div>
 
-                        {/* Controles do Envio */}
-                        <div className="p-6 flex flex-col gap-6 flex-1 bg-white rounded-t-[2rem] -mt-4 shadow-sm border-t border-slate-100">
-                            
-                            {/* Seção 1: Valor */}
-                            <div className="flex flex-col gap-3">
-                                <label className="text-[11px] font-bold text-slate-450 uppercase tracking-wider">
-                                    Valor de Acesso
+                        {/* Configurações em Duas Colunas */}
+                        <div className="grid grid-cols-2 gap-4 mb-5">
+                            {/* Coluna da Esquerda: Preço */}
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                                    Preço
                                 </label>
-                                <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-2xl border border-slate-200">
+                                <div className="flex bg-gray-100 p-0.5 rounded-xl border border-gray-200 h-9">
                                     <button
                                         type="button"
-                                        className={`py-3 text-sm font-extrabold rounded-xl transition-all ${
+                                        className={`flex-1 text-[11px] font-bold rounded-lg transition-all ${
                                             mediaPriceType === 'free'
                                                 ? 'bg-white text-purple-700 shadow-sm'
-                                                : 'text-slate-500 hover:text-slate-700'
+                                                : 'text-gray-500 hover:text-gray-700'
                                         }`}
                                         onClick={() => {
                                             setMediaPriceType('free');
@@ -3029,226 +3007,185 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                     </button>
                                     <button
                                         type="button"
-                                        className={`py-3 text-sm font-extrabold rounded-xl transition-all ${
+                                        className={`flex-1 text-[11px] font-bold rounded-lg transition-all ${
                                             mediaPriceType === 'paid'
                                                 ? 'bg-white text-purple-700 shadow-sm'
-                                                : 'text-slate-500 hover:text-slate-700'
+                                                : 'text-gray-500 hover:text-gray-700'
                                         }`}
                                         onClick={() => {
                                             setMediaPriceType('paid');
                                         }}
                                     >
-                                        Pago (Bloqueado)
+                                        Pago
                                     </button>
                                 </div>
 
-                                {mediaPriceType === 'paid' && (
-                                    <div className="w-full relative mt-1 animate-in slide-in-from-top-2 duration-200">
-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-slate-400">R$</span>
+                                {/* Campo condicional do preço */}
+                                {mediaPriceType === 'paid' ? (
+                                    <div className="relative animate-in slide-in-from-top-1 duration-150 h-9">
+                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">R$</span>
                                         <input
                                             type="text"
-                                            className="bg-slate-50 border border-slate-200 rounded-2xl py-3.5 pl-11 pr-4 w-full text-left text-xl font-black focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-slate-900"
+                                            className="bg-gray-50 border border-gray-200 rounded-xl py-1.5 pl-7 pr-1.5 w-full text-center text-xs font-bold focus:outline-none focus:ring-1 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-gray-900 h-9"
                                             placeholder="0,00"
                                             value={mediaPriceFormatted.replace('R$', '').trim()}
                                             onChange={handlePriceChange}
                                         />
-                                        <p className="text-[10px] text-slate-400 mt-1.5 pl-1 leading-normal">
-                                            Os usuários terão que pagar este valor para visualizar a foto/vídeo.
-                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="h-9 flex items-center justify-center">
+                                        <span className="text-[9.5px] text-gray-400 text-center font-medium leading-tight">Livre acesso</span>
                                     </div>
                                 )}
                             </div>
 
-                            {/* Seção 2: Duração */}
-                            <div className="flex flex-col gap-3">
-                                <label className="text-[11px] font-bold text-slate-450 uppercase tracking-wider">
-                                    Disponibilidade no Chat
+                            {/* Coluna da Direita: Duração */}
+                            <div className="flex flex-col gap-1.5 border-l border-gray-100 pl-4">
+                                <label className="text-[9px] font-black text-gray-450 uppercase tracking-widest">
+                                    Disponibilidade
                                 </label>
-                                <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-2xl border border-slate-200">
-                                    <button
-                                        type="button"
-                                        className={`py-3 text-sm font-extrabold rounded-xl transition-all ${
-                                            !isTemporary
-                                                ? 'bg-white text-purple-700 shadow-sm'
-                                                : 'text-slate-500 hover:text-slate-700'
-                                        }`}
-                                        onClick={() => setIsTemporary(false)}
-                                    >
-                                        Permanente
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className={`py-3 text-sm font-extrabold rounded-xl transition-all ${
-                                            isTemporary
-                                                ? 'bg-white text-purple-700 shadow-sm'
-                                                : 'text-slate-500 hover:text-slate-700'
-                                        }`}
-                                        onClick={() => setIsTemporary(true)}
-                                    >
-                                        Temporária
-                                    </button>
-                                </div>
+                                <select
+                                    className="bg-gray-105 border border-gray-200 rounded-xl px-2 text-[11px] font-bold text-gray-700 focus:outline-none cursor-pointer h-9 shadow-sm"
+                                    value={expiryOption}
+                                    onChange={(e) => {
+                                        const opt = e.target.value as any;
+                                        setExpiryOption(opt);
+                                        if (opt === 'permanent') {
+                                            setIsTemporary(false);
+                                        } else {
+                                            setIsTemporary(true);
+                                            if (opt === '1min') { setCustomExpiryValue(1); setCustomExpiryUnit('minutes'); }
+                                            else if (opt === '10min') { setCustomExpiryValue(10); setCustomExpiryUnit('minutes'); }
+                                            else if (opt === '1h') { setCustomExpiryValue(1); setCustomExpiryUnit('hours'); }
+                                            else if (opt === '24h') { setCustomExpiryValue(24); setCustomExpiryUnit('hours'); }
+                                            else if (opt === '3d') { setCustomExpiryValue(3); setCustomExpiryUnit('days'); }
+                                            else if (opt === '7d') { setCustomExpiryValue(7); setCustomExpiryUnit('days'); }
+                                        }
+                                    }}
+                                >
+                                    <option value="permanent">Permanente</option>
+                                    <option value="1min">1 minuto</option>
+                                    <option value="10min">10 minutos</option>
+                                    <option value="1h">1 hora</option>
+                                    <option value="24h">24 horas</option>
+                                    <option value="3d">3 dias</option>
+                                    <option value="7d">7 dias</option>
+                                    <option value="custom">Personalizado...</option>
+                                </select>
 
-                                {isTemporary && (
-                                    <div className="flex flex-col gap-3 mt-1 animate-in slide-in-from-top-2 duration-200">
-                                        {/* Grade de tempos rápidos e confortáveis */}
-                                        <div className="grid grid-cols-4 gap-2">
-                                            {[
-                                                { label: '1 min', value: '1min' },
-                                                { label: '10 min', value: '10min' },
-                                                { label: '1 hora', value: '1h' },
-                                                { label: '24 horas', value: '24h' },
-                                                { label: '3 dias', value: '3d' },
-                                                { label: '7 dias', value: '7d' },
-                                                { label: 'Outro...', value: 'custom', colSpan: true }
-                                            ].map((opt) => (
-                                                <button
-                                                    key={opt.value}
-                                                    type="button"
-                                                    className={`py-2.5 px-2 text-xs font-bold rounded-xl border transition-all ${
-                                                        opt.colSpan ? 'col-span-2' : ''
-                                                    } ${
-                                                        expiryOption === opt.value
-                                                            ? 'border-purple-650 bg-purple-50 text-purple-750 font-extrabold'
-                                                            : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
-                                                    }`}
-                                                    onClick={() => {
-                                                        setExpiryOption(opt.value as any);
-                                                        // Se clicar em um atalho, definimos o valor customizado correspondente
-                                                        if (opt.value === '1min') { setCustomExpiryValue(1); setCustomExpiryUnit('minutes'); }
-                                                        else if (opt.value === '10min') { setCustomExpiryValue(10); setCustomExpiryUnit('minutes'); }
-                                                        else if (opt.value === '1h') { setCustomExpiryValue(1); setCustomExpiryUnit('hours'); }
-                                                        else if (opt.value === '24h') { setCustomExpiryValue(24); setCustomExpiryUnit('hours'); }
-                                                        else if (opt.value === '3d') { setCustomExpiryValue(3); setCustomExpiryUnit('days'); }
-                                                        else if (opt.value === '7d') { setCustomExpiryValue(7); setCustomExpiryUnit('days'); }
-                                                    }}
-                                                >
-                                                    {opt.label}
-                                                </button>
-                                            ))}
-                                        </div>
-
-                                        {expiryOption === 'custom' && (
-                                            <div className="flex gap-2 items-center justify-between bg-slate-50 p-3.5 rounded-2xl border border-slate-200 animate-in zoom-in-95 duration-150">
-                                                <div className="flex items-center bg-white border border-slate-200 rounded-xl px-2 py-1 shrink-0 shadow-sm">
-                                                    <button
-                                                        type="button"
-                                                        className="w-10 h-10 flex items-center justify-center font-bold text-slate-500 hover:bg-slate-100 rounded-xl text-xl select-none active:scale-90"
-                                                        onClick={() => setCustomExpiryValue(prev => Math.max(1, prev - 1))}
-                                                    >
-                                                        -
-                                                    </button>
-                                                    <span className="w-10 text-center text-base font-black text-slate-800">
-                                                        {customExpiryValue}
-                                                    </span>
-                                                    <button
-                                                        type="button"
-                                                        className="w-10 h-10 flex items-center justify-center font-bold text-slate-500 hover:bg-slate-100 rounded-xl text-xl select-none active:scale-90"
-                                                        onClick={() => setCustomExpiryValue(prev => prev + 1)}
-                                                    >
-                                                        +
-                                                    </button>
-                                                </div>
-
-                                                <select
-                                                    className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-3 text-sm font-bold text-slate-700 shadow-sm focus:outline-none cursor-pointer"
-                                                    value={customExpiryUnit}
-                                                    onChange={(e) => setCustomExpiryUnit(e.target.value as any)}
-                                                >
-                                                    <option value="minutes">Minutos</option>
-                                                    <option value="hours">Horas</option>
-                                                    <option value="days">Dias</option>
-                                                </select>
-                                            </div>
-                                        )}
+                                {/* Campo condicional do personalizado */}
+                                {expiryOption === 'custom' ? (
+                                    <div className="flex gap-1 animate-in slide-in-from-top-1 duration-150 h-9">
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            className="bg-gray-50 border border-gray-200 rounded-xl w-10 text-center text-xs font-bold focus:outline-none focus:ring-1 focus:ring-purple-500/20 focus:border-purple-500 text-gray-900 h-9"
+                                            value={customExpiryValue}
+                                            onChange={(e) => setCustomExpiryValue(Math.max(1, parseInt(e.target.value) || 1))}
+                                        />
+                                        <select
+                                            className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-1 text-[10px] font-bold text-gray-700 focus:outline-none cursor-pointer h-9"
+                                            value={customExpiryUnit}
+                                            onChange={(e) => setCustomExpiryUnit(e.target.value as any)}
+                                        >
+                                            <option value="minutes">Min.</option>
+                                            <option value="hours">Horas</option>
+                                            <option value="days">Dias</option>
+                                        </select>
+                                    </div>
+                                ) : (
+                                    <div className="h-9 flex items-center justify-center">
+                                        <span className="text-[9.5px] text-gray-400 text-center font-medium leading-tight">
+                                            {expiryOption === 'permanent' ? 'Fica para sempre' : 'Mídia temporária'}
+                                        </span>
                                     </div>
                                 )}
                             </div>
                         </div>
-                    </div>
 
-                    {/* Barra de Ações Inferior Fixa */}
-                    <div className="p-4 bg-white border-t border-slate-100 flex gap-3 shrink-0">
-                        <button
-                            className="flex-1 h-12 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-extrabold transition-all active:scale-98 text-sm"
-                            onClick={() => {
-                                setSelectedFile(null);
-                                setPreviewUrl(null);
-                                setMediaPriceStr('');
-                                setMediaPriceFormatted('R$ 0,00');
-                                setMediaPriceType('free');
-                                setIsTemporary(false);
-                                setCustomExpiryValue(5);
-                                setCustomExpiryUnit('minutes');
-                                setExpiryOption('1h');
-                            }}
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            disabled={isVideo && !previewUrl}
-                            className="flex-1 h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-extrabold flex justify-center items-center transition-all shadow-lg shadow-purple-600/20 active:scale-98 disabled:opacity-50 text-sm"
-                            onClick={() => {
-                                const price = parseFloat(mediaPriceStr || '0');
-                                if (mediaPriceType === 'paid' && (!price || price <= 0)) {
-                                    alert('Por favor, defina um valor maior que R$ 0,00 para mídias pagas.');
-                                    return;
-                                }
-                                
-                                const file = selectedFile;
-                                const isVideoFile = isVideo;
-                                const preview = previewUrl || '';
-                                
-                                // Calcular minutos de expiração
-                                let expiryMinutes = 60; // default 1h
-                                if (isTemporary) {
-                                    const val = customExpiryValue || 1;
-                                    if (customExpiryUnit === 'minutes') expiryMinutes = val;
-                                    else if (customExpiryUnit === 'hours') expiryMinutes = val * 60;
-                                    else if (customExpiryUnit === 'days') expiryMinutes = val * 1440;
-                                }
+                        {/* Botões de Ação */}
+                        <div className="flex gap-3 w-full shrink-0">
+                            <button
+                                className="flex-1 h-11 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-bold transition-all active:scale-98 text-xs"
+                                onClick={() => {
+                                    setSelectedFile(null);
+                                    setPreviewUrl(null);
+                                    setMediaPriceStr('');
+                                    setMediaPriceFormatted('R$ 0,00');
+                                    setMediaPriceType('free');
+                                    setIsTemporary(false);
+                                    setCustomExpiryValue(5);
+                                    setCustomExpiryUnit('minutes');
+                                    setExpiryOption('permanent');
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                disabled={isVideo && !previewUrl}
+                                className="flex-1 h-11 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-bold flex justify-center items-center transition-all shadow-lg shadow-purple-600/20 active:scale-98 disabled:opacity-50 text-xs"
+                                onClick={() => {
+                                    const price = parseFloat(mediaPriceStr || '0');
+                                    if (mediaPriceType === 'paid' && (!price || price <= 0)) {
+                                        alert('Por favor, defina um valor maior que R$ 0,00 para mídias pagas.');
+                                        return;
+                                    }
+                                    
+                                    const file = selectedFile;
+                                    const isVideoFile = isVideo;
+                                    const preview = previewUrl || '';
+                                    
+                                    // Calcular minutos de expiração
+                                    let expiryMinutes = 60; // default 1h
+                                    if (isTemporary) {
+                                        const val = customExpiryValue || 1;
+                                        if (customExpiryUnit === 'minutes') expiryMinutes = val;
+                                        else if (customExpiryUnit === 'hours') expiryMinutes = val * 60;
+                                        else if (customExpiryUnit === 'days') expiryMinutes = val * 1440;
+                                    }
 
-                                const expiresAtCalculated = isTemporary 
-                                    ? new Date(Date.now() + expiryMinutes * 60000).toISOString()
-                                    : undefined;
+                                    const expiresAtCalculated = isTemporary 
+                                        ? new Date(Date.now() + expiryMinutes * 60000).toISOString()
+                                        : undefined;
 
-                                setSelectedFile(null);
-                                setPreviewUrl(null);
-                                setMediaPriceStr('');
-                                setMediaPriceFormatted('R$ 0,00');
-                                setMediaPriceType('free');
-                                setIsTemporary(false);
-                                setCustomExpiryValue(5);
-                                setCustomExpiryUnit('minutes');
-                                setExpiryOption('1h');
+                                    setSelectedFile(null);
+                                    setPreviewUrl(null);
+                                    setMediaPriceStr('');
+                                    setMediaPriceFormatted('R$ 0,00');
+                                    setMediaPriceType('free');
+                                    setIsTemporary(false);
+                                    setCustomExpiryValue(5);
+                                    setCustomExpiryUnit('minutes');
+                                    setExpiryOption('permanent');
 
-                                const tempId = `temp-media-${Date.now()}`;
-                                const priceInCents = Math.round(price * 100);
-                                const newMsg: Message = {
-                                    _id: tempId,
-                                    tempId: tempId,
-                                    senderId: user?.id ?? '',
-                                    receiverId: otherUserId,
-                                    content: isVideoFile ? 'Vídeo' : 'Foto',
-                                    charCount: 0,
-                                    cost: 0,
-                                    timestamp: new Date().toISOString(),
-                                    status: 'sending',
-                                    isVideo: isVideoFile,
-                                    thumbnailUrl: isVideoFile ? preview : undefined,
-                                    originalImageUrl: !isVideoFile ? preview : undefined,
-                                    isLockedImage: priceInCents > 0,
-                                    lockedImagePrice: priceInCents,
-                                    isTemporary: isTemporary,
-                                    expiresAt: expiresAtCalculated ? new Date(expiresAtCalculated) : undefined,
-                                };
-                                setMessages(prev => [...prev, newMsg]);
+                                    const tempId = `temp-media-${Date.now()}`;
+                                    const priceInCents = Math.round(price * 100);
+                                    const newMsg: Message = {
+                                        _id: tempId,
+                                        tempId: tempId,
+                                        senderId: user?.id ?? '',
+                                        receiverId: otherUserId,
+                                        content: isVideoFile ? 'Vídeo' : 'Foto',
+                                        charCount: 0,
+                                        cost: 0,
+                                        timestamp: new Date().toISOString(),
+                                        status: 'sending',
+                                        isVideo: isVideoFile,
+                                        thumbnailUrl: isVideoFile ? preview : undefined,
+                                        originalImageUrl: !isVideoFile ? preview : undefined,
+                                        isLockedImage: priceInCents > 0,
+                                        lockedImagePrice: priceInCents,
+                                        isTemporary: isTemporary,
+                                        expiresAt: expiresAtCalculated ? new Date(expiresAtCalculated) : undefined,
+                                    };
+                                    setMessages(prev => [...prev, newMsg]);
 
-                                startMediaUpload(file, isVideoFile, priceInCents, tempId, preview, isTemporary, expiryMinutes);
-                            }}
-                        >
-                            Enviar Mídia
-                        </button>
+                                    startMediaUpload(file, isVideoFile, priceInCents, tempId, preview, isTemporary, expiryMinutes);
+                                }}
+                            >
+                                Enviar
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

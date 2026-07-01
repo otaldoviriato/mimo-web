@@ -109,7 +109,7 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
                 const bufferLength = analyserRef.current.frequencyBinCount;
                 const dataArray = dataArrayRef.current;
 
-                analyserRef.current.getByteFrequencyData(dataArray);
+                analyserRef.current.getByteFrequencyData(dataArray as any);
 
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
 
