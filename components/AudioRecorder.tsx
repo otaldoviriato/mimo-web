@@ -141,7 +141,6 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
             setStatus('recording');
             startTimer();
             startWaveformAnimation(stream);
-            vibrate(25);
         } catch (err) {
             console.error('Error accessing microphone:', err);
             alert('Não foi possível acessar o microfone. Verifique as permissões do seu navegador/dispositivo.');
@@ -216,6 +215,7 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
     const handleTouchStart = (e: React.TouchEvent) => {
         if (!connected || status !== 'idle') return;
         e.preventDefault();
+        vibrate(50); // vibração IMEDIATA ao toque — antes de qualquer async
         isTouchActiveRef.current = true;
         swipeDirectionRef.current = null;
         const touch = e.touches[0];
@@ -245,6 +245,7 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
     const handleMouseDown = (e: React.MouseEvent) => {
         if (!connected || status !== 'idle' || e.button !== 0) return;
         e.preventDefault();
+        vibrate(50); // vibração IMEDIATA ao clique
         isTouchActiveRef.current = true;
         swipeDirectionRef.current = null;
         touchStartCoords.current = { x: e.clientX, y: e.clientY };
@@ -479,15 +480,16 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseLeave}
                             disabled={!connected}
-                            className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 disabled:opacity-50 ${
+                            className={`rounded-2xl flex items-center justify-center shrink-0 disabled:opacity-50 ${
                                 status === 'recording'
-                                    ? 'bg-red-500 text-white'
-                                    : 'bg-purple-600 text-white hover:bg-purple-700 active:scale-90 shadow-sm'
+                                    // Botão grande (64px) para ficar visível sob o dedo
+                                    ? 'w-16 h-16 bg-red-500 text-white'
+                                    : 'w-11 h-11 bg-purple-600 text-white hover:bg-purple-700 active:scale-90 shadow-sm'
                             }`}
                             style={{
                                 // Em gravação: acompanha o dedo no eixo detectado
                                 transform: status === 'recording'
-                                    ? `translate(${btnX}px, ${btnY}px) scale(1.15)`
+                                    ? `translate(${btnX}px, ${btnY}px)`
                                     : undefined,
                                 transition: status === 'recording'
                                     ? 'transform 0.04s linear'
@@ -496,10 +498,10 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
                                 // Sombra contextual apenas quando gravando
                                 boxShadow: status === 'recording'
                                     ? cancelProgress > 0.25
-                                        ? `0 4px 18px rgba(239, 68, 68, ${0.35 + cancelProgress * 0.45})`
+                                        ? `0 6px 24px rgba(239, 68, 68, ${0.4 + cancelProgress * 0.45})`
                                         : lockProgress > 0.25
-                                            ? `0 4px 18px rgba(109, 40, 217, ${0.35 + lockProgress * 0.45})`
-                                            : '0 4px 14px rgba(239, 68, 68, 0.45)'
+                                            ? `0 6px 24px rgba(109, 40, 217, ${0.4 + lockProgress * 0.45})`
+                                            : '0 6px 20px rgba(239, 68, 68, 0.5)'
                                     : undefined,
                             }}
                         >
