@@ -19,6 +19,7 @@ export interface IMessage extends Document {
     videoUrl?: string;
     thumbnailUrl?: string;
     isGift?: boolean;
+    isSystem?: boolean;
     deletedFor?: string[];
     replyToId?: string | null;
     replyToContent?: string | null;
@@ -99,6 +100,10 @@ const MessageSchema = new Schema<IMessage>({
         default: null,
     },
     isGift: {
+        type: Boolean,
+        default: false,
+    },
+    isSystem: {
         type: Boolean,
         default: false,
     },

@@ -29,6 +29,7 @@ interface Message {
     videoUrl?: string;
     thumbnailUrl?: string;
     isGift?: boolean;
+    isSystem?: boolean;
     receiverEarnings?: number;
     status?: 'sending' | 'sent' | 'error';
     tempId?: string;
@@ -58,6 +59,7 @@ interface CachedRoom {
     otherUser?: {
         balance?: number;
     };
+    monetizationDisabled?: boolean;
 }
 
 function formatMediaDuration(durationInSeconds?: number) {
@@ -322,6 +324,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const [loadingMore, setLoadingMore] = useState(false);
     const [messageText, setMessageText] = useState('');
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+    const [monetizationDisabled, setMonetizationDisabled] = useState(false);
 
     // Refs para o gesto de swipe para responder
     const swipingMessage = useRef<Message | null>(null);
@@ -786,9 +789,12 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
         socketService.joinRoom(user.id, otherUserId);
 
-        socket.on('room_joined', (data: { messages: Message[] }) => {
+        socket.on('room_joined', (data: { messages: Message[]; monetizationDisabled?: boolean }) => {
             setMessages([...data.messages]);
             setLoadingMessages(false);
+            if (data.monetizationDisabled !== undefined) {
+                setMonetizationDisabled(data.monetizationDisabled);
+            }
             if (data.messages.length < 50) {
                 setHasMore(false);
             } else {
@@ -851,6 +857,12 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                         lastSeen: data.lastSeen
                     };
                 });
+            }
+        });
+
+        socket.on('monetization_toggled', (data: { roomId: string; disabled: boolean }) => {
+            if (data.roomId === roomId) {
+                setMonetizationDisabled(data.disabled);
             }
         });
 
@@ -1003,6 +1015,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             socketService.leaveRoom(roomId);
             socket.off('room_joined');
             socket.off('user_presence');
+            socket.off('monetization_toggled');
             socketService.offNewMessage();
             socket.off('balance_update');
             socket.off('message_error');
@@ -1877,7 +1890,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
     const charCount = messageText.length;
     const isSubscriber = receiver?.subscribers?.includes(user?.id ?? '');
-    const currentRate = receiver?.isProfessional 
+    const currentRate = (receiver?.isProfessional && !monetizationDisabled)
         ? (isSubscriber 
             ? (receiver.chargePerCharSubscribers ?? 0.002) 
             : (receiver.chargePerCharNonSubscribers ?? 0.005))
@@ -2047,6 +2060,34 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                 </svg>
                                                 Denunciar
                                             </button>
+                                            {userData?.isAdmin && (
+                                                <>
+                                                    <div className="border-t border-gray-100" />
+                                                    <button
+                                                        onClick={() => {
+                                                            setMenuVisible(false);
+                                                            socket?.emit('toggle_monetization', { roomId, disabled: !monetizationDisabled });
+                                                        }}
+                                                        className="flex items-center gap-3 w-full px-4 py-3 text-sm text-purple-700 hover:bg-purple-50 transition-colors font-semibold"
+                                                    >
+                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                            {monetizationDisabled ? (
+                                                                <>
+                                                                    <circle cx="12" cy="12" r="10" />
+                                                                    <line x1="12" y1="8" x2="12" y2="16" />
+                                                                    <line x1="8" y1="12" x2="16" y2="12" />
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <circle cx="12" cy="12" r="10" />
+                                                                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                                                                </>
+                                                            )}
+                                                        </svg>
+                                                        {monetizationDisabled ? 'Habilitar Monetização' : 'Desabilitar Monetização'}
+                                                    </button>
+                                                </>
+                                            )}
                                         </div>
                                     </>
                                 )}
@@ -2085,7 +2126,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 {[...messages].reverse().map((item, index, arr) => {
                     const isMine = item.senderId === user?.id;
                     const isLocked = item.isLockedImage;
-                    const isText = !item.isGift && !isLocked && !item.originalImageUrl && !item.isVideo;
+                    const isText = !item.isGift && !isLocked && !item.originalImageUrl && !item.isVideo && !item.isSystem;
                     
                     const nextItem = arr[index + 1];
                     let shouldShowSeparator = false;
@@ -2105,8 +2146,15 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     
                     return (
                         <React.Fragment key={item._id}>
-                            <div
-                                id={`msg-${item._id}`}
+                            {item.isSystem ? (
+                                <div className="flex justify-center my-3.5 w-full px-4 select-none">
+                                    <div className="bg-slate-100 text-slate-700 text-[11px] md:text-xs px-4 py-2.5 rounded-2xl font-bold shadow-sm border border-slate-200 text-center max-w-[85%]">
+                                        {item.content}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div
+                                    id={`msg-${item._id}`}
                                 className={`flex ${isMine ? 'justify-end' : 'justify-start'} items-end ${isText ? 'mb-0.5' : 'mb-2'} -mx-4 px-4 py-0.5 transition-colors duration-300 ${selectedMessageIds.has(item._id) ? 'bg-purple-100/50' : ''} select-none no-select relative`}
                                 style={{ touchAction: 'pan-y' }}
                                 onMouseDown={(e) => handleStartPress(item, e)}
@@ -2572,7 +2620,8 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                     )}
                                 </>
                             )}
-                            </div>
+                                </div>
+                            )}
                             {shouldShowSeparator && (
                                 <div className="flex items-center gap-3 my-6 px-4 w-full">
                                     <span className="text-[8.5px] font-black uppercase tracking-[0.15em] text-purple-600/75 dark:text-purple-400/80 whitespace-nowrap">
