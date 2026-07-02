@@ -22,6 +22,7 @@ export interface IMessage extends Document {
     isSystem?: boolean;
     isTemporary?: boolean;
     expiresAt?: Date;
+    expiryMinutes?: number;
     deletedFor?: string[];
     replyToId?: string | null;
     replyToContent?: string | null;
@@ -115,6 +116,10 @@ const MessageSchema = new Schema<IMessage>({
     },
     expiresAt: {
         type: Date,
+        default: null,
+    },
+    expiryMinutes: {
+        type: Number,
         default: null,
     },
     deletedFor: {
