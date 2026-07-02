@@ -2039,9 +2039,9 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         estimatedCostInReais = totalCostInCents / 100;
     }
 
-    // Preço do áudio: preço por caractere x multiplicador configurável, por minuto.
+    // Preço do áudio: preço por caractere x multiplicador configurável, por segundo.
     const audioPriceMultiplier = receiver?.audioPriceMultiplier ?? 5;
-    const audioCostPerSecondInCents = currentRate > 0 ? (currentRate * 100 * audioPriceMultiplier) / 60 : 0;
+    const audioCostPerSecondInCents = currentRate > 0 ? (currentRate * 100 * audioPriceMultiplier) : 0;
     // Quantos segundos de áudio o saldo atual do cliente consegue pagar (undefined = sem limite, mensagem gratuita).
     const maxAudioDurationSeconds = audioCostPerSecondInCents > 0
         ? Math.floor(balance / audioCostPerSecondInCents)
@@ -3008,6 +3008,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     
                     {(audioRecordingStatus === 'idle' && (messageText.trim() || selectedFile)) ? (
                         <button
+                            onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
                                 if (selectedFile) {
                                     // Fallback: só é alcançável durante a janela em que userData ainda

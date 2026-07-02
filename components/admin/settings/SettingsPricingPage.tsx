@@ -120,10 +120,10 @@ export function SettingsPricingPage({
                     title="Multiplicador de Preço do Áudio"
                     description={
                         <span>
-                            Fator aplicado sobre o preço por caractere do profissional para calcular o valor cobrado por <strong className="text-slate-600">minuto de áudio</strong> enviado. O preço por minuto de áudio é sempre calculado como <strong className="text-slate-600">preço por caractere × este multiplicador</strong>, usando a mesma taxa (assinante ou não-assinante) já definida pelo profissional para mensagens de texto. Exemplo: se o preço por caractere é R$ 0,005 e o multiplicador é 5, cada minuto de áudio custa R$ 0,025.
+                            Fator aplicado sobre o preço por caractere do profissional para calcular o valor cobrado por <strong className="text-slate-600">segundo de áudio</strong> enviado. O preço por segundo de áudio é sempre calculado como <strong className="text-slate-600">preço por caractere × este multiplicador</strong>, usando a mesma taxa (assinante ou não-assinante) já definida pelo profissional para mensagens de texto. Exemplo: se o preço por caractere é R$ 0,005 e o multiplicador é 5, cada segundo de áudio custa R$ 0,025.
                         </span>
                     }
-                    unit="x por minuto"
+                    unit="x por segundo"
                 >
                     <input
                         type="number"

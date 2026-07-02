@@ -667,7 +667,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                         {/* Preço do Áudio (derivado do preço por caractere) */}
                                         <div className="bg-purple-50/40 rounded-xl p-2.5 border border-purple-50 text-[10px]">
                                             <span className="font-semibold text-gray-400 uppercase tracking-wider text-[8px] block mb-1">
-                                                Preço do Áudio (por minuto)
+                                                Preço do Áudio (por segundo)
                                             </span>
                                             <p className="text-[9px] text-gray-400 leading-snug mb-1.5">
                                                 Calculado automaticamente como o preço por caractere × {userData?.audioPriceMultiplier ?? 5}.
@@ -676,13 +676,13 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                                 <div className="flex flex-col gap-0.5">
                                                     <span className="font-semibold text-gray-400 uppercase tracking-wider text-[8px]">Não Assinantes</span>
                                                     <span className="font-bold text-gray-800">
-                                                        {((Number(chargePerCharNonSubscribers) || 0) * (userData?.audioPriceMultiplier ?? 5)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4 })} / min
+                                                        {((Number(chargePerCharNonSubscribers) || 0) * (userData?.audioPriceMultiplier ?? 5)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4 })} / seg
                                                     </span>
                                                 </div>
                                                 <div className="flex flex-col gap-0.5 border-l border-purple-100/50 pl-2.5">
                                                     <span className="font-semibold text-purple-600 uppercase tracking-wider text-[8px]">Assinantes</span>
                                                     <span className="font-bold text-purple-700">
-                                                        {((Number(chargePerCharNonSubscribers) || 0) * (1 - (userData?.subscriberDiscountPercentage ?? 20) / 100) * (userData?.audioPriceMultiplier ?? 5)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4 })} / min
+                                                        {((Number(chargePerCharNonSubscribers) || 0) * (1 - (userData?.subscriberDiscountPercentage ?? 20) / 100) * (userData?.audioPriceMultiplier ?? 5)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4 })} / seg
                                                     </span>
                                                 </div>
                                             </div>
