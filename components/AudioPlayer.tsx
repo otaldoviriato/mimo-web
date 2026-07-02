@@ -23,8 +23,18 @@ export function AudioPlayer({ src, duration = 0, isMine, timestamp, isRead, isDe
         const audio = new Audio(src);
         audioRef.current = audio;
 
+        const updateProgress = () => {
+            if (audio && !audio.paused) {
+                setCurrentTime(audio.currentTime);
+                animationFrameRef.current = requestAnimationFrame(updateProgress);
+            }
+        };
+
         const onTimeUpdate = () => {
-            setCurrentTime(audio.currentTime);
+            // Atualiza o progresso quando o áudio estiver pausado ou o loop de animação não estiver ativo
+            if (audio.paused || !animationFrameRef.current) {
+                setCurrentTime(audio.currentTime);
+            }
         };
 
         const onEnded = () => {
@@ -32,15 +42,24 @@ export function AudioPlayer({ src, duration = 0, isMine, timestamp, isRead, isDe
             setCurrentTime(0);
             if (animationFrameRef.current) {
                 cancelAnimationFrame(animationFrameRef.current);
+                animationFrameRef.current = null;
             }
         };
 
         const onPlay = () => {
             setIsPlaying(true);
+            if (animationFrameRef.current) {
+                cancelAnimationFrame(animationFrameRef.current);
+            }
+            animationFrameRef.current = requestAnimationFrame(updateProgress);
         };
 
         const onPause = () => {
             setIsPlaying(false);
+            if (animationFrameRef.current) {
+                cancelAnimationFrame(animationFrameRef.current);
+                animationFrameRef.current = null;
+            }
         };
 
         audio.addEventListener('timeupdate', onTimeUpdate);
