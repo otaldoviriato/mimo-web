@@ -369,6 +369,60 @@ function TemporaryMediaBadge({ expiresAt, onExpire }: { expiresAt: string | Date
     );
 }
 
+const compressImage = (file: File, maxW = 1600, maxH = 1600, quality = 0.82): Promise<File> => {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target?.result as string;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > maxW) {
+                        height = Math.round((height * maxW) / width);
+                        width = maxW;
+                    }
+                } else {
+                    if (height > maxH) {
+                        width = Math.round((width * maxH) / height);
+                        height = maxH;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    resolve(file); // Fallback se falhar
+                    return;
+                }
+                ctx.drawImage(img, 0, 0, width, height);
+                canvas.toBlob(
+                    (blob) => {
+                        if (!blob) {
+                            resolve(file);
+                            return;
+                        }
+                        const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+                            type: 'image/jpeg',
+                            lastModified: Date.now()
+                        });
+                        resolve(compressedFile);
+                    },
+                    'image/jpeg',
+                    quality
+                );
+            };
+            img.onerror = () => resolve(file);
+        };
+        reader.onerror = () => resolve(file);
+    });
+};
+
 export default function ChatPage({ params, userId: propUserId, giftCode: propGiftCode, onBack, isSubPage = false, isClosing = false }: ChatPageProps) {
     const resolvedParams = params ? use(params) : null;
     const otherUserId = propUserId || resolvedParams?.userId || '';
@@ -554,9 +608,12 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 return m.originalImageUrl || (m.isVideo && m.videoUrl);
             })
             .map(m => ({
+                messageId: m._id,
                 url: m.isVideo ? m.videoUrl! : m.originalImageUrl!,
                 thumbnailUrl: m.isVideo ? m.thumbnailUrl : m.originalImageUrl,
                 isVideo: !!m.isVideo,
+                isTemporary: m.isTemporary,
+                expiresAt: m.expiresAt,
             }));
 
         const newLocalMedias = localMedias.filter(item => !loadedUrls.has(item.url));
@@ -1344,11 +1401,20 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 }
             }
 
+            let uploadFile = file;
+            if (!isVideoFile) {
+                try {
+                    uploadFile = await compressImage(file);
+                } catch (err) {
+                    console.error("Falha ao compactar imagem no cliente:", err);
+                }
+            }
+
             const formData = new FormData();
             if (isVideoFile) {
                 formData.append('videoUrl', finalVideoUrl);
             } else {
-                formData.append('file', file);
+                formData.append('file', uploadFile);
             }
             
             formData.append('roomId', roomId);
@@ -3334,10 +3400,26 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                 {mediaItems.map((item, idx) => (
                                     <div 
                                         key={idx} 
-                                        className="h-full flex-shrink-0 flex items-center justify-center"
+                                        className="h-full flex-shrink-0 flex items-center justify-center relative"
                                         style={{ width: '100vw' }}
                                         onClick={handleSlideClick}
                                     >
+                                        {item.isTemporary && item.expiresAt && idx === fullscreenIndex && (
+                                            <div 
+                                                onClick={e => e.stopPropagation()} 
+                                                className="absolute top-24 right-4 z-50 pointer-events-auto"
+                                            >
+                                                <TemporaryMediaBadge 
+                                                    expiresAt={item.expiresAt} 
+                                                    onExpire={() => {
+                                                        if (item.messageId) {
+                                                            setMessages(prev => prev.map(m => m._id === item.messageId ? { ...m, isExpired: true } : m));
+                                                        }
+                                                        setFullscreenIndex(null);
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
                                         {item.isVideo ? (
                                             <VideoPlayer
                                                 key={item.url}
