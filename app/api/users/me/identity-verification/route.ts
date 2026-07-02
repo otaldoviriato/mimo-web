@@ -279,15 +279,15 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // 5. Atualizar usuário no banco de dados e liberar a conta da criadora automaticamente
+        // 5. Atualizar usuário no banco de dados e liberar a conta da criadora se for profissional
         const updatedUser = await User.findOneAndUpdate(
             { clerkId: userId },
             {
                 $set: {
                     taxId: cpfClean,
                     birthDate: birthDateObj,
-                    professionalStatus: 'approved',
-                    isProfessional: true, // Define como profissional no final do fluxo step-by-step
+                    professionalStatus: user.isProfessional ? 'approved' : null,
+                    isProfessional: user.isProfessional ?? false,
                     notes: ''
                 }
             },
@@ -302,7 +302,7 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
             success: true,
-            professionalStatus: 'approved'
+            professionalStatus: user.isProfessional ? 'approved' : null
         });
     } catch (error: unknown) {
         console.error('Erro na validação de CPF:', error);

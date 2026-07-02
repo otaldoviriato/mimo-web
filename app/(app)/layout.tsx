@@ -28,9 +28,9 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     
     // Garante que o perfil carregado no cache/Query pertence ao usuário atualmente logado no Clerk
     const isProfileValid = !!(userData && user && userData.clerkId === user.id);
-    const professionalNeedsIdentity =
+    const userNeedsIdentity =
         isProfileValid &&
-        userData.isProfessional === true &&
+        userData.isProfessional !== undefined &&
         (!userData.taxId || !userData.birthDate);
 
     const router = useRouter();
@@ -415,7 +415,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             router.replace('/onboarding');
             return;
         }
-        if (professionalNeedsIdentity) {
+        if (userNeedsIdentity) {
             router.replace('/onboarding');
             return;
         }
@@ -425,7 +425,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                 router.replace('/onboarding');
             }
         }
-    }, [isProfileValid, userData?.isProfessional, professionalNeedsIdentity, pathname, router]);
+    }, [isProfileValid, userData?.isProfessional, userNeedsIdentity, pathname, router]);
 
     if (!isLoaded || (isSignedIn && !isNavInitialized)) {
         return (
@@ -528,7 +528,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
     const needsOnboarding =
         (isProfileValid && userData?.isProfessional === undefined) ||
-        professionalNeedsIdentity ||
+        userNeedsIdentity ||
         hasPendingOnboardingStep;
 
     if (needsOnboarding) {

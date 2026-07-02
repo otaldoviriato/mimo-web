@@ -149,9 +149,9 @@ export default function OnboardingPage() {
         }
         if (userData.photoUrl) setPhotoPreview(userData.photoUrl);
 
-        const needsIdentity = userData.isProfessional === true && (!userData.taxId || !userData.birthDate);
+        const needsIdentity = userData.isProfessional !== undefined && (!userData.taxId || !userData.birthDate);
 
-        // 1. Profissional que ainda precisa verificar identidade (via API do servidor)
+        // 1. Usuário que ainda precisa verificar identidade (via API do servidor)
         if (needsIdentity) {
             setStep('identity');
             localStorage.setItem(STEP_KEY, 'identity');
@@ -318,19 +318,16 @@ export default function OnboardingPage() {
         setRoleLoading(true);
         setRoleError('');
         try {
-            if (role === 'client') {
-                const res = await fetch('/api/users/me', {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ isProfessional: false }),
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Erro ao definir perfil');
-                await refetch();
-                navigateToApp();
-            } else {
-                go('identity');
-            }
+            const isProfessional = role === 'professional';
+            const res = await fetch('/api/users/me', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isProfessional }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao definir perfil');
+            await refetch();
+            go('identity');
         } catch (err: any) {
             setRoleError(err.message || 'Erro de conexão. Tente novamente.');
         } finally {
@@ -643,14 +640,20 @@ export default function OnboardingPage() {
                                 Validação de Identidade
                             </h2>
                             <p className="text-[13px] text-gray-500 mt-1.5 leading-relaxed">
-                                Precisamos confirmar que você é maior de idade para liberar o perfil profissional.
+                                {role === 'professional' || userData?.isProfessional === true
+                                    ? "Precisamos confirmar que você é maior de idade para liberar o perfil profissional."
+                                    : "Precisamos confirmar que você é maior de idade para liberar o seu acesso."
+                                }
                             </p>
                         </div>
 
                         {/* Banner informativo */}
                         <div className="rounded-2xl border border-purple-100 bg-purple-50 px-4 py-3">
                             <p className="text-[11px] font-semibold text-purple-900 leading-relaxed">
-                                Seus dados ficam protegidos. Os repasses só vão para uma chave Pix vinculada a este CPF.
+                                {role === 'professional' || userData?.isProfessional === true
+                                    ? "Seus dados ficam protegidos. Os repasses só vão para uma chave Pix vinculada a este CPF."
+                                    : "Seus dados ficam protegidos em conformidade com as diretrizes de segurança do MimoChat."
+                                }
                             </p>
                         </div>
 
@@ -956,7 +959,10 @@ export default function OnboardingPage() {
                 <div className="space-y-2">
                     <h2 className="text-2xl font-black text-gray-900 tracking-tight">Tudo certo!</h2>
                     <p className="text-sm text-gray-500 max-w-[250px] mx-auto leading-relaxed">
-                        Seu CPF foi validado e seu perfil profissional está pronto para começar.
+                        {userData?.isProfessional
+                            ? "Seu CPF foi validado e seu perfil profissional está pronto para começar."
+                            : "Seu CPF foi validado e sua conta está pronta para você começar a conversar."
+                        }
                     </p>
                 </div>
 
