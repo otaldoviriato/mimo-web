@@ -69,8 +69,11 @@ export async function GET(request: NextRequest) {
         const earningsByUser = new Map(earningsAgg.map(e => [e._id, e.total]));
 
         // Quantidade de conversas (salas) por usuário
+        // $setUnion remove duplicatas dentro do array de participantes antes do $unwind,
+        // evitando contar a mesma sala 2x em conversas antigas onde os 2 participantes são o mesmo usuário
         const roomsAgg = await Room.aggregate([
             { $match: { participants: { $in: clerkIds } } },
+            { $project: { participants: { $setUnion: ['$participants', []] } } },
             { $unwind: '$participants' },
             { $match: { participants: { $in: clerkIds } } },
             { $group: { _id: '$participants', total: { $sum: 1 } } },
@@ -80,7 +83,7 @@ export async function GET(request: NextRequest) {
         // Quantidade de mensagens trocadas (enviadas ou recebidas) por usuário
         const messagesAgg = await Message.aggregate([
             { $match: { isSystem: { $ne: true }, $or: [{ senderId: { $in: clerkIds } }, { receiverId: { $in: clerkIds } }] } },
-            { $project: { parties: ['$senderId', '$receiverId'] } },
+            { $project: { parties: { $setUnion: [['$senderId'], ['$receiverId']] } } },
             { $unwind: '$parties' },
             { $match: { parties: { $in: clerkIds } } },
             { $group: { _id: '$parties', total: { $sum: 1 } } },
