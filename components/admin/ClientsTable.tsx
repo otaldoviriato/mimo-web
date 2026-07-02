@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, MoreVertical, ShieldCheck, Mail, Calendar, Coins, Edit, Trash2, X, Phone, TrendingUp, Activity, ArrowUpDown } from 'lucide-react';
+import { Search, MoreVertical, ShieldCheck, Mail, Calendar, Coins, Edit, Trash2, X, Phone, TrendingUp, Activity, ArrowUpDown, MessageCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 
@@ -11,7 +11,7 @@ export function ClientsTable() {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedUserMenu, setSelectedUserMenu] = useState<string | null>(null);
-    const [sortBy, setSortBy] = useState<'recent' | 'access' | 'deposited' | 'balance'>('recent');
+    const [sortBy, setSortBy] = useState<'recent' | 'access' | 'deposited' | 'balance' | 'rooms' | 'messages'>('recent');
 
     // Ordena os usuários conforme o critério selecionado
     const sortedUsers = useMemo(() => {
@@ -25,6 +25,12 @@ export function ClientsTable() {
                 break;
             case 'balance':
                 sorted.sort((a, b) => (b.balance || 0) - (a.balance || 0));
+                break;
+            case 'rooms':
+                sorted.sort((a, b) => (b.roomsCount || 0) - (a.roomsCount || 0));
+                break;
+            case 'messages':
+                sorted.sort((a, b) => (b.messagesCount || 0) - (a.messagesCount || 0));
                 break;
             default:
                 break; // mantém a ordem de cadastro mais recente vinda da API
@@ -141,6 +147,8 @@ export function ClientsTable() {
                             <option value="access">Mais acessos</option>
                             <option value="deposited">Maior total adicionado</option>
                             <option value="balance">Maior saldo</option>
+                            <option value="rooms">Mais conversas</option>
+                            <option value="messages">Mais mensagens</option>
                         </select>
                     </div>
 
@@ -173,6 +181,7 @@ export function ClientsTable() {
                                 <th className="py-4 px-6">Saldo da Carteira</th>
                                 <th className="py-4 px-6">Total Adicionado</th>
                                 <th className="py-4 px-6">Acessos</th>
+                                <th className="py-4 px-6">Conversas & Mensagens</th>
                                 <th className="py-4 px-6">WhatsApp / Telefone</th>
                                 <th className="py-4 px-6">Cadastro</th>
                                 <th className="py-4 px-6 text-center">Ações</th>
@@ -246,6 +255,19 @@ export function ClientsTable() {
                                                 </span>
                                                 <span className="text-[11px] text-slate-400 font-medium">
                                                     Último: {formatLastSeen(user.lastAccessAt)}
+                                                </span>
+                                            </div>
+                                        </td>
+
+                                        {/* Conversas & Mensagens */}
+                                        <td className="py-4 px-6">
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                                                    <MessageCircle size={12} className="text-slate-400" />
+                                                    {user.roomsCount || 0} conversa{(user.roomsCount || 0) === 1 ? '' : 's'}
+                                                </span>
+                                                <span className="text-[11px] text-slate-400 font-medium">
+                                                    {user.messagesCount || 0} mensage{(user.messagesCount || 0) === 1 ? 'm' : 'ns'} trocadas
                                                 </span>
                                             </div>
                                         </td>
@@ -334,7 +356,7 @@ export function ClientsTable() {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={7} className="py-20 text-center text-sm font-semibold text-slate-400">
+                                    <td colSpan={8} className="py-20 text-center text-sm font-semibold text-slate-400">
                                         Nenhum usuário encontrado.
                                     </td>
                                 </tr>

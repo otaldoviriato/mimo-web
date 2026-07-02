@@ -5,6 +5,8 @@ import { User } from '@/models/User';
 import { AppSettings } from '@/models/AppSettings';
 import { Transaction } from '@/models/Transaction';
 import { MicroTransaction } from '@/models/MicroTransaction';
+import { Room } from '@/models/Room';
+import { Message } from '@/models/Message';
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
@@ -66,6 +68,25 @@ export async function GET(request: NextRequest) {
         ]);
         const earningsByUser = new Map(earningsAgg.map(e => [e._id, e.total]));
 
+        // Quantidade de conversas (salas) por usuário
+        const roomsAgg = await Room.aggregate([
+            { $match: { participants: { $in: clerkIds } } },
+            { $unwind: '$participants' },
+            { $match: { participants: { $in: clerkIds } } },
+            { $group: { _id: '$participants', total: { $sum: 1 } } },
+        ]);
+        const roomsByUser = new Map(roomsAgg.map(r => [r._id, r.total]));
+
+        // Quantidade de mensagens trocadas (enviadas ou recebidas) por usuário
+        const messagesAgg = await Message.aggregate([
+            { $match: { isSystem: { $ne: true }, $or: [{ senderId: { $in: clerkIds } }, { receiverId: { $in: clerkIds } }] } },
+            { $project: { parties: ['$senderId', '$receiverId'] } },
+            { $unwind: '$parties' },
+            { $match: { parties: { $in: clerkIds } } },
+            { $group: { _id: '$parties', total: { $sum: 1 } } },
+        ]);
+        const messagesByUser = new Map(messagesAgg.map(m => [m._id, m.total]));
+
         return NextResponse.json({
             users: usersList.map(u => ({
                 id: u.clerkId,
@@ -87,6 +108,8 @@ export async function GET(request: NextRequest) {
                 totalEarned: earningsByUser.get(u.clerkId) || 0,
                 accessCount: u.accessCount || 0,
                 lastAccessAt: u.lastAccessAt ? new Date(u.lastAccessAt).toISOString() : null,
+                roomsCount: roomsByUser.get(u.clerkId) || 0,
+                messagesCount: messagesByUser.get(u.clerkId) || 0,
             }))
         });
 
