@@ -22,6 +22,7 @@ export interface SettingsData {
     onlineDelayMinutes?: number;
     defaultPricePerCharSubscribers: number;
     defaultPricePerCharNonSubscribers: number;
+    audioPriceMultiplier: number;
     pwaShowAgainIntervalDays: number;
     newProfileDaysThreshold: number;
 }

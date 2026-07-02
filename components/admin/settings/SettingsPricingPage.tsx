@@ -12,6 +12,7 @@ type Props = Pick<UseSettingsReturn,
     | 'minSubscriptionPrice' | 'setMinSubscriptionPrice'
     | 'maxSubscriptionPrice' | 'setMaxSubscriptionPrice'
     | 'subscriberDiscountPercentage' | 'setSubscriberDiscountPercentage'
+    | 'audioPriceMultiplier' | 'setAudioPriceMultiplier'
     | 'isDirtyPricing' | 'saving' | 'saveSettings'
 >;
 
@@ -37,6 +38,7 @@ export function SettingsPricingPage({
     minSubscriptionPrice, setMinSubscriptionPrice,
     maxSubscriptionPrice, setMaxSubscriptionPrice,
     subscriberDiscountPercentage, setSubscriberDiscountPercentage,
+    audioPriceMultiplier, setAudioPriceMultiplier,
     isDirtyPricing, saving, saveSettings,
 }: Props) {
     const inputCls = 'w-full max-w-xs px-3.5 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700 shadow-sm';
@@ -111,6 +113,25 @@ export function SettingsPricingPage({
                         value={defaultPricePerCharSubscribers}
                         disabled
                         className={`${inputCls} opacity-60 bg-slate-50 cursor-not-allowed`}
+                    />
+                </SettingField>
+
+                <SettingField
+                    title="Multiplicador de Preço do Áudio"
+                    description={
+                        <span>
+                            Fator aplicado sobre o preço por caractere do profissional para calcular o valor cobrado por <strong className="text-slate-600">minuto de áudio</strong> enviado. O preço por minuto de áudio é sempre calculado como <strong className="text-slate-600">preço por caractere × este multiplicador</strong>, usando a mesma taxa (assinante ou não-assinante) já definida pelo profissional para mensagens de texto. Exemplo: se o preço por caractere é R$ 0,005 e o multiplicador é 5, cada minuto de áudio custa R$ 0,025.
+                        </span>
+                    }
+                    unit="x por minuto"
+                >
+                    <input
+                        type="number"
+                        step="0.5"
+                        value={audioPriceMultiplier}
+                        onChange={(e) => setAudioPriceMultiplier(Number(e.target.value))}
+                        min={0}
+                        className={inputCls}
                     />
                 </SettingField>
 

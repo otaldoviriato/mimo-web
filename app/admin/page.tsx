@@ -287,6 +287,7 @@ export default function AdminPage() {
                             minSubscriptionPrice={settings.minSubscriptionPrice} setMinSubscriptionPrice={settings.setMinSubscriptionPrice}
                             maxSubscriptionPrice={settings.maxSubscriptionPrice} setMaxSubscriptionPrice={settings.setMaxSubscriptionPrice}
                             subscriberDiscountPercentage={settings.subscriberDiscountPercentage} setSubscriberDiscountPercentage={settings.setSubscriberDiscountPercentage}
+                            audioPriceMultiplier={settings.audioPriceMultiplier} setAudioPriceMultiplier={settings.setAudioPriceMultiplier}
                             isDirtyPricing={settings.isDirtyPricing}
                             saving={settings.saving} saveSettings={settings.saveSettings}
                         />

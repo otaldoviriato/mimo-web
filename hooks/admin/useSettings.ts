@@ -21,6 +21,7 @@ interface SettingsSnapshot {
     onlineDelayMinutes: number;
     defaultPricePerCharSubscribers: number;
     defaultPricePerCharNonSubscribers: number;
+    audioPriceMultiplier: number;
     pwaShowAgainIntervalDays: number;
     newProfileDaysThreshold: number;
     adminClerkIds: string[];
@@ -52,6 +53,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     const [onlineDelayMinutes, setOnlineDelayMinutes] = useState(2);
     const [defaultPricePerCharSubscribers, setDefaultPricePerCharSubscribers] = useState(0.002);
     const [defaultPricePerCharNonSubscribers, setDefaultPricePerCharNonSubscribers] = useState(0.005);
+    const [audioPriceMultiplier, setAudioPriceMultiplier] = useState(5);
     const [pwaShowAgainIntervalDays, setPwaShowAgainIntervalDays] = useState(7);
     const [newProfileDaysThreshold, setNewProfileDaysThreshold] = useState(15);
 
@@ -81,6 +83,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         onlineDelayMinutes: s.onlineDelayMinutes ?? 2,
         defaultPricePerCharSubscribers: s.defaultPricePerCharSubscribers ?? 0.002,
         defaultPricePerCharNonSubscribers: s.defaultPricePerCharNonSubscribers ?? 0.005,
+        audioPriceMultiplier: s.audioPriceMultiplier ?? 5,
         pwaShowAgainIntervalDays: s.pwaShowAgainIntervalDays ?? 7,
         newProfileDaysThreshold: s.newProfileDaysThreshold ?? 15,
         adminClerkIds: richAdmins.map(a => a.clerkId),
@@ -122,6 +125,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     setOnlineDelayMinutes(s.onlineDelayMinutes ?? 2);
                     setDefaultPricePerCharSubscribers(s.defaultPricePerCharSubscribers ?? 0.002);
                     setDefaultPricePerCharNonSubscribers(s.defaultPricePerCharNonSubscribers ?? 0.005);
+                    setAudioPriceMultiplier(s.audioPriceMultiplier ?? 5);
                     setPwaShowAgainIntervalDays(s.pwaShowAgainIntervalDays ?? 7);
                     setNewProfileDaysThreshold(s.newProfileDaysThreshold ?? 15);
                     setSavedSnapshot(buildSnapshot(s, richAdmins));
@@ -205,6 +209,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     onlineDelayMinutes,
                     defaultPricePerCharSubscribers,
                     defaultPricePerCharNonSubscribers,
+                    audioPriceMultiplier,
                     pwaShowAgainIntervalDays,
                     newProfileDaysThreshold,
                 }),
@@ -230,6 +235,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                 setOnlineDelayMinutes(s.onlineDelayMinutes ?? 2);
                 setDefaultPricePerCharSubscribers(s.defaultPricePerCharSubscribers ?? 0.002);
                 setDefaultPricePerCharNonSubscribers(s.defaultPricePerCharNonSubscribers ?? 0.005);
+                setAudioPriceMultiplier(s.audioPriceMultiplier ?? 5);
                 setPwaShowAgainIntervalDays(s.pwaShowAgainIntervalDays ?? 7);
                 setNewProfileDaysThreshold(s.newProfileDaysThreshold ?? 15);
             } else {
@@ -279,7 +285,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         minSubscriptionPrice !== savedSnapshot.minSubscriptionPrice ||
         subscriberDiscountPercentage !== savedSnapshot.subscriberDiscountPercentage ||
         defaultPricePerCharSubscribers !== savedSnapshot.defaultPricePerCharSubscribers ||
-        defaultPricePerCharNonSubscribers !== savedSnapshot.defaultPricePerCharNonSubscribers
+        defaultPricePerCharNonSubscribers !== savedSnapshot.defaultPricePerCharNonSubscribers ||
+        audioPriceMultiplier !== savedSnapshot.audioPriceMultiplier
     );
     const isDirtyProfiles = savedSnapshot !== null && (
         minPublicPhotos !== savedSnapshot.minPublicPhotos ||
@@ -322,6 +329,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         onlineDelayMinutes, setOnlineDelayMinutes,
         defaultPricePerCharSubscribers, setDefaultPricePerCharSubscribers,
         defaultPricePerCharNonSubscribers, setDefaultPricePerCharNonSubscribers,
+        audioPriceMultiplier, setAudioPriceMultiplier,
         pwaShowAgainIntervalDays, setPwaShowAgainIntervalDays,
         newProfileDaysThreshold, setNewProfileDaysThreshold,
         adminListRich,

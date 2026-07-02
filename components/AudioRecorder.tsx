@@ -6,9 +6,13 @@ interface AudioRecorderProps {
     onSendAudio: (blob: Blob, durationInSeconds: number) => void;
     connected: boolean;
     onStatusChange?: (status: 'idle' | 'recording' | 'locked') => void;
+    /** Duração máxima (em segundos) que o saldo atual do usuário consegue pagar. `undefined` = sem limite (mensagem gratuita). */
+    maxDurationSeconds?: number;
+    /** Chamado quando o usuário tenta gravar sem ter saldo para nem 1 segundo de áudio. */
+    onInsufficientBalance?: () => void;
 }
 
-export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioRecorderProps) {
+export function AudioRecorder({ onSendAudio, connected, onStatusChange, maxDurationSeconds, onInsufficientBalance }: AudioRecorderProps) {
     const [status, setStatus] = useState<'idle' | 'recording' | 'locked'>('idle');
     const [duration, setDuration] = useState(0);
     const [swipeOffset, setSwipeOffset] = useState({ x: 0, y: 0 });
@@ -68,6 +72,14 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
         setDuration(0);
         timerRef.current = setInterval(() => setDuration(p => p + 1), 1000);
     };
+
+    // Encerra e envia automaticamente a gravação quando o saldo do usuário não cobre mais um segundo adicional.
+    useEffect(() => {
+        if (status === 'recording' && maxDurationSeconds !== undefined && duration >= maxDurationSeconds) {
+            stopAndSendRecording();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [duration, status, maxDurationSeconds]);
 
     // ─── Waveform ────────────────────────────────────────────────
     const startWaveformAnimation = (stream: MediaStream) => {
@@ -214,6 +226,10 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
     // ─── Handlers de Toque ────────────────────────────────────────────────
     const handleTouchStart = (e: React.TouchEvent) => {
         if (!connected || status !== 'idle') return;
+        if (maxDurationSeconds !== undefined && maxDurationSeconds < 1) {
+            onInsufficientBalance?.();
+            return;
+        }
         e.preventDefault();
         vibrate(50); // vibração IMEDIATA ao toque — antes de qualquer async
         isTouchActiveRef.current = true;
@@ -244,6 +260,10 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange }: AudioR
     // ─── Handlers de Mouse ────────────────────────────────────────────────
     const handleMouseDown = (e: React.MouseEvent) => {
         if (!connected || status !== 'idle' || e.button !== 0) return;
+        if (maxDurationSeconds !== undefined && maxDurationSeconds < 1) {
+            onInsufficientBalance?.();
+            return;
+        }
         e.preventDefault();
         vibrate(50); // vibração IMEDIATA ao clique
         isTouchActiveRef.current = true;

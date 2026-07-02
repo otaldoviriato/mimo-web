@@ -46,9 +46,10 @@ export async function GET(
             }
         }
 
-        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers').lean();
+        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers audioPriceMultiplier').lean();
         const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
         const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
+        const audioPriceMultiplier = settings?.audioPriceMultiplier ?? 5;
 
         return NextResponse.json({
             user: {
@@ -64,6 +65,7 @@ export async function GET(
                 subscriptionPrice: user.subscriptionPrice || 0,
                 chargePerCharSubscribers: user.chargePerCharSubscribers ?? defaultSub,
                 chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? defaultNonSub,
+                audioPriceMultiplier,
                 subscribers: user.subscribers || [],
                 bio: user.bio || '',
                 isOnline: user.isOnline ?? false,

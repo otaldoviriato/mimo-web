@@ -28,6 +28,7 @@ async function getOrCreateSettings() {
             maxExclusivePhotos: 4,
             defaultPricePerCharSubscribers: 0.002,
             defaultPricePerCharNonSubscribers: 0.005,
+            audioPriceMultiplier: 5,
             pwaShowAgainIntervalDays: 7,
             newProfileDaysThreshold: 15,
             onlineDelayMinutes: 2,
@@ -47,6 +48,7 @@ async function getOrCreateSettings() {
         if (settings.institutionalEmails === undefined) { settings.institutionalEmails = ['viriatoceo@mimochat.com.br']; updated = true; }
         if (settings.defaultPricePerCharSubscribers === undefined) { settings.defaultPricePerCharSubscribers = 0.002; updated = true; }
         if (settings.defaultPricePerCharNonSubscribers === undefined) { settings.defaultPricePerCharNonSubscribers = 0.005; updated = true; }
+        if (settings.audioPriceMultiplier === undefined) { settings.audioPriceMultiplier = 5; updated = true; }
         if (settings.pwaShowAgainIntervalDays === undefined) { settings.pwaShowAgainIntervalDays = 7; updated = true; }
         if (settings.newProfileDaysThreshold === undefined) { settings.newProfileDaysThreshold = 15; updated = true; }
         if (settings.onlineDelayMinutes === undefined) { settings.onlineDelayMinutes = 2; updated = true; }
@@ -150,6 +152,7 @@ export async function PUT(request: NextRequest) {
             chatSessionTimeoutMinutes,
             defaultPricePerCharSubscribers,
             defaultPricePerCharNonSubscribers,
+            audioPriceMultiplier,
             pwaShowAgainIntervalDays,
             newProfileDaysThreshold,
             onlineDelayMinutes,
@@ -289,6 +292,14 @@ export async function PUT(request: NextRequest) {
                 return NextResponse.json({ error: 'Preço por caractere padrão para não-assinantes inválido' }, { status: 400 });
             }
             settings.defaultPricePerCharNonSubscribers = val;
+        }
+
+        if (audioPriceMultiplier !== undefined) {
+            const val = Number(audioPriceMultiplier);
+            if (isNaN(val) || val < 0) {
+                return NextResponse.json({ error: 'Multiplicador de preço do áudio inválido' }, { status: 400 });
+            }
+            settings.audioPriceMultiplier = val;
         }
 
         if (pwaShowAgainIntervalDays !== undefined) {

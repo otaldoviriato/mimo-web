@@ -26,6 +26,7 @@ export async function GET() {
         const maxSubscriptionPrice = settings?.maxSubscriptionPrice ?? 200;
         const minSubscriptionPrice = settings?.minSubscriptionPrice ?? 10;
         const subscriberDiscountPercentage = settings?.subscriberDiscountPercentage ?? 20;
+        const audioPriceMultiplier = settings?.audioPriceMultiplier ?? 5;
 
         let user = await User.findOne({ clerkId: userId });
 
@@ -165,6 +166,7 @@ export async function GET() {
                 maxSubscriptionPrice,
                 minSubscriptionPrice,
                 subscriberDiscountPercentage,
+                audioPriceMultiplier,
                 minPublicPhotos: settings?.minPublicPhotos ?? 6,
                 maxPublicPhotos: settings?.maxPublicPhotos ?? 12,
                 minExclusivePhotos: settings?.minExclusivePhotos ?? 2,
@@ -366,6 +368,7 @@ export async function PATCH(request: NextRequest) {
                 maxSubscriptionPrice,
                 minSubscriptionPrice,
                 subscriberDiscountPercentage,
+                audioPriceMultiplier: settings?.audioPriceMultiplier ?? 5,
                 minPublicPhotos: settings?.minPublicPhotos ?? 6,
                 maxPublicPhotos: settings?.maxPublicPhotos ?? 12,
                 minExclusivePhotos: settings?.minExclusivePhotos ?? 2,
