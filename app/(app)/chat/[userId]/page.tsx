@@ -2057,6 +2057,32 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         ? '' // A div externa do layout já gerencia as animações de slide-in/out da subpágina
         : (useNativeTransition ? '' : (isClosingOrLeaving ? 'animate-android-slide-out' : 'animate-android-slide-in'));
 
+    // Um usuário nunca pode conversar consigo mesmo, nem com outro usuário do mesmo tipo
+    // (profissional com profissional, cliente com cliente). O servidor também bloqueia isso,
+    // mas escondemos a UI de chat aqui para não exibir uma conversa inválida.
+    const isSelfChat = !!user?.id && user.id === otherUserId;
+    const isSameUserType = !!userData && !!receiver && !!userData.isProfessional === !!receiver.isProfessional;
+    if (isSelfChat || isSameUserType) {
+        return (
+            <div
+                className={`flex flex-col items-center justify-center gap-4 bg-gray-50 ${layoutClass} ${animationClass} p-6 text-center`}
+                style={{ ...viewportStyle, overscrollBehaviorY: 'none' }}
+            >
+                <p className="text-gray-700 font-medium">
+                    {isSelfChat
+                        ? 'Você não pode conversar com você mesmo.'
+                        : 'Esta conversa não está disponível.'}
+                </p>
+                <button
+                    onClick={handleBack}
+                    className="py-2.5 px-5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold text-sm transition-all"
+                >
+                    Voltar
+                </button>
+            </div>
+        );
+    }
+
     return (
         <div 
             ref={chatRootRef}

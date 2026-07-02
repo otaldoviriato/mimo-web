@@ -46,6 +46,10 @@ export default function UserProfilePage({ params, username: propUsername, onBack
 
     const isSubscriber = galleryData?.isSubscriber;
     const isOwner = galleryData?.isOwner;
+    // Um usuário nunca pode conversar consigo mesmo, nem com outro usuário do mesmo tipo
+    // (profissional com profissional, cliente com cliente).
+    const sameUserType = !!me && !!user && !!me.isProfessional === !!user.isProfessional;
+    const canMessage = !isOwner && !sameUserType;
     const showSubscribeButton = user?.isProfessional && user?.isSubscriptionEnabled && !isSubscriber && !isOwner;
 
     const handleBack = () => {
@@ -473,40 +477,34 @@ export default function UserProfilePage({ params, username: propUsername, onBack
             {/* O banner discretizado antigo foi removido por ter sido integrado ao bloco superior */}
 
             {/* Barra de Ações Flutuante no Rodapé */}
-            <div className="fixed bottom-6 left-4 right-4 z-30 flex justify-center pointer-events-none">
-                <div className="w-full max-w-md flex gap-3 px-2 pointer-events-auto">
-                    {showSubscribeButton ? (
-                        <>
-                            <button 
-                                onClick={handleSubscribe} 
+            {(showSubscribeButton || canMessage) && (
+                <div className="fixed bottom-6 left-4 right-4 z-30 flex justify-center pointer-events-none">
+                    <div className="w-full max-w-md flex gap-3 px-2 pointer-events-auto">
+                        {showSubscribeButton && (
+                            <button
+                                onClick={handleSubscribe}
                                 disabled={subscribeMutation.isPending}
-                                className="flex-[3] py-3.5 px-4 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 active:scale-[0.98] text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-xl shadow-purple-600/30"
+                                className={`${canMessage ? 'flex-[3]' : 'w-full'} py-3.5 px-4 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 active:scale-[0.98] text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-xl shadow-purple-600/30`}
                             >
                                 <span>Assinar por R$ {user.subscriptionPrice?.toFixed(2)}</span>
                             </button>
-                            <button 
+                        )}
+                        {canMessage && (
+                            <button
                                 onClick={() => router.push(`/chat/${user.clerkId}`)}
-                                className="flex-[2] py-3.5 px-4 bg-white/95 hover:bg-gray-50 active:scale-[0.98] text-gray-800 border border-gray-200/80 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-black/5"
+                                className={showSubscribeButton
+                                    ? "flex-[2] py-3.5 px-4 bg-white/95 hover:bg-gray-50 active:scale-[0.98] text-gray-800 border border-gray-200/80 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-black/5"
+                                    : "w-full py-3.5 px-4 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 active:scale-[0.98] text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-xl shadow-purple-600/30"}
                             >
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                                 </svg>
-                                <span>Mensagem</span>
+                                <span>{showSubscribeButton ? 'Mensagem' : 'Enviar Mensagem'}</span>
                             </button>
-                        </>
-                    ) : (
-                        <button 
-                            onClick={() => router.push(`/chat/${user.clerkId}`)}
-                            className="w-full py-3.5 px-4 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 active:scale-[0.98] text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-xl shadow-purple-600/30"
-                        >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                            </svg>
-                            <span>Enviar Mensagem</span>
-                        </button>
-                    )}
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Lightbox para visualização de fotos em tela cheia */}
             {activeImage && (
