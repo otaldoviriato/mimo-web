@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useUser } from '@clerk/nextjs';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Avatar } from '@/components/Avatar';
@@ -8,7 +9,7 @@ import { useMyProfile, useUploadPhoto, useUploadCover, useMyGallery, useUploadTo
 import { ImageCropper } from '@/components/ImageCropper';
 import { usePayment } from '@/context/PaymentContext';
 import { PullToRefresh } from '@/components';
-import { Settings, Share2, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, ShieldAlert, Heart, Globe, Crown, Camera, Gift, CreditCard, QrCode, Star, Info, CheckCircle2, X, MoreVertical } from 'lucide-react';
+import { Settings, Share2, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, ShieldAlert, Heart, Globe, Crown, Camera, Gift, CreditCard, QrCode, Star, Info, CheckCircle2, X, MoreVertical, ChevronLeft, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function ProfilePage() {
@@ -55,6 +56,78 @@ export default function ProfilePage() {
     const [cropperState, setCropperState] = useState<{ open: boolean; imageSrc: string; type: 'photo' | 'cover' } | null>(null);
     const [selectedItem, setSelectedItem] = useState<any | null>(null);
     const [showItemOptionsMenu, setShowItemOptionsMenu] = useState(false);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+        return () => setMounted(false);
+    }, []);
+
+    const touchStartX = useRef(0);
+    const touchEndX = useRef(0);
+
+    const currentGalleryItems = activeGalleryTab === 'public'
+        ? (galleryData?.publicItems ?? galleryData?.items ?? [])
+        : (galleryData?.privateItems ?? []);
+
+    const handleNextPhoto = useCallback(() => {
+        if (!selectedItem) return;
+        const currentIndex = currentGalleryItems.findIndex((item: any) => item._id === selectedItem._id);
+        if (currentIndex !== -1 && currentIndex < currentGalleryItems.length - 1) {
+            setSelectedItem(currentGalleryItems[currentIndex + 1]);
+            setShowItemOptionsMenu(false);
+        }
+    }, [selectedItem, currentGalleryItems]);
+
+    const handlePrevPhoto = useCallback(() => {
+        if (!selectedItem) return;
+        const currentIndex = currentGalleryItems.findIndex((item: any) => item._id === selectedItem._id);
+        if (currentIndex > 0) {
+            setSelectedItem(currentGalleryItems[currentIndex - 1]);
+            setShowItemOptionsMenu(false);
+        }
+    }, [selectedItem, currentGalleryItems]);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        touchStartX.current = e.targetTouches[0].clientX;
+        touchEndX.current = e.targetTouches[0].clientX;
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        touchEndX.current = e.targetTouches[0].clientX;
+    };
+
+    const handleTouchEnd = useCallback(() => {
+        const diffX = touchStartX.current - touchEndX.current;
+        const minSwipeDistance = 50;
+
+        if (diffX > minSwipeDistance) {
+            handleNextPhoto();
+        } else if (diffX < -minSwipeDistance) {
+            handlePrevPhoto();
+        }
+
+        touchStartX.current = 0;
+        touchEndX.current = 0;
+    }, [handleNextPhoto, handlePrevPhoto]);
+
+    useEffect(() => {
+        if (!selectedItem) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'ArrowRight') {
+                handleNextPhoto();
+            } else if (e.key === 'ArrowLeft') {
+                handlePrevPhoto();
+            } else if (e.key === 'Escape') {
+                setSelectedItem(null);
+                setShowItemOptionsMenu(false);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedItem, handleNextPhoto, handlePrevPhoto]);
 
     useEffect(() => {
         if (userData) {
@@ -598,139 +671,175 @@ export default function ProfilePage() {
                 />
             )}
 
-            {/* Modal de Imagem em Tela Cheia */}
-            {selectedItem && (
-                <div className="fixed inset-0 z-50 flex flex-col justify-between bg-black animate-in fade-in duration-200">
-                    {/* Cabeçalho do Modal */}
-                    <div className="h-16 px-5 flex items-center justify-between border-b border-white/10 bg-black/60 backdrop-blur-md z-10 shrink-0">
-                        <button
-                            onClick={() => {
-                                setSelectedItem(null);
-                                setShowItemOptionsMenu(false);
-                            }}
-                            className="w-10 h-10 rounded-full hover:bg-white/10 active:scale-75 flex items-center justify-center text-white transition-all duration-75"
-                        >
-                            <X className="w-6 h-6" />
-                        </button>
-                        <div className="text-center">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                                {selectedItem.galleryType === 'public' ? 'Galeria Pública' : 'Galeria Privada'}
-                            </span>
-                            <span className="text-xs font-bold text-white flex items-center justify-center gap-1">
-                                {selectedItem.galleryType === 'public' ? (
-                                    selectedItem.visibility === 'public' ? (
-                                        <>
-                                            <Globe className="w-3.5 h-3.5 text-slate-300" />
-                                            Pública
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Crown className="w-3.5 h-3.5 text-amber-400" />
-                                            Assinantes
-                                        </>
-                                    )
-                                ) : (
-                                    <>
-                                        <Lock className="w-3.5 h-3.5 text-purple-400" />
-                                        Privada (Assinantes)
-                                    </>
-                                )}
-                            </span>
-                        </div>
-                        <div className="relative">
+            {/* Modal antigo foi removido daqui e reposicionado fora do PullToRefresh via Portal */}
+                </PullToRefresh>
+
+                {mounted && selectedItem && createPortal(
+                    <div className="fixed inset-0 z-[9999] flex flex-col justify-between bg-black animate-in fade-in duration-200 select-none">
+                        {/* Cabeçalho do Modal */}
+                        <div className="h-16 px-5 flex items-center justify-between border-b border-white/10 bg-black/60 backdrop-blur-md z-10 shrink-0">
                             <button
-                                onClick={() => setShowItemOptionsMenu(!showItemOptionsMenu)}
+                                onClick={() => {
+                                    setSelectedItem(null);
+                                    setShowItemOptionsMenu(false);
+                                }}
                                 className="w-10 h-10 rounded-full hover:bg-white/10 active:scale-75 flex items-center justify-center text-white transition-all duration-75"
                             >
-                                <MoreVertical className="w-6 h-6" />
+                                <X className="w-6 h-6" />
                             </button>
+                            <div className="text-center">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                                    {selectedItem.galleryType === 'public' ? 'Galeria Pública' : 'Galeria Privada'}
+                                </span>
+                                <span className="text-xs font-bold text-white flex items-center justify-center gap-1">
+                                    {selectedItem.galleryType === 'public' ? (
+                                        selectedItem.visibility === 'public' ? (
+                                            <>
+                                                <Globe className="w-3.5 h-3.5 text-slate-300" />
+                                                Pública
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Crown className="w-3.5 h-3.5 text-amber-400" />
+                                                Assinantes
+                                            </>
+                                        )
+                                    ) : (
+                                        <>
+                                            <Lock className="w-3.5 h-3.5 text-purple-400" />
+                                            Privada (Assinantes)
+                                        </>
+                                    )}
+                                </span>
+                            </div>
+                            <div className="relative">
+                                <button
+                                    onClick={() => setShowItemOptionsMenu(!showItemOptionsMenu)}
+                                    className="w-10 h-10 rounded-full hover:bg-white/10 active:scale-75 flex items-center justify-center text-white transition-all duration-75"
+                                >
+                                    <MoreVertical className="w-6 h-6" />
+                                </button>
 
-                            {/* Dropdown de Opções */}
-                            {showItemOptionsMenu && (
-                                <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white border border-slate-200 shadow-xl py-2 z-20 animate-in fade-in slide-in-from-top-1 duration-150">
-                                    {selectedItem.galleryType === 'public' && (
+                                {/* Dropdown de Opções */}
+                                {showItemOptionsMenu && (
+                                    <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white border border-slate-200 shadow-xl py-2 z-20 animate-in fade-in slide-in-from-top-1 duration-150">
+                                        {selectedItem.galleryType === 'public' && (
+                                            <button
+                                                onClick={async () => {
+                                                    const newVisibility = selectedItem.visibility === 'public' ? 'subscribers' : 'public';
+                                                    try {
+                                                        await updateGalleryItemVisibilityMutation.mutateAsync({
+                                                            itemId: selectedItem._id,
+                                                            visibility: newVisibility,
+                                                        });
+                                                        setSelectedItem({
+                                                            ...selectedItem,
+                                                            visibility: newVisibility,
+                                                        });
+                                                        toast.success(`Visibilidade alterada para ${newVisibility === 'public' ? 'Pública' : 'Assinantes'}`);
+                                                    } catch (err: any) {
+                                                        toast.error(err.message || 'Erro ao alterar visibilidade');
+                                                    } finally {
+                                                        setShowItemOptionsMenu(false);
+                                                    }
+                                                }}
+                                                className="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 active:scale-95 transition-all duration-75 flex items-center gap-2.5"
+                                            >
+                                                {selectedItem.visibility === 'public' ? (
+                                                    <>
+                                                        <Crown className="w-4 h-4 text-amber-500" />
+                                                        Mudar para Assinantes
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Globe className="w-4 h-4 text-slate-500" />
+                                                        Mudar para Pública
+                                                    </>
+                                                )}
+                                            </button>
+                                        )}
                                         <button
                                             onClick={async () => {
-                                                const newVisibility = selectedItem.visibility === 'public' ? 'subscribers' : 'public';
-                                                try {
-                                                    await updateGalleryItemVisibilityMutation.mutateAsync({
-                                                        itemId: selectedItem._id,
-                                                        visibility: newVisibility,
-                                                    });
-                                                    setSelectedItem({
-                                                        ...selectedItem,
-                                                        visibility: newVisibility,
-                                                    });
-                                                    toast.success(`Visibilidade alterada para ${newVisibility === 'public' ? 'Pública' : 'Assinantes'}`);
-                                                } catch (err: any) {
-                                                    toast.error(err.message || 'Erro ao alterar visibilidade');
-                                                } finally {
-                                                    setShowItemOptionsMenu(false);
+                                                if (confirm('Tem certeza que deseja excluir esta foto da sua galeria?')) {
+                                                    try {
+                                                        await deleteGalleryMutation.mutateAsync(selectedItem._id);
+                                                        toast.success('Item excluído com sucesso');
+                                                        setSelectedItem(null);
+                                                    } catch (err: any) {
+                                                        toast.error(err.message || 'Erro ao excluir item');
+                                                    } finally {
+                                                        setShowItemOptionsMenu(false);
+                                                    }
                                                 }
                                             }}
-                                            className="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 active:scale-95 transition-all duration-75 flex items-center gap-2.5"
+                                            disabled={deleteGalleryMutation.isPending}
+                                            className="w-full px-4 py-2.5 text-left text-xs font-bold text-red-600 hover:bg-red-50/50 active:bg-red-100/50 active:scale-95 transition-all duration-75 flex items-center gap-2.5"
                                         >
-                                            {selectedItem.visibility === 'public' ? (
-                                                <>
-                                                    <Crown className="w-4 h-4 text-amber-500" />
-                                                    Mudar para Assinantes
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Globe className="w-4 h-4 text-slate-500" />
-                                                    Mudar para Pública
-                                                </>
-                                            )}
+                                            <Trash2 className="w-4 h-4" />
+                                            Excluir Foto
                                         </button>
-                                    )}
-                                    <button
-                                        onClick={async () => {
-                                            if (confirm('Tem certeza que deseja excluir esta foto da sua galeria?')) {
-                                                try {
-                                                    await deleteGalleryMutation.mutateAsync(selectedItem._id);
-                                                    toast.success('Item excluído com sucesso');
-                                                    setSelectedItem(null);
-                                                } catch (err: any) {
-                                                    toast.error(err.message || 'Erro ao excluir item');
-                                                } finally {
-                                                    setShowItemOptionsMenu(false);
-                                                }
-                                            }
-                                        }}
-                                        disabled={deleteGalleryMutation.isPending}
-                                        className="w-full px-4 py-2.5 text-left text-xs font-bold text-red-600 hover:bg-red-50/50 active:bg-red-100/50 active:scale-95 transition-all duration-75 flex items-center gap-2.5"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                        Excluir Foto
-                                    </button>
-                                </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Visualização Central com Navegação e Eventos de Gesto */}
+                        <div className="flex-1 relative flex items-center justify-center bg-black w-full h-full">
+                            {/* Botão Esquerdo */}
+                            {currentGalleryItems.findIndex((item: any) => item._id === selectedItem._id) > 0 && (
+                                <button
+                                    onClick={handlePrevPhoto}
+                                    className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/45 hover:bg-black/70 active:scale-90 flex items-center justify-center text-white transition-all duration-75 z-20 border border-white/10 shadow-lg pointer-events-auto"
+                                    aria-label="Foto anterior"
+                                >
+                                    <ChevronLeft className="w-6 h-6" />
+                                </button>
+                            )}
+
+                            {/* Container da Mídia com Handlers de Swipe */}
+                            <div 
+                                className="w-full h-full flex items-center justify-center pointer-events-auto"
+                                onTouchStart={handleTouchStart}
+                                onTouchMove={handleTouchMove}
+                                onTouchEnd={handleTouchEnd}
+                            >
+                                {selectedItem.mediaType === 'video' ? (
+                                    <video
+                                        src={selectedItem.imageUrl}
+                                        controls
+                                        autoPlay
+                                        className="w-full h-full max-h-[80vh] object-contain bg-black"
+                                    />
+                                ) : (
+                                    <img
+                                        src={selectedItem.imageUrl}
+                                        alt="Gallery item in fullscreen"
+                                        className="w-full h-full max-h-[80vh] object-contain pointer-events-none select-none"
+                                    />
+                                )}
+                            </div>
+
+                            {/* Botão Direito */}
+                            {currentGalleryItems.findIndex((item: any) => item._id === selectedItem._id) < currentGalleryItems.length - 1 && (
+                                <button
+                                    onClick={handleNextPhoto}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/45 hover:bg-black/70 active:scale-90 flex items-center justify-center text-white transition-all duration-75 z-20 border border-white/10 shadow-lg pointer-events-auto"
+                                    aria-label="Próxima foto"
+                                >
+                                    <ChevronRight className="w-6 h-6" />
+                                </button>
                             )}
                         </div>
-                    </div>
 
-                    {/* Visualização Central */}
-                    <div className="flex-1 flex items-center justify-center bg-black">
-                        {selectedItem.mediaType === 'video' ? (
-                            <video
-                                src={selectedItem.imageUrl}
-                                controls
-                                autoPlay
-                                className="w-full h-full max-h-[80vh] object-contain bg-black"
-                            />
-                        ) : (
-                            <img
-                                src={selectedItem.imageUrl}
-                                alt="Gallery item in fullscreen"
-                                className="w-full h-full max-h-[80vh] object-contain"
-                            />
-                        )}
-                    </div>
-                    
-                    {/* Rodapé Vazio para Balanço Visual */}
-                    <div className="h-16 bg-black shrink-0" />
-                </div>
-            )}
-                </PullToRefresh>
+                        {/* Rodapé com Indicador de Foto */}
+                        <div className="h-16 bg-black/60 border-t border-white/10 shrink-0 flex items-center justify-center z-10">
+                            <span className="text-xs font-semibold text-slate-300">
+                                {currentGalleryItems.findIndex((item: any) => item._id === selectedItem._id) + 1} de {currentGalleryItems.length}
+                            </span>
+                        </div>
+                    </div>,
+                    document.body
+                )}
             </div>
         );
     }

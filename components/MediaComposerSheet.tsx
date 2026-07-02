@@ -22,7 +22,9 @@ const PRICE_OPTIONS = [
 
 const DURATION_OPTIONS = [
     { label: 'Permanente', value: 'permanent' },
-    { label: '10 minutos', value: '10min' },
+    { label: '10 segundos', value: '10s' },
+    { label: '30 segundos', value: '30s' },
+    { label: '1 minuto', value: '1min' },
     { label: '30 minutos', value: '30min' },
     { label: '1 dia', value: '24h' },
     { label: '1 semana', value: '7d' },
@@ -34,9 +36,9 @@ export function MediaComposerSheet({ previewUrl, isVideo, onCancel, onConfirm }:
     const [mediaPriceType, setMediaPriceType] = useState<'free' | 'paid'>('free');
     const [mediaPriceFormatted, setMediaPriceFormatted] = useState('R$ 0,00');
     const [isTemporary, setIsTemporary] = useState(false);
-    const [expiryOption, setExpiryOption] = useState<'permanent' | '10min' | '30min' | '24h' | '7d' | 'custom'>('permanent');
+    const [expiryOption, setExpiryOption] = useState<'permanent' | '10s' | '30s' | '1min' | '30min' | '24h' | '7d' | 'custom'>('permanent');
     const [customExpiryValue, setCustomExpiryValue] = useState(1);
-    const [customExpiryUnit, setCustomExpiryUnit] = useState<'minutes' | 'hours' | 'days'>('hours');
+    const [customExpiryUnit, setCustomExpiryUnit] = useState<'seconds' | 'minutes' | 'hours' | 'days'>('hours');
 
     const handlePriceInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const cleanValue = e.target.value.replace(/\D/g, '');
@@ -60,9 +62,11 @@ export function MediaComposerSheet({ previewUrl, isVideo, onCancel, onConfirm }:
         let expiryMinutes = 60;
         if (isTemporary) {
             const val = customExpiryValue || 1;
-            if (customExpiryUnit === 'minutes') expiryMinutes = val;
-            else if (customExpiryUnit === 'hours') expiryMinutes = val * 60;
-            else if (customExpiryUnit === 'days') expiryMinutes = val * 1440;
+            const unit = customExpiryUnit as string;
+            if (unit === 'seconds') expiryMinutes = val / 60;
+            else if (unit === 'minutes') expiryMinutes = val;
+            else if (unit === 'hours') expiryMinutes = val * 60;
+            else if (unit === 'days') expiryMinutes = val * 1440;
         }
 
         onConfirm(Math.round(price * 100), isTemporary, expiryMinutes);
@@ -210,7 +214,7 @@ export function MediaComposerSheet({ previewUrl, isVideo, onCancel, onConfirm }:
                                         const isSelected = opt.value === 'permanent'
                                             ? !isTemporary
                                             : opt.value === 'custom_duration'
-                                            ? isTemporary && !['10min', '30min', '24h', '7d'].includes(expiryOption)
+                                            ? isTemporary && !['10s', '30s', '1min', '30min', '24h', '7d'].includes(expiryOption)
                                             : isTemporary && expiryOption === opt.value;
                                         return (
                                             <button
@@ -227,8 +231,10 @@ export function MediaComposerSheet({ previewUrl, isVideo, onCancel, onConfirm }:
                                                         setCustomExpiryUnit('hours');
                                                     } else {
                                                         setIsTemporary(true);
-                                                        setExpiryOption(opt.value);
-                                                        if (opt.value === '10min') { setCustomExpiryValue(10); setCustomExpiryUnit('minutes'); }
+                                                        setExpiryOption(opt.value as any);
+                                                        if (opt.value === '10s') { setCustomExpiryValue(10); setCustomExpiryUnit('seconds'); }
+                                                        else if (opt.value === '30s') { setCustomExpiryValue(30); setCustomExpiryUnit('seconds'); }
+                                                        else if (opt.value === '1min') { setCustomExpiryValue(1); setCustomExpiryUnit('minutes'); }
                                                         else if (opt.value === '30min') { setCustomExpiryValue(30); setCustomExpiryUnit('minutes'); }
                                                         else if (opt.value === '24h') { setCustomExpiryValue(24); setCustomExpiryUnit('hours'); }
                                                         else if (opt.value === '7d') { setCustomExpiryValue(7); setCustomExpiryUnit('days'); }
@@ -257,8 +263,9 @@ export function MediaComposerSheet({ previewUrl, isVideo, onCancel, onConfirm }:
                                         <select
                                             className="flex-1 bg-transparent text-sm font-semibold text-slate-700 focus:outline-none cursor-pointer"
                                             value={customExpiryUnit}
-                                            onChange={(e) => setCustomExpiryUnit(e.target.value as 'minutes' | 'hours' | 'days')}
+                                            onChange={(e) => setCustomExpiryUnit(e.target.value as 'seconds' | 'minutes' | 'hours' | 'days')}
                                         >
+                                            <option value="seconds">Segundos</option>
                                             <option value="minutes">Minutos</option>
                                             <option value="hours">Horas</option>
                                             <option value="days">Dias</option>
