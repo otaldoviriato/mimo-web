@@ -40,6 +40,27 @@ export function MediaComposerSheet({ previewUrl, isVideo, onCancel, onConfirm }:
     const [customExpiryValue, setCustomExpiryValue] = useState(1);
     const [customExpiryUnit, setCustomExpiryUnit] = useState<'seconds' | 'minutes' | 'hours' | 'days'>('hours');
 
+    const shouldBlur = mediaPriceType === 'paid' || isTemporary;
+
+    const getDurationLabel = () => {
+        if (!isTemporary) return '';
+        if (expiryOption === '10s') return '10s';
+        if (expiryOption === '30s') return '30s';
+        if (expiryOption === '1min') return '1min';
+        if (expiryOption === '30min') return '30min';
+        if (expiryOption === '24h') return '24h';
+        if (expiryOption === '7d') return '7d';
+        
+        // Custom
+        const val = customExpiryValue || 1;
+        const unit = customExpiryUnit;
+        if (unit === 'seconds') return `${val}s`;
+        if (unit === 'minutes') return `${val}min`;
+        if (unit === 'hours') return `${val}h`;
+        if (unit === 'days') return `${val}d`;
+        return '';
+    };
+
     const handlePriceInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const cleanValue = e.target.value.replace(/\D/g, '');
         const numberValue = parseFloat(cleanValue) / 100;
@@ -105,7 +126,7 @@ export function MediaComposerSheet({ previewUrl, isVideo, onCancel, onConfirm }:
                                 isVideo ? (
                                     <video
                                         src={previewUrl}
-                                        className={`w-full h-full object-cover transition-all duration-300 ${mediaPriceType === 'paid' ? 'blur-md scale-105' : ''}`}
+                                        className={`w-full h-full object-cover transition-all duration-300 ${shouldBlur ? 'blur-md scale-105' : ''}`}
                                         muted
                                         playsInline
                                     />
@@ -113,7 +134,7 @@ export function MediaComposerSheet({ previewUrl, isVideo, onCancel, onConfirm }:
                                     <img
                                         src={previewUrl}
                                         alt="Prévia da mídia"
-                                        className={`w-full h-full object-cover transition-all duration-300 ${mediaPriceType === 'paid' ? 'blur-md scale-105' : ''}`}
+                                        className={`w-full h-full object-cover transition-all duration-300 ${shouldBlur ? 'blur-md scale-105' : ''}`}
                                     />
                                 )
                             ) : (
@@ -122,17 +143,44 @@ export function MediaComposerSheet({ previewUrl, isVideo, onCancel, onConfirm }:
                                 </div>
                             )}
 
-                            {mediaPriceType === 'paid' && (
-                                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 select-none">
-                                    <Lock size={30} className="text-white opacity-90" strokeWidth={2} />
-                                    <span className="text-white text-xs font-bold opacity-90">Conteúdo pago</span>
+                            {shouldBlur && (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 select-none bg-black/20 z-10">
+                                    {mediaPriceType === 'paid' ? (
+                                        <>
+                                            <Lock size={30} className="text-white opacity-95 drop-shadow" strokeWidth={2.5} />
+                                            <span className="text-white text-xs font-bold opacity-95 drop-shadow">Conteúdo pago</span>
+                                            {isTemporary && (
+                                                <span className="text-purple-200 text-[10px] font-semibold opacity-90 drop-shadow">
+                                                    Expira {getDurationLabel()} após desbloqueio
+                                                </span>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Timer size={30} className="text-white opacity-95 drop-shadow" strokeWidth={2.5} />
+                                            <span className="text-white text-xs font-bold opacity-95 drop-shadow">Mídia temporária</span>
+                                            <span className="text-amber-350 text-[10px] font-semibold opacity-90 drop-shadow">
+                                                Expira {getDurationLabel()} após revelar
+                                            </span>
+                                        </>
+                                    )}
                                 </div>
                             )}
 
-                            {mediaPriceType === 'paid' && mediaPriceFormatted !== 'R$ 0,00' && (
-                                <div className="absolute top-3 right-3 flex items-center gap-1 bg-black/50 backdrop-blur-sm text-white text-xs font-bold px-2.5 py-1 rounded-full">
-                                    <Lock size={11} strokeWidth={2.5} />
-                                    {mediaPriceFormatted}
+                            {shouldBlur && (
+                                <div className="absolute top-3 right-3 flex flex-col gap-1.5 items-end z-20">
+                                    {mediaPriceType === 'paid' && mediaPriceFormatted !== 'R$ 0,00' && (
+                                        <div className="flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white text-[10px] font-extrabold px-2.5 py-1 rounded-full border border-white/10 shadow-sm">
+                                            <Lock size={10} strokeWidth={2.5} />
+                                            {mediaPriceFormatted}
+                                        </div>
+                                    )}
+                                    {isTemporary && (
+                                        <div className="flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white text-[10px] font-extrabold px-2.5 py-1 rounded-full border border-white/10 shadow-sm">
+                                            <Timer size={10} strokeWidth={2.5} />
+                                            {getDurationLabel()}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>

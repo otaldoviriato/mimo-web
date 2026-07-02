@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
         }
         
         const lockedPriceInCents = Math.round(lockedPrice * 100);
-        const isLocked = lockedPriceInCents > 0;
+        const isLocked = lockedPriceInCents > 0 || isTemporary;
 
         let originalUrl = '';
         let blurredUrl = '';

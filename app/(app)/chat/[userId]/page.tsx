@@ -44,6 +44,7 @@ interface Message {
     replyToSenderId?: string | null;
     isTemporary?: boolean;
     expiresAt?: string | Date;
+    expiryMinutes?: number;
     isExpired?: boolean;
 }
 
@@ -318,7 +319,7 @@ const VideoPlayer = ({ src, isActive, controlsVisible }: { src: string; isActive
     );
 };
 
-function TemporaryMediaBadge({ expiresAt }: { expiresAt: string | Date }) {
+function TemporaryMediaBadge({ expiresAt, onExpire }: { expiresAt: string | Date; onExpire?: () => void }) {
     const [timeLeft, setTimeLeft] = useState('');
     const [isExpired, setIsExpired] = useState(false);
 
@@ -328,6 +329,7 @@ function TemporaryMediaBadge({ expiresAt }: { expiresAt: string | Date }) {
             if (difference <= 0) {
                 setTimeLeft('Expirado');
                 setIsExpired(true);
+                if (onExpire) onExpire();
                 return;
             }
 
@@ -350,7 +352,7 @@ function TemporaryMediaBadge({ expiresAt }: { expiresAt: string | Date }) {
         calculateTimeLeft();
         const interval = setInterval(calculateTimeLeft, 1000);
         return () => clearInterval(interval);
-    }, [expiresAt]);
+    }, [expiresAt, onExpire]);
 
     if (isExpired) return null;
 
@@ -1901,9 +1903,6 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         const file = selectedFile;
         const isVideoFile = isVideo;
         const preview = previewUrl || '';
-        const expiresAtCalculated = isTemporaryMedia
-            ? new Date(Date.now() + expiryMinutes * 60000).toISOString()
-            : undefined;
 
         setSelectedFile(null);
         setPreviewUrl(null);
@@ -1922,17 +1921,48 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             isVideo: isVideoFile,
             thumbnailUrl: isVideoFile ? preview : undefined,
             originalImageUrl: !isVideoFile ? preview : undefined,
-            isLockedImage: priceInCents > 0,
+            isLockedImage: priceInCents > 0 || isTemporaryMedia,
             lockedImagePrice: priceInCents,
             isTemporary: isTemporaryMedia,
-            expiresAt: expiresAtCalculated ? new Date(expiresAtCalculated) : undefined,
+            expiryMinutes: expiryMinutes,
+            expiresAt: undefined,
         };
         setMessages(prev => [...prev, newMsg]);
 
         startMediaUpload(file, isVideoFile, priceInCents, tempId, preview, isTemporaryMedia, expiryMinutes);
     };
 
+    const executeUnlock = async (messageId: string) => {
+        setUnlocking(true);
+        try {
+            const res = await fetch(`/api/chats/message/${messageId}/unlock`, { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            const data = await res.json();
+            if (data.success) {
+                // Atualiza a mensagem localmente no estado
+                setMessages(prev => prev.map(m => m._id === messageId ? data.message : m));
+                return true;
+            } else {
+                alert(data.error || 'Erro ao desbloquear conteúdo');
+                return false;
+            }
+        } catch (e) {
+            alert('Erro na requisição');
+            return false;
+        } finally {
+            setUnlocking(false);
+        }
+    };
+
     const handleUnlockImage = async (messageId: string, priceInCents: number, isVideoMessage: boolean = false) => {
+        if (priceInCents === 0) {
+            // Desbloqueia mídias grátis temporárias instantaneamente
+            await executeUnlock(messageId);
+            return;
+        }
+
         if (balance < priceInCents) {
             openRechargeModal('Você não tem saldo suficiente para desbloquear este conteúdo. Por favor, recarregue sua carteira.');
             return;
@@ -1950,23 +1980,10 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             return;
         }
 
-        setUnlocking(true);
-        try {
-            const res = await fetch(`/api/chats/message/${unlockData.id}/unlock`, { 
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            });
-            const data = await res.json();
-            if (data.success) {
-                setUnlockModalVisible(false);
-                setUnlockData(null);
-            } else {
-                alert(data.error || 'Erro ao desbloquear conteúdo');
-            }
-        } catch (e) {
-            alert('Erro na requisição');
-        } finally {
-            setUnlocking(false);
+        const success = await executeUnlock(unlockData.id);
+        if (success) {
+            setUnlockModalVisible(false);
+            setUnlockData(null);
         }
     };
 
@@ -2531,9 +2548,6 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                         setFullscreenLockedMessage(item);
                                                     }
                                                 }}>
-                                                    {item.isTemporary && item.expiresAt && (
-                                                        <TemporaryMediaBadge expiresAt={item.expiresAt} />
-                                                    )}
                                                     {(item.isVideo ? item.thumbnailUrl : item.originalImageUrl) ? (
                                                         <img 
                                                             src={(isMine ? (item.isVideo ? item.thumbnailUrl : item.originalImageUrl) : item.blurredImageUrl) || ''} 
@@ -2608,11 +2622,26 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                                                             </svg>
                                                             <span className="text-[10px] font-medium uppercase tracking-widest text-white/90 drop-shadow">
-                                                                Desbloquear
+                                                                {item.lockedImagePrice && item.lockedImagePrice > 0 ? 'Desbloquear' : 'Revelar mídia'}
                                                             </span>
-                                                            <span className="text-xs font-semibold text-purple-200 drop-shadow">
-                                                                R$ {((item.lockedImagePrice || 0) / 100).toFixed(2)}
-                                                            </span>
+                                                            {item.lockedImagePrice && item.lockedImagePrice > 0 ? (
+                                                                <span className="text-xs font-semibold text-purple-200 drop-shadow">
+                                                                    R$ {((item.lockedImagePrice || 0) / 100).toFixed(2)}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-xs font-semibold text-amber-200 drop-shadow">
+                                                                    Grátis
+                                                                </span>
+                                                            )}
+                                                            {item.isTemporary && item.expiryMinutes && (
+                                                                <span className="text-[9px] text-white/80 font-bold drop-shadow flex items-center gap-1 mt-0.5">
+                                                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                                        <circle cx="12" cy="12" r="10" />
+                                                                        <polyline points="12 6 12 12 16 14" />
+                                                                    </svg>
+                                                                    Expira após {item.expiryMinutes < 1 ? `${Math.round(item.expiryMinutes * 60)}s` : `${item.expiryMinutes}min`}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     ) : (
                                                         (!item.tempId || !uploadTasks[item.tempId]) && (
@@ -2622,6 +2651,8 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                                     <span className="text-[8px] font-bold text-white uppercase tracking-wider">
                                                                         {item.lockedImagePrice && item.lockedImagePrice > 0 
                                                                             ? `Aguardando • R$ ${((item.lockedImagePrice || 0) / 100).toFixed(2)}` 
+                                                                            : item.isTemporary && item.expiryMinutes
+                                                                            ? `Aguardando • ${item.expiryMinutes < 1 ? `${Math.round(item.expiryMinutes * 60)}s` : `${item.expiryMinutes}min`}`
                                                                             : 'Aguardando'
                                                                         }
                                                                     </span>
@@ -2642,7 +2673,12 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                     }}
                                                 >
                                                     {item.isTemporary && item.expiresAt && (
-                                                        <TemporaryMediaBadge expiresAt={item.expiresAt} />
+                                                        <TemporaryMediaBadge 
+                                                            expiresAt={item.expiresAt} 
+                                                            onExpire={() => {
+                                                                setMessages(prev => prev.map(m => m._id === item._id ? { ...m, isExpired: true } : m));
+                                                            }}
+                                                        />
                                                     )}
                                                     {(item.isVideo ? item.thumbnailUrl : item.originalImageUrl) ? (
                                                         <img 
