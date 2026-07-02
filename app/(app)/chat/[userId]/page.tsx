@@ -1410,13 +1410,24 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
         } catch (e: any) {
             console.error('Erro no upload em background:', e);
-            let errMsg = e.message || 'Erro no upload';
-            if (e.response?.data?.error) {
-                errMsg = e.response.data.error;
-            } else if (e.response?.data?.message) {
-                errMsg = e.response.data.message;
+            let errMsg = 'Erro no upload';
+            if (e.response?.data) {
+                const data = e.response.data;
+                if (typeof data.error === 'string') {
+                    errMsg = data.error;
+                } else if (data.error && typeof data.error === 'object') {
+                    errMsg = data.error.message || JSON.stringify(data.error);
+                } else if (typeof data.message === 'string') {
+                    errMsg = data.message;
+                } else if (data.message && typeof data.message === 'object') {
+                    errMsg = data.message.message || JSON.stringify(data.message);
+                } else {
+                    errMsg = JSON.stringify(data);
+                }
             } else if (e.message?.includes('Network Error')) {
                 errMsg = 'Erro de rede. Verifique sua conexão.';
+            } else {
+                errMsg = e.message || 'Erro desconhecido';
             }
             
             // Exibir alerta explicativo do erro
@@ -2477,8 +2488,8 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                             />
                                         )}
                                         <div
-                                            className={`reply-swipe-balloon relative z-10 max-w-[75%] ${isLocked || item.originalImageUrl || item.isVideo ? 'p-0 bg-transparent shadow-none' : (isAudio ? 'p-3' : 'px-3 py-1.5')} rounded-2xl ${
-                                            (!isLocked && !item.originalImageUrl && !item.isVideo) 
+                                            className={`reply-swipe-balloon relative z-10 max-w-[75%] ${isLocked || item.originalImageUrl || item.isVideo || item.isExpired ? 'p-0 bg-transparent shadow-none' : (isAudio ? 'p-3' : 'px-3 py-1.5')} rounded-2xl ${
+                                            (!isLocked && !item.originalImageUrl && !item.isVideo && !item.isExpired) 
                                         ? (isMine ? 'bg-purple-600 text-white rounded-br-sm' : 'bg-white text-gray-900 shadow-sm rounded-bl-sm')
                                                 : (isMine ? 'rounded-br-sm' : 'rounded-bl-sm')
                                             }`}
@@ -2513,7 +2524,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                             )}
                                     {isLocked || item.originalImageUrl || item.isVideo || isAudio || item.isExpired ? (
                                         <>
-                                            {item.isExpired || (item.expiresAt && new Date(item.expiresAt) < new Date()) ? (
+                                            {item.isExpired || (item.expiresAt && new Date(item.expiresAt).getTime() > 0 && new Date(item.expiresAt) < new Date()) ? (
                                                 <div className="relative w-60 h-60 rounded-2xl bg-slate-100 flex flex-col items-center justify-center gap-2 text-slate-400 border border-slate-200 shadow-inner">
                                                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400/80">
                                                         <circle cx="12" cy="12" r="10" />

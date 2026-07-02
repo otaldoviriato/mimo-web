@@ -56,7 +56,7 @@ export async function GET(
 
         const now = new Date();
         const processedMessages = messages.map((m: any) => {
-            if (m.isTemporary && m.expiresAt && new Date(m.expiresAt) < now) {
+            if (m.isTemporary && m.expiresAt && new Date(m.expiresAt).getTime() > 0 && new Date(m.expiresAt) < now) {
                 return {
                     ...m,
                     originalImageUrl: undefined,

@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
         const expiryMinutesStr = formData.get('expiryMinutes') as string | null;
         let expiryMinutes = 0;
         if (isTemporary && expiryMinutesStr) {
-            expiryMinutes = parseInt(expiryMinutesStr, 10);
+            expiryMinutes = parseFloat(expiryMinutesStr);
         }
 
         if ((!file && !preUploadedVideoUrl) || !roomId || !receiverId || !priceStr) {
