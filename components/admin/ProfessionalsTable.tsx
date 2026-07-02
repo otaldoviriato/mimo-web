@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, MoreVertical, ShieldCheck, Mail, Calendar, Coins, Edit, Trash2, X, Phone, UserCheck, Key, TrendingUp, Activity } from 'lucide-react';
+import { Search, MoreVertical, ShieldCheck, Mail, Calendar, Coins, Edit, Trash2, X, UserCheck, TrendingUp, Activity } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 
@@ -161,12 +161,8 @@ export function ProfessionalsTable() {
                         <thead>
                             <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
                                 <th className="py-4 px-6">Perfil Monetizado</th>
-                                <th className="py-4 px-6">Saldo a Receber</th>
-                                <th className="py-4 px-6">Total Arrecadado</th>
-                                <th className="py-4 px-6">Total Adicionado</th>
+                                <th className="py-4 px-6">Saldo & Arrecadação</th>
                                 <th className="py-4 px-6">Acessos</th>
-                                <th className="py-4 px-6">Chave PIX</th>
-                                <th className="py-4 px-6">Telefone</th>
                                 <th className="py-4 px-6">Valor Assinatura</th>
                                 <th className="py-4 px-6 text-center">Ações</th>
                             </tr>
@@ -214,28 +210,20 @@ export function ProfessionalsTable() {
                                             </div>
                                         </td>
 
-                                        {/* Saldo */}
+                                        {/* Saldo & Arrecadação */}
                                         <td className="py-4 px-6">
-                                            <span className="text-sm font-semibold text-slate-700 flex items-center gap-1">
-                                                <Coins size={14} className="text-amber-500" />
-                                                {((user.balance || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                            </span>
-                                        </td>
-
-                                        {/* Total Arrecadado */}
-                                        <td className="py-4 px-6">
-                                            <span className="text-sm font-semibold text-purple-600 flex items-center gap-1">
-                                                <TrendingUp size={14} className="text-purple-500" />
-                                                {((user.totalEarned || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                            </span>
-                                        </td>
-
-                                        {/* Total Adicionado */}
-                                        <td className="py-4 px-6">
-                                            <span className="text-sm font-semibold text-emerald-600 flex items-center gap-1">
-                                                <TrendingUp size={14} className="text-emerald-500" />
-                                                {((user.totalDeposited || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                            </span>
+                                            <div className="flex flex-col gap-1">
+                                                <span className="text-sm font-semibold text-slate-700 flex items-center gap-1">
+                                                    <Coins size={14} className="text-amber-500" />
+                                                    {((user.balance || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                    <span className="text-[10px] text-slate-400 font-medium">a receber</span>
+                                                </span>
+                                                <span className="text-xs font-bold text-purple-600 flex items-center gap-1">
+                                                    <TrendingUp size={12} className="text-purple-500" />
+                                                    {((user.totalEarned || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                    <span className="text-[10px] text-slate-400 font-medium">arrecadado</span>
+                                                </span>
+                                            </div>
                                         </td>
 
                                         {/* Acessos */}
@@ -249,34 +237,6 @@ export function ProfessionalsTable() {
                                                     Último: {formatLastSeen(user.lastAccessAt)}
                                                 </span>
                                             </div>
-                                        </td>
-
-                                        {/* Chave PIX */}
-                                        <td className="py-4 px-6">
-                                            <span className="text-xs text-slate-600 font-bold flex items-center gap-1">
-                                                {user.pixKey ? (
-                                                    <>
-                                                        <Key size={13} className="text-slate-400" />
-                                                        {user.pixKey}
-                                                    </>
-                                                ) : (
-                                                    <span className="text-rose-500 font-bold italic">Não cadastrada</span>
-                                                )}
-                                            </span>
-                                        </td>
-
-                                        {/* Telefone */}
-                                        <td className="py-4 px-6">
-                                            <span className="text-xs text-slate-600 font-medium flex items-center gap-1">
-                                                {user.phone ? (
-                                                    <>
-                                                        <Phone size={13} className="text-slate-400" />
-                                                        {user.phone}
-                                                    </>
-                                                ) : (
-                                                    <span className="text-slate-400 italic">Não informado</span>
-                                                )}
-                                            </span>
                                         </td>
 
                                         {/* Valor Assinatura */}
@@ -357,7 +317,7 @@ export function ProfessionalsTable() {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={9} className="py-20 text-center text-sm font-semibold text-slate-400">
+                                    <td colSpan={5} className="py-20 text-center text-sm font-semibold text-slate-400">
                                         Nenhum perfil monetizado encontrado.
                                     </td>
                                 </tr>
