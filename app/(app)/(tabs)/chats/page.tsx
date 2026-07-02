@@ -29,6 +29,7 @@ interface Room {
         isProfessional?: boolean;
         balance?: number;
         isHighSpender?: boolean;
+        isOnline?: boolean;
     };
 }
 
@@ -221,12 +222,25 @@ export default function ChatsPage() {
             }
         };
 
+        // 3. Atualiza a bolinha de online/offline nas conversas em tempo real
+        const handleUserPresence = (data: { userId: string; isOnline: boolean }) => {
+            queryClient.setQueryData(QueryKeys.rooms(user.id), (old: Room[] | undefined) =>
+                old?.map((room) =>
+                    room.otherUser?.clerkId === data.userId
+                        ? { ...room, otherUser: { ...room.otherUser, isOnline: data.isOnline } }
+                        : room
+                )
+            );
+        };
+
         socket.on('balance_update', handleBalanceUpdate);
         socket.on('global_typing', handleGlobalTyping);
+        socket.on('user_presence', handleUserPresence);
 
         return () => {
             socket.off('balance_update', handleBalanceUpdate);
             socket.off('global_typing', handleGlobalTyping);
+            socket.off('user_presence', handleUserPresence);
 
             // Limpa todos os timeouts de typing ativos
             Object.values(typingTimeouts.current).forEach(clearTimeout);
@@ -671,7 +685,7 @@ export default function ChatsPage() {
                                         className="w-full flex items-center px-4 py-3.5 bg-white border-b border-gray-100 hover:bg-gray-50 transition-colors text-left select-none"
                                     >
                                         <div className="relative shrink-0">
-                                            <Avatar size={52} uri={room.otherUser?.photoUrl} />
+                                            <Avatar size={52} uri={room.otherUser?.photoUrl} isOnline={room.otherUser?.isOnline} />
                                         </div>
                                         <div className="flex-1 ml-3 min-w-0">
                                             <div className="flex items-center justify-between mb-1">
