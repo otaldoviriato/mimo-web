@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Search, MoreVertical, ShieldCheck, Mail, Calendar, Coins, Edit, Trash2, X, UserCheck, TrendingUp, Activity } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, MoreVertical, ShieldCheck, Mail, Calendar, Coins, Edit, Trash2, X, UserCheck, TrendingUp, Activity, ArrowUpDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 
@@ -11,8 +11,26 @@ export function ProfessionalsTable() {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedUserMenu, setSelectedUserMenu] = useState<string | null>(null);
+    const [sortBy, setSortBy] = useState<'recent' | 'access' | 'earned' | 'balance'>('recent');
 
-
+    // Ordena os perfis conforme o critério selecionado
+    const sortedUsers = useMemo(() => {
+        const sorted = [...users];
+        switch (sortBy) {
+            case 'access':
+                sorted.sort((a, b) => (b.accessCount || 0) - (a.accessCount || 0));
+                break;
+            case 'earned':
+                sorted.sort((a, b) => (b.totalEarned || 0) - (a.totalEarned || 0));
+                break;
+            case 'balance':
+                sorted.sort((a, b) => (b.balance || 0) - (a.balance || 0));
+                break;
+            default:
+                break; // mantém a ordem de cadastro mais recente vinda da API
+        }
+        return sorted;
+    }, [users, sortBy]);
 
     // Busca os usuários da API
     const fetchUsers = async (query: string = '') => {
@@ -134,6 +152,21 @@ export function ProfessionalsTable() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-center gap-3">
+                    {/* Ordenar por */}
+                    <div className="relative w-full sm:w-52">
+                        <ArrowUpDown className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+                        <select
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                            className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 transition-all font-semibold text-slate-700 appearance-none cursor-pointer"
+                        >
+                            <option value="recent">Mais recentes</option>
+                            <option value="access">Mais acessos</option>
+                            <option value="earned">Maior valor arrecadado</option>
+                            <option value="balance">Maior saldo</option>
+                        </select>
+                    </div>
+
                     {/* Barra de Busca */}
                     <div className="relative w-full sm:w-64">
                         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
@@ -168,8 +201,8 @@ export function ProfessionalsTable() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {users.length > 0 ? (
-                                users.map((user) => (
+                            {sortedUsers.length > 0 ? (
+                                sortedUsers.map((user) => (
                                     <tr 
                                         key={user.clerkId} 
                                         onClick={() => router.push(`/admin/users/${user.clerkId}`)}
@@ -329,7 +362,7 @@ export function ProfessionalsTable() {
 
             {/* Rodapé / Informações */}
             <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 font-bold bg-slate-50/50 mt-auto">
-                <span>Total de perfis monetizados mostrados: {users.length}</span>
+                <span>Total de perfis monetizados mostrados: {sortedUsers.length}</span>
                 <span className="text-[10px] text-purple-500 uppercase tracking-widest font-black">MimoAdmin Perfis Monetizados</span>
             </div>
         </div>
