@@ -1,9 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, MoreVertical, ShieldCheck, Mail, Calendar, Coins, Edit, Trash2, X, Phone, TrendingUp, Activity, ArrowUpDown, MessageCircle } from 'lucide-react';
+import { Search, MoreVertical, ShieldCheck, Mail, Calendar, Coins, Edit, Trash2, X, Phone, TrendingUp, Activity, MessageCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { SortableColumnHeader } from './SortableColumnHeader';
+
+type SortKey = 'balance' | 'deposited' | 'access' | 'rooms' | 'messages';
 
 export function ClientsTable() {
     const router = useRouter();
@@ -11,32 +14,35 @@ export function ClientsTable() {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedUserMenu, setSelectedUserMenu] = useState<string | null>(null);
-    const [sortBy, setSortBy] = useState<'recent' | 'access' | 'deposited' | 'balance' | 'rooms' | 'messages'>('recent');
+    const [sortKey, setSortKey] = useState<SortKey | null>(null);
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
-    // Ordena os usuários conforme o critério selecionado
-    const sortedUsers = useMemo(() => {
-        const sorted = [...users];
-        switch (sortBy) {
-            case 'access':
-                sorted.sort((a, b) => (b.accessCount || 0) - (a.accessCount || 0));
-                break;
-            case 'deposited':
-                sorted.sort((a, b) => (b.totalDeposited || 0) - (a.totalDeposited || 0));
-                break;
-            case 'balance':
-                sorted.sort((a, b) => (b.balance || 0) - (a.balance || 0));
-                break;
-            case 'rooms':
-                sorted.sort((a, b) => (b.roomsCount || 0) - (a.roomsCount || 0));
-                break;
-            case 'messages':
-                sorted.sort((a, b) => (b.messagesCount || 0) - (a.messagesCount || 0));
-                break;
-            default:
-                break; // mantém a ordem de cadastro mais recente vinda da API
+    // Alterna a ordenação ao clicar numa coluna: clique na mesma coluna inverte a direção
+    const handleSort = (key: SortKey) => {
+        if (sortKey === key) {
+            setSortDir(prev => (prev === 'desc' ? 'asc' : 'desc'));
+        } else {
+            setSortKey(key);
+            setSortDir('desc');
         }
+    };
+
+    const SORT_VALUE: Record<SortKey, (u: any) => number> = {
+        balance: (u) => u.balance || 0,
+        deposited: (u) => u.totalDeposited || 0,
+        access: (u) => u.accessCount || 0,
+        rooms: (u) => u.roomsCount || 0,
+        messages: (u) => u.messagesCount || 0,
+    };
+
+    // Ordena os usuários conforme a coluna clicada (mantém a ordem de cadastro mais recente vinda da API por padrão)
+    const sortedUsers = useMemo(() => {
+        if (!sortKey) return users;
+        const getValue = SORT_VALUE[sortKey];
+        const sorted = [...users];
+        sorted.sort((a, b) => sortDir === 'desc' ? getValue(b) - getValue(a) : getValue(a) - getValue(b));
         return sorted;
-    }, [users, sortBy]);
+    }, [users, sortKey, sortDir]);
 
     // Busca os usuários da API
     const fetchUsers = async (query: string = '') => {
@@ -135,23 +141,6 @@ export function ClientsTable() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-center gap-3">
-                    {/* Ordenar por */}
-                    <div className="relative w-full sm:w-52">
-                        <ArrowUpDown className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-                        <select
-                            value={sortBy}
-                            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                            className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 transition-all font-semibold text-slate-700 appearance-none cursor-pointer"
-                        >
-                            <option value="recent">Mais recentes</option>
-                            <option value="access">Mais acessos</option>
-                            <option value="deposited">Maior total adicionado</option>
-                            <option value="balance">Maior saldo</option>
-                            <option value="rooms">Mais conversas</option>
-                            <option value="messages">Mais mensagens</option>
-                        </select>
-                    </div>
-
                     {/* Barra de Busca */}
                     <div className="relative w-full sm:w-64">
                         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
@@ -178,10 +167,21 @@ export function ClientsTable() {
                         <thead>
                             <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
                                 <th className="py-4 px-6">Usuário</th>
-                                <th className="py-4 px-6">Saldo da Carteira</th>
-                                <th className="py-4 px-6">Total Adicionado</th>
-                                <th className="py-4 px-6">Acessos</th>
-                                <th className="py-4 px-6">Conversas & Mensagens</th>
+                                <th className="py-4 px-6">
+                                    <SortableColumnHeader label="Saldo da Carteira" active={sortKey === 'balance'} direction={sortDir} onClick={() => handleSort('balance')} />
+                                </th>
+                                <th className="py-4 px-6">
+                                    <SortableColumnHeader label="Total Adicionado" active={sortKey === 'deposited'} direction={sortDir} onClick={() => handleSort('deposited')} />
+                                </th>
+                                <th className="py-4 px-6">
+                                    <SortableColumnHeader label="Acessos" active={sortKey === 'access'} direction={sortDir} onClick={() => handleSort('access')} />
+                                </th>
+                                <th className="py-4 px-6">
+                                    <div className="flex flex-col gap-1.5">
+                                        <SortableColumnHeader label="Conversas" active={sortKey === 'rooms'} direction={sortDir} onClick={() => handleSort('rooms')} />
+                                        <SortableColumnHeader label="Mensagens" active={sortKey === 'messages'} direction={sortDir} onClick={() => handleSort('messages')} />
+                                    </div>
+                                </th>
                                 <th className="py-4 px-6">WhatsApp / Telefone</th>
                                 <th className="py-4 px-6">Cadastro</th>
                                 <th className="py-4 px-6 text-center">Ações</th>
