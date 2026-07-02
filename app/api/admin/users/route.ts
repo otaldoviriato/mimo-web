@@ -55,11 +55,12 @@ export async function GET(request: NextRequest) {
         const clerkIds = usersList.map(u => u.clerkId);
 
         // Total já depositado (recargas pagas) por usuário
+        // Transactions com source 'recharge' guardam o valor em REAIS (diferente de balance, que é em centavos) — convertemos aqui para manter o padrão de centavos da API
         const depositsAgg = await Transaction.aggregate([
             { $match: { userId: { $in: clerkIds }, source: 'recharge', status: { $in: ['PAID', 'COMPLETED'] } } },
-            { $group: { _id: '$userId', total: { $sum: '$amount' } } },
+            { $group: { _id: '$userId', total: { $sum: { $multiply: ['$amount', 100] } } } },
         ]);
-        const depositsByUser = new Map(depositsAgg.map(d => [d._id, d.total]));
+        const depositsByUser = new Map(depositsAgg.map(d => [d._id, Math.round(d.total)]));
 
         // Total arrecadado (créditos recebidos) por usuário - relevante para perfis monetizados
         const earningsAgg = await MicroTransaction.aggregate([
