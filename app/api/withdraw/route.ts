@@ -183,7 +183,6 @@ export async function GET(request: NextRequest) {
         if (request.nextUrl.searchParams.get('history') === 'true') {
             const withdrawals = await WithdrawRequest.find({
                 userId,
-                hiddenFromUser: { $ne: true },
             })
                 .sort({ createdAt: -1 })
                 .limit(50)
@@ -204,7 +203,6 @@ export async function GET(request: NextRequest) {
         const pendingWithdrawal = await WithdrawRequest.findOne({ 
             userId: userId,
             status: { $in: ['pendente', 'processando'] },
-            hiddenFromUser: { $ne: true },
         }).sort({ createdAt: -1 });
 
         return NextResponse.json({ pendingWithdrawal });

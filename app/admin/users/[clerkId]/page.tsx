@@ -393,35 +393,6 @@ export default function UserDetailPage() {
         }
     };
 
-    const handleHideWithdrawalFromUser = async (withdrawalId: string) => {
-        const confirmHide = window.confirm(
-            'Deseja ocultar esta retirada do histórico da profissional? Ela continuará visível no back-office para auditoria.'
-        );
-        if (!confirmHide) return;
-
-        try {
-            const response = await fetch(`/api/admin/withdrawals/${withdrawalId}`, {
-                method: 'DELETE',
-            });
-
-            if (response.ok) {
-                toast.success('Retirada ocultada do histórico da profissional.', {
-                    style: { borderRadius: '12px', background: '#1E293B', color: '#FFF', fontWeight: 600 }
-                });
-                setWithdrawals(prev => prev.map(item => (
-                    item.id === withdrawalId
-                        ? { ...item, hiddenFromUser: true, hiddenFromUserAt: new Date().toLocaleString('pt-BR') }
-                        : item
-                )));
-            } else {
-                const data = await response.json();
-                toast.error(data.error || 'Erro ao ocultar retirada.');
-            }
-        } catch (error) {
-            console.error('Erro ao ocultar retirada:', error);
-            toast.error('Erro de conexão com o servidor.');
-        }
-    };
 
     // Remove foto da galeria
     const handleDeletePhoto = async (itemId: string) => {
@@ -926,7 +897,7 @@ export default function UserDetailPage() {
                                     Histórico de Retiradas
                                 </h3>
                                 <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-                                    Veja as retiradas solicitadas por esta profissional e oculte registros que não devem aparecer na carteira dela.
+                                    Veja as retiradas solicitadas por esta profissional.
                                 </p>
                             </div>
 
@@ -938,7 +909,6 @@ export default function UserDetailPage() {
                                             <th className="py-4 px-6">Chave Pix</th>
                                             <th className="py-4 px-6">Solicitada em</th>
                                             <th className="py-4 px-6">Status</th>
-                                            <th className="py-4 px-6 text-center">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -975,43 +945,13 @@ export default function UserDetailPage() {
                                                                  withdrawal.status === 'processando' ? 'Processando' :
                                                                  withdrawal.status === 'pendente' ? 'Pendente' : 'Recusada'}
                                                             </span>
-                                                            {withdrawal.hiddenFromUser && (
-                                                                <span
-                                                                    className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200"
-                                                                    title={withdrawal.hiddenFromUserAt ? `Oculta em ${withdrawal.hiddenFromUserAt}` : 'Oculta do histórico da profissional'}
-                                                                >
-                                                                    <Eye size={10} className="opacity-60" />
-                                                                    Oculta da profissional
-                                                                </span>
-                                                            )}
                                                         </div>
-                                                    </td>
-                                                    <td className="py-4 px-6 text-center">
-                                                        {withdrawal.hiddenFromUser ? (
-                                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                                                                Já oculta
-                                                            </span>
-                                                        ) : withdrawal.status === 'pendente' || withdrawal.status === 'processando' ? (
-                                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                                                                Em andamento
-                                                            </span>
-                                                        ) : (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleHideWithdrawalFromUser(withdrawal.id)}
-                                                                className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-bold rounded-lg transition-all border border-slate-200 cursor-pointer shadow-sm active:scale-95"
-                                                                title="Ocultar retirada do histórico da profissional"
-                                                            >
-                                                                <Trash2 size={12} />
-                                                                Ocultar
-                                                            </button>
-                                                        )}
                                                     </td>
                                                 </tr>
                                             ))
                                         ) : (
                                             <tr>
-                                                <td colSpan={5} className="py-12 text-center text-xs font-semibold text-slate-400">
+                                                <td colSpan={4} className="py-12 text-center text-xs font-semibold text-slate-400">
                                                     Nenhuma retirada encontrada para esta profissional.
                                                 </td>
                                             </tr>

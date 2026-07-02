@@ -231,7 +231,7 @@ export function MediaComposerSheet({ previewUrl, isVideo, onCancel, onConfirm }:
                                                         setCustomExpiryUnit('hours');
                                                     } else {
                                                         setIsTemporary(true);
-                                                        setExpiryOption(opt.value as any);
+                                                        setExpiryOption(opt.value);
                                                         if (opt.value === '10s') { setCustomExpiryValue(10); setCustomExpiryUnit('seconds'); }
                                                         else if (opt.value === '30s') { setCustomExpiryValue(30); setCustomExpiryUnit('seconds'); }
                                                         else if (opt.value === '1min') { setCustomExpiryValue(1); setCustomExpiryUnit('minutes'); }
