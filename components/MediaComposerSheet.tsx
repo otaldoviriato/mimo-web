@@ -37,7 +37,7 @@ export function MediaComposerSheet({ previewUrl, isVideo, onCancel, onConfirm }:
     const [mediaPriceFormatted, setMediaPriceFormatted] = useState('R$ 0,00');
     const [isTemporary, setIsTemporary] = useState(false);
     const [expiryOption, setExpiryOption] = useState<'permanent' | '10s' | '30s' | '1min' | '30min' | '24h' | '7d' | 'custom'>('permanent');
-    const [customExpiryValue, setCustomExpiryValue] = useState(1);
+    const [customExpiryValue, setCustomExpiryValue] = useState<number | "">(1);
     const [customExpiryUnit, setCustomExpiryUnit] = useState<'seconds' | 'minutes' | 'hours' | 'days'>('hours');
 
     const shouldBlur = mediaPriceType === 'paid' || isTemporary;
@@ -306,7 +306,17 @@ export function MediaComposerSheet({ previewUrl, isVideo, onCancel, onConfirm }:
                                             min="1"
                                             className="w-16 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-800 focus:outline-none text-center py-1"
                                             value={customExpiryValue}
-                                            onChange={(e) => setCustomExpiryValue(Math.max(1, parseInt(e.target.value) || 1))}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                if (val === '') {
+                                                    setCustomExpiryValue('');
+                                                } else {
+                                                    const parsed = parseInt(val, 10);
+                                                    if (!isNaN(parsed)) {
+                                                        setCustomExpiryValue(parsed);
+                                                    }
+                                                }
+                                            }}
                                         />
                                         <select
                                             className="flex-1 bg-transparent text-sm font-semibold text-slate-700 focus:outline-none cursor-pointer"

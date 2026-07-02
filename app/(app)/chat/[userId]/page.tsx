@@ -319,7 +319,7 @@ const VideoPlayer = ({ src, isActive, controlsVisible }: { src: string; isActive
     );
 };
 
-function TemporaryMediaBadge({ expiresAt, onExpire }: { expiresAt: string | Date; onExpire?: () => void }) {
+function TemporaryMediaBadge({ expiresAt, onExpire, className }: { expiresAt: string | Date; onExpire?: () => void; className?: string }) {
     const [timeLeft, setTimeLeft] = useState('');
     const [isExpired, setIsExpired] = useState(false);
 
@@ -357,7 +357,7 @@ function TemporaryMediaBadge({ expiresAt, onExpire }: { expiresAt: string | Date
     if (isExpired) return null;
 
     return (
-        <div className="absolute right-2 top-2 z-20 flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/55 px-2 py-1 text-white shadow-sm backdrop-blur-md">
+        <div className={className || "absolute right-2 top-2 z-20 flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/55 px-2 py-1 text-white shadow-sm backdrop-blur-md"}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-amber-450">
                 <circle cx="12" cy="12" r="10" />
                 <polyline points="12 6 12 12 16 14" />
@@ -3453,26 +3453,10 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                 {mediaItems.map((item, idx) => (
                                     <div 
                                         key={idx} 
-                                        className="h-full flex-shrink-0 flex items-center justify-center relative"
+                                        className="h-full flex-shrink-0 flex items-center justify-center"
                                         style={{ width: '100vw' }}
                                         onClick={handleSlideClick}
                                     >
-                                        {item.isTemporary && item.expiresAt && idx === fullscreenIndex && (
-                                            <div 
-                                                onClick={e => e.stopPropagation()} 
-                                                className="absolute top-24 right-4 z-50 pointer-events-auto"
-                                            >
-                                                <TemporaryMediaBadge 
-                                                    expiresAt={item.expiresAt} 
-                                                    onExpire={() => {
-                                                        if (item.messageId) {
-                                                            setMessages(prev => prev.map(m => m._id === item.messageId ? { ...m, isExpired: true } : m));
-                                                        }
-                                                        setFullscreenIndex(null);
-                                                    }}
-                                                />
-                                            </div>
-                                        )}
                                         {item.isVideo ? (
                                             <VideoPlayer
                                                 key={item.url}
@@ -3518,7 +3502,26 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                 <span className="text-white/80 text-sm font-semibold tracking-wide bg-black/45 px-3 py-1.5 rounded-full backdrop-blur-sm">
                                     {fullscreenIndex + 1} / {mediaItems.length}
                                 </span>
-                                <div className="w-10" />{/* spacer */}
+                                {(() => {
+                                    const activeItem = mediaItems[fullscreenIndex];
+                                    if (activeItem?.isTemporary && activeItem?.expiresAt) {
+                                        return (
+                                            <div className="pointer-events-auto flex items-center justify-end">
+                                                <TemporaryMediaBadge 
+                                                    expiresAt={activeItem.expiresAt} 
+                                                    className="flex items-center gap-1 bg-black/45 px-2.5 py-1 text-white shadow-sm rounded-full border border-white/10 text-[9px] font-bold uppercase tracking-wider backdrop-blur-sm whitespace-nowrap"
+                                                    onExpire={() => {
+                                                        if (activeItem.messageId) {
+                                                            setMessages(prev => prev.map(m => m._id === activeItem.messageId ? { ...m, isExpired: true } : m));
+                                                        }
+                                                        setFullscreenIndex(null);
+                                                    }}
+                                                />
+                                            </div>
+                                        );
+                                    }
+                                    return <div className="w-10" />;
+                                })()}
                             </div>
 
                             {/* Seta esquerda */}
