@@ -41,6 +41,8 @@ export interface IUser extends Document {
     bio?: string;
     isOnline?: boolean;
     lastSeen?: Date;
+    accessCount?: number;
+    lastAccessAt?: Date;
     emailNotificationsEnabled?: boolean;
     isSuspended?: boolean;
     suspendedAt?: Date;
@@ -173,6 +175,14 @@ const UserSchema = new Schema<IUser>({
         default: false,
     },
     lastSeen: {
+        type: Date,
+    },
+    accessCount: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    lastAccessAt: {
         type: Date,
     },
     emailNotificationsEnabled: {

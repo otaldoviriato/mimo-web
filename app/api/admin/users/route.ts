@@ -3,6 +3,8 @@ import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { AppSettings } from '@/models/AppSettings';
+import { Transaction } from '@/models/Transaction';
+import { MicroTransaction } from '@/models/MicroTransaction';
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
@@ -43,10 +45,26 @@ export async function GET(request: NextRequest) {
         }
 
         const usersList = await User.find(filter)
-            .select('clerkId username name email photoUrl balance isProfessional createdAt taxId phone pixKey subscriptionPrice lastSeen isOnline')
+            .select('clerkId username name email photoUrl balance isProfessional createdAt taxId phone pixKey subscriptionPrice lastSeen isOnline accessCount lastAccessAt')
             .sort({ createdAt: -1 })
             .limit(100)
             .lean() as any[];
+
+        const clerkIds = usersList.map(u => u.clerkId);
+
+        // Total já depositado (recargas pagas) por usuário
+        const depositsAgg = await Transaction.aggregate([
+            { $match: { userId: { $in: clerkIds }, source: 'recharge', status: { $in: ['PAID', 'COMPLETED'] } } },
+            { $group: { _id: '$userId', total: { $sum: '$amount' } } },
+        ]);
+        const depositsByUser = new Map(depositsAgg.map(d => [d._id, d.total]));
+
+        // Total arrecadado (créditos recebidos) por usuário - relevante para perfis monetizados
+        const earningsAgg = await MicroTransaction.aggregate([
+            { $match: { userId: { $in: clerkIds }, type: 'credit' } },
+            { $group: { _id: '$userId', total: { $sum: '$amount' } } },
+        ]);
+        const earningsByUser = new Map(earningsAgg.map(e => [e._id, e.total]));
 
         return NextResponse.json({
             users: usersList.map(u => ({
@@ -65,6 +83,10 @@ export async function GET(request: NextRequest) {
                 subscriptionPrice: u.subscriptionPrice || 0,
                 lastSeen: u.lastSeen ? new Date(u.lastSeen).toISOString() : null,
                 isOnline: u.isOnline || false,
+                totalDeposited: depositsByUser.get(u.clerkId) || 0,
+                totalEarned: earningsByUser.get(u.clerkId) || 0,
+                accessCount: u.accessCount || 0,
+                lastAccessAt: u.lastAccessAt ? new Date(u.lastAccessAt).toISOString() : null,
             }))
         });
 

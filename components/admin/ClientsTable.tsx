@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, MoreVertical, ShieldCheck, Mail, Calendar, Coins, Edit, Trash2, X, Phone } from 'lucide-react';
+import { Search, MoreVertical, ShieldCheck, Mail, Calendar, Coins, Edit, Trash2, X, Phone, TrendingUp, Activity } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 
@@ -136,6 +136,8 @@ export function ClientsTable() {
                             <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
                                 <th className="py-4 px-6">Usuário</th>
                                 <th className="py-4 px-6">Saldo da Carteira</th>
+                                <th className="py-4 px-6">Total Adicionado</th>
+                                <th className="py-4 px-6">Acessos</th>
                                 <th className="py-4 px-6">WhatsApp / Telefone</th>
                                 <th className="py-4 px-6">Cadastro</th>
                                 <th className="py-4 px-6 text-center">Ações</th>
@@ -190,6 +192,27 @@ export function ClientsTable() {
                                                 <Coins size={14} className="text-amber-500" />
                                                 {((user.balance || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                             </span>
+                                        </td>
+
+                                        {/* Total Adicionado */}
+                                        <td className="py-4 px-6">
+                                            <span className="text-sm font-semibold text-emerald-600 flex items-center gap-1">
+                                                <TrendingUp size={14} className="text-emerald-500" />
+                                                {((user.totalDeposited || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                            </span>
+                                        </td>
+
+                                        {/* Acessos */}
+                                        <td className="py-4 px-6">
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                                                    <Activity size={12} className="text-slate-400" />
+                                                    {user.accessCount || 0} acesso{(user.accessCount || 0) === 1 ? '' : 's'}
+                                                </span>
+                                                <span className="text-[11px] text-slate-400 font-medium">
+                                                    Último: {formatLastSeen(user.lastAccessAt)}
+                                                </span>
+                                            </div>
                                         </td>
 
                                         {/* Telefone */}
@@ -276,7 +299,7 @@ export function ClientsTable() {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={5} className="py-20 text-center text-sm font-semibold text-slate-400">
+                                    <td colSpan={7} className="py-20 text-center text-sm font-semibold text-slate-400">
                                         Nenhum usuário encontrado.
                                     </td>
                                 </tr>
