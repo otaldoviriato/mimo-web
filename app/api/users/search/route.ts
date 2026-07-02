@@ -156,11 +156,8 @@ export async function GET(request: NextRequest) {
             };
         });
 
-        // Filtrar fora usuários não qualificados, a menos que seja um match exato de username
-        const filteredUsers = usersWithScores.filter(u => {
-            const isExactMatch = u.username.toLowerCase() === cleanQuery.toLowerCase();
-            return u.isQualified || isExactMatch;
-        });
+        // Na busca, não filtramos por perfil qualificado/completo para permitir que qualquer usuário profissional aprovado correspondente seja encontrado.
+        const filteredUsers = usersWithScores;
 
         // Ordenação manual: Exact username matches primeiro, depois por score de relevância
         const sortedUsers = filteredUsers.sort((a, b) => {
