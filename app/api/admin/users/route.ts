@@ -69,6 +69,13 @@ export async function GET(request: NextRequest) {
         ]);
         const earningsByUser = new Map(earningsAgg.map(e => [e._id, e.total]));
 
+        // Total de assinaturas recebidas (em reais, convertidas para centavos)
+        const subscriptionEarningsAgg = await Transaction.aggregate([
+            { $match: { userId: { $in: clerkIds }, type: 'credit', source: 'subscription', status: 'COMPLETED' } },
+            { $group: { _id: '$userId', total: { $sum: { $multiply: ['$amount', 100] } } } }
+        ]);
+        const subscriptionEarningsByUser = new Map(subscriptionEarningsAgg.map(s => [s._id, Math.round(s.total)]));
+
         // Quantidade de conversas (salas) por usuário
         // $setUnion remove duplicatas dentro do array de participantes antes do $unwind,
         // evitando contar a mesma sala 2x em conversas antigas onde os 2 participantes são o mesmo usuário
@@ -109,7 +116,7 @@ export async function GET(request: NextRequest) {
                 lastSeen: u.lastSeen ? new Date(u.lastSeen).toISOString() : null,
                 isOnline: u.isOnline || false,
                 totalDeposited: depositsByUser.get(u.clerkId) || 0,
-                totalEarned: earningsByUser.get(u.clerkId) || 0,
+                totalEarned: (earningsByUser.get(u.clerkId) || 0) + (subscriptionEarningsByUser.get(u.clerkId) || 0),
                 accessCount: u.accessCount || 0,
                 lastAccessAt: u.lastAccessAt ? new Date(u.lastAccessAt).toISOString() : null,
                 roomsCount: roomsByUser.get(u.clerkId) || 0,

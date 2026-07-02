@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { WithdrawRequest } from '@/models/WithdrawRequest';
 import { MicroTransaction } from '@/models/MicroTransaction';
+import { Transaction } from '@/models/Transaction';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,14 +59,12 @@ export async function GET(request: NextRequest) {
         const pendingWithdrawal = await WithdrawRequest.findOne({
             userId: user.clerkId,
             status: { $in: ['pendente', 'processando'] },
-            hiddenFromUser: { $ne: true },
         }).sort({ createdAt: -1 }).lean();
 
         // 3. Total sacado (concluído)
         const completedWithdrawals = await WithdrawRequest.find({
             userId: user.clerkId,
             status: 'concluido',
-            hiddenFromUser: { $ne: true },
         });
         const totalWithdrawn = completedWithdrawals.reduce((sum, req: any) => sum + (req.netAmount !== undefined ? req.netAmount : req.amount), 0);
 
@@ -90,8 +89,15 @@ export async function GET(request: NextRequest) {
             { $group: { _id: '$source', total: { $sum: '$amount' } } }
         ]);
 
+        // Assinaturas são registradas na coleção Transaction (em reais). Somamos os créditos e multiplicamos por 100 para ter em centavos.
+        const subscriptionEarningsResult = await Transaction.aggregate([
+            { $match: { userId: user.clerkId, type: 'credit', source: 'subscription', status: 'COMPLETED' } },
+            { $group: { _id: null, total: { $sum: '$amount' } } }
+        ]);
+        const subscriptionEarnings = Math.round((subscriptionEarningsResult[0]?.total || 0) * 100);
+
         const earningsByCategory = {
-            subscription: 0,
+            subscription: subscriptionEarnings,
             message: 0,
             image_unlock: 0,
             gift: 0
