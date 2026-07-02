@@ -600,11 +600,30 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
     // Lista derivada das mídias históricas carregadas combinadas com as mídias das mensagens locais
     const mediaItems = React.useMemo(() => {
-        const loadedUrls = new Set(allMediaItemsLoaded.map(item => item.url));
-        
+        const now = new Date();
+
+        // 1. Filtrar mídias históricas que por ventura já expiraram
+        const validHistorical = allMediaItemsLoaded.filter(item => {
+            if (item.isTemporary && item.expiresAt) {
+                const expiresTime = new Date(item.expiresAt).getTime();
+                if (expiresTime > 0 && expiresTime < now.getTime()) {
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        // 2. Extrair mídias locais válidas (não expiradas e não bloqueadas)
         const localMedias = messages
             .filter(m => {
                 if (m.isLockedImage) return false; // locked não entra
+                if (m.isExpired) return false;
+                if (m.isTemporary && m.expiresAt) {
+                    const expiresTime = new Date(m.expiresAt).getTime();
+                    if (expiresTime > 0 && expiresTime < now.getTime()) {
+                        return false;
+                    }
+                }
                 return m.originalImageUrl || (m.isVideo && m.videoUrl);
             })
             .map(m => ({
@@ -616,10 +635,44 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 expiresAt: m.expiresAt,
             }));
 
+        // 3. Enriquecer itens da galeria histórica com propriedades locais se houver correspondência
+        const enrichedHistorical = validHistorical.map(histItem => {
+            const localMatch = localMedias.find(lm => lm.url === histItem.url);
+            if (localMatch) {
+                return {
+                    ...histItem,
+                    messageId: localMatch.messageId,
+                    isTemporary: localMatch.isTemporary,
+                    expiresAt: localMatch.expiresAt
+                };
+            }
+            return histItem;
+        });
+
+        const loadedUrls = new Set(enrichedHistorical.map(item => item.url));
         const newLocalMedias = localMedias.filter(item => !loadedUrls.has(item.url));
 
-        return [...allMediaItemsLoaded, ...newLocalMedias];
+        return [...enrichedHistorical, ...newLocalMedias];
     }, [allMediaItemsLoaded, messages]);
+
+    // Efeito para fechar o visualizador de tela cheia se a mídia ativa expirar ou for removida da lista
+    useEffect(() => {
+        if (fullscreenIndex !== null) {
+            // Se o index ficou fora dos limites ou se a mídia sumiu do array (por expiração)
+            if (!mediaItems[fullscreenIndex]) {
+                setFullscreenIndex(null);
+                return;
+            }
+            
+            const activeItem = mediaItems[fullscreenIndex];
+            if (activeItem.isTemporary && activeItem.expiresAt) {
+                const expiresTime = new Date(activeItem.expiresAt).getTime();
+                if (expiresTime > 0 && expiresTime < Date.now()) {
+                    setFullscreenIndex(null);
+                }
+            }
+        }
+    }, [fullscreenIndex, mediaItems]);
 
     useEffect(() => {
         const videosToMeasure = messages.filter((message) => (
