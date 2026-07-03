@@ -76,7 +76,7 @@ export default function ChatsPage() {
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
-            const isDismissed = localStorage.getItem('mimo_hide_profile_progress_banner') === 'true';
+            const isDismissed = sessionStorage.getItem('mimo_hide_profile_progress_banner') === 'true';
             setHideProfileProgress(isDismissed);
         }
     }, []);
@@ -215,7 +215,7 @@ export default function ChatsPage() {
                 <button 
                     onClick={() => {
                         setHideProfileProgress(true);
-                        localStorage.setItem('mimo_hide_profile_progress_banner', 'true');
+                        sessionStorage.setItem('mimo_hide_profile_progress_banner', 'true');
                     }}
                     className="absolute top-2.5 right-2.5 p-1 rounded-full text-purple-400 hover:text-purple-600 transition-colors"
                     title="Dispensar"

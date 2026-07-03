@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
             ]
         })
         .select('clerkId username name email photoUrl coverUrl isProfessional subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers bio createdAt avgResponseTimeMinutes isOnline lastSeen')
-        .limit(80)
+        .limit(200)
         .lean() as any[];
 
         if (!featuredUsers || featuredUsers.length === 0) {
@@ -71,56 +71,34 @@ export async function GET(request: NextRequest) {
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - thresholdDays);
 
-        // Mapear usuários, calcular o score e anexar até 4 fotos públicas
+        // Mapear usuários, calcular a completude do perfil e anexar até 4 fotos públicas
         const usersWithPhotos = featuredUsers.map(u => {
             const publicPhotos = photosByOwner[u.clerkId] || [];
-
-            // Algoritmo de Score
-            let score = 0;
-
-            // 1. Estático: Foto de Capa (30 pts)
-            if (u.coverUrl && u.coverUrl.trim() !== '') {
-                score += 30;
-            }
-
-            // 2. Estático: Bio (40 pts)
-            if (u.bio && u.bio.trim().length >= 10) {
-                score += 40;
-            }
-
-            // 3. Estático: Galeria Pública (até 30 pts)
-            // Mínimo de 3 fotos públicas = 30 pts (10 pts por foto)
             const photosCount = publicPhotos.length;
-            score += Math.min(photosCount * 10, 30);
 
-            // 4. Dinâmico: Online Agora (100 pts)
-            if (u.isOnline) {
-                score += 100;
-            }
+            // 1. Calcular completude (peso de 25% por requisito preenchido)
+            const hasPhoto = !!u.photoUrl && u.photoUrl.trim() !== '';
+            const hasCover = !!u.coverUrl && u.coverUrl.trim() !== '';
+            const hasBio = !!u.bio && u.bio.trim().length >= 10;
+            const hasPhotos = photosCount >= 3;
 
-            // 5. Dinâmico: Frequência de Acesso (até 50 pts)
+            let completedSteps = 0;
+            if (hasPhoto) completedSteps++;
+            if (hasCover) completedSteps++;
+            if (hasBio) completedSteps++;
+            if (hasPhotos) completedSteps++;
+
+            const completeness = completedSteps * 25;
+
+            // 2. Determinar timestamp de última atividade (online ou mais recente)
+            let lastActiveTime = 0;
             if (u.isOnline) {
-                score += 50;
+                lastActiveTime = Date.now();
             } else if (u.lastSeen) {
-                const lastSeenDate = new Date(u.lastSeen);
-                const diffMs = Date.now() - lastSeenDate.getTime();
-                const diffHours = diffMs / (1000 * 60 * 60);
-                if (diffHours <= 24) {
-                    score += 50;
-                } else if (diffHours <= 48) {
-                    score += 30;
-                } else if (diffHours <= 168) { // 7 dias
-                    score += 10;
-                }
+                lastActiveTime = new Date(u.lastSeen).getTime();
+            } else if (u.createdAt) {
+                lastActiveTime = new Date(u.createdAt).getTime();
             }
-
-            // 6. Dinâmico: Tempo de Resposta (15 pts)
-            if (u.avgResponseTimeMinutes != null && u.avgResponseTimeMinutes < 15) {
-                score += 15;
-            }
-
-            // Adiciona um fator aleatório sutil (0 a 5 pts) para que perfis de relevância semelhante se alternem de forma justa
-            const finalScore = score + Math.random() * 5;
 
             return {
                 id: u._id,
@@ -138,14 +116,23 @@ export async function GET(request: NextRequest) {
                 isNew: u.createdAt ? new Date(u.createdAt) >= cutoffDate : false,
                 publicPhotos: publicPhotos.slice(0, 4),
                 avgResponseTimeMinutes: u.avgResponseTimeMinutes ?? null,
-                score: finalScore,
-                publicPhotosCount: photosCount // adicionado para o filtro de qualificação
+                score: completeness, // mantido para compatibilidade com a tipagem do frontend
+                completeness,
+                lastActiveTime,
+                publicPhotosCount: photosCount
             };
         });
 
-        // Ordenar decrescentemente pelo score de relevância e pegar as top 12 recomendações
+        // Ordenar decrescentemente:
+        // 1. Pela completude do perfil (100% primeiro, etc.)
+        // 2. Por quem esteve online/ativo mais recentemente (lastActiveTime descendente)
         const sorted = usersWithPhotos
-            .sort((a, b) => b.score - a.score)
+            .sort((a, b) => {
+                if (b.completeness !== a.completeness) {
+                    return b.completeness - a.completeness;
+                }
+                return b.lastActiveTime - a.lastActiveTime;
+            })
             .slice(0, 12);
 
         return NextResponse.json({ users: sorted });
