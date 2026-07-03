@@ -247,7 +247,7 @@ export default function ChatsPage() {
 
                         <div className="mt-3.5 flex justify-end">
                             <button
-                                onClick={() => router.push('/profile')}
+                                onClick={() => router.replace('/profile')}
                                 className="inline-flex items-center justify-center gap-1.5 bg-purple-600 hover:bg-purple-700 active:scale-[0.98] transition-all text-white text-[10px] font-extrabold px-3 py-1.5 rounded-xl shadow-md shadow-purple-600/10 cursor-pointer"
                             >
                                 Completar Agora
