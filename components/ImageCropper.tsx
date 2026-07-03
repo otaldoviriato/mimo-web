@@ -160,7 +160,7 @@ export function ImageCropper({ imageSrc, circular = false, aspectRatio, onCrop, 
     const cropHeight = circular ? 220 : Math.round(280 / aspectRatio);
 
     return (
-        <div className="fixed inset-0 z-[100] flex flex-col justify-between bg-black/95 text-white animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[100000] flex flex-col justify-between bg-black/95 text-white animate-in fade-in duration-300">
             {/* Cabeçalho */}
             <div className="px-5 py-4 flex items-center justify-between border-b border-neutral-800 bg-neutral-950/40 backdrop-blur-md">
                 <button
