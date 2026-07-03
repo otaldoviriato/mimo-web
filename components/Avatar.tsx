@@ -31,7 +31,7 @@ export function Avatar({ uri, size = 40, className = '', isOnline = false }: Ava
 
     if (uri && !imgError) {
         return (
-            <div className="relative inline-block flex-shrink-0">
+            <div className="relative flex flex-shrink-0">
                 <div
                     className={`rounded-full overflow-hidden bg-gray-200 flex-shrink-0 ${className}`}
                     style={style}
@@ -49,7 +49,7 @@ export function Avatar({ uri, size = 40, className = '', isOnline = false }: Ava
     }
 
     return (
-        <div className="relative inline-block flex-shrink-0">
+        <div className="relative flex flex-shrink-0">
             <div
                 className={`rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 ${className}`}
                 style={style}
