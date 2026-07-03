@@ -102,6 +102,9 @@ export default function UserDetailPage() {
     const [user, setUser] = useState<UserDetail | null>(null);
     const [gallery, setGallery] = useState<GalleryItemType[]>([]);
     const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>([]);
+    const [subscribers, setSubscribers] = useState<any[]>([]);
+    const [subscribersPage, setSubscribersPage] = useState(1);
+    const [showPrivatePhotos, setShowPrivatePhotos] = useState(false);
 
     // Estados do Gerenciamento de Salas de Chat da Profissional
     const [rooms, setRooms] = useState<ChatRoom[]>([]);
@@ -281,6 +284,7 @@ export default function UserDetailPage() {
                     setUser(data.user);
                     setGallery(data.gallery || []);
                     setWithdrawals(data.withdrawals || []);
+                    setSubscribers(data.subscribers || []);
                     
                     // Preenche os states dos inputs
                     setName(data.user.name || '');
@@ -778,115 +782,290 @@ export default function UserDetailPage() {
                         </div>
                     </form>
 
-                    {/* Galeria de Fotos (Apenas se for profissional) */}
+                    {/* Assinantes Ativos (Apenas se for profissional) */}
                     {isProfessional && (
                         <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-6">
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
-                                <div>
-                                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                                        <ImageIcon size={16} className="text-purple-600" />
-                                        Galeria de Fotos do Perfil
-                                    </h3>
-                                    <p className="text-[11px] text-slate-400 font-medium mt-0.5">Gerencie os conteúdos visuais exibidos na galeria pública e assinante desta profissional.</p>
-                                </div>
-
-                                <button
-                                    type="button"
-                                    onClick={() => fileInputRef.current?.click()}
-                                    disabled={uploadingPhoto}
-                                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 active:bg-slate-950 disabled:opacity-60 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md"
-                                >
-                                    {uploadingPhoto ? (
-                                        <Loader2 size={13} className="animate-spin" />
-                                    ) : (
-                                        <Plus size={13} />
-                                    )}
-                                    Adicionar Foto
-                                </button>
-                                <input 
-                                    type="file" 
-                                    ref={fileInputRef}
-                                    onChange={handleUploadPhoto}
-                                    className="hidden"
-                                    accept="image/*"
-                                />
+                            <div>
+                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                                    <User size={16} className="text-purple-600" />
+                                    Assinantes Ativos ({subscribers.length})
+                                </h3>
+                                <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                                    Lista de usuários com assinatura ativa para este perfil profissional.
+                                </p>
                             </div>
 
-                            {gallery.length > 0 ? (
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
-                                        {(galleryExpanded ? gallery : gallery.slice(0, 5)).map((item) => (
-                                            <div key={item._id} className="relative aspect-square rounded-2xl overflow-hidden bg-slate-50 border border-slate-200 group shadow-sm">
-                                                <img 
-                                                    src={item.imageUrl} 
-                                                    alt="Galeria Item" 
-                                                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
-                                                />
-                                                {/* Badge de visibilidade */}
-                                                {item.visibility === 'subscribers' ? (
-                                                    <div className="absolute top-2 left-2 z-20 px-2 py-0.5 text-[9px] font-bold bg-amber-500 text-white rounded-md shadow flex items-center gap-0.5 select-none">
-                                                        <Lock size={9} />
-                                                        Assinantes
-                                                    </div>
-                                                ) : (
-                                                    <div className="absolute top-2 left-2 z-20 px-2 py-0.5 text-[9px] font-bold bg-slate-600/80 backdrop-blur-sm text-white rounded-md shadow flex items-center gap-0.5 select-none">
-                                                        <Eye size={9} />
-                                                        Pública
-                                                    </div>
-                                                )}
-                                                {/* Overlay hover para deletar e alterar visibilidade */}
-                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2.5 z-10">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleToggleVisibility(item._id, item.visibility)}
-                                                        className="p-2.5 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white rounded-xl shadow-md transition-all hover:scale-110 cursor-pointer"
-                                                        title={item.visibility === 'subscribers' ? 'Tornar Pública' : 'Tornar Exclusiva'}
-                                                    >
-                                                        {item.visibility === 'subscribers' ? <Unlock size={14} /> : <Lock size={14} />}
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleDeletePhoto(item._id)}
-                                                        className="p-2.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-xl shadow-md transition-all hover:scale-110 cursor-pointer"
-                                                        title="Excluir Foto"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+                                            <th className="py-4 px-6">Usuário</th>
+                                            <th className="py-4 px-6">E-mail</th>
+                                            <th className="py-4 px-6 text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {subscribers.length > 0 ? (
+                                            subscribers
+                                                .slice((subscribersPage - 1) * 5, subscribersPage * 5)
+                                                .map((subscriber) => {
+                                                    const initials = subscriber.name ? 
+                                                        (subscriber.name.split(' ').length >= 2 ? `${subscriber.name.split(' ')[0][0]}${subscriber.name.split(' ')[1][0]}` : subscriber.name.substring(0, 2)) : 'US';
+                                                    return (
+                                                        <tr key={subscriber.clerkId} className="hover:bg-slate-50/40 transition-colors group">
+                                                            <td className="py-4 px-6">
+                                                                <div className="flex items-center gap-2.5">
+                                                                    {subscriber.photoUrl ? (
+                                                                        <img src={subscriber.photoUrl} alt="Avatar" className="w-8 h-8 rounded-full object-cover border border-slate-200" />
+                                                                    ) : (
+                                                                        <div className="w-8 h-8 rounded-full bg-purple-50 text-purple-750 border border-purple-100 flex items-center justify-center font-bold text-xs">
+                                                                            {initials.toUpperCase()}
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="flex flex-col min-w-0">
+                                                                        <span className="text-xs font-bold text-slate-800 leading-tight truncate">{subscriber.name}</span>
+                                                                        <span className="text-[10px] text-slate-400 font-semibold truncate">@{subscriber.username}</span>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-4 px-6">
+                                                                <span className="text-xs font-medium text-slate-600">{subscriber.email}</span>
+                                                            </td>
+                                                            <td className="py-4 px-6 text-center">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => router.push(`/admin/users/${subscriber.clerkId}`)}
+                                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-sm active:scale-95"
+                                                                >
+                                                                    Ver Perfil
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={3} className="py-12 text-center text-xs font-semibold text-slate-400">
+                                                    Nenhum assinante ativo para este perfil até o momento.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
 
-                                    {/* Botão de Expandir/Ocultar */}
-                                    {gallery.length > 5 && (
-                                        <div className="flex justify-center pt-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => setGalleryExpanded(!galleryExpanded)}
-                                                className="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm"
-                                            >
-                                                {galleryExpanded ? (
-                                                    <>
-                                                        <ChevronUp size={14} />
-                                                        Mostrar Menos
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <ChevronDown size={14} />
-                                                        Mostrar Mais (+{gallery.length - 5} fotos)
-                                                    </>
-                                                )}
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="py-12 text-center text-xs font-semibold text-slate-400 border-2 border-dashed border-slate-100 rounded-2xl">
-                                    Nenhuma foto na galeria desta profissional até o momento.
+                            {/* Controles de Paginação */}
+                            {subscribers.length > 5 && (
+                                <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+                                    <span className="text-[11px] text-slate-400 font-medium">
+                                        Mostrando {Math.min((subscribersPage - 1) * 5 + 1, subscribers.length)} a {Math.min(subscribersPage * 5, subscribers.length)} de {subscribers.length} assinantes
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            disabled={subscribersPage === 1}
+                                            onClick={() => setSubscribersPage(prev => Math.max(prev - 1, 1))}
+                                            className="px-3 py-1.5 border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-700 text-xs font-bold rounded-lg transition-all cursor-pointer shadow-sm"
+                                        >
+                                            Anterior
+                                        </button>
+                                        <span className="text-xs font-bold text-slate-650 bg-slate-100 px-2.5 py-1.5 rounded-lg border border-slate-200/60">
+                                            {subscribersPage} / {Math.ceil(subscribers.length / 5)}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            disabled={subscribersPage >= Math.ceil(subscribers.length / 5)}
+                                            onClick={() => setSubscribersPage(prev => Math.min(prev + 1, Math.ceil(subscribers.length / 5)))}
+                                            className="px-3 py-1.5 border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-700 text-xs font-bold rounded-lg transition-all cursor-pointer shadow-sm"
+                                        >
+                                            Próxima
+                                        </button>
+                                    </div>
                                 </div>
                             )}
                         </div>
                     )}
+
+                    {/* Galeria de Fotos (Apenas se for profissional) */}
+                    {isProfessional && (() => {
+                        const publicPhotos = gallery.filter(item => item.visibility !== 'subscribers');
+                        const privatePhotos = gallery.filter(item => item.visibility === 'subscribers');
+
+                        return (
+                            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-6">
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
+                                    <div>
+                                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                                            <ImageIcon size={16} className="text-purple-600" />
+                                            Galeria de Fotos do Perfil
+                                        </h3>
+                                        <p className="text-[11px] text-slate-400 font-medium mt-0.5">Gerencie os conteúdos visuais exibidos na galeria pública e assinante desta profissional.</p>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={uploadingPhoto}
+                                        className="px-4 py-2 bg-slate-900 hover:bg-slate-800 active:bg-slate-950 disabled:opacity-60 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md"
+                                    >
+                                        {uploadingPhoto ? (
+                                            <Loader2 size={13} className="animate-spin" />
+                                        ) : (
+                                            <Plus size={13} />
+                                        )}
+                                        Adicionar Foto
+                                    </button>
+                                    <input 
+                                        type="file" 
+                                        ref={fileInputRef}
+                                        onChange={handleUploadPhoto}
+                                        className="hidden"
+                                        accept="image/*"
+                                    />
+                                </div>
+
+                                {gallery.length > 0 ? (
+                                    <div className="space-y-8">
+                                        {/* Categoria: Galeria Pública */}
+                                        <div className="space-y-4">
+                                            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                                                    <Eye size={14} className="text-slate-500" />
+                                                    Galeria Pública ({publicPhotos.length})
+                                                </h4>
+                                            </div>
+                                            
+                                            {publicPhotos.length > 0 ? (
+                                                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
+                                                    {publicPhotos.map((item) => (
+                                                        <div key={item._id} className="relative aspect-square rounded-2xl overflow-hidden bg-slate-50 border border-slate-200 group shadow-sm">
+                                                            <img 
+                                                                src={item.imageUrl} 
+                                                                alt="Galeria Pública Item" 
+                                                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
+                                                            />
+                                                            <div className="absolute top-2 left-2 z-20 px-2 py-0.5 text-[9px] font-bold bg-slate-650/80 backdrop-blur-sm text-white rounded-md shadow flex items-center gap-0.5 select-none">
+                                                                <Eye size={9} />
+                                                                Pública
+                                                            </div>
+                                                            {/* Overlay hover para deletar e alterar visibilidade */}
+                                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2.5 z-10">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleToggleVisibility(item._id, item.visibility)}
+                                                                    className="p-2.5 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white rounded-xl shadow-md transition-all hover:scale-110 cursor-pointer"
+                                                                    title="Tornar Exclusiva (Assinantes)"
+                                                                >
+                                                                    <Lock size={14} />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleDeletePhoto(item._id)}
+                                                                    className="p-2.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-xl shadow-md transition-all hover:scale-110 cursor-pointer"
+                                                                    title="Excluir Foto"
+                                                                >
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="py-6 text-center text-xs font-semibold text-slate-400 border border-dashed border-slate-100 rounded-2xl bg-slate-50/50">
+                                                    Nenhuma foto na galeria pública desta profissional.
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Categoria: Galeria Privada (Assinantes) */}
+                                        <div className="space-y-4 pt-4 border-t border-slate-100">
+                                            <div className="flex items-center justify-between pb-2">
+                                                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                                                    <Lock size={14} className="text-amber-500" />
+                                                    Galeria Privada / Assinantes ({privatePhotos.length})
+                                                </h4>
+                                                {privatePhotos.length > 0 && showPrivatePhotos && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowPrivatePhotos(false)}
+                                                        className="text-[10px] font-bold text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-md transition-all border border-slate-200 cursor-pointer"
+                                                    >
+                                                        Ocultar Fotos
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {privatePhotos.length > 0 ? (
+                                                !showPrivatePhotos ? (
+                                                    /* Painel de Fotos Ocultadas */
+                                                    <div className="py-10 flex flex-col items-center justify-center bg-slate-50 border border-slate-200/60 rounded-2xl text-center space-y-3.5 shadow-xs">
+                                                        <div className="p-3 bg-amber-50 text-amber-600 rounded-full border border-amber-100">
+                                                            <Lock size={20} />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <p className="text-xs font-bold text-slate-700">Esta galeria contém {privatePhotos.length} fotos privadas</p>
+                                                            <p className="text-[10px] text-slate-400 font-medium">As mídias privadas estão ocultas por padrão nesta tela de auditoria.</p>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowPrivatePhotos(true)}
+                                                            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
+                                                        >
+                                                            Exibir Fotos Privadas
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    /* Fotos Reveladas */
+                                                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
+                                                        {privatePhotos.map((item) => (
+                                                            <div key={item._id} className="relative aspect-square rounded-2xl overflow-hidden bg-slate-50 border border-slate-200 group shadow-sm">
+                                                                <img 
+                                                                    src={item.imageUrl} 
+                                                                    alt="Galeria Privada Item" 
+                                                                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
+                                                                />
+                                                                <div className="absolute top-2 left-2 z-20 px-2 py-0.5 text-[9px] font-bold bg-amber-500 text-white rounded-md shadow flex items-center gap-0.5 select-none">
+                                                                    <Lock size={9} />
+                                                                    Assinantes
+                                                                </div>
+                                                                {/* Overlay hover para deletar e alterar visibilidade */}
+                                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2.5 z-10">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleToggleVisibility(item._id, item.visibility)}
+                                                                        className="p-2.5 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white rounded-xl shadow-md transition-all hover:scale-110 cursor-pointer"
+                                                                        title="Tornar Pública"
+                                                                    >
+                                                                        <Unlock size={14} />
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleDeletePhoto(item._id)}
+                                                                        className="p-2.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-xl shadow-md transition-all hover:scale-110 cursor-pointer"
+                                                                        title="Excluir Foto"
+                                                                    >
+                                                                        <Trash2 size={14} />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )
+                                            ) : (
+                                                <div className="py-6 text-center text-xs font-semibold text-slate-400 border border-dashed border-slate-100 rounded-2xl bg-slate-50/50">
+                                                    Nenhuma foto na galeria privada desta profissional.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="py-12 text-center text-xs font-semibold text-slate-400 border-2 border-dashed border-slate-100 rounded-2xl">
+                                        Nenhuma foto na galeria desta profissional até o momento.
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
 
                     {/* Histórico de Retiradas */}
                     {isProfessional && (

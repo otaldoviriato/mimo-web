@@ -5,6 +5,7 @@ import { User } from '@/models/User';
 import { AppSettings } from '@/models/AppSettings';
 import { GalleryItem } from '@/models/GalleryItem';
 import { WithdrawRequest } from '@/models/WithdrawRequest';
+import { Subscription } from '@/models/Subscription';
 import { buildProfileRoleMetadata } from '@/lib/profileRole';
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
@@ -44,6 +45,14 @@ export async function GET(
         const galleryItems = await GalleryItem.find({ ownerId: clerkId }).sort({ createdAt: -1 }).lean();
         const withdrawals = await WithdrawRequest.find({ userId: clerkId }).sort({ createdAt: -1 }).lean() as any[];
 
+        // Buscar assinantes ativos
+        const subscriptions = await Subscription.find({ professionalId: clerkId, status: 'ACTIVE' }).lean();
+        const subscriberIds = subscriptions.map((s) => s.subscriberId);
+        const subscribersList = await User.find(
+            { clerkId: { $in: subscriberIds } },
+            'clerkId name username email photoUrl'
+        ).lean();
+
         const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
         const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
 
@@ -55,6 +64,13 @@ export async function GET(
                 createdAt: userObj.createdAt ? new Date(userObj.createdAt).toLocaleDateString('pt-BR') : 'N/A',
             },
             gallery: galleryItems,
+            subscribers: subscribersList.map((sub: any) => ({
+                clerkId: sub.clerkId,
+                name: sub.name || sub.username || 'Sem Nome',
+                username: sub.username,
+                email: sub.email,
+                photoUrl: sub.photoUrl || null,
+            })),
             withdrawals: withdrawals.map((withdrawal) => ({
                 id: withdrawal._id.toString(),
                 amount: withdrawal.amount / 100,
