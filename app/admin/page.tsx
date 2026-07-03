@@ -233,6 +233,11 @@ export default function AdminPage() {
                                                     <div className="text-right flex items-center gap-2">
                                                         <div className="flex flex-col text-right">
                                                             <span className="text-xs font-bold text-slate-700 block">{tx.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                                            {tx.fee > 0 && (
+                                                                <span className="text-[9px] text-emerald-600 font-bold block">
+                                                                    Líq: {tx.net.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                                </span>
+                                                            )}
                                                             <span className="text-[9px] text-slate-400 font-semibold uppercase">{tx.displayId || tx.id}</span>
                                                         </div>
                                                         <button onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(tx.id, tx.displayId || tx.id); }} className="p-1 hover:text-rose-600 rounded-lg text-slate-350 hover:bg-rose-50 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" title="Excluir Transação">
@@ -312,6 +317,7 @@ export default function AdminPage() {
                     {activeTab === 'settings-app' && (
                         <SettingsAppPage
                             pwaShowAgainIntervalDays={settings.pwaShowAgainIntervalDays} setPwaShowAgainIntervalDays={settings.setPwaShowAgainIntervalDays}
+                            identityVerificationPromptIntervalDays={settings.identityVerificationPromptIntervalDays} setIdentityVerificationPromptIntervalDays={settings.setIdentityVerificationPromptIntervalDays}
                             isDirtyApp={settings.isDirtyApp}
                             saving={settings.saving} saveSettings={settings.saveSettings}
                         />

@@ -85,31 +85,6 @@ export default function ChatsPage() {
     // Controle do banner de incentivo à verificação de identidade
     const [hideIdentityPrompt, setHideIdentityPrompt] = useState(true);
 
-    useEffect(() => {
-        if (typeof window !== 'undefined' && myProfile) {
-            if (myProfile.identityStatus === 'approved' || myProfile.identityStatus === 'pending') {
-                setHideIdentityPrompt(true);
-                return;
-            }
-
-            const dismissedAtStr = localStorage.getItem('mimo_identity_prompt_dismissed_at');
-            if (!dismissedAtStr) {
-                setHideIdentityPrompt(false);
-                return;
-            }
-
-            const dismissedAt = parseInt(dismissedAtStr, 10);
-            const intervalDays = myProfile.identityVerificationPromptIntervalDays ?? 7;
-            const intervalMs = intervalDays * 24 * 60 * 60 * 1000;
-
-            if (Date.now() - dismissedAt >= intervalMs) {
-                setHideIdentityPrompt(false);
-            } else {
-                setHideIdentityPrompt(true);
-            }
-        }
-    }, [myProfile]);
-
     // Estado de "digitando" por sala: { [roomId]: boolean }
     const [typingRooms, setTypingRooms] = useState<Record<string, boolean>>({});
     // Rastreia os timeouts ativos de digitação por sala para evitar conflitos concorrentes
@@ -161,6 +136,31 @@ export default function ChatsPage() {
                 }
             }
             prevStatusRef.current = currentStatus;
+        }
+    }, [myProfile]);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && myProfile) {
+            if (myProfile.identityStatus === 'approved' || myProfile.identityStatus === 'pending') {
+                setHideIdentityPrompt(true);
+                return;
+            }
+
+            const dismissedAtStr = localStorage.getItem('mimo_identity_prompt_dismissed_at');
+            if (!dismissedAtStr) {
+                setHideIdentityPrompt(false);
+                return;
+            }
+
+            const dismissedAt = parseInt(dismissedAtStr, 10);
+            const intervalDays = myProfile.identityVerificationPromptIntervalDays ?? 7;
+            const intervalMs = intervalDays * 24 * 60 * 60 * 1000;
+
+            if (Date.now() - dismissedAt >= intervalMs) {
+                setHideIdentityPrompt(false);
+            } else {
+                setHideIdentityPrompt(true);
+            }
         }
     }, [myProfile]);
 

@@ -24,6 +24,7 @@ export interface SettingsData {
     defaultPricePerCharNonSubscribers: number;
     audioPriceMultiplier: number;
     pwaShowAgainIntervalDays: number;
+    identityVerificationPromptIntervalDays: number;
     newProfileDaysThreshold: number;
 }
 
