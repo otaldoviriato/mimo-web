@@ -31,7 +31,7 @@ export async function grantWelcomeCredit(
     }
 
     // 2. Valida o tipo do usuário (somente cliente pode receber)
-    const user = await User.findOne({ clerkId: userId }).select('isProfessional onboardingStep email phone taxId name');
+    const user = await User.findOne({ clerkId: userId }).select('isProfessional onboardingStep email phone taxId name balance promotionalBalance');
     if (!user) {
         return { success: false, reason: 'user_not_found' };
     }
@@ -44,6 +44,22 @@ export async function grantWelcomeCredit(
     const isCompleted = user.onboardingStep === 'completed' || (user.name && user.isProfessional !== undefined && !user.onboardingStep);
     if (!isCompleted) {
         return { success: false, reason: 'onboarding_not_completed' };
+    }
+
+    // Só concede o crédito se o usuário tiver saldo zero (tanto real quanto promocional)
+    const hasZeroBalance = (user.balance || 0) === 0 && (user.promotionalBalance || 0) === 0;
+    if (!hasZeroBalance) {
+        return { success: false, reason: 'has_existing_balance' };
+    }
+
+    // Só concede o crédito se o usuário nunca tiver efetuado recargas pagas no sistema
+    const hasPriorRecharges = await Transaction.findOne({
+        userId,
+        source: 'recharge',
+        type: 'credit'
+    }).select('_id');
+    if (hasPriorRecharges) {
+        return { success: false, reason: 'has_prior_recharges' };
     }
 
     // 3. Valida se já atingiu o limite maxTotalUsers da campanha
