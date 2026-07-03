@@ -70,11 +70,12 @@ export async function GET(request: NextRequest) {
                 continue;
             }
 
-            const price = professional.subscriptionPrice || 0;
+            // subscriptionPrice é armazenado em reais; balance é em centavos
+            const priceInCents = Math.round((professional.subscriptionPrice || 0) * 100);
 
-            if (price > 0) {
+            if (priceInCents > 0) {
                 // Verificar se o cliente tem saldo
-                if (client.balance < price) {
+                if (client.balance < priceInCents) {
                     // Sem saldo suficiente: expirar assinatura
                     sub.status = 'EXPIRED';
                     await sub.save();
@@ -86,19 +87,19 @@ export async function GET(request: NextRequest) {
                     );
 
                     results.expired++;
-                    results.details.push(`Subscription of ${subscriberId} to ${professionalId} expired due to insufficient balance. Price: ${price}, Balance: ${client.balance}`);
+                    results.details.push(`Subscription of ${subscriberId} to ${professionalId} expired due to insufficient balance. Price: ${priceInCents} cents, Balance: ${client.balance} cents`);
                     continue;
                 }
 
                 // Se tiver saldo, debitar do cliente e creditar na profissional
                 await User.updateOne(
                     { clerkId: subscriberId },
-                    { $inc: { balance: -price } }
+                    { $inc: { balance: -priceInCents } }
                 );
 
                 await User.updateOne(
                     { clerkId: professionalId },
-                    { $inc: { balance: price } }
+                    { $inc: { balance: priceInCents } }
                 );
 
                 // Criar transações de histórico
@@ -106,7 +107,7 @@ export async function GET(request: NextRequest) {
                     {
                         userId: subscriberId,
                         type: 'debit',
-                        amount: price,
+                        amount: priceInCents,
                         source: 'subscription',
                         status: 'COMPLETED',
                         relatedUserId: professionalId,
@@ -114,7 +115,7 @@ export async function GET(request: NextRequest) {
                     {
                         userId: professionalId,
                         type: 'credit',
-                        amount: price,
+                        amount: priceInCents,
                         source: 'subscription',
                         status: 'COMPLETED',
                         relatedUserId: subscriberId,

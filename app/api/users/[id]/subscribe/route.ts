@@ -41,10 +41,11 @@ export async function POST(
             return NextResponse.json({ error: 'Você já é um assinante' }, { status: 400 });
         }
 
-        const price = owner.subscriptionPrice || 0;
+        // subscriptionPrice é armazenado em reais; balance é em centavos
+        const priceInCents = Math.round((owner.subscriptionPrice || 0) * 100);
 
-        if (price > 0) {
-            if (requester.balance < price) {
+        if (priceInCents > 0) {
+            if (requester.balance < priceInCents) {
                 return NextResponse.json({ error: 'Saldo insuficiente para assinar' }, { status: 400 });
             }
 
@@ -52,21 +53,21 @@ export async function POST(
             // Tira de quem assina
             await User.updateOne(
                 { clerkId: requesterId },
-                { $inc: { balance: -price } }
+                { $inc: { balance: -priceInCents } }
             );
 
             // Dá para o dono do perfil
             await User.updateOne(
                 { clerkId: ownerId },
-                { $inc: { balance: price } }
+                { $inc: { balance: priceInCents } }
             );
 
-            // Registrar transações (Opcional, mas boa prática)
+            // Registrar transações
             await Transaction.create([
                 {
                     userId: requesterId,
                     type: 'debit',
-                    amount: price,
+                    amount: priceInCents,
                     source: 'subscription',
                     status: 'COMPLETED',
                     relatedUserId: ownerId,
@@ -74,7 +75,7 @@ export async function POST(
                 {
                     userId: ownerId,
                     type: 'credit',
-                    amount: price,
+                    amount: priceInCents,
                     source: 'subscription',
                     status: 'COMPLETED',
                     relatedUserId: requesterId,
@@ -90,7 +91,7 @@ export async function POST(
             { subscriberId: requesterId, professionalId: ownerId },
             {
                 status: 'ACTIVE',
-                priceInCents: price,
+                priceInCents: priceInCents,
                 expiresAt,
             },
             { upsert: true, new: true }
