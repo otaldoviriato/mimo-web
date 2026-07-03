@@ -51,6 +51,7 @@ export interface IUser extends Document {
     identitySelfieUrl?: string;
     identityDocumentType?: string;
     hideFromExplore?: boolean;
+    subscriberDiscountPercentage?: number;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -127,6 +128,10 @@ const UserSchema = new Schema<IUser>({
         type: Number,
         default: 0.005,
         min: 0,
+    },
+    subscriberDiscountPercentage: {
+        type: Number,
+        default: null,
     },
     subscribers: {
         type: [String],

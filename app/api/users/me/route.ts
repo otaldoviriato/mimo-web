@@ -176,7 +176,7 @@ export async function GET() {
                 maxPricePerChar,
                 maxSubscriptionPrice,
                 minSubscriptionPrice,
-                subscriberDiscountPercentage,
+                subscriberDiscountPercentage: user.subscriberDiscountPercentage ?? subscriberDiscountPercentage,
                 audioPriceMultiplier,
                 minPublicPhotos: settings?.minPublicPhotos ?? 6,
                 maxPublicPhotos: settings?.maxPublicPhotos ?? 12,
@@ -187,6 +187,7 @@ export async function GET() {
                 hasPushToken: Boolean(user.fcmToken || (user.fcmTokens && user.fcmTokens.length > 0)),
                 hideFromExplore: user.hideFromExplore ?? false,
                 publicPhotosCount,
+                avgResponseTimeMinutes: user.avgResponseTimeMinutes,
             },
         });
     } catch (error: any) {
@@ -205,7 +206,7 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, subscriptionPrice, isSubscriptionEnabled, chargePerCharSubscribers, chargePerCharNonSubscribers, bio, emailNotificationsEnabled, hideFromExplore } = body;
+        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, subscriptionPrice, isSubscriptionEnabled, chargePerCharSubscribers, chargePerCharNonSubscribers, bio, emailNotificationsEnabled, hideFromExplore, subscriberDiscountPercentage } = body;
 
         await connectToDatabase();
 
@@ -213,7 +214,7 @@ export async function PATCH(request: NextRequest) {
         const maxPricePerChar = settings?.maxPricePerChar ?? 0.2;
         const maxSubscriptionPrice = settings?.maxSubscriptionPrice ?? 200;
         const minSubscriptionPrice = settings?.minSubscriptionPrice ?? 10;
-        const subscriberDiscountPercentage = settings?.subscriberDiscountPercentage ?? 20;
+        const globalSubscriberDiscountPercentage = settings?.subscriberDiscountPercentage ?? 20;
 
         const currentUser = await User.findOne({ clerkId: userId });
 
@@ -266,9 +267,12 @@ export async function PATCH(request: NextRequest) {
             }
         }
 
-        if (chargePerCharSubscribers !== undefined) {
-            if (chargePerCharSubscribers < 0) return NextResponse.json({ error: 'Charge per char cannot be negative' }, { status: 400 });
-            updateData.chargePerCharSubscribers = chargePerCharSubscribers;
+        if (subscriberDiscountPercentage !== undefined) {
+            const discountNum = Number(subscriberDiscountPercentage);
+            if (isNaN(discountNum) || discountNum < 20 || discountNum > 80) {
+                return NextResponse.json({ error: 'O desconto da assinatura deve ser entre 20% e 80%' }, { status: 400 });
+            }
+            updateData.subscriberDiscountPercentage = discountNum;
         }
 
         if (chargePerCharNonSubscribers !== undefined) {
@@ -277,6 +281,21 @@ export async function PATCH(request: NextRequest) {
                 return NextResponse.json({ error: `O preço por caractere não pode ser maior que R$ ${maxPricePerChar}` }, { status: 400 });
             }
             updateData.chargePerCharNonSubscribers = chargePerCharNonSubscribers;
+        }
+
+        if (chargePerCharNonSubscribers !== undefined || subscriberDiscountPercentage !== undefined) {
+            const currentDiscount = subscriberDiscountPercentage !== undefined 
+                ? Number(subscriberDiscountPercentage) 
+                : (currentUser?.subscriberDiscountPercentage ?? globalSubscriberDiscountPercentage);
+                
+            const currentNonSubPrice = chargePerCharNonSubscribers !== undefined 
+                ? Number(chargePerCharNonSubscribers) 
+                : (currentUser?.chargePerCharNonSubscribers ?? 0.005);
+                
+            updateData.chargePerCharSubscribers = Number((currentNonSubPrice * (1 - currentDiscount / 100)).toFixed(4));
+        } else if (chargePerCharSubscribers !== undefined) {
+            if (chargePerCharSubscribers < 0) return NextResponse.json({ error: 'Charge per char cannot be negative' }, { status: 400 });
+            updateData.chargePerCharSubscribers = chargePerCharSubscribers;
         }
 
         const isProf = isProfessional !== undefined ? isProfessional : (currentUser?.isProfessional ?? false);
@@ -379,7 +398,7 @@ export async function PATCH(request: NextRequest) {
                 maxPricePerChar,
                 maxSubscriptionPrice,
                 minSubscriptionPrice,
-                subscriberDiscountPercentage,
+                subscriberDiscountPercentage: user.subscriberDiscountPercentage ?? globalSubscriberDiscountPercentage,
                 audioPriceMultiplier: settings?.audioPriceMultiplier ?? 5,
                 minPublicPhotos: settings?.minPublicPhotos ?? 6,
                 maxPublicPhotos: settings?.maxPublicPhotos ?? 12,
@@ -389,6 +408,7 @@ export async function PATCH(request: NextRequest) {
                 emailNotificationsEnabled: user.emailNotificationsEnabled ?? false,
                 hasPushToken: Boolean(user.fcmToken || (user.fcmTokens && user.fcmTokens.length > 0)),
                 hideFromExplore: user.hideFromExplore ?? false,
+                avgResponseTimeMinutes: user.avgResponseTimeMinutes,
             },
         });
     } catch (error: any) {
