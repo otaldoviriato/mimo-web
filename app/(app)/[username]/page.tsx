@@ -269,20 +269,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
     const relationshipStats = (user as any).relationshipStats;
     const characterStats = relationshipStats?.characterStats;
     const totalClientTextChars = characterStats?.totalClientTextChars ?? 0;
-    const freeCharsLimit = characterStats?.freeCharsLimit ?? 500;
-    const freeCharsUsed = characterStats?.freeCharsUsed ?? Math.min(totalClientTextChars, freeCharsLimit);
-    const chargedChars = characterStats?.chargedChars ?? Math.max(0, totalClientTextChars - freeCharsLimit);
-    const remainingFreeChars = characterStats?.remainingFreeChars ?? Math.max(0, freeCharsLimit - totalClientTextChars);
-    const hasFreeCharAllowance = freeCharsLimit > 0;
-    const freeCharsProgress = freeCharsLimit > 0
-        ? Math.min(100, Math.round((freeCharsUsed / freeCharsLimit) * 100))
-        : 100;
-    const isBeyondFreeAllowance = characterStats?.isBeyondFreeAllowance ?? (!hasFreeCharAllowance || totalClientTextChars >= freeCharsLimit);
-    const characterStatusLabel = !hasFreeCharAllowance
-        ? 'Sem isenção'
-        : isBeyondFreeAllowance
-            ? 'Precificando'
-            : 'Isento';
+
 
     return (
         <div className={`flex flex-col bg-slate-50 overflow-y-auto overflow-x-hidden pb-28 no-scrollbar relative ${layoutClass} ${animationClass}`}>
@@ -401,41 +388,11 @@ export default function UserProfilePage({ params, username: propUsername, onBack
 
                         {/* Estatísticas de Conversa */}
                         <div className="grid grid-cols-2 gap-3 text-[11px] text-slate-400 border-t border-purple-50 pt-3.5 w-full">
-                            <div className="flex flex-col border-r border-slate-100 pr-3 text-left">
-                                <div className="flex items-center justify-between gap-2">
-                                    <span className="font-black text-slate-800 text-base tabular-nums">
-                                        {totalClientTextChars.toLocaleString('pt-BR')}
-                                    </span>
-                                    <span className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-wider ${isBeyondFreeAllowance ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                        {characterStatusLabel}
-                                    </span>
-                                </div>
+                            <div className="flex flex-col border-r border-slate-100 pr-3 text-left justify-center">
+                                <span className="font-black text-slate-800 text-base tabular-nums">
+                                    {totalClientTextChars.toLocaleString('pt-BR')}
+                                </span>
                                 <span className="mt-0.5 font-semibold text-[9px] uppercase tracking-wider">caracteres do cliente</span>
-                                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                                    <div
-                                        className={`h-full rounded-full ${isBeyondFreeAllowance ? 'bg-amber-500' : 'bg-emerald-500'}`}
-                                        style={{ width: `${freeCharsProgress}%` }}
-                                    />
-                                </div>
-                                <div className="mt-2 grid grid-cols-2 gap-1.5">
-                                    <div className="rounded-lg bg-emerald-50 px-2 py-1">
-                                        <span className="block text-[8px] font-bold uppercase text-emerald-600">grátis</span>
-                                        <span className="block text-[10px] font-black text-emerald-700">
-                                            {freeCharsUsed.toLocaleString('pt-BR')} / {freeCharsLimit.toLocaleString('pt-BR')}
-                                        </span>
-                                    </div>
-                                    <div className="rounded-lg bg-amber-50 px-2 py-1">
-                                        <span className="block text-[8px] font-bold uppercase text-amber-600">cobrados</span>
-                                        <span className="block text-[10px] font-black text-amber-700">
-                                            {chargedChars.toLocaleString('pt-BR')}
-                                        </span>
-                                    </div>
-                                </div>
-                                {!isBeyondFreeAllowance && (
-                                    <span className="mt-1.5 text-[9px] font-semibold text-slate-400">
-                                        Restam {remainingFreeChars.toLocaleString('pt-BR')} caracteres grátis
-                                    </span>
-                                )}
                             </div>
                             <div className="flex flex-col justify-center text-center">
                                 <span className="font-bold text-slate-700 text-sm">
