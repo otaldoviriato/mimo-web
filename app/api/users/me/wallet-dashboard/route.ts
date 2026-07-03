@@ -30,6 +30,10 @@ export async function GET(request: NextRequest) {
                 totalWithdrawn: 0,
                 pendingWithdrawal: null,
                 projectedMonthlyRecurring: 0,
+                subscribersCount: 0,
+                subscriptionPrice: 0,
+                annualEarnings: 0,
+                subscribersList: [],
                 earningsByCategory: {
                     subscription: 0,
                     message: 0,
@@ -176,53 +180,66 @@ export async function GET(request: NextRequest) {
         const monthlyImageUnlockEarnings = monthlyMediaStatsResult[0]?.totalAmount ?? 0;
         const monthlyImageUnlocksCount = monthlyMediaStatsResult[0]?.count ?? 0;
 
-        // 6. Evolução diária dos ganhos nos últimos 15 dias
-        const fifteenDaysAgo = new Date();
-        fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
-        fifteenDaysAgo.setHours(0, 0, 0, 0);
+        // 6. Evolução mensal dos ganhos no ano corrente (Faturamento Mensal)
+        const currentYear = new Date().getFullYear();
+        const startOfYear = new Date(currentYear, 0, 1);
+        startOfYear.setHours(0, 0, 0, 0);
 
-        const dailyEarningsResult = await MicroTransaction.aggregate([
+        // Agregação de MicroTransactions por mês
+        const monthlyMicroEarnings = await MicroTransaction.aggregate([
             {
                 $match: {
                     userId: user.clerkId,
                     type: 'credit',
-                    timestamp: { $gte: fifteenDaysAgo }
+                    timestamp: { $gte: startOfYear }
                 }
             },
             {
                 $group: {
-                    _id: {
-                        day: { $dayOfMonth: '$timestamp' },
-                        month: { $month: '$timestamp' },
-                        year: { $year: '$timestamp' }
-                    },
+                    _id: { $month: '$timestamp' },
                     total: { $sum: '$amount' }
                 }
-            },
-            { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 } }
+            }
         ]);
 
-        // Formata para o gráfico no frontend: [{ date: 'DD/MM', amount: 100 }]
-        const dailyHistory: Array<{ date: string; amount: number }> = [];
-        
-        // Vamos preencher todos os 15 dias, inclusive com R$ 0 se não houver ganho, para o gráfico ficar bonito
-        for (let i = 14; i >= 0; i--) {
-            const d = new Date();
-            d.setDate(d.getDate() - i);
-            const dayStr = String(d.getDate()).padStart(2, '0');
-            const monthStr = String(d.getMonth() + 1).padStart(2, '0');
-            const key = `${dayStr}/${monthStr}`;
-            
-            // Procura nos resultados do mongo
-            const match = dailyEarningsResult.find(
-                (item) => item._id.day === d.getDate() && item._id.month === (d.getMonth() + 1)
-            );
-            
-            dailyHistory.push({
-                date: key,
-                amount: match ? match.total : 0
+        // Agregação de Transactions (Subscriptions) por mês
+        const monthlySubEarnings = await Transaction.aggregate([
+            {
+                $match: {
+                    userId: user.clerkId,
+                    type: 'credit',
+                    source: 'subscription',
+                    status: 'COMPLETED',
+                    timestamp: { $gte: startOfYear }
+                }
+            },
+            {
+                $group: {
+                    _id: { $month: '$timestamp' },
+                    total: { $sum: '$amount' }
+                }
+            }
+        ]);
+
+        // Formata os 12 meses do ano (Jan a Dez)
+        const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        const monthlyHistory: Array<{ date: string; amount: number }> = [];
+
+        for (let i = 0; i < 12; i++) {
+            const monthNumber = i + 1;
+            const microMatch = monthlyMicroEarnings.find((item) => item._id === monthNumber);
+            const subMatch = monthlySubEarnings.find((item) => item._id === monthNumber);
+
+            const microTotal = microMatch ? microMatch.total : 0;
+            const subTotal = subMatch ? Math.round(subMatch.total * 100) : 0;
+
+            monthlyHistory.push({
+                date: monthNames[i],
+                amount: microTotal + subTotal
             });
         }
+
+        const annualEarnings = monthlyHistory.reduce((sum, item) => sum + item.amount, 0);
 
         // 7. Ranking dos 5 melhores clientes (fãs)
         const topCustomersResult = await MicroTransaction.aggregate([
@@ -260,13 +277,24 @@ export async function GET(request: NextRequest) {
             photoUrl: item.customerDetails?.photoUrl || null
         }));
 
+        // 8. Buscar lista de detalhes dos assinantes ativos
+        const subscribersList = await User.find({
+            clerkId: { $in: user.subscribers || [] }
+        })
+        .select('clerkId name username photoUrl')
+        .lean();
+
         return NextResponse.json({
             balance,
             totalWithdrawn,
             pendingWithdrawal,
             projectedMonthlyRecurring,
+            subscribersCount,
+            subscriptionPrice: subscriptionPriceReais * 100, // em centavos
+            subscribersList,
             earningsByCategory,
-            earningsEvolution: dailyHistory,
+            earningsEvolution: monthlyHistory,
+            annualEarnings,
             topCustomers,
             totalMessageEarnings,
             totalMessagesCount,

@@ -49,11 +49,22 @@ interface EarningEvolutionPoint {
     amount: number;
 }
 
+interface SubscriberInfo {
+    clerkId: string;
+    name: string;
+    username: string;
+    photoUrl: string | null;
+}
+
 interface WalletDashboardData {
     balance: number;
     totalWithdrawn: number;
     pendingWithdrawal: unknown;
     projectedMonthlyRecurring: number;
+    subscribersCount?: number;
+    subscriptionPrice?: number;
+    annualEarnings?: number;
+    subscribersList?: SubscriberInfo[];
     earningsByCategory: {
         subscription: number;
         message: number;
@@ -87,6 +98,7 @@ export default function WalletPage() {
     const [withdrawTaxWarningModalOpen, setWithdrawTaxWarningModalOpen] = useState(false);
     const [withdrawErrorModalOpen, setWithdrawErrorModalOpen] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
+    const [subscribersModalOpen, setSubscribersModalOpen] = useState(false);
     const [withdrawFeedback, setWithdrawFeedback] = useState<'created' | 'approved' | 'failed' | null>(null);
     const [lastSeenWithdrawalStatus, setLastSeenWithdrawalStatus] = useState<string | null>(null);
 
@@ -147,6 +159,10 @@ export default function WalletPage() {
         totalWithdrawn: 0,
         pendingWithdrawal: null,
         projectedMonthlyRecurring: 0,
+        subscribersCount: 0,
+        subscriptionPrice: 0,
+        annualEarnings: 0,
+        subscribersList: [],
         earningsByCategory: { subscription: 0, message: 0, image_unlock: 0, gift: 0 },
         earningsEvolution: [],
         topCustomers: [],
@@ -223,47 +239,35 @@ export default function WalletPage() {
         );
     }
 
-    // Cálculos para o gráfico SVG de linha
-    const points = data.earningsEvolution;
+    // Cálculos para o gráfico de barras mensal
+    const points = data.earningsEvolution || [];
     const maxVal = Math.max(...points.map(p => p.amount), 100);
     const width = 500;
     const height = 130;
-    const padding = 15;
 
-    const svgPoints = points.map((p, idx) => {
-        const x = padding + (idx / (points.length - 1)) * (width - padding * 2);
-        const y = height - padding - (p.amount / maxVal) * (height - padding * 2);
-        return { x, y, val: p.amount, date: p.date };
+    // Lógica para o gráfico Donut de Origem dos Ganhos
+    const categories = [
+        { label: 'Mensagens', value: data.earningsByCategory.message || 0, color: '#8b5cf6', icon: MessageSquare },
+        { label: 'Mídias Privadas', value: data.earningsByCategory.image_unlock || 0, color: '#10b981', icon: ImageIcon },
+        { label: 'Assinaturas', value: data.earningsByCategory.subscription || 0, color: '#6366f1', icon: Crown },
+        { label: 'Presentes', value: data.earningsByCategory.gift || 0, color: '#f59e0b', icon: Gift }
+    ];
+
+    const totalVal = categories.reduce((sum, c) => sum + c.value, 0);
+
+    const C = 2 * Math.PI * 30; // Circunferência do donut (R = 30) => 188.4955
+    let accumulatedPercent = 0;
+    const segments = categories.map(cat => {
+        const percent = totalVal > 0 ? (cat.value / totalVal) : 0;
+        const offset = -(accumulatedPercent * C);
+        accumulatedPercent += percent;
+        return {
+            ...cat,
+            percent,
+            strokeDasharray: `${percent * C} ${C}`,
+            strokeDashoffset: offset
+        };
     });
-
-    const generatePath = () => {
-        if (svgPoints.length === 0) return '';
-        let d = `M ${svgPoints[0].x} ${svgPoints[0].y}`;
-        for (let i = 0; i < svgPoints.length - 1; i++) {
-            const p0 = svgPoints[i];
-            const p1 = svgPoints[i + 1];
-            const cpX1 = p0.x + (p1.x - p0.x) / 2;
-            const cpY1 = p0.y;
-            const cpX2 = p0.x + (p1.x - p0.x) / 2;
-            const cpY2 = p1.y;
-            d += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p1.x} ${p1.y}`;
-        }
-        return d;
-    };
-
-    const generateAreaPath = () => {
-        const path = generatePath();
-        if (!path) return '';
-        return `${path} L ${svgPoints[svgPoints.length - 1].x} ${height - padding} L ${svgPoints[0].x} ${height - padding} Z`;
-    };
-
-    const linePath = generatePath();
-    const areaPath = generateAreaPath();
-
-    const totalEarningsSum = Object.values(data.earningsByCategory).reduce((a, b) => a + b, 0) || 1;
-    const getPercent = (val: number) => {
-        return ((val / totalEarningsSum) * 100).toFixed(0) + '%';
-    };
 
     // Cálculo da completude do perfil para criadores
     const hasPhoto = !!userData?.photoUrl && userData.photoUrl.trim() !== '';
@@ -427,12 +431,70 @@ export default function WalletPage() {
                         </div>
 
                         <button
-                            onClick={() => router.push('/profile')}
+                            onClick={() => router.replace('/profile')}
                             className="w-full h-10 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-100 text-xs font-bold transition-all active:scale-[0.98] mt-1 flex items-center justify-center gap-1.5 cursor-pointer"
                         >
                             Ajustar Perfil
                             <ArrowUpRight className="w-3.5 h-3.5" />
                         </button>
+                    </div>
+                )}
+
+                {/* ── PAINEL DE VELOCIDADE DE RESPOSTA ── */}
+                {userData?.isProfessional && userData?.professionalStatus === 'approved' && (
+                    <div className="bg-white border border-purple-100 rounded-2xl p-5 shadow-[0_4px_20px_rgb(0,0,0,0.012)] flex flex-col gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div>
+                            <div className="flex items-center justify-between">
+                                <h3 className="font-bold text-gray-900 text-sm">Tempo de Resposta no Chat</h3>
+                                {(() => {
+                                    const minutes = userData?.avgResponseTimeMinutes;
+                                    if (minutes == null) {
+                                        return <span className="text-xs font-black text-slate-500 bg-slate-50 border border-slate-200/50 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Aguardando dados</span>;
+                                    }
+                                    if (minutes <= 10) {
+                                        return <span className="text-xs font-black text-emerald-650 bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Excelente</span>;
+                                    }
+                                    if (minutes <= 30) {
+                                        return <span className="text-xs font-black text-teal-600 bg-teal-50 border border-teal-100 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Bom</span>;
+                                    }
+                                    if (minutes <= 60) {
+                                        return <span className="text-xs font-black text-amber-650 bg-amber-50 border border-amber-100 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Regular</span>;
+                                    }
+                                    return <span className="text-xs font-black text-rose-650 bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Pode melhorar</span>;
+                                })()}
+                            </div>
+                            <p className="text-[11px] text-gray-400 leading-snug mt-1">
+                                O algoritmo do Explorar prioriza criadores que respondem rápido. Mantenha seu tempo baixo para receber mais destaque!
+                            </p>
+                        </div>
+
+                        {/* Detalhe do Tempo de Resposta */}
+                        <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-xl bg-purple-100 flex items-center justify-center text-purple-600 shrink-0">
+                                    <Clock3 className="w-4 h-4" />
+                                </div>
+                                <div className="flex flex-col text-left">
+                                    <span className="text-xs font-bold text-slate-700">Seu tempo médio</span>
+                                    <span className="text-[10px] text-slate-400 font-medium">Calculado em tempo real</span>
+                                </div>
+                            </div>
+                            <span className="text-sm font-black text-slate-800 tabular-nums">
+                                {(() => {
+                                    const minutes = userData?.avgResponseTimeMinutes;
+                                    if (minutes == null) return 'Calculando...';
+                                    if (minutes < 1) return 'Menos de 1 min';
+                                    if (minutes < 60) {
+                                        const sec = Math.round((minutes % 1) * 60);
+                                        const minStr = Math.floor(minutes);
+                                        return `${minStr} min ${sec > 0 ? `${sec}s` : ''}`;
+                                    }
+                                    const hours = Math.floor(minutes / 60);
+                                    const mins = Math.round(minutes % 60);
+                                    return `${hours}h ${mins > 0 ? `${mins}min` : ''}`;
+                                })()}
+                            </span>
+                        </div>
                     </div>
                 )}
 
@@ -581,152 +643,207 @@ export default function WalletPage() {
                     )}
                 </div>
 
-                {/* ── BENTO BLOCK 5: GRÁFICO DE EVOLUÇÃO (Refinado, Compacto, SVG Roxo) ── */}
-                <div className="bg-white border border-purple-100/60 rounded-2xl p-4 shadow-[0_4px_20px_rgb(0,0,0,0.015)] flex flex-col justify-between min-h-[200px]">
+                {/* ── BENTO BLOCK 5: GRÁFICO DE EVOLUÇÃO (Faturamento Mensal em Barras) ── */}
+                <div className="bg-white border border-purple-100/60 rounded-2xl p-4 shadow-[0_4px_20px_rgb(0,0,0,0.015)] flex flex-col justify-between min-h-[210px]">
                     <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
                         <span className="text-xs text-gray-500 font-bold uppercase tracking-widest flex items-center gap-1.5">
                             <TrendingUp className="w-3.5 h-3.5 text-purple-650" />
-                            Evolução de Ganhos Diários
+                            Faturamento Mensal
                         </span>
-                        <span className="text-[10.5px] text-gray-400 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100 font-medium">Últimos 15 Dias</span>
+                        <div className="flex flex-col items-end">
+                            <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider leading-none">Total Anual</span>
+                            <span className="text-sm font-black text-purple-650 leading-tight">
+                                {renderValue(data.annualEarnings ?? 0)}
+                            </span>
+                        </div>
                     </div>
 
-                    {/* Gráfico SVG Linha Suave */}
-                    {svgPoints.length > 0 ? (
+                    {/* Gráfico SVG de Barras */}
+                    {points.length > 0 ? (
                         <div className="w-full flex-1 flex flex-col justify-end">
                             <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto overflow-visible">
-                                <defs>
-                                    <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.08" />
-                                        <stop offset="100%" stopColor="#7c3aed" stopOpacity="0.0" />
-                                    </linearGradient>
-                                </defs>
+                                {/* Linhas de grade sutis de fundo */}
+                                <line x1={20} y1={15} x2={width - 20} y2={15} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3" />
+                                <line x1={20} y1={(height - 30) / 2 + 15} x2={width - 20} y2={(height - 30) / 2 + 15} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3" />
+                                <line x1={20} y1={height - 15} x2={width - 20} y2={height - 15} stroke="#f8fafc" strokeWidth="1.5" />
 
-                                {/* Linhas de grade sutis */}
-                                <line x1={padding} y1={padding} x2={width - padding} y2={padding} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3" />
-                                <line x1={padding} y1={height / 2} x2={width - padding} y2={height / 2} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3" />
-                                <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#f1f5f9" strokeWidth="1.5" />
+                                {/* Barras do gráfico */}
+                                {points.map((pt, idx) => {
+                                    const chartWidth = width - 40;
+                                    const chartHeight = height - 30;
+                                    const barWidth = chartWidth / 12 - 8;
+                                    const barHeight = (pt.amount / maxVal) * chartHeight;
+                                    const x = 20 + idx * (chartWidth / 12) + 4;
+                                    const y = height - 15 - barHeight;
 
-                                {/* Área sob a curva */}
-                                <path d={areaPath} fill="url(#areaGrad)" />
-
-                                {/* Linha do gráfico - Roxo Limpo */}
-                                <path d={linePath} fill="none" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-
-                                {/* Pontos de Dados */}
-                                {svgPoints.map((pt, idx) => {
-                                    if (pt.val === 0) return null;
                                     return (
-                                        <g key={idx} className="group/dot cursor-pointer">
-                                            <circle cx={pt.x} cy={pt.y} r="4.5" fill="#7c3aed" className="opacity-0 group-hover/dot:opacity-20 transition-opacity animate-ping" />
-                                            <circle cx={pt.x} cy={pt.y} r="2.5" fill="#ffffff" stroke="#7c3aed" strokeWidth="2" />
+                                        <g key={idx} className="group/bar cursor-pointer">
+                                            {/* Tooltip no Hover (valor do mês) */}
+                                            <title>{`${pt.date}: ${formatCurrency(pt.amount)}`}</title>
+                                            
+                                            {/* Barra de fundo invisível para facilitar o hover */}
+                                            <rect
+                                                x={x - 2}
+                                                y={15}
+                                                width={barWidth + 4}
+                                                height={chartHeight}
+                                                fill="transparent"
+                                            />
+                                            
+                                            {/* A barra visível */}
+                                            <rect
+                                                x={x}
+                                                y={y}
+                                                width={barWidth}
+                                                height={Math.max(barHeight, 2)}
+                                                rx={3}
+                                                fill={pt.amount > 0 ? '#7c3aed' : '#f1f5f9'}
+                                                className="transition-all duration-300 hover:fill-purple-700 hover:filter hover:drop-shadow-[0_2px_4px_rgba(124,58,237,0.3)]"
+                                            />
                                         </g>
                                     );
                                 })}
                             </svg>
                             
-                            {/* Eixo X com as datas */}
-                            <div className="flex justify-between px-2.5 mt-1.5 border-t border-gray-50 pt-1.5 text-[10px] text-gray-400 font-medium">
-                                <span>{points[0]?.date}</span>
-                                <span>{points[Math.floor(points.length / 2)]?.date}</span>
-                                <span>{points[points.length - 1]?.date}</span>
+                            {/* Eixo X com os meses */}
+                            <div className="flex justify-between px-5 mt-2 border-t border-gray-50 pt-2 text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                                {points.map((pt, idx) => (
+                                    <span key={idx} className="w-[calc(100%/12)] text-center">
+                                        {pt.date}
+                                    </span>
+                                ))}
                             </div>
                         </div>
                     ) : (
                         <div className="h-32 flex items-center justify-center text-xs text-gray-400 border border-dashed border-gray-200 rounded-xl">
-                            Nenhum ganho registrado nos últimos 15 dias.
+                            Nenhum ganho registrado no ano corrente.
                         </div>
                     )}
                 </div>
 
-                {/* ── BENTO BLOCK 3: TOP CLIENTES (FÃS VIP) (Terceiro Card) ── */}
-                <div className="bg-white border border-purple-100/60 rounded-2xl p-4 shadow-[0_4px_20px_rgb(0,0,0,0.015)] flex flex-col justify-between min-h-[220px]">
-                    <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
-                        <span className="text-xs text-gray-500 font-bold uppercase tracking-widest">
-                            Top Faturamento
+                {/* ── BENTO BLOCK 3: ASSINANTES (Substitui o Top Faturamento) ── */}
+                <div className="bg-white border border-purple-100/60 rounded-2xl p-5 shadow-[0_4px_20px_rgb(0,0,0,0.015)] flex flex-col justify-between min-h-[220px]">
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-2">
+                        <span className="text-xs text-gray-500 font-bold uppercase tracking-widest flex items-center gap-1.5">
+                            <Crown className="w-3.5 h-3.5 text-purple-650" />
+                            Assinantes & Recorrência
                         </span>
-                        <span className="text-[10.5px] text-purple-650 font-bold uppercase tracking-wider bg-purple-50 px-2 py-0.5 rounded-md border border-purple-100/50">Top 5</span>
+                        <span className="text-[10.5px] text-purple-650 font-bold uppercase tracking-wider bg-purple-50 px-2.5 py-0.5 rounded-md border border-purple-100/50">
+                            Ativos
+                        </span>
                     </div>
 
-                    {data.topCustomers && data.topCustomers.length > 0 ? (
-                        <div className="flex-1 flex flex-col gap-3 justify-center">
-                            {data.topCustomers.map((customer, index) => (
-                                <div key={customer.clerkId} className="flex items-center justify-between py-1 border-b border-gray-50 last:border-b-0">
-                                    <div className="flex items-center gap-2.5 min-w-0">
-                                        <div className="w-5.5 h-5.5 rounded-full flex items-center justify-center text-[10.5px] font-bold bg-slate-50 border border-gray-200 shrink-0 text-gray-500">
-                                            {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
-                                        </div>
-                                        <div className="p-[0.5px] bg-gradient-to-tr from-purple-500 to-indigo-500 rounded-full shrink-0">
-                                            <div className="bg-white p-[1px] rounded-full">
-                                                <Avatar uri={customer.photoUrl} size={24} />
-                                            </div>
-                                        </div>
-                                        <div className="min-w-0">
-                                            <h4 className="text-xs font-bold text-gray-900 truncate leading-tight">{customer.name}</h4>
-                                            <p className="text-[10px] text-gray-400 truncate mt-0.5">@{customer.username}</p>
-                                        </div>
-                                    </div>
-                                    <span className="text-xs font-extrabold text-purple-650 shrink-0 text-right">{renderValue(customer.totalSpent)}</span>
-                                </div>
-                            ))}
+                    <div className="flex-1 flex flex-col justify-center gap-4">
+                        <div className="flex flex-col">
+                            <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider leading-none">Receita Recorrente Mensal</span>
+                            <span className="text-3xl font-black text-slate-800 tracking-tight mt-1">
+                                {renderValue(data.projectedMonthlyRecurring)}
+                            </span>
                         </div>
-                    ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-gray-100 rounded-xl gap-1 py-6 bg-slate-50/50">
-                            <p className="text-xs text-gray-400">Nenhum VIP listado ainda.</p>
+
+                        <div className="grid grid-cols-2 gap-4 bg-slate-50/70 border border-slate-100 rounded-xl p-3.5">
+                            <button 
+                                onClick={() => setSubscribersModalOpen(true)}
+                                className="flex flex-col text-left cursor-pointer hover:bg-purple-50/40 p-1 rounded-lg transition-colors group focus:outline-none"
+                            >
+                                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1 group-hover:text-purple-600">
+                                    Assinantes
+                                    <span className="text-[8px] text-purple-600 font-extrabold opacity-0 group-hover:opacity-100 transition-opacity">Ver todos</span>
+                                </span>
+                                <span className="text-lg font-black text-slate-800 mt-0.5 group-hover:text-purple-700">{data.subscribersCount ?? 0}</span>
+                            </button>
+                            <div className="flex flex-col border-l border-gray-200/50 pl-4 py-1">
+                                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Preço Unitário</span>
+                                <span className="text-lg font-black text-slate-800 mt-0.5">
+                                    {renderValue(data.subscriptionPrice ?? 0)}
+                                </span>
+                            </div>
                         </div>
-                    )}
+
+                        <p className="text-[10.5px] text-gray-400 leading-snug">
+                            Projeção calculada com base no preço atual da assinatura e na quantidade de assinantes ativos.
+                        </p>
+                    </div>
                 </div>
 
-                {/* ── BENTO BLOCK 6: DETALHAMENTO DE PRODUTOS (Origem dos Ganhos) ── */}
-                <div className="bg-white border border-purple-100/60 rounded-2xl p-4 shadow-[0_4px_20px_rgb(0,0,0,0.015)] flex flex-col justify-between min-h-[220px]">
+                {/* ── BENTO BLOCK 6: ORIGEM DOS GANHOS (Gráfico de Pizza/Donut) ── */}
+                <div className="bg-white border border-purple-100/60 rounded-2xl p-4 shadow-[0_4px_20px_rgb(0,0,0,0.015)] flex flex-col justify-between min-h-[240px]">
                     <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
                         <span className="text-xs text-gray-500 font-bold uppercase tracking-widest">Origem dos Ganhos</span>
-                        <span className="text-[10.5px] text-gray-450 font-bold uppercase tracking-wider">Divisão</span>
+                        <span className="text-[10.5px] text-gray-400 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100 font-medium">Proporção</span>
                     </div>
 
-                    <div className="flex-1 flex flex-col gap-2 justify-center">
-                        {/* Mensagens */}
-                        <div className="flex flex-col gap-0.5">
-                            <div className="flex justify-between items-center text-xs font-semibold text-gray-500">
-                                <span className="flex items-center gap-1.5"><MessageSquare className="w-3.5 h-3.5 text-purple-650" /> Mensagens</span>
-                                <span className="font-bold text-gray-900">{renderValue(data.earningsByCategory.message)} ({getPercent(data.earningsByCategory.message)})</span>
-                            </div>
-                            <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden border border-gray-200/30">
-                                <div style={{ width: getPercent(data.earningsByCategory.message) }} className="h-full bg-purple-600 rounded-full" />
+                    <div className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-6 py-2">
+                        {/* Gráfico Donut Chart SVG */}
+                        <div className="relative w-32 h-32 flex items-center justify-center shrink-0">
+                            {totalVal > 0 ? (
+                                <svg width="128" height="128" viewBox="0 0 80 80" className="transform -rotate-90">
+                                    {segments.map((seg, idx) => {
+                                        if (seg.value === 0) return null;
+                                        return (
+                                            <circle
+                                                key={idx}
+                                                cx="40"
+                                                cy="40"
+                                                r="30"
+                                                fill="transparent"
+                                                stroke={seg.color}
+                                                strokeWidth="11"
+                                                strokeDasharray={seg.strokeDasharray}
+                                                strokeDashoffset={seg.strokeDashoffset}
+                                                className="transition-all duration-300 hover:stroke-[13px] cursor-pointer"
+                                            >
+                                                <title>{`${seg.label}: ${formatCurrency(seg.value)} (${(seg.percent * 100).toFixed(0)}%)`}</title>
+                                            </circle>
+                                        );
+                                    })}
+                                </svg>
+                            ) : (
+                                <svg width="128" height="128" viewBox="0 0 80 80" className="transform -rotate-90">
+                                    <circle
+                                        cx="40"
+                                        cy="40"
+                                        r="30"
+                                        fill="transparent"
+                                        stroke="#e2e8f0"
+                                        strokeWidth="11"
+                                    />
+                                </svg>
+                            )}
+                            
+                            {/* Centro do Donut com o valor total formatado */}
+                            <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-none">Total</span>
+                                <span className="text-xs font-black text-slate-800 tracking-tight mt-0.5">
+                                    {renderValue(totalVal)}
+                                </span>
                             </div>
                         </div>
 
-                        {/* Mídias */}
-                        <div className="flex flex-col gap-0.5">
-                            <div className="flex justify-between items-center text-xs font-semibold text-gray-500">
-                                <span className="flex items-center gap-1.5"><ImageIcon className="w-3.5 h-3.5 text-purple-650" /> Mídias Privadas</span>
-                                <span className="font-bold text-gray-900">{renderValue(data.earningsByCategory.image_unlock)} ({getPercent(data.earningsByCategory.image_unlock)})</span>
-                            </div>
-                            <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden border border-gray-200/30">
-                                <div style={{ width: getPercent(data.earningsByCategory.image_unlock) }} className="h-full bg-purple-600 rounded-full" />
-                            </div>
-                        </div>
-
-                        {/* Assinaturas */}
-                        <div className="flex flex-col gap-0.5">
-                            <div className="flex justify-between items-center text-xs font-semibold text-gray-500">
-                                <span className="flex items-center gap-1.5"><Crown className="w-3.5 h-3.5 text-purple-650" /> Assinaturas</span>
-                                <span className="font-bold text-gray-900">{renderValue(data.earningsByCategory.subscription)} ({getPercent(data.earningsByCategory.subscription)})</span>
-                            </div>
-                            <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden border border-gray-200/30">
-                                <div style={{ width: getPercent(data.earningsByCategory.subscription) }} className="h-full bg-purple-600 rounded-full" />
-                            </div>
-                        </div>
-
-                        {/* Presentes */}
-                        <div className="flex flex-col gap-0.5">
-                            <div className="flex justify-between items-center text-xs font-semibold text-gray-500">
-                                <span className="flex items-center gap-1.5"><Gift className="w-3.5 h-3.5 text-purple-650" /> Presentes</span>
-                                <span className="font-bold text-gray-900">{renderValue(data.earningsByCategory.gift)} ({getPercent(data.earningsByCategory.gift)})</span>
-                            </div>
-                            <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden border border-gray-200/30">
-                                <div style={{ width: getPercent(data.earningsByCategory.gift) }} className="h-full bg-purple-600 rounded-full" />
-                            </div>
+                        {/* Legenda Explicativa */}
+                        <div className="flex-1 flex flex-col gap-2.5 w-full">
+                            {categories.map((cat, idx) => {
+                                const percent = totalVal > 0 ? (cat.value / totalVal) : 0;
+                                const CatIcon = cat.icon;
+                                return (
+                                    <div key={idx} className="flex items-center justify-between py-0.5 border-b border-slate-50 last:border-b-0">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <div 
+                                                className="w-2.5 h-2.5 rounded-full shrink-0" 
+                                                style={{ backgroundColor: cat.color }}
+                                            />
+                                            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600 min-w-0">
+                                                <CatIcon className="w-3.5 h-3.5 shrink-0" style={{ color: cat.color }} />
+                                                <span className="truncate">{cat.label}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0 text-right">
+                                            <span className="text-xs font-extrabold text-slate-800">{renderValue(cat.value)}</span>
+                                            <span className="text-[10px] text-slate-400 font-bold">({(percent * 100).toFixed(0)}%)</span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
@@ -923,6 +1040,52 @@ export default function WalletPage() {
                         >
                             Entendido
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* ── MODAL: LISTAR ASSINANTES ────────────────────────────────── */}
+            {subscribersModalOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm flex flex-col gap-4 border border-gray-100 animate-in zoom-in duration-300">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                            <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                                <Crown className="w-4 h-4 text-purple-650" />
+                                Seus Assinantes
+                            </h2>
+                            <button
+                                onClick={() => setSubscribersModalOpen(false)}
+                                className="text-xs font-bold text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                Fechar
+                            </button>
+                        </div>
+
+                        <div className="max-h-[300px] overflow-y-auto pr-1 flex flex-col gap-3 no-scrollbar">
+                            {data.subscribersList && data.subscribersList.length > 0 ? (
+                                data.subscribersList.map((subscriber) => (
+                                    <div key={subscriber.clerkId} className="flex items-center gap-3 py-1 border-b border-gray-50 last:border-b-0">
+                                        <div className="p-[0.5px] bg-gradient-to-tr from-purple-500 to-indigo-500 rounded-full shrink-0">
+                                            <div className="bg-white p-[1px] rounded-full">
+                                                <Avatar uri={subscriber.photoUrl} size={28} />
+                                            </div>
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <h4 className="text-xs font-bold text-gray-900 truncate leading-tight">
+                                                {subscriber.name || 'Assinante Mimo'}
+                                            </h4>
+                                            <p className="text-[10px] text-gray-400 truncate mt-0.5">
+                                                @{subscriber.username}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="text-center py-8 flex flex-col items-center justify-center gap-2">
+                                    <p className="text-xs text-gray-400">Você ainda não possui nenhum assinante ativo.</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
