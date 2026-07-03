@@ -16,7 +16,7 @@ import { buildProfileRoleMetadata, getCreatorLandingProfileRole } from '@/lib/pr
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
 
 // GET /api/users/me - Get current user
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
         const { userId } = await auth();
 
@@ -161,7 +161,8 @@ export async function GET() {
         // --- CONTINGÊNCIA: CONCESSÃO AUTOMÁTICA DE CRÉDITO DE BOAS-VINDAS ---
         if (user.isProfessional === false) {
             try {
-                const welcomeResult = await grantWelcomeCredit(user.clerkId, user.email, undefined, user.phone, user.taxId);
+                const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() || undefined;
+                const welcomeResult = await grantWelcomeCredit(user.clerkId, user.email, ip, user.phone, user.taxId);
                 if (welcomeResult.success) {
                     const updatedUser = await User.findOne({ clerkId: userId });
                     if (updatedUser) {
