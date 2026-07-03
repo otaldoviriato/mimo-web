@@ -110,15 +110,6 @@ export default function SearchPage() {
     }, [username]);
 
     const renderUserCard = (user: any) => {
-        const formatResponseTime = (minutes: number | null | undefined): string => {
-            if (minutes == null) return '';
-            if (minutes <= 2.5) return '1 minuto';
-            if (minutes <= 7.5) return '5 minutos';
-            if (minutes <= 20) return '10 minutos';
-            if (minutes <= 45) return '30 minutos';
-            return 'mais de uma hora';
-        };
-        const responseTime = formatResponseTime(user.avgResponseTimeMinutes);
         const photos: string[] = user.publicPhotos || [];
 
         return (
@@ -134,7 +125,7 @@ export default function SearchPage() {
                         <Avatar uri={user.photoUrl} size={64} />
                     </div>
 
-                    {/* Nome (com badge Novo inline), Bio e Tempo de Resposta */}
+                    {/* Nome (com badge Novo inline) e Bio */}
                     <div className="min-w-0 flex-1 space-y-1.5">
                         <div>
                             <div className="flex items-center gap-1.5 flex-wrap">
@@ -153,16 +144,6 @@ export default function SearchPage() {
                                 </p>
                             )}
                         </div>
-
-                        {/* Indicador de Tempo Médio de Resposta */}
-                        {user.avgResponseTimeMinutes != null && (
-                        <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200/60 px-2 py-0.5 rounded-full w-fit">
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                                <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
-                            </svg>
-                            <span>Responde em média em {responseTime}</span>
-                        </div>
-                        )}
                     </div>
                 </div>
 

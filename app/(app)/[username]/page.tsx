@@ -242,21 +242,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                     </div>
                 )}
 
-                {/* Galeria Privada - Contador minimalista e discreto no topo */}
-                {user.isProfessional && ((galleryData?.privatePhotosCount ?? 0) > 0 || (galleryData?.privateVideosCount ?? 0) > 0) && (
-                    <div className="mt-2.5 flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-full text-[10px] text-slate-500 font-medium border border-slate-200/50 shadow-sm z-10 animate-in fade-in duration-300">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-slate-400">
-                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                        </svg>
-                        <span>Galeria Privada:</span>
-                        <span className="font-bold text-slate-700">
-                            {galleryData.privatePhotosCount > 0 && `${galleryData.privatePhotosCount} ${galleryData.privatePhotosCount === 1 ? 'foto' : 'fotos'}`}
-                            {galleryData.privatePhotosCount > 0 && galleryData.privateVideosCount > 0 && ' e '}
-                            {galleryData.privateVideosCount > 0 && `${galleryData.privateVideosCount} ${galleryData.privateVideosCount === 1 ? 'vídeo' : 'vídeos'}`}
-                        </span>
-                    </div>
-                )}
+
 
                 {/* Biografia do usuário */}
                 {user.isProfessional && user.bio && (

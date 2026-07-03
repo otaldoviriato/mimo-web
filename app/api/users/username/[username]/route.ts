@@ -28,7 +28,7 @@ export async function GET(
         await connectToDatabase();
 
         let user = await User.findOne({ username: cleanUsername }).select(
-            'clerkId username name email photoUrl coverUrl isProfessional professionalStatus subscriptionPrice isSubscriptionEnabled chargePerCharSubscribers chargePerCharNonSubscribers subscribers balance bio'
+            'clerkId username name email photoUrl coverUrl isProfessional professionalStatus subscriptionPrice isSubscriptionEnabled chargePerCharSubscribers chargePerCharNonSubscribers subscribers balance bio avgResponseTimeMinutes'
         );
 
         if (!user) {
@@ -172,6 +172,7 @@ export async function GET(
                 bio: user.bio || '',
                 balance: shouldShowBalance ? (user.balance || 0) : undefined,
                 relationshipStats: relationshipStats || undefined,
+                avgResponseTimeMinutes: user.avgResponseTimeMinutes ?? null,
             },
         });
     } catch (error: any) {
