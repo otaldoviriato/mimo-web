@@ -143,7 +143,7 @@ export function FinancialTab({ dashboardData, loadingDashboard: parentLoading, h
                     <thead>
                         <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
                             <th className="py-4 px-6">ID Transação</th>
-                            <th className="py-4 px-6">Usuário</th>
+                            <th className="py-4 px-6">Remetente → Destinatário</th>
                             <th className="py-4 px-6">Tipo</th>
                             <th className="py-4 px-6">Valor</th>
                             <th className="py-4 px-6">Data/Hora</th>
@@ -165,9 +165,13 @@ export function FinancialTab({ dashboardData, loadingDashboard: parentLoading, h
                             transactions.map((tx: any) => (
                                 <tr key={tx.id} className="hover:bg-slate-50/40 transition-colors group">
                                     <td className="py-4 px-6 text-xs font-bold text-slate-500 uppercase">{tx.displayId || tx.id}</td>
-                                    <td className="py-4 px-6 text-sm font-bold text-slate-800">
+                                    <td className="py-4 px-6 text-sm font-bold">
                                         <div className="flex flex-col">
-                                            <span>{tx.user}</span>
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="text-slate-700 font-extrabold">{tx.senderName}</span>
+                                                <span className="text-slate-400 font-normal">→</span>
+                                                <span className="text-purple-600 font-extrabold">{tx.receiverName}</span>
+                                            </div>
                                             {tx.isWithdrawRequest && tx.pixKey && (
                                                 <span className="text-[10px] font-mono text-slate-400 mt-0.5 break-all">Pix: {tx.pixKey}</span>
                                             )}

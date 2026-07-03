@@ -52,6 +52,7 @@ export interface IUser extends Document {
     onboardingStep?: 'welcome' | 'identity' | 'profile' | 'completed';
     identitySelfieUrl?: string;
     identityDocumentType?: string;
+    identityStatus?: 'pending' | 'approved' | 'rejected' | null;
     hideFromExplore?: boolean;
     subscriberDiscountPercentage?: number;
     createdAt: Date;
@@ -227,6 +228,12 @@ const UserSchema = new Schema<IUser>({
     },
     identityDocumentType: {
         type: String,
+    },
+    identityStatus: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected', null],
+        default: null,
+        index: true,
     },
     hideFromExplore: {
         type: Boolean,

@@ -9,6 +9,7 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { formatCPF, formatPhone } from '@/components/RechargeModal';
 import { PricingGuideModal, PRICE_PER_CHAR_OPTIONS } from '@/components/PricingGuideModal';
 import Link from 'next/link';
+import { ShieldCheck, RefreshCw, AlertCircle } from 'lucide-react';
 
 function SkeletonField() {
     return (

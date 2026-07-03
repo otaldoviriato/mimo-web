@@ -38,13 +38,7 @@ export async function GET(request: NextRequest) {
         const typeFilter = searchParams.get('type') || 'all';
 
         const offset = (page - 1) * limit;
-
-        // Limite máximo para evitar queries gigantescas na junção em memória
         const maxFetch = page * limit;
-
-        // Queries básicas de usuários
-        // Precisamos dos dados dos usuários para mapear nomes reais
-        // Para otimização, coletamos todos os usuários relevantes no final baseado nas transações selecionadas
         
         let allTransactions: any[] = [];
         let totalItems = 0;
@@ -72,7 +66,6 @@ export async function GET(request: NextRequest) {
             const mappedWithdrawals = withdrawalsRaw.map(w => mapWithdrawRequest(w));
             const mappedTransactions = transactionsRaw.map(tx => mapTransaction(tx));
 
-            // Combinar e ordenar
             const combined = [...mappedWithdrawals, ...mappedTransactions]
                 .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
@@ -102,7 +95,7 @@ export async function GET(request: NextRequest) {
             allTransactions = raw.map(tx => mapMicroTransaction(tx));
 
         } else if (typeFilter === 'gift') {
-            // Mimos / Cupons (microtransações e transações)
+            // Mimos / Cupons
             const queryMicro = { source: 'gift', type: { $in: ['debit', 'credit'] } };
             const queryTx = { source: 'gift' };
 
@@ -128,8 +121,6 @@ export async function GET(request: NextRequest) {
 
         } else {
             // 'all' - Combinado
-            // Omitimos transações do tipo 'promotional_credit_usage' para evitar duplicação nas mensagens cobradas
-            // Também omitimos transações de saque que estão associadas a um WithdrawRequest para evitar duplicados
             const txQuery = { 
                 type: { $ne: 'promotional_credit_usage' },
                 $or: [
@@ -142,13 +133,11 @@ export async function GET(request: NextRequest) {
                 type: { $in: ['debit', 'credit'] } 
             };
 
-            // Contagem total combinada
             const countTx = await Transaction.countDocuments(txQuery);
             const countMtx = await MicroTransaction.countDocuments(mtxQuery);
             const countWr = await WithdrawRequest.countDocuments();
             totalItems = countTx + countMtx + countWr;
 
-            // Para paginação no combinador, buscamos os mais recentes até o limite necessário de cada coleção
             const txs = await Transaction.find(txQuery).sort({ timestamp: -1 }).limit(maxFetch).lean();
             const mtxs = await MicroTransaction.find(mtxQuery).sort({ timestamp: -1 }).limit(maxFetch).lean();
             const wrs = await WithdrawRequest.find().sort({ createdAt: -1 }).limit(maxFetch).lean();
@@ -162,21 +151,39 @@ export async function GET(request: NextRequest) {
             allTransactions = combined.slice(offset, offset + limit);
         }
 
-        // 3. Fazer enrich de nomes de usuários baseados nos Clerk IDs das transações obtidas
-        const clerkIds = Array.from(new Set(allTransactions.map(tx => tx.userId).filter(Boolean))) as string[];
+        // 3. Fazer enrich de nomes de usuários baseados nos Clerk IDs (remetente e destinatário)
+        const clerkIds = Array.from(new Set([
+            ...allTransactions.map(tx => tx.senderId),
+            ...allTransactions.map(tx => tx.receiverId)
+        ])).filter(id => id && id !== 'platform') as string[];
+
         const usersList = await User.find({ clerkId: { $in: clerkIds } })
             .select('clerkId name username')
             .lean();
 
-        // Mapear os nomes corretos
+        // Mapear os nomes corretos para remetente (sender) e destinatário (receiver)
         const enrichedTransactions = allTransactions.map(tx => {
-            const relatedUser = usersList.find(u => u.clerkId === tx.userId);
-            const userName = relatedUser 
-                ? (relatedUser.name || `@${relatedUser.username}`) 
-                : tx.user; // Mantém o fallback definido na função map
+            let senderName = 'MimoChat';
+            let receiverName = 'MimoChat';
+
+            if (tx.senderId === 'platform') {
+                senderName = 'MimoChat';
+            } else if (tx.senderId) {
+                const u = usersList.find(usr => usr.clerkId === tx.senderId);
+                senderName = u ? (u.name || `@${u.username}`) : `Usuário (${tx.senderId.substring(0, 8)})`;
+            }
+
+            if (tx.receiverId === 'platform') {
+                receiverName = 'MimoChat';
+            } else if (tx.receiverId) {
+                const u = usersList.find(usr => usr.clerkId === tx.receiverId);
+                receiverName = u ? (u.name || `@${u.username}`) : `Usuário (${tx.receiverId.substring(0, 8)})`;
+            }
+
             return {
                 ...tx,
-                user: userName
+                senderName,
+                receiverName
             };
         });
 
@@ -227,11 +234,32 @@ function mapTransaction(tx: any) {
 
     const txDate = tx.timestamp ? new Date(tx.timestamp) : new Date();
 
+    // Determinar remetente (senderId) e destinatário (receiverId)
+    let senderId = null;
+    let receiverId = null;
+
+    if (tx.source === 'recharge') {
+        senderId = tx.userId;
+        receiverId = 'platform';
+    } else if (tx.source === 'withdrawal') {
+        senderId = 'platform';
+        receiverId = tx.userId;
+    } else {
+        if (tx.type === 'debit' || tx.status === 'debit') {
+            senderId = tx.userId;
+            receiverId = tx.relatedUserId || null;
+        } else {
+            senderId = tx.relatedUserId || null;
+            receiverId = tx.userId;
+        }
+    }
+
     return {
         id: tx._id?.toString(),
         displayId: tx.abacatePayId || tx._id?.toString() || `TX-${Math.floor(Math.random() * 100000)}`,
         userId: tx.userId,
-        user: `Usuário (${tx.userId.substring(0, 8)}...)`,
+        senderId,
+        receiverId,
         val: valInReais,
         type: typeLabel,
         source: tx.source,
@@ -259,11 +287,24 @@ function mapMicroTransaction(tx: any) {
     const statusLabel = tx.type === 'debit' ? 'Débito' : 'Crédito';
     const txDate = tx.timestamp ? new Date(tx.timestamp) : new Date();
 
+    // Determinar remetente (senderId) e destinatário (receiverId)
+    let senderId = null;
+    let receiverId = null;
+
+    if (tx.type === 'debit') {
+        senderId = tx.userId;
+        receiverId = tx.relatedUserId || null;
+    } else {
+        senderId = tx.relatedUserId || null;
+        receiverId = tx.userId;
+    }
+
     return {
         id: tx._id?.toString(),
         displayId: tx._id?.toString() || `MTX-${Math.floor(Math.random() * 100000)}`,
         userId: tx.userId,
-        user: `Usuário (${tx.userId.substring(0, 8)}...)`,
+        senderId,
+        receiverId,
         val: valInReais,
         type: typeLabel,
         source: tx.source,
@@ -291,7 +332,8 @@ function mapWithdrawRequest(w: any) {
         id: w._id.toString(),
         displayId: `SAQUE-${w._id.toString().substring(18).toUpperCase()}`,
         userId: w.userId,
-        user: `Profissional (${w.userId.substring(0, 8)})`,
+        senderId: 'platform',
+        receiverId: w.userId,
         val: valInReais,
         type: 'Saque',
         source: 'withdrawal',
