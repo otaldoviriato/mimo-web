@@ -14,8 +14,10 @@ export function ImageCropper({ imageSrc, circular = false, aspectRatio, onCrop, 
     const [zoom, setZoom] = useState(1);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
-    
+
     const dragStart = useRef({ x: 0, y: 0 });
+    const pinchStartDist = useRef<number | null>(null);
+    const pinchStartZoom = useRef(1);
     const containerRef = useRef<HTMLDivElement>(null);
     const imgRef = useRef<HTMLImageElement>(null);
 
@@ -43,8 +45,22 @@ export function ImageCropper({ imageSrc, circular = false, aspectRatio, onCrop, 
         setIsDragging(false);
     };
 
+    // Helpers para pinch
+    const getPinchDist = (touches: React.TouchList) => {
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        return Math.hypot(dx, dy);
+    };
+
     // Handlers para arrastar com Toque (Celular)
     const handleTouchStart = (e: React.TouchEvent) => {
+        if (e.touches.length === 2) {
+            // Início do pinch
+            setIsDragging(false);
+            pinchStartDist.current = getPinchDist(e.touches);
+            pinchStartZoom.current = zoom;
+            return;
+        }
         if (e.touches.length !== 1) return;
         setIsDragging(true);
         const touch = e.touches[0];
@@ -52,6 +68,14 @@ export function ImageCropper({ imageSrc, circular = false, aspectRatio, onCrop, 
     };
 
     const handleTouchMove = (e: React.TouchEvent) => {
+        if (e.touches.length === 2 && pinchStartDist.current !== null) {
+            // Pinch-to-zoom
+            const dist = getPinchDist(e.touches);
+            const scale = dist / pinchStartDist.current;
+            const newZoom = Math.min(3, Math.max(1, pinchStartZoom.current * scale));
+            setZoom(newZoom);
+            return;
+        }
         if (!isDragging || e.touches.length !== 1) return;
         const touch = e.touches[0];
         const newX = touch.clientX - dragStart.current.x;
@@ -60,6 +84,7 @@ export function ImageCropper({ imageSrc, circular = false, aspectRatio, onCrop, 
     };
 
     const handleTouchEnd = () => {
+        pinchStartDist.current = null;
         setIsDragging(false);
     };
 
@@ -230,7 +255,7 @@ export function ImageCropper({ imageSrc, circular = false, aspectRatio, onCrop, 
                         onClick={handleCropConfirm}
                         className="flex-1 py-3 px-4 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 active:scale-95 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-purple-950/20"
                     >
-                        Cortar e Confirmar
+                        Confirmar
                     </button>
                 </div>
             </div>
