@@ -1,8 +1,92 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
+import { Resend } from 'resend';
 import { connectToDatabase } from '@/lib/db';
 import { User, Transaction, Subscription } from '@/models';
+import { sendPushNotification } from '@/lib/push';
 import { SubscriptionBillingError, subscriptionPriceBRLToCents } from '@/lib/subscriptionBilling';
+
+const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
+
+function escapeHtml(value: string) {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+async function notifyProfessionalAboutNewSubscriber({
+    professional,
+    subscriber,
+    priceInCents,
+}: {
+    professional: {
+        clerkId: string;
+        email?: string;
+        username?: string;
+        name?: string;
+    };
+    subscriber: {
+        clerkId: string;
+        username?: string;
+        name?: string;
+    };
+    priceInCents: number;
+}) {
+    const subscriberDisplayName = subscriber.name || (subscriber.username ? `@${subscriber.username}` : 'Uma nova pessoa');
+    const amountInReais = (priceInCents / 100).toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+    });
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.mimochat.com.br';
+
+    try {
+        await sendPushNotification(
+            professional.clerkId,
+            'Nova assinatura no seu perfil',
+            `${subscriberDisplayName} assinou seu perfil por ${amountInReais}.`,
+            {
+                type: 'new_subscriber',
+                subscriberId: subscriber.clerkId,
+                amount: priceInCents,
+                url: `${appUrl}/wallet`,
+            }
+        );
+    } catch (pushError) {
+        console.error('[POST /api/users/[id]/subscribe] Failed to send new subscriber push:', pushError);
+    }
+
+    if (!professional.email || !process.env.RESEND_API_KEY) {
+        return;
+    }
+
+    try {
+        const safeSubscriberName = escapeHtml(subscriberDisplayName);
+        const safeProfessionalName = escapeHtml(professional.name || professional.username || 'criadora');
+
+        await resend.emails.send({
+            from: 'Mimo <onboarding@resend.dev>',
+            to: professional.email,
+            subject: 'Nova assinatura no seu perfil',
+            html: `
+                <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #0f172a;">
+                    <h2 style="margin: 0 0 12px; color: #0f172a;">Nova assinatura recebida</h2>
+                    <p style="font-size: 16px; line-height: 1.5; color: #334155;">Oi, ${safeProfessionalName}. <strong>${safeSubscriberName}</strong> acabou de assinar seu perfil no Mimo.</p>
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin: 20px 0;">
+                        <p style="margin: 0 0 8px;"><strong>Valor:</strong> ${amountInReais}</p>
+                        <p style="margin: 0 0 8px;"><strong>Status:</strong> Assinatura ativa</p>
+                        <p style="margin: 0;"><strong>Data:</strong> ${new Date().toLocaleString('pt-BR')}</p>
+                    </div>
+                    <p style="font-size: 13px; color: #64748b;">Voce pode acompanhar suas assinaturas e ganhos na carteira do Mimo.</p>
+                </div>
+            `,
+        });
+    } catch (emailError) {
+        console.error('[POST /api/users/[id]/subscribe] Failed to send new subscriber email:', emailError);
+    }
+}
 
 export async function POST(
     request: NextRequest,
@@ -175,6 +259,12 @@ export async function POST(
 
             throw error;
         }
+
+        await notifyProfessionalAboutNewSubscriber({
+            professional: owner,
+            subscriber: requester,
+            priceInCents,
+        });
 
         return NextResponse.json({
             success: true,
