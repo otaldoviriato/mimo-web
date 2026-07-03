@@ -49,6 +49,7 @@ export interface IUser extends Document {
     suspendedAt?: Date;
     avgResponseTimeMinutes?: number | null;
     identityDocumentUrl?: string;
+    onboardingStep?: 'welcome' | 'identity' | 'profile' | 'completed';
     identitySelfieUrl?: string;
     identityDocumentType?: string;
     hideFromExplore?: boolean;
@@ -105,6 +106,12 @@ const UserSchema = new Schema<IUser>({
     },
     isProfessional: {
         type: Boolean,
+    },
+    onboardingStep: {
+        type: String,
+        enum: ['welcome', 'identity', 'profile', 'completed'],
+        default: 'welcome',
+        index: true,
     },
     professionalStatus: {
         type: String,

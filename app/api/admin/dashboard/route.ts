@@ -70,14 +70,21 @@ export async function GET(request: NextRequest) {
 
         // --- CÁLCULO DE MÉTRICAS ---
 
+        const onboardingCompletedFilter = {
+            $or: [
+                { onboardingStep: 'completed' },
+                { name: { $exists: true, $ne: '' }, onboardingStep: { $exists: false } }
+            ]
+        };
+
         // A. Total de Usuários
-        const totalUsers = await User.countDocuments();
+        const totalUsers = await User.countDocuments(onboardingCompletedFilter);
         let usersChange = '';
         let isUsersPositive = true;
 
         if (startDate && prevStartDate) {
-            const currUsers = await User.countDocuments({ createdAt: { $gte: startDate } });
-            const prevUsers = await User.countDocuments({ createdAt: { $gte: prevStartDate, $lt: startDate } });
+            const currUsers = await User.countDocuments({ ...onboardingCompletedFilter, createdAt: { $gte: startDate } });
+            const prevUsers = await User.countDocuments({ ...onboardingCompletedFilter, createdAt: { $gte: prevStartDate, $lt: startDate } });
             const res = calculateChange(currUsers, prevUsers);
             usersChange = res.change;
             isUsersPositive = res.isPositive;
@@ -171,7 +178,7 @@ export async function GET(request: NextRequest) {
             const dayLabel = weekdayNames[dStart.getDay()];
 
             const msgsCount = await Message.countDocuments({ timestamp: { $gte: dStart, $lt: dEnd } });
-            const usrsCount = await User.countDocuments({ createdAt: { $gte: dStart, $lt: dEnd } });
+            const usrsCount = await User.countDocuments({ ...onboardingCompletedFilter, createdAt: { $gte: dStart, $lt: dEnd } });
 
             activityData.push({
                 label: dayLabel,

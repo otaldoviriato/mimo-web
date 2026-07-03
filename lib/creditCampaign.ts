@@ -31,13 +31,19 @@ export async function grantWelcomeCredit(
     }
 
     // 2. Valida o tipo do usuário (somente cliente pode receber)
-    const user = await User.findOne({ clerkId: userId }).select('isProfessional email phone taxId');
+    const user = await User.findOne({ clerkId: userId }).select('isProfessional onboardingStep email phone taxId name');
     if (!user) {
         return { success: false, reason: 'user_not_found' };
     }
 
     if (user.isProfessional === true) {
         return { success: false, reason: 'user_is_professional' };
+    }
+
+    // Só concede o crédito se o usuário tiver concluído o onboarding
+    const isCompleted = user.onboardingStep === 'completed' || (user.name && user.isProfessional !== undefined && !user.onboardingStep);
+    if (!isCompleted) {
+        return { success: false, reason: 'onboarding_not_completed' };
     }
 
     // 3. Valida se já atingiu o limite maxTotalUsers da campanha

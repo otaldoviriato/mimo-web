@@ -33,21 +33,51 @@ export async function GET(request: NextRequest) {
 
         const searchParams = request.nextUrl.searchParams;
         const query = searchParams.get('q') || '';
+        const onboardingStatus = searchParams.get('onboardingStatus') || 'completed';
         
         let filter: any = {};
+        
+        // Filtro de onboardingStatus
+        if (onboardingStatus === 'completed') {
+            filter.$or = [
+                { onboardingStep: 'completed' },
+                { name: { $exists: true, $ne: '' }, onboardingStep: { $exists: false } }
+            ];
+        } else if (onboardingStatus === 'pending') {
+            filter.$or = [
+                { onboardingStep: { $in: ['welcome', 'identity', 'profile'] } },
+                { onboardingStep: { $exists: false }, $or: [
+                    { name: { $in: [null, ''] } },
+                    { isProfessional: { $exists: false } }
+                ]}
+            ];
+        }
+
         if (query.trim().length > 0) {
             const cleanQuery = query.trim().replace('@', '');
-            filter = {
+            const searchFilter = {
                 $or: [
                     { username: { $regex: new RegExp(cleanQuery, 'i') } },
                     { name: { $regex: new RegExp(cleanQuery, 'i') } },
                     { email: { $regex: new RegExp(cleanQuery, 'i') } }
                 ]
             };
+            
+            if (filter.$or) {
+                filter = {
+                    $and: [
+                        { $or: filter.$or },
+                        searchFilter
+                    ]
+                };
+            } else {
+                filter = searchFilter;
+            }
         }
-
+        
+        // Garante que adicionamos onboardingStep no select para controle do admin
         const usersList = await User.find(filter)
-            .select('clerkId username name email photoUrl balance isProfessional createdAt taxId phone pixKey subscriptionPrice lastSeen isOnline accessCount lastAccessAt')
+            .select('clerkId username name email photoUrl balance isProfessional onboardingStep createdAt taxId phone pixKey subscriptionPrice lastSeen isOnline accessCount lastAccessAt')
             .sort({ createdAt: -1 })
             .limit(100)
             .lean() as any[];

@@ -288,6 +288,7 @@ export async function POST(request: NextRequest) {
                     birthDate: birthDateObj,
                     professionalStatus: user.isProfessional ? 'approved' : null,
                     isProfessional: user.isProfessional ?? false,
+                    onboardingStep: 'profile',
                     notes: ''
                 }
             },

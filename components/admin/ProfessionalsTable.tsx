@@ -13,6 +13,7 @@ export function ProfessionalsTable() {
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [onboardingFilter, setOnboardingFilter] = useState<'completed' | 'pending'>('completed');
     const [selectedUserMenu, setSelectedUserMenu] = useState<string | null>(null);
     const [sortKey, setSortKey] = useState<SortKey | null>(null);
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -45,10 +46,10 @@ export function ProfessionalsTable() {
     }, [users, sortKey, sortDir]);
 
     // Busca os usuários da API
-    const fetchUsers = async (query: string = '') => {
+    const fetchUsers = async (query: string = '', onboarding = onboardingFilter) => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/admin/users?q=${encodeURIComponent(query)}`);
+            const res = await fetch(`/api/admin/users?q=${encodeURIComponent(query)}&onboardingStatus=${onboarding}`);
             if (res.ok) {
                 const data = await res.json();
                 // Filtra apenas profissionais (isProfessional)
@@ -69,10 +70,10 @@ export function ProfessionalsTable() {
     // Debounce para a barra de pesquisa
     useEffect(() => {
         const timer = setTimeout(() => {
-            fetchUsers(searchQuery);
-        }, 400);
+            fetchUsers(searchQuery, onboardingFilter);
+        }, searchQuery ? 400 : 0);
         return () => clearTimeout(timer);
-    }, [searchQuery]);
+    }, [searchQuery, onboardingFilter]);
 
     // Ação: Excluir Usuário permanentemente do banco e do Clerk
     const handleDeleteUser = async (clerkId: string, name: string) => {
@@ -164,6 +165,32 @@ export function ProfessionalsTable() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-center gap-3">
+                    {/* Seletor de Onboarding */}
+                    <div className="bg-slate-100 p-1 rounded-xl flex items-center shadow-inner text-xs font-semibold">
+                        <button
+                            type="button"
+                            onClick={() => setOnboardingFilter('completed')}
+                            className={`px-3 py-1.5 rounded-lg transition-all ${
+                                onboardingFilter === 'completed'
+                                    ? 'bg-white text-purple-700 shadow-sm'
+                                    : 'text-slate-500 hover:text-slate-700'
+                            }`}
+                        >
+                            Concluído
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setOnboardingFilter('pending')}
+                            className={`px-3 py-1.5 rounded-lg transition-all ${
+                                onboardingFilter === 'pending'
+                                    ? 'bg-white text-purple-700 shadow-sm'
+                                    : 'text-slate-500 hover:text-slate-700'
+                            }`}
+                        >
+                            Em Onboarding
+                        </button>
+                    </div>
+
                     {/* Barra de Busca */}
                     <div className="relative w-full sm:w-64">
                         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
@@ -175,7 +202,6 @@ export function ProfessionalsTable() {
                             className="w-full pl-10 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 transition-all font-medium placeholder-slate-400 text-slate-700"
                         />
                     </div>
-
                 </div>
             </div>
 

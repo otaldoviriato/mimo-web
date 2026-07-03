@@ -367,7 +367,12 @@ export async function PATCH(request: NextRequest) {
         if (phone !== undefined) updateData.phone = phone;
         if (taxId !== undefined) updateData.taxId = taxId;
         
-        if (isProfessional !== undefined) updateData.isProfessional = isProfessional;
+        if (isProfessional !== undefined) {
+            updateData.isProfessional = isProfessional;
+            updateData.onboardingStep = 'identity';
+        } else if (username !== undefined || name !== undefined || photoUrl !== undefined) {
+            updateData.onboardingStep = 'completed';
+        }
         
         if (isSubscriptionEnabled !== undefined) {
             updateData.isSubscriptionEnabled = Boolean(isSubscriptionEnabled);
