@@ -45,18 +45,23 @@ export async function POST(
         const priceInCents = Math.round((owner.subscriptionPrice || 0) * 100);
 
         if (priceInCents > 0) {
+            // [SEGURAÇA] Verificação de saldo antes de prosseguir
             if (requester.balance < priceInCents) {
                 return NextResponse.json({ error: 'Saldo insuficiente para assinar' }, { status: 400 });
             }
 
-            // Realizar transação
-            // Tira de quem assina
-            await User.updateOne(
-                { clerkId: requesterId },
+            // [SEGURANÇA] Débito atômico: só debita se o saldo ainda for suficiente
+            // Evita race condition caso dois requests simultâneos tentem assinar
+            const debitResult = await User.updateOne(
+                { clerkId: requesterId, balance: { $gte: priceInCents } },
                 { $inc: { balance: -priceInCents } }
             );
 
-            // Dá para o dono do perfil
+            if (debitResult.modifiedCount === 0) {
+                return NextResponse.json({ error: 'Saldo insuficiente para assinar' }, { status: 400 });
+            }
+
+            // Creditar no perfil da profissional
             await User.updateOne(
                 { clerkId: ownerId },
                 { $inc: { balance: priceInCents } }

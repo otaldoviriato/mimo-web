@@ -39,24 +39,27 @@ export async function GET(request: NextRequest) {
             const client = await User.findOne({ clerkId: subscriberId });
             const professional = await User.findOne({ clerkId: professionalId });
 
-            if (!professional || !professional.isProfessional || !professional.isSubscriptionEnabled) {
-                // Profissional não existe ou desativou assinaturas: expirar acesso
+            // [SEGURANÇA] Verificar se profissional ainda existe, está aprovado e com assinaturas ativas
+            if (
+                !professional ||
+                !professional.isProfessional ||
+                professional.professionalStatus !== 'approved' ||
+                !professional.isSubscriptionEnabled
+            ) {
                 sub.status = 'EXPIRED';
                 await sub.save();
 
-                // Remover da lista de assinantes
                 await User.updateOne(
                     { clerkId: professionalId },
                     { $pull: { subscribers: subscriberId } }
                 );
 
                 results.expired++;
-                results.details.push(`Subscription of ${subscriberId} to ${professionalId} expired because professional disabled subscriptions or does not exist.`);
+                results.details.push(`Subscription of ${subscriberId} to ${professionalId} expired because professional disabled subscriptions, is not approved, or does not exist.`);
                 continue;
             }
 
             if (!client) {
-                // Cliente não encontrado: expirar acesso
                 sub.status = 'EXPIRED';
                 await sub.save();
 
@@ -70,17 +73,15 @@ export async function GET(request: NextRequest) {
                 continue;
             }
 
-            // subscriptionPrice é armazenado em reais; balance é em centavos
+            // [SEGURANÇA] subscriptionPrice é armazenado em reais; balance é em centavos
             const priceInCents = Math.round((professional.subscriptionPrice || 0) * 100);
 
             if (priceInCents > 0) {
-                // Verificar se o cliente tem saldo
+                // [SEGURANÇA] Verificar se o cliente tem saldo suficiente
                 if (client.balance < priceInCents) {
-                    // Sem saldo suficiente: expirar assinatura
                     sub.status = 'EXPIRED';
                     await sub.save();
 
-                    // Remover da lista de assinantes
                     await User.updateOne(
                         { clerkId: professionalId },
                         { $pull: { subscribers: subscriberId } }
@@ -91,18 +92,35 @@ export async function GET(request: NextRequest) {
                     continue;
                 }
 
-                // Se tiver saldo, debitar do cliente e creditar na profissional
-                await User.updateOne(
-                    { clerkId: subscriberId },
+                // [SEGURANÇA] Débito atômico: só debita se ainda tiver saldo suficiente
+                // Evita race condition caso o saldo seja consumido entre a leitura e o débito
+                const debitResult = await User.updateOne(
+                    { clerkId: subscriberId, balance: { $gte: priceInCents } },
                     { $inc: { balance: -priceInCents } }
                 );
 
+                if (debitResult.modifiedCount === 0) {
+                    // Saldo foi consumido entre a verificação e o débito (race condition)
+                    sub.status = 'EXPIRED';
+                    await sub.save();
+
+                    await User.updateOne(
+                        { clerkId: professionalId },
+                        { $pull: { subscribers: subscriberId } }
+                    );
+
+                    results.expired++;
+                    results.details.push(`Subscription of ${subscriberId} to ${professionalId} expired due to race condition on balance debit.`);
+                    continue;
+                }
+
+                // Creditar na profissional
                 await User.updateOne(
                     { clerkId: professionalId },
                     { $inc: { balance: priceInCents } }
                 );
 
-                // Criar transações de histórico
+                // Registrar transações de histórico
                 await Transaction.create([
                     {
                         userId: subscriberId,
@@ -123,11 +141,11 @@ export async function GET(request: NextRequest) {
                 ]);
             }
 
-            // Renovar assinatura (estender validade por +30 dias a partir da data de expiração anterior)
+            // Renovar assinatura (+30 dias a partir da data de expiração anterior)
             const newExpiresAt = new Date(sub.expiresAt);
             newExpiresAt.setDate(newExpiresAt.getDate() + 30);
-            
-            // Caso por algum motivo a assinatura já esteja muito atrasada, renovar a partir de agora
+
+            // Se a data ficou muito atrasada, renovar a partir de agora
             if (newExpiresAt <= now) {
                 const altExpiresAt = new Date();
                 altExpiresAt.setDate(altExpiresAt.getDate() + 30);
@@ -136,11 +154,12 @@ export async function GET(request: NextRequest) {
                 sub.expiresAt = newExpiresAt;
             }
 
-            sub.priceInCents = price;
+            // [CORRIGIDO] Salvar priceInCents correto (era `price`, variável inexistente)
+            sub.priceInCents = priceInCents;
             await sub.save();
 
             results.renewed++;
-            results.details.push(`Subscription of ${subscriberId} to ${professionalId} successfully renewed. New expiration: ${sub.expiresAt.toISOString()}`);
+            results.details.push(`Subscription of ${subscriberId} to ${professionalId} successfully renewed. Price: ${priceInCents} cents. New expiration: ${sub.expiresAt.toISOString()}`);
         }
 
         return NextResponse.json({ success: true, results });
