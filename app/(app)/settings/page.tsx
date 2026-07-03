@@ -604,6 +604,88 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                             </div>
                         </div>
 
+                        {/* ── SEÇÃO: VERIFICAÇÃO DE IDENTIDADE ── */}
+                        <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Verificação de Identidade (Selo de Verificado)</p>
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-4 space-y-3.5">
+                                {userData?.identityStatus === 'approved' ? (
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0 text-purple-600">
+                                            <ShieldCheck className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                                                Identidade Verificada
+                                            </h4>
+                                            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                                                Parabéns! Seu perfil foi verificado com sucesso e você possui o selo de autenticidade ao lado do seu nome.
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : userData?.identityStatus === 'pending' ? (
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0 text-amber-600">
+                                            <RefreshCw className="w-5 h-5 animate-spin" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-bold text-gray-900">Sob Análise</h4>
+                                            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                                                Seus documentos foram enviados e estão sendo analisados pela nossa equipe. Esse processo costuma levar até 48 horas.
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : userData?.identityStatus === 'rejected' ? (
+                                    <div className="space-y-3">
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-red-50 border border-red-100 flex items-center justify-center shrink-0 text-red-600">
+                                                <AlertCircle className="w-5 h-5" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="text-sm font-bold text-gray-900">Verificação Rejeitada</h4>
+                                                <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                                                    Infelizmente não foi possível validar seus documentos.
+                                                </p>
+                                                {userData?.notes && (
+                                                    <div className="mt-2 bg-red-50/55 border border-red-100 rounded-xl p-3">
+                                                        <p className="text-[11px] font-bold text-red-800 uppercase tracking-wider">Motivo:</p>
+                                                        <p className="text-xs text-red-700 mt-0.5 leading-relaxed italic">"{userData.notes}"</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => router.push('/verificacao-identidade')}
+                                            className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition-all active:scale-[0.99] flex items-center justify-center gap-1.5 cursor-pointer shadow-sm shadow-purple-600/10"
+                                        >
+                                            <RefreshCw className="w-3.5 h-3.5" />
+                                            Reenviar Documentos
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0 text-purple-600">
+                                                <ShieldCheck className="w-5 h-5" />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-sm font-bold text-gray-900">Verifique seu Perfil</h4>
+                                                <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                                                    Envie seus documentos de identificação para obter o selo de verificado ao lado do seu nome, mostrando a todos que seu perfil é autêntico.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => router.push('/verificacao-identidade')}
+                                            className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 text-white font-extrabold rounded-xl text-xs transition-all active:scale-[0.99] flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-purple-600/10"
+                                        >
+                                            <ShieldCheck className="w-3.5 h-3.5" />
+                                            Verificar Identidade
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         {/* ── SEÇÃO: PREÇOS E GANHOS (Profissionais) ── */}
                         {/* ── CARD 1: OFERECER ASSINATURA ── */}
                         {profileIsProfessional && (

@@ -262,8 +262,11 @@ export function UserTable() {
                                                     </div>
                                                 )}
                                                 <div className="flex flex-col">
-                                                    <span className="text-sm font-bold text-slate-800 group-hover:text-purple-600 transition-colors">
+                                                    <span className="text-sm font-bold text-slate-800 group-hover:text-purple-600 transition-colors flex items-center gap-1">
                                                         {user.name}
+                                                        {user.identityStatus === 'approved' && (
+                                                            <ShieldCheck size={14} className="text-purple-600 shrink-0" />
+                                                        )}
                                                     </span>
                                                     <span className="text-xs text-slate-400 font-medium flex items-center gap-1 mt-0.5">
                                                         <Mail size={12} />

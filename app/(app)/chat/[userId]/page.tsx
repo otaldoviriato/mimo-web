@@ -13,6 +13,7 @@ import { Drawer } from 'vaul';
 import { AudioRecorder } from '@/components/AudioRecorder';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { MediaComposerSheet } from '@/components/MediaComposerSheet';
+import { ShieldCheck } from 'lucide-react';
 
 interface Message {
     _id: string;
@@ -2319,9 +2320,14 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                 )}
                             </div>
                             <div className={`flex-1 min-w-0 ${!receiver ? 'animate-pulse' : ''}`}>
-                                <p className="text-base font-bold text-white truncate tracking-tight">
-                                    {receiver?.name || receiver?.username || (otherUserId ? `Usuário ${otherUserId.substring(0, 8)}` : 'Conversa')}
-                                </p>
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                    <p className="text-base font-bold text-white truncate tracking-tight">
+                                        {receiver?.name || receiver?.username || (otherUserId ? `Usuário ${otherUserId.substring(0, 8)}` : 'Conversa')}
+                                    </p>
+                                    {receiver?.identityStatus === 'approved' && (
+                                        <ShieldCheck className="w-4 h-4 text-white shrink-0" />
+                                    )}
+                                </div>
                                 <div className="flex items-center gap-1.5 mt-0.5">
                                     {!connected ? (
                                         <span className="text-[10px] text-white/50 font-bold uppercase tracking-widest">Conectando...</span>

@@ -7,7 +7,7 @@ import { Button } from '@/components/Button';
 import { Avatar } from '@/components/Avatar';
 import { userApi } from '@/services/api';
 import { useMyProfile } from '@/hooks/useQueries';
-import { ShieldAlert } from 'lucide-react';
+import { ShieldAlert, ShieldCheck } from 'lucide-react';
 
 export default function SearchPage() {
     const router = useRouter();
@@ -132,6 +132,9 @@ export default function SearchPage() {
                                 <h2 className="text-sm font-extrabold text-slate-800 truncate hover:text-purple-700 tracking-tight leading-snug">
                                     {user.name || `@${user.username}`}
                                 </h2>
+                                {user.identityStatus === 'approved' && (
+                                    <ShieldCheck className="w-4 h-4 text-purple-600 shrink-0" />
+                                )}
                                 {user.isNew && (
                                     <span className="shrink-0 bg-purple-600 text-white text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shadow-sm">
                                         Novo

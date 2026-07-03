@@ -59,6 +59,7 @@ export function Sidebar({ activeTab, setActiveTab, isOpen = false, onClose }: Si
         { id: 'financial', label: 'Financeiro', icon: DollarSign },
         { id: 'help-tickets', label: 'Tickets de Ajuda', icon: LifeBuoy },
         { id: 'institutional-emails', label: 'E-mails Institucionais', icon: Mail },
+        { id: 'identity-verifications', label: 'Verificações de Selos', icon: ShieldCheck },
     ];
 
     const handleTabChange = (tab: string) => {

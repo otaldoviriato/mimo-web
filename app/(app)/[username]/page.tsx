@@ -7,7 +7,7 @@ import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { SubscribeModal } from '@/components/SubscribeModal';
 import { useUserByUsername, usePublicGallery, useSubscribe, useMyProfile } from '@/hooks/useQueries';
-import { UserX, Briefcase, Camera, Lock, Eye, EyeOff, X, MessageSquare, ChevronLeft, ChevronRight } from 'lucide-react';
+import { UserX, Briefcase, Camera, Lock, Eye, EyeOff, X, MessageSquare, ChevronLeft, ChevronRight, ShieldCheck } from 'lucide-react';
 
 interface UserProfilePageProps {
     params?: Promise<{ username: string }>;
@@ -320,9 +320,14 @@ export default function UserProfilePage({ params, username: propUsername, onBack
 
             {/* Content */}
             <div className="px-6 mt-4 flex flex-col items-center">
-                <h1 className="text-2xl font-black text-gray-900 tracking-tight text-center">
-                    {user.name || `@${user.username}`}
-                </h1>
+                <div className="flex items-center gap-1.5 justify-center">
+                    <h1 className="text-2xl font-black text-gray-900 tracking-tight text-center">
+                        {user.name || `@${user.username}`}
+                    </h1>
+                    {user.identityStatus === 'approved' && (
+                        <ShieldCheck className="w-5 h-5 text-purple-600 shrink-0" />
+                    )}
+                </div>
                 <p className="text-purple-600 font-bold text-sm tracking-wide mt-0.5">
                     @{user.username}
                 </p>

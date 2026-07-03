@@ -9,6 +9,7 @@ import { StatsCard } from '@/components/admin/StatsCard';
 import { ActivityChart } from '@/components/admin/ActivityChart';
 import { ClientsTable } from '@/components/admin/ClientsTable';
 import { ProfessionalsTable } from '@/components/admin/ProfessionalsTable';
+import { IdentityVerifications } from '@/components/admin/IdentityVerifications';
 import { RoomsTab } from '@/components/admin/RoomsTab';
 import { FinancialTab } from '@/components/admin/FinancialTab';
 import { HelpTicketsTab } from '@/components/admin/HelpTicketsTab';
@@ -35,6 +36,7 @@ const TAB_TITLES: Record<string, string> = {
     financial: 'Movimentações Financeiras',
     'help-tickets': 'Tickets de Ajuda',
     'institutional-emails': 'E-mails Institucionais',
+    'identity-verifications': 'Verificações de Selos de Autenticidade',
     'settings-platform': 'Configurações — Plataforma & Operação',
     'settings-chat': 'Configurações — Chat & Sessões',
     'settings-pricing': 'Configurações — Precificação & Assinaturas',
@@ -255,6 +257,7 @@ export default function AdminPage() {
                     {activeTab === 'financial' && <FinancialTab dashboardData={dashboardData} loadingDashboard={loadingDashboard} handleDeleteTransaction={handleDeleteTransaction} />}
                     {activeTab === 'help-tickets' && <HelpTicketsTab />}
                     {activeTab === 'institutional-emails' && <InstitutionalEmailsTab />}
+                    {activeTab === 'identity-verifications' && <IdentityVerifications />}
                     {/* Settings sub-pages */}
                     {activeTab === 'settings-platform' && (
                         <SettingsPlatformPage

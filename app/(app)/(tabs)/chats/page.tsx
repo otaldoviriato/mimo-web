@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Avatar, TouchableRipple, PullToRefresh } from '@/components';
 import { useChatRooms, useMyProfile, QueryKeys } from '@/hooks/useQueries';
 import { useSocket } from '@/hooks/useSocket';
-import { CheckCircle2, X, WalletCards, Crown, ShieldAlert, Clock, AlertCircle, ChevronRight, MessageCircle, Trash2 } from 'lucide-react';
+import { CheckCircle2, X, WalletCards, Crown, ShieldAlert, Clock, AlertCircle, ChevronRight, MessageCircle, Trash2, ShieldCheck } from 'lucide-react';
 import { Drawer } from 'vaul';
 
 interface Room {
@@ -30,6 +30,7 @@ interface Room {
         balance?: number;
         isHighSpender?: boolean;
         isOnline?: boolean;
+        identityStatus?: 'pending' | 'approved' | 'rejected' | null;
     };
 }
 
@@ -774,6 +775,9 @@ export default function ChatsPage() {
                                                     <span className={`text-base truncate ${hasUnread ? 'font-bold text-gray-900' : 'font-semibold text-gray-800'}`}>
                                                         {room.otherUser?.name || room.otherUser?.username || `Usuário ${otherUserId?.substring(0, 8)}`}
                                                     </span>
+                                                    {room.otherUser?.identityStatus === 'approved' && (
+                                                        <ShieldCheck className="w-4 h-4 text-purple-600 shrink-0" />
+                                                    )}
                                                     {myProfile?.isProfessional && room.otherUser?.isHighSpender && (
                                                         <span title="VIP" className="shrink-0 flex items-center justify-center">
                                                             <Crown className="w-4 h-4 text-amber-500" />
