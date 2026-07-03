@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
+import { SubscribeModal } from '@/components/SubscribeModal';
 import { useUserByUsername, usePublicGallery, useSubscribe, useMyProfile } from '@/hooks/useQueries';
 import { UserX, Briefcase, Camera, Lock, Eye, EyeOff, X, MessageSquare } from 'lucide-react';
 
@@ -20,6 +21,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
     const [activeGalleryTab, setActiveGalleryTab] = useState<'public' | 'private'>('public');
     const [revealedItems, setRevealedItems] = useState<Record<string, boolean>>({});
     const [activeImage, setActiveImage] = useState<string | null>(null);
+    const [isSubscribeModalOpen, setIsSubscribeModalOpen] = useState(false);
 
     let resolvedUsername = '';
     if (propUsername) {
@@ -60,16 +62,14 @@ export default function UserProfilePage({ params, username: propUsername, onBack
         }
     };
 
-    const handleSubscribe = async () => {
+    const handleSubscribe = () => {
         if (!user) return;
-        if (confirm(`Deseja assinar o perfil de ${user.name || user.username} por R$ ${user.subscriptionPrice?.toFixed(2)}?`)) {
-            try {
-                await subscribeMutation.mutateAsync(user.clerkId);
-                alert('Assinatura realizada com sucesso!');
-            } catch (err: any) {
-                alert(err.message || 'Erro ao realizar assinatura');
-            }
-        }
+        setIsSubscribeModalOpen(true);
+    };
+
+    const handleSubscribeConfirm = async () => {
+        if (!user) throw new Error('Perfil não encontrado');
+        await subscribeMutation.mutateAsync(user.clerkId);
     };
 
     const layoutClass = isSubPage
@@ -544,6 +544,22 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                         />
                     </div>
                 </div>
+            )}
+
+            {/* Modal de Assinatura */}
+            {user && (
+                <SubscribeModal
+                    isOpen={isSubscribeModalOpen}
+                    onClose={() => setIsSubscribeModalOpen(false)}
+                    onConfirm={handleSubscribeConfirm}
+                    professional={{
+                        name: user.name,
+                        username: user.username,
+                        photoUrl: user.photoUrl,
+                        subscriptionPrice: user.subscriptionPrice,
+                    }}
+                    myBalance={me?.balance ?? 0}
+                />
             )}
         </div>
     );
