@@ -31,6 +31,7 @@ export function CampaignsTab() {
     const [name, setName] = useState('');
     const [enabled, setEnabled] = useState(false);
     const [amount, setAmount] = useState<number>(500); // R$ 5,00 padrão
+    const [amountInput, setAmountInput] = useState('5.00');
     const [validityHours, setValidityHours] = useState<number>(72);
     const [limitByCpf, setLimitByCpf] = useState(true);
     const [limitByEmail, setLimitByEmail] = useState(true);
@@ -86,6 +87,7 @@ export function CampaignsTab() {
                 setName(c.name);
                 setEnabled(c.enabled);
                 setAmount(c.amount);
+                setAmountInput((c.amount / 100).toFixed(2));
                 setValidityHours(c.validityHours || 72);
                 setLimitByCpf(c.limitByCpf);
                 setLimitByEmail(c.limitByEmail);
@@ -165,6 +167,7 @@ export function CampaignsTab() {
             if (data.success) {
                 toast.success('Configuração da campanha salva com sucesso!');
                 setCampaign(data.campaign);
+                setAmountInput((data.campaign.amount / 100).toFixed(2));
             } else {
                 toast.error(data.error || 'Erro ao salvar configuração.');
             }
@@ -262,12 +265,36 @@ export function CampaignsTab() {
                             <div className="relative">
                                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">R$</span>
                                 <input
-                                    type="number"
-                                    step="0.01"
-                                    value={(amount / 100).toFixed(2)}
-                                    onChange={(e) => setAmount(Math.round(parseFloat(e.target.value || '0') * 100))}
+                                    type="text"
+                                    value={amountInput}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        // Permite apenas números, ponto e vírgula
+                                        const cleanVal = val.replace(/[^0-9.,]/g, '');
+                                        setAmountInput(cleanVal);
+
+                                        const normalized = cleanVal.replace(',', '.');
+                                        const parsed = parseFloat(normalized);
+                                        if (!isNaN(parsed)) {
+                                            setAmount(Math.round(parsed * 100));
+                                        } else {
+                                            setAmount(0);
+                                        }
+                                    }}
+                                    onBlur={() => {
+                                        // Formata com 2 casas decimais ao sair
+                                        const normalized = amountInput.replace(',', '.');
+                                        const parsed = parseFloat(normalized);
+                                        if (!isNaN(parsed)) {
+                                            setAmountInput(parsed.toFixed(2));
+                                            setAmount(Math.round(parsed * 100));
+                                        } else {
+                                            setAmountInput('0.00');
+                                            setAmount(0);
+                                        }
+                                    }}
                                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm font-semibold text-slate-800"
-                                    placeholder="0,00"
+                                    placeholder="0.00"
                                 />
                             </div>
                         </div>
