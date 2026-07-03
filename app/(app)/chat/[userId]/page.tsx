@@ -3317,22 +3317,32 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                         </div>
                                     </div>
 
-                                    <div className="bg-purple-50 p-5 rounded-[2rem] border border-purple-100">
-                                        <div className="flex justify-between items-center mb-4">
-                                            <p className="text-xs font-bold text-purple-600 uppercase tracking-widest">
-                                                {isMine ? 'Seu Investimento' : 'Seu Ganho'}
-                                            </p>
-                                            <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${isMine ? 'bg-purple-200 text-purple-700' : 'bg-green-200 text-green-700'}`}>
-                                                {isMine ? 'Débito' : 'Crédito'}
+                                    {(() => {
+                                        const isMediaUnlock = msg.lockedImagePrice && msg.lockedImagePrice > 0;
+                                        const showAsDebit = isMediaUnlock ? !isMine : isMine;
+                                        const displayAmount = showAsDebit 
+                                            ? msg.cost 
+                                            : (msg.receiverEarnings ?? msg.cost * 0.9);
+
+                                        return (
+                                            <div className="bg-purple-50 p-5 rounded-[2rem] border border-purple-100">
+                                                <div className="flex justify-between items-center mb-4">
+                                                    <p className="text-xs font-bold text-purple-600 uppercase tracking-widest">
+                                                        {showAsDebit ? 'Seu Investimento' : 'Seu Ganho'}
+                                                    </p>
+                                                    <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${showAsDebit ? 'bg-purple-200 text-purple-700' : 'bg-green-200 text-green-700'}`}>
+                                                        {showAsDebit ? 'Débito' : 'Crédito'}
+                                                    </div>
+                                                </div>
+                                                <p className="text-4xl font-black text-gray-900 tracking-tight">
+                                                    R$ {(displayAmount / 100).toFixed(2)}
+                                                </p>
+                                                <p className="text-[10px] text-gray-500 mt-2 font-medium">
+                                                    {isMediaUnlock ? 'Mídia desbloqueada' : `${msg.charCount} caracteres enviados`}
+                                                </p>
                                             </div>
-                                        </div>
-                                        <p className="text-4xl font-black text-gray-900 tracking-tight">
-                                            R$ {((isMine ? msg.cost : (msg.receiverEarnings ?? msg.cost * 0.9)) / 100).toFixed(2)}
-                                        </p>
-                                        <p className="text-[10px] text-gray-500 mt-2 font-medium">
-                                            {msg.charCount} caracteres enviados
-                                        </p>
-                                    </div>
+                                        );
+                                    })()}
 
                                     <div className="space-y-3">
                                         <div className="flex justify-between text-sm py-2 border-b border-gray-100">

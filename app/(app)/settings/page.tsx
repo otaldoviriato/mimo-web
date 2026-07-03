@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useUser, useClerk } from '@clerk/nextjs';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
-import { useMyProfile, useUpdateProfile, useMyGallery } from '@/hooks/useQueries';
+import { useMyProfile, useUpdateProfile } from '@/hooks/useQueries';
 import { usePWA } from '@/context/PWAContext';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { formatCPF, formatPhone } from '@/components/RechargeModal';
@@ -269,7 +269,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
         }
     };
 
-    const { data: galleryData } = useMyGallery();
 
     const handleAdjustPrice = (delta: number) => {
         const limitMax = userData?.maxPricePerChar ?? 0.2;
@@ -778,150 +777,48 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                         </div>
 
                         {/* ── SEÇÃO: PRIVACIDADE (Profissionais) ── */}
-                        {profileIsProfessional && (() => {
-                            const publicPhotosCount = galleryData?.publicItems?.length ?? galleryData?.items?.length ?? 0;
-                            const hasPhoto = !!userData?.photoUrl && userData.photoUrl.trim() !== '';
-                            const hasCover = !!userData?.coverUrl && userData.coverUrl.trim() !== '';
-                            const hasBio = !!userData?.bio && userData.bio.trim().length >= 10;
-                            const hasPhotos = publicPhotosCount >= 3;
-                            const isQualified = hasPhoto && hasCover && hasBio && hasPhotos;
-
-                            const activeShowInExplore = isQualified ? showInExplore : false;
-
-                            return (
-                                <div>
-                                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Privacidade</p>
-                                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col divide-y divide-gray-50">
-                                        
-                                        {/* Toggle Exibir no Explorar */}
-                                        <div className="px-4 py-3.5 flex items-center justify-between">
-                                            <div className="flex items-center gap-3 min-w-0">
-                                                <div className="w-8 h-8 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0">
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-500">
-                                                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                                                        <line x1="1" y1="1" x2="23" y2="23"/>
-                                                    </svg>
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <p className="text-sm font-medium text-gray-800">Exibir no explorar</p>
-                                                    <p className="text-[10px] text-gray-400 leading-snug">
-                                                        Exibir seu perfil nas sugestões e buscas do aplicativo
-                                                    </p>
-                                                </div>
+                        {profileIsProfessional && (
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Privacidade</p>
+                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col divide-y divide-gray-50">
+                                    
+                                    {/* Toggle Exibir no Explorar */}
+                                    <div className="px-4 py-3.5 flex items-center justify-between">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-8 h-8 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-500">
+                                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                                                    <line x1="1" y1="1" x2="23" y2="23"/>
+                                                </svg>
                                             </div>
-                                            <button
-                                                id="show-in-explore-toggle"
-                                                type="button"
-                                                onClick={() => {
-                                                    if (isQualified) {
-                                                        setShowInExplore(!showInExplore);
-                                                    }
-                                                }}
-                                                disabled={!isQualified}
-                                                className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${
-                                                    activeShowInExplore ? 'bg-purple-600' : 'bg-gray-200 opacity-60 cursor-not-allowed'
-                                                }`}
-                                                aria-label="Exibir perfil no explorar"
-                                                role="switch"
-                                                aria-checked={activeShowInExplore}
-                                            >
-                                                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${
-                                                    activeShowInExplore ? 'translate-x-5' : 'translate-x-0'
-                                                }`} />
-                                            </button>
-                                        </div>
-
-                                        {/* Painel de Requisitos e Qualificação */}
-                                        <div className="px-4 py-4 bg-slate-50/50 flex flex-col gap-3">
-                                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                                                Requisitos para exibição no explorar:
-                                            </p>
-
-                                            <div className="grid grid-cols-1 gap-2.5">
-                                                {/* Requisito: Foto Perfil */}
-                                                <div className="flex items-center gap-2 text-xs font-semibold text-gray-750">
-                                                    {hasPhoto ? (
-                                                        <div className="p-0.5 rounded bg-emerald-100 text-emerald-700 shrink-0">
-                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="p-0.5 rounded bg-red-100 text-red-700 shrink-0">
-                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                                        </div>
-                                                    )}
-                                                    <span className={hasPhoto ? 'text-gray-700' : 'text-gray-400'}>Foto de perfil preenchida</span>
-                                                </div>
-
-                                                {/* Requisito: Foto Capa */}
-                                                <div className="flex items-center gap-2 text-xs font-semibold text-gray-750">
-                                                    {hasCover ? (
-                                                        <div className="p-0.5 rounded bg-emerald-100 text-emerald-700 shrink-0">
-                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="p-0.5 rounded bg-red-100 text-red-700 shrink-0">
-                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                                        </div>
-                                                    )}
-                                                    <span className={hasCover ? 'text-gray-700' : 'text-gray-400'}>Foto de capa preenchida</span>
-                                                </div>
-
-                                                {/* Requisito: Bio */}
-                                                <div className="flex items-center gap-2 text-xs font-semibold text-gray-750">
-                                                    {hasBio ? (
-                                                        <div className="p-0.5 rounded bg-emerald-100 text-emerald-700 shrink-0">
-                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="p-0.5 rounded bg-red-100 text-red-700 shrink-0">
-                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                                        </div>
-                                                    )}
-                                                    <span className={hasBio ? 'text-gray-700' : 'text-gray-400'}>Biografia preenchida (min 10 caracteres)</span>
-                                                </div>
-
-                                                {/* Requisito: Galeria */}
-                                                <div className="flex items-center gap-2 text-xs font-semibold text-gray-750">
-                                                    {hasPhotos ? (
-                                                        <div className="p-0.5 rounded bg-emerald-100 text-emerald-700 shrink-0">
-                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><polyline points="20 6 9 17 4 12"/></svg>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="p-0.5 rounded bg-red-100 text-red-700 shrink-0">
-                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                                        </div>
-                                                    )}
-                                                    <span className={hasPhotos ? 'text-gray-700' : 'text-gray-400'}>
-                                                        Mínimo de 3 fotos públicas na galeria ({publicPhotosCount}/3)
-                                                    </span>
-                                                </div>
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium text-gray-800">Exibir no explorar</p>
+                                                <p className="text-[10px] text-gray-400 leading-snug">
+                                                    Exibir seu perfil nas sugestões do explorar (seu perfil continuará acessível por busca direta)
+                                                </p>
                                             </div>
-
-                                            {/* Mensagem Informativa de Qualificação */}
-                                            {isQualified ? (
-                                                <div className="flex items-start gap-1.5 mt-2 bg-emerald-100/30 border border-emerald-100 rounded-xl p-2.5">
-                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-emerald-600 shrink-0 mt-0.5">
-                                                        <polyline points="20 6 9 17 4 12"/>
-                                                    </svg>
-                                                    <p className="text-[10px] text-emerald-700 font-bold leading-normal">
-                                                        Seu perfil está qualificado! Você aparecerá nos destaques do Explorar quando a exibição estiver ativa.
-                                                    </p>
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-start gap-1.5 mt-2 bg-amber-50 border border-amber-100 rounded-xl p-2.5">
-                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-amber-500 shrink-0 mt-0.5">
-                                                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                                                    </svg>
-                                                    <p className="text-[10px] text-amber-700 font-bold leading-normal">
-                                                        Seu perfil está oculto do explorar porque ainda não atende aos requisitos mínimos descritos acima.
-                                                    </p>
-                                                </div>
-                                            )}
                                         </div>
+                                        <button
+                                            id="show-in-explore-toggle"
+                                            type="button"
+                                            onClick={() => {
+                                                setShowInExplore(!showInExplore);
+                                            }}
+                                            className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${
+                                                showInExplore ? 'bg-purple-600' : 'bg-gray-200'
+                                            }`}
+                                            aria-label="Exibir perfil no explorar"
+                                            role="switch"
+                                            aria-checked={showInExplore}
+                                        >
+                                            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                                                showInExplore ? 'translate-x-5' : 'translate-x-0'
+                                            }`} />
+                                        </button>
                                     </div>
                                 </div>
-                            );
-                        })()}
+                            </div>
+                        )}
 
 
 

@@ -23,16 +23,12 @@ export async function GET(request: NextRequest) {
         activeLimitDate.setDate(activeLimitDate.getDate() - 30);
 
         // Encontrar criadores profissionais aprovados (excluindo a si mesmo e suspensos, e quem optou por ocultar do explorar)
-        // Deve possuir foto de perfil, capa, bio e ter acessado ou ter sido criado nos últimos 30 dias
         const featuredUsers = await User.find({
             clerkId: { $ne: userId },
             isProfessional: true,
             professionalStatus: 'approved',
             isSuspended: { $ne: true },
             hideFromExplore: { $ne: true },
-            photoUrl: { $exists: true, $ne: '' },
-            coverUrl: { $exists: true, $ne: '' },
-            bio: { $exists: true, $ne: '' },
             $or: [
                 { lastSeen: { $gte: activeLimitDate } },
                 { isOnline: true },
@@ -145,8 +141,7 @@ export async function GET(request: NextRequest) {
                 score: finalScore,
                 publicPhotosCount: photosCount // adicionado para o filtro de qualificação
             };
-        })
-        .filter(u => u.publicPhotosCount >= 3); // EXIGÊNCIA RÍGIDA: Mínimo de 3 fotos públicas na galeria
+        });
 
         // Ordenar decrescentemente pelo score de relevância e pegar as top 12 recomendações
         const sorted = usersWithPhotos
