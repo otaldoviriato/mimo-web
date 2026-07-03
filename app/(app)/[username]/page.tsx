@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { SubscribeModal } from '@/components/SubscribeModal';
 import { useUserByUsername, usePublicGallery, useSubscribe, useMyProfile } from '@/hooks/useQueries';
-import { UserX, Briefcase, Camera, Lock, Eye, EyeOff, X, MessageSquare } from 'lucide-react';
+import { UserX, Briefcase, Camera, Lock, Eye, EyeOff, X, MessageSquare, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface UserProfilePageProps {
     params?: Promise<{ username: string }>;
@@ -16,12 +17,22 @@ interface UserProfilePageProps {
     isClosing?: boolean;
 }
 
+interface PublicProfileGalleryItem {
+    _id: string;
+    imageUrl: string;
+    mediaType?: 'image' | 'video' | string;
+    visibility?: 'public' | 'subscribers';
+    galleryType?: 'public' | 'private';
+}
+
 export default function UserProfilePage({ params, username: propUsername, onBack, isSubPage = false, isClosing = false }: UserProfilePageProps) {
     const router = useTransitionRouter();
     const [activeGalleryTab, setActiveGalleryTab] = useState<'public' | 'private'>('public');
     const [revealedItems, setRevealedItems] = useState<Record<string, boolean>>({});
-    const [activeImage, setActiveImage] = useState<string | null>(null);
+    const [activeViewerIndex, setActiveViewerIndex] = useState<number | null>(null);
     const [isSubscribeModalOpen, setIsSubscribeModalOpen] = useState(false);
+    const touchStartX = useRef(0);
+    const touchEndX = useRef(0);
 
     let resolvedUsername = '';
     if (propUsername) {
@@ -32,9 +43,15 @@ export default function UserProfilePage({ params, username: propUsername, onBack
     }
 
     React.useEffect(() => {
-        if (typeof window !== 'undefined' && (window as any).__resolveTransition) {
-            (window as any).__resolveTransition();
-            (window as any).__resolveTransition = null;
+        if (typeof window !== 'undefined') {
+            const transitionWindow = window as Window & {
+                __resolveTransition?: (() => void) | null;
+            };
+
+            if (transitionWindow.__resolveTransition) {
+                transitionWindow.__resolveTransition();
+                transitionWindow.__resolveTransition = null;
+            }
         }
     }, []);
 
@@ -53,6 +70,77 @@ export default function UserProfilePage({ params, username: propUsername, onBack
     const sameUserType = !!me && !!user && !!me.isProfessional === !!user.isProfessional;
     const canMessage = !isOwner && !sameUserType;
     const showSubscribeButton = user?.isProfessional && user?.isSubscriptionEnabled && !isSubscriber && !isOwner;
+
+    const currentGalleryItems = useMemo<PublicProfileGalleryItem[]>(() => {
+        const items = activeGalleryTab === 'public'
+            ? (galleryData?.items ?? [])
+            : (galleryData?.privateItems ?? []);
+
+        return Array.isArray(items) ? items as PublicProfileGalleryItem[] : [];
+    }, [activeGalleryTab, galleryData?.items, galleryData?.privateItems]);
+
+    const activeViewerItem = activeViewerIndex !== null ? currentGalleryItems[activeViewerIndex] : null;
+    const hasPreviousViewerItem = activeViewerIndex !== null && activeViewerIndex > 0;
+    const hasNextViewerItem = activeViewerIndex !== null && activeViewerIndex < currentGalleryItems.length - 1;
+
+    const openViewer = useCallback((itemId: string) => {
+        const index = currentGalleryItems.findIndex((item) => item._id === itemId);
+        if (index >= 0) {
+            setActiveViewerIndex(index);
+        }
+    }, [currentGalleryItems]);
+
+    const closeViewer = useCallback(() => {
+        setActiveViewerIndex(null);
+    }, []);
+
+    const showPreviousViewerItem = useCallback(() => {
+        setActiveViewerIndex(current => current !== null && current > 0 ? current - 1 : current);
+    }, []);
+
+    const showNextViewerItem = useCallback(() => {
+        setActiveViewerIndex(current => current !== null && current < currentGalleryItems.length - 1 ? current + 1 : current);
+    }, [currentGalleryItems.length]);
+
+    const handleViewerTouchStart = (e: React.TouchEvent) => {
+        touchStartX.current = e.targetTouches[0].clientX;
+        touchEndX.current = e.targetTouches[0].clientX;
+    };
+
+    const handleViewerTouchMove = (e: React.TouchEvent) => {
+        touchEndX.current = e.targetTouches[0].clientX;
+    };
+
+    const handleViewerTouchEnd = useCallback(() => {
+        const diffX = touchStartX.current - touchEndX.current;
+        const minSwipeDistance = 50;
+
+        if (diffX > minSwipeDistance) {
+            showNextViewerItem();
+        } else if (diffX < -minSwipeDistance) {
+            showPreviousViewerItem();
+        }
+
+        touchStartX.current = 0;
+        touchEndX.current = 0;
+    }, [showNextViewerItem, showPreviousViewerItem]);
+
+    useEffect(() => {
+        if (activeViewerIndex === null) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                closeViewer();
+            } else if (e.key === 'ArrowLeft') {
+                showPreviousViewerItem();
+            } else if (e.key === 'ArrowRight') {
+                showNextViewerItem();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [activeViewerIndex, closeViewer, showNextViewerItem, showPreviousViewerItem]);
 
     const handleBack = () => {
         if (onBack) {
@@ -400,7 +488,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                             </div>
                         ) : (
                             <div className="grid grid-cols-3 gap-0.5 px-0.5">
-                                {galleryData?.items?.map((item: any) => {
+                                {currentGalleryItems.map((item) => {
                                     const isLocked = item.visibility === 'subscribers' && !isSubscriber && !isOwner;
                                     const isOwnerSubscribersOnly = item.visibility === 'subscribers' && isOwner;
                                     const isOwnerLocked = isOwnerSubscribersOnly && !revealedItems[item._id];
@@ -410,7 +498,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                                                 <div 
                                                     onClick={() => {
                                                         if (isOwnerLocked) {
-                                                            setActiveImage(item.imageUrl);
+                                                            openViewer(item._id);
                                                         } else {
                                                             handleSubscribe();
                                                         }
@@ -461,7 +549,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                                             ) : (
                                                 <div 
                                                     className="w-full h-full relative cursor-pointer"
-                                                    onClick={() => setActiveImage(item.imageUrl)}
+                                                    onClick={() => openViewer(item._id)}
                                                 >
                                                     <img
                                                         src={item.imageUrl}
@@ -504,8 +592,12 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                             </div>
                         ) : (
                             <div className="grid grid-cols-3 gap-0.5 px-0.5">
-                                {galleryData?.privateItems?.map((item: any) => (
-                                    <div key={item._id} className="relative aspect-square overflow-hidden bg-gray-100 group">
+                                {currentGalleryItems.map((item) => (
+                                    <div
+                                        key={item._id}
+                                        className="relative aspect-square overflow-hidden bg-gray-100 group cursor-pointer"
+                                        onClick={() => openViewer(item._id)}
+                                    >
                                         {item.mediaType === 'video' ? (
                                             <div className="w-full h-full relative">
                                                 <video src={item.imageUrl} preload="metadata" className="w-full h-full object-cover" />
@@ -516,10 +608,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div 
-                                                className="w-full h-full cursor-pointer"
-                                                onClick={() => setActiveImage(item.imageUrl)}
-                                            >
+                                            <div className="w-full h-full">
                                                 <img
                                                     src={item.imageUrl}
                                                     alt="Private Gallery item"
@@ -567,33 +656,82 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                 </div>
             )}
 
-            {/* Lightbox para visualização de fotos em tela cheia */}
-            {activeImage && (
-                <div 
-                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md transition-all duration-300 animate-in fade-in animate-duration-200"
-                    onClick={() => setActiveImage(null)}
+            {/* Visualizador fullscreen da galeria */}
+            {typeof document !== 'undefined' && activeViewerItem && createPortal(
+                <div
+                    className="fixed inset-0 z-[9999] bg-black animate-in fade-in duration-200 select-none"
+                    role="dialog"
+                    aria-modal="true"
+                    onClick={closeViewer}
                 >
-                    <button 
-                        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all z-[110] active:scale-95"
+                    <div
+                        className="absolute inset-0 flex items-center justify-center bg-black"
+                        onClick={(e) => e.stopPropagation()}
+                        onTouchStart={handleViewerTouchStart}
+                        onTouchMove={handleViewerTouchMove}
+                        onTouchEnd={handleViewerTouchEnd}
+                    >
+                        {activeViewerItem.mediaType === 'video' ? (
+                            <video
+                                src={activeViewerItem.imageUrl}
+                                controls
+                                autoPlay
+                                className="w-screen h-screen object-contain bg-black"
+                            />
+                        ) : (
+                            <img
+                                src={activeViewerItem.imageUrl}
+                                alt="Midia da galeria em tela cheia"
+                                className="w-screen h-screen object-contain pointer-events-none"
+                            />
+                        )}
+                    </div>
+
+                    <button
+                        className="absolute top-4 right-4 w-11 h-11 rounded-full bg-black/55 hover:bg-black/75 text-white flex items-center justify-center transition-all z-20 active:scale-95 border border-white/10"
                         onClick={(e) => {
                             e.stopPropagation();
-                            setActiveImage(null);
+                            closeViewer();
                         }}
-                        title="Fechar visualização"
+                        title="Fechar visualizacao"
+                        aria-label="Fechar visualizacao"
                     >
                         <X className="w-6 h-6" />
                     </button>
-                    <div 
-                        className="relative max-w-[95vw] max-h-[85vh] flex items-center justify-center animate-in zoom-in-95 duration-200"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <img 
-                            src={activeImage} 
-                            alt="Visualização ampliada" 
-                            className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl border border-white/5"
-                        />
-                    </div>
-                </div>
+
+                    {hasPreviousViewerItem && (
+                        <button
+                            className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/45 hover:bg-black/70 active:scale-90 flex items-center justify-center text-white transition-all z-20 border border-white/10"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                showPreviousViewerItem();
+                            }}
+                            aria-label="Midia anterior"
+                        >
+                            <ChevronLeft className="w-7 h-7" />
+                        </button>
+                    )}
+
+                    {hasNextViewerItem && (
+                        <button
+                            className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/45 hover:bg-black/70 active:scale-90 flex items-center justify-center text-white transition-all z-20 border border-white/10"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                showNextViewerItem();
+                            }}
+                            aria-label="Proxima midia"
+                        >
+                            <ChevronRight className="w-7 h-7" />
+                        </button>
+                    )}
+
+                    {currentGalleryItems.length > 1 && (
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1.5 text-xs font-semibold text-white/90 border border-white/10 z-20">
+                            {(activeViewerIndex ?? 0) + 1} de {currentGalleryItems.length}
+                        </div>
+                    )}
+                </div>,
+                document.body
             )}
 
             {/* Modal de Assinatura */}
