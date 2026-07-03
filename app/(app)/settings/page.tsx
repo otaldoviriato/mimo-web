@@ -57,7 +57,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const [bio, setBio] = useState('');
     const [chargePerCharSubscribers, setChargePerCharSubscribers] = useState('');
     const [chargePerCharNonSubscribers, setChargePerCharNonSubscribers] = useState('');
-    const [showInExplore, setShowInExplore] = useState(true);
+    const [hideFromExplore, setHideFromExplore] = useState(false);
 
     const [loading, setLoading] = useState(false);
     const [saveError, setSaveError] = useState('');
@@ -95,7 +95,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             setEmailNotificationsEnabled(userData.emailNotificationsEnabled ?? false);
             setChargePerCharSubscribers(userData.chargePerCharSubscribers?.toString() ?? '0.002');
             setChargePerCharNonSubscribers(userData.chargePerCharNonSubscribers?.toString() ?? '0.005');
-            setShowInExplore(userData.hideFromExplore === true ? false : true);
+            setHideFromExplore(userData.hideFromExplore === true);
             hasPopulated.current = true;
         }
     }, [userData]);
@@ -149,7 +149,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                 updateData.bio = bio;
                 updateData.chargePerCharNonSubscribers = charPrice;
                 updateData.chargePerCharSubscribers = Number(chargePerCharSubscribers) || 0;
-                updateData.hideFromExplore = !showInExplore;
+                updateData.hideFromExplore = hideFromExplore;
             } else {
                 updateData.bio = '';
                 updateData.hideFromExplore = false;
@@ -216,7 +216,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                 bio,
                 chargePerCharNonSubscribers: charPrice,
                 chargePerCharSubscribers: Number(chargePerCharSubscribers) || 0,
-                hideFromExplore: !showInExplore
+                hideFromExplore: hideFromExplore
             };
 
             await updateProfileMutation.mutateAsync(updateData);
@@ -324,7 +324,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
         name !== initialName ||
         username !== initialUsername ||
         phone !== initialPhone ||
-        (profileIsProfessional && (bio !== initialBio || showInExplore !== (userData?.hideFromExplore === true ? false : true)));
+        (profileIsProfessional && (bio !== initialBio || hideFromExplore !== (userData?.hideFromExplore === true)));
 
     const initialSubscriptionPrice = userData?.subscriptionPrice?.toString() ?? '0';
     const initialIsSubscriptionEnabled = userData?.isSubscriptionEnabled ?? false;
@@ -792,9 +792,9 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                                 </svg>
                                             </div>
                                             <div className="min-w-0">
-                                                <p className="text-sm font-medium text-gray-800">Exibir no explorar</p>
+                                                <p className="text-sm font-medium text-gray-800">Ocultar do explorar</p>
                                                 <p className="text-[10px] text-gray-400 leading-snug">
-                                                    Exibir seu perfil nas sugestões do explorar (seu perfil continuará acessível por busca direta)
+                                                    Ocultar seu perfil das sugestões do explorar (seu perfil continuará acessível por busca direta)
                                                 </p>
                                             </div>
                                         </div>
@@ -802,17 +802,17 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                             id="show-in-explore-toggle"
                                             type="button"
                                             onClick={() => {
-                                                setShowInExplore(!showInExplore);
+                                                setHideFromExplore(!hideFromExplore);
                                             }}
                                             className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${
-                                                showInExplore ? 'bg-purple-600' : 'bg-gray-200'
+                                                hideFromExplore ? 'bg-purple-600' : 'bg-gray-200'
                                             }`}
-                                            aria-label="Exibir perfil no explorar"
+                                            aria-label="Ocultar perfil no explorar"
                                             role="switch"
-                                            aria-checked={showInExplore}
+                                            aria-checked={hideFromExplore}
                                         >
                                             <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${
-                                                showInExplore ? 'translate-x-5' : 'translate-x-0'
+                                                hideFromExplore ? 'translate-x-5' : 'translate-x-0'
                                             }`} />
                                         </button>
                                     </div>
