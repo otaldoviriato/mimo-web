@@ -189,7 +189,13 @@ export async function GET(request: NextRequest) {
         }
 
         // --- TRANSAÇÕES DA TABELA TRANSACTION ---
-        const rawTransactions = await Transaction.find()
+        const rawTransactions = await Transaction.find({
+            type: { $ne: 'promotional_credit_usage' },
+            $or: [
+                { source: { $ne: 'subscription' } },
+                { type: 'debit' }
+            ]
+        })
             .sort({ timestamp: -1 })
             .limit(100)
             .lean() as any[];
@@ -197,7 +203,7 @@ export async function GET(request: NextRequest) {
         // --- TRANSAÇÕES DA TABELA MICROTRANSACTION ---
         const rawMicroTransactions = await MicroTransaction.find({
             source: { $in: ['image_unlock', 'gift', 'message'] },
-            type: { $in: ['debit', 'credit'] }
+            type: 'debit'
         })
             .sort({ timestamp: -1 })
             .limit(100)

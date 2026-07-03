@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
 
         } else if (typeFilter === 'subscription') {
             // Assinaturas
-            const query = { source: 'subscription' };
+            const query = { source: 'subscription', type: 'debit' };
             totalItems = await Transaction.countDocuments(query);
             const raw = await Transaction.find(query)
                 .sort({ timestamp: -1 })
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
 
         } else if (typeFilter === 'image_unlock') {
             // Desbloqueios de mídia
-            const query = { source: 'image_unlock', type: { $in: ['debit', 'credit'] } };
+            const query = { source: 'image_unlock', type: 'debit' };
             totalItems = await MicroTransaction.countDocuments(query);
             const raw = await MicroTransaction.find(query)
                 .sort({ timestamp: -1 })
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
 
         } else if (typeFilter === 'gift') {
             // Mimos / Cupons
-            const queryMicro = { source: 'gift', type: { $in: ['debit', 'credit'] } };
+            const queryMicro = { source: 'gift', type: 'debit' };
             const queryTx = { source: 'gift' };
 
             const microRaw = await MicroTransaction.find(queryMicro).sort({ timestamp: -1 }).lean();
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
 
         } else if (typeFilter === 'message') {
             // Mensagens
-            const query = { source: 'message', type: { $in: ['debit', 'credit'] } };
+            const query = { source: 'message', type: 'debit' };
             totalItems = await MicroTransaction.countDocuments(query);
             const raw = await MicroTransaction.find(query)
                 .sort({ timestamp: -1 })
@@ -126,11 +126,17 @@ export async function GET(request: NextRequest) {
                 $or: [
                     { source: { $ne: 'withdrawal' } },
                     { 'metadata.withdrawRequestId': { $exists: false } }
+                ],
+                $and: [
+                    { $or: [
+                        { source: { $ne: 'subscription' } },
+                        { type: 'debit' }
+                    ]}
                 ]
             };
             const mtxQuery = { 
                 source: { $in: ['image_unlock', 'gift', 'message'] },
-                type: { $in: ['debit', 'credit'] } 
+                type: 'debit' 
             };
 
             const countTx = await Transaction.countDocuments(txQuery);
