@@ -1,4 +1,4 @@
-'use client';
+ï»¿'use client';
 
 import React, { useEffect, useState } from 'react';
 import { Avatar } from '@/components/Avatar';
@@ -91,7 +91,7 @@ export function SubscribeModal({ isOpen, onClose, onConfirm, professional, myBal
                     <div className="w-10 h-1 bg-slate-200 rounded-full" />
                 </div>
 
-                {/* ESTADO: CONFIRMAÇÃO */}
+                {/* ESTADO: CONFIRMAÃ‡ÃƒO */}
                 {state === 'confirm' && (
                     <div className="px-6 pb-8 pt-2">
                         <div className="flex items-center justify-between mb-5">
@@ -120,20 +120,20 @@ export function SubscribeModal({ isOpen, onClose, onConfirm, professional, myBal
                                 <p className="text-2xl font-black text-slate-800 tracking-tight">
                                     R$ {priceInReais.toFixed(2).replace('.', ',')}
                                 </p>
-                                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">por mês</p>
+                                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">por mÃªs</p>
                             </div>
                         </div>
 
-                        {/* O que está incluso */}
+                        {/* O que estÃ¡ incluso */}
                         <div className="mb-5 space-y-2.5">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-3">O que está incluso</p>
-                            <Benefit icon={<ImageIcon size={14} className="text-purple-600" />} text="Acesso à galeria de fotos exclusivas" />
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-3">O que estÃ¡ incluso</p>
+                            <Benefit icon={<ImageIcon size={14} className="text-purple-600" />} text="Acesso Ã  galeria de fotos exclusivas" />
                             <Benefit icon={<MessageCircle size={14} className="text-purple-600" />} text="Desconto no custo por mensagem no chat" />
                             <Benefit icon={<Crown size={14} className="text-purple-600" />} text="Badge de assinante no perfil" />
-                            <Benefit icon={<ShieldCheck size={14} className="text-purple-600" />} text="Válido por 30 dias — renova automaticamente" />
+                            <Benefit icon={<ShieldCheck size={14} className="text-purple-600" />} text="VÃ¡lido por 30 dias â€” renova automaticamente" />
                         </div>
 
-                        {/* Saldo do usuário */}
+                        {/* Saldo do usuÃ¡rio */}
                         <div className={`flex items-center justify-between px-4 py-3 rounded-2xl mb-4 ${hasEnoughBalance ? 'bg-emerald-50 border border-emerald-100' : 'bg-rose-50 border border-rose-100'}`}>
                             <div className="flex items-center gap-2">
                                 {hasEnoughBalance
@@ -151,7 +151,7 @@ export function SubscribeModal({ isOpen, onClose, onConfirm, professional, myBal
 
                         {!hasEnoughBalance && (
                             <p className="text-xs text-rose-500 font-semibold text-center mb-4 leading-snug">
-                                Você precisa de mais{' '}
+                                VocÃª precisa de mais{' '}
                                 <span className="font-black">
                                     R$ {((priceInCents - myBalance) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                 </span>{' '}
@@ -159,7 +159,7 @@ export function SubscribeModal({ isOpen, onClose, onConfirm, professional, myBal
                             </p>
                         )}
 
-                        {/* Botões */}
+                        {/* BotÃµes */}
                         <div className="flex gap-3">
                             <button
                                 onClick={handleClose}
@@ -213,7 +213,7 @@ export function SubscribeModal({ isOpen, onClose, onConfirm, professional, myBal
                         <div>
                             <p className="font-black text-slate-800 text-xl tracking-tight">Assinatura ativada!</p>
                             <p className="text-sm text-slate-500 font-medium mt-1.5 leading-snug max-w-xs">
-                                Você agora tem acesso à galeria exclusiva e ao desconto no chat de{' '}
+                                VocÃª agora tem acesso Ã  galeria exclusiva e ao desconto no chat de{' '}
                                 <span className="font-bold text-slate-700">{displayName}</span>.
                             </p>
                         </div>
@@ -228,7 +228,7 @@ export function SubscribeModal({ isOpen, onClose, onConfirm, professional, myBal
                                 <span className="text-slate-700 font-bold">R$ {priceInReais.toFixed(2).replace('.', ',')}</span>
                             </div>
                             <div className="flex justify-between text-xs">
-                                <span className="text-slate-400 font-semibold">Válido por</span>
+                                <span className="text-slate-400 font-semibold">VÃ¡lido por</span>
                                 <span className="text-slate-700 font-bold">30 dias</span>
                             </div>
                         </div>
