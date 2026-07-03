@@ -5,6 +5,7 @@ import { User } from '@/models/User';
 import { Room } from '@/models/Room';
 import { Message } from '@/models/Message';
 import { Transaction } from '@/models/Transaction';
+import { MicroTransaction } from '@/models/MicroTransaction';
 import { AppSettings } from '@/models/AppSettings';
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
@@ -187,27 +188,41 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        // --- ÚLTIMAS TRANSAÇÕES REAIS (Últimas 5) ---
+        // --- TRANSAÇÕES DA TABELA TRANSACTION ---
         const rawTransactions = await Transaction.find()
             .sort({ timestamp: -1 })
-            .limit(5)
+            .limit(100)
             .lean() as any[];
 
-        // Obter os Clerk IDs dos envolvidos para fazer fetch rico de nomes dos usuários
-        const clerkIds = Array.from(new Set(rawTransactions.map(tx => tx.userId).filter(Boolean))) as string[];
+        // --- TRANSAÇÕES DA TABELA MICROTRANSACTION ---
+        const rawMicroTransactions = await MicroTransaction.find({
+            source: { $in: ['image_unlock', 'gift', 'message'] },
+            type: { $in: ['debit', 'credit'] }
+        })
+            .sort({ timestamp: -1 })
+            .limit(100)
+            .lean() as any[];
+
+        // Obter os Clerk IDs dos envolvidos de ambas as fontes
+        const clerkIds = Array.from(new Set([
+            ...rawTransactions.map(tx => tx.userId),
+            ...rawMicroTransactions.map(tx => tx.userId)
+        ])).filter(Boolean) as string[];
+
         const usersList = await User.find({ clerkId: { $in: clerkIds } })
             .select('clerkId name username')
             .lean();
 
-        const transactionsMapped = rawTransactions.map(tx => {
+        const mappedTransactions = rawTransactions.map(tx => {
             const relatedUser = usersList.find(u => u.clerkId === tx.userId);
             const userName = relatedUser 
                 ? (relatedUser.name || `@${relatedUser.username}`) 
                 : `Usuário (${tx.userId.substring(0, 8)}...)`;
 
-            // Agora todos os valores na coleção Transaction estão salvos em Reais!
-            // Exceção: As transações do tipo 'gift' (resgate de cupom) salvam em centavos.
-            const valInReais = tx.source === 'gift' ? ((tx.amount || 0) / 100) : (tx.amount || 0);
+            // Transações com source 'gift', 'subscription' ou 'campaign' salvam amount em centavos
+            const valInReais = (tx.source === 'gift' || tx.source === 'subscription' || tx.source === 'campaign')
+                ? ((tx.amount || 0) / 100)
+                : (tx.amount || 0);
 
             // Mapeia o tipo amigável
             let typeLabel = 'Movimentação';
@@ -217,11 +232,15 @@ export async function GET(request: NextRequest) {
                 typeLabel = 'Saque';
             } else if (tx.source === 'gift') {
                 typeLabel = 'Resgate de Cupom';
+            } else if (tx.source === 'subscription') {
+                typeLabel = 'Assinatura';
+            } else if (tx.source === 'campaign') {
+                typeLabel = 'Crédito Promocional';
             }
 
             // Mapeia o status amigável
             let statusLabel = 'Pendente';
-            if (tx.status === 'PAID' || tx.status === 'COMPLETED') {
+            if (tx.status === 'PAID' || tx.status === 'COMPLETED' || tx.status === 'debit') {
                 statusLabel = 'Aprovado';
             } else if (tx.status === 'CANCELLED') {
                 statusLabel = 'Cancelado';
@@ -248,10 +267,68 @@ export async function GET(request: NextRequest) {
                 user: userName,
                 val: valInReais,
                 type: typeLabel,
+                source: tx.source,
                 time: timeAgo,
                 status: statusLabel,
+                timestamp: txDate
             };
         });
+
+        const mappedMicroTransactions = rawMicroTransactions.map(tx => {
+            const relatedUser = usersList.find(u => u.clerkId === tx.userId);
+            const userName = relatedUser 
+                ? (relatedUser.name || `@${relatedUser.username}`) 
+                : `Usuário (${tx.userId.substring(0, 8)}...)`;
+
+            // MicroTransaction sempre salva em centavos
+            const valInReais = (tx.amount || 0) / 100;
+
+            // Mapeia o tipo amigável
+            let typeLabel = 'Movimentação';
+            if (tx.source === 'image_unlock') {
+                typeLabel = 'Desbloqueio de Mídia';
+            } else if (tx.source === 'gift') {
+                typeLabel = 'Mimo enviado';
+            } else if (tx.source === 'message') {
+                typeLabel = 'Mensagem Chat';
+            } else if (tx.source === 'campaign') {
+                typeLabel = 'Crédito Promocional';
+            }
+
+            // MicroTransactions na base já são consideradas de status efetivado
+            const statusLabel = tx.type === 'debit' ? 'Débito' : 'Crédito';
+
+            // Formatação do tempo
+            const txDate = tx.timestamp ? new Date(tx.timestamp) : new Date();
+            const diffMs = now.getTime() - txDate.getTime();
+            const diffMin = Math.floor(diffMs / 60000);
+            const diffHrs = Math.floor(diffMin / 60);
+
+            let timeAgo = txDate.toLocaleDateString('pt-BR');
+            if (diffMin < 60) {
+                timeAgo = diffMin <= 1 ? 'Agora mesmo' : `Há ${diffMin} min`;
+            } else if (diffHrs < 24) {
+                timeAgo = `Há ${diffHrs} ${diffHrs === 1 ? 'hora' : 'horas'}`;
+            } else if (diffHrs < 48) {
+                timeAgo = 'Ontem';
+            }
+
+            return {
+                id: tx._id?.toString(),
+                displayId: tx._id?.toString() || `MTX-${Math.floor(Math.random() * 100000)}`,
+                user: userName,
+                val: valInReais,
+                type: typeLabel,
+                source: tx.source,
+                time: timeAgo,
+                status: statusLabel,
+                timestamp: txDate
+            };
+        });
+
+        // Combinar ambas as coleções e ordernar por data decrescente
+        const combinedTransactions = [...mappedTransactions, ...mappedMicroTransactions]
+            .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
         // 3. Responder
         return NextResponse.json({
@@ -279,7 +356,7 @@ export async function GET(request: NextRequest) {
                 }
             },
             activityData,
-            recentTransactions: transactionsMapped,
+            recentTransactions: combinedTransactions,
         });
 
     } catch (error: any) {
