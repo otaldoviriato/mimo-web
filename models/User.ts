@@ -24,6 +24,7 @@ export interface IUser extends Document {
     photoUrl?: string;
     coverUrl?: string;
     balance: number;
+    promotionalBalance?: number;
     isProfessional?: boolean;
     professionalStatus?: 'pending' | 'approved' | 'rejected' | null;
     notes?: string;
@@ -93,6 +94,11 @@ const UserSchema = new Schema<IUser>({
         type: String,
     },
     balance: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    promotionalBalance: {
         type: Number,
         default: 0,
         min: 0,

@@ -5,10 +5,13 @@ export interface ITransaction extends Document {
     abacatePayId?: string;
     amount: number;
     status: 'PAID' | 'PENDING' | 'CANCELLED' | 'COMPLETED' | 'debit';
-    type: 'PIX' | 'CC' | 'credit' | 'debit' | 'platform_fee';
-    source: 'message' | 'recharge' | 'withdrawal' | 'image_unlock' | 'gift' | 'subscription';
+    type: 'PIX' | 'CC' | 'credit' | 'debit' | 'platform_fee' | 'promotional_credit_grant' | 'promotional_credit_usage' | 'promotional_credit_expired';
+    source: 'message' | 'recharge' | 'withdrawal' | 'image_unlock' | 'gift' | 'subscription' | 'campaign';
     messageId?: string;
     relatedUserId?: string;
+    campaignId?: string;
+    creditGrantId?: string;
+    withdrawable?: boolean;
     timestamp: Date;
     metadata?: Record<string, any>;
     createdAt: Date;
@@ -35,12 +38,12 @@ const TransactionSchema = new Schema<ITransaction>({
     },
     type: {
         type: String,
-        enum: ['PIX', 'CC', 'credit', 'debit', 'platform_fee'],
+        enum: ['PIX', 'CC', 'credit', 'debit', 'platform_fee', 'promotional_credit_grant', 'promotional_credit_usage', 'promotional_credit_expired'],
         required: true,
     },
     source: {
         type: String,
-        enum: ['message', 'recharge', 'withdrawal', 'image_unlock', 'gift', 'subscription'],
+        enum: ['message', 'recharge', 'withdrawal', 'image_unlock', 'gift', 'subscription', 'campaign'],
         required: true,
     },
     messageId: {
@@ -48,6 +51,16 @@ const TransactionSchema = new Schema<ITransaction>({
     },
     relatedUserId: {
         type: String,
+    },
+    campaignId: {
+        type: String,
+    },
+    creditGrantId: {
+        type: String,
+    },
+    withdrawable: {
+        type: Boolean,
+        default: true,
     },
     timestamp: {
         type: Date,

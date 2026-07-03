@@ -89,7 +89,6 @@ const FIXED_OPTIONS = [
 const INITIAL_METHODS = [
     { id: 'pix', type: 'pix', label: 'Pix', icon: 'qr-code' },
     { id: 'card', type: 'card', label: 'Cartão de crédito', icon: 'card' },
-    { id: 'coupon', type: 'coupon', label: 'Resgatar Cupom', icon: 'ticket' },
 ];
 
 function detectCardBrand(number: string): string {
@@ -648,7 +647,7 @@ export function RechargeModal({
                                             )}
 
                                             {/* Opção Resgatar Cupom */}
-                                            {(!paymentAvailability || paymentAvailability.couponsEnabled !== false) && (
+                                            {false && (
                                                 <button
                                                     type="button"
                                                     onClick={() => {

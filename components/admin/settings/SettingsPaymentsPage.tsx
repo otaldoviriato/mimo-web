@@ -110,14 +110,7 @@ export function SettingsPaymentsPage({
                     warningWhenOff="Pagamento via cartão está desativado. Usuários não conseguirão recarregar com cartão de crédito."
                 />
 
-                <PaymentToggle
-                    title="Resgate de Cupons de Desconto"
-                    description="Controla a visibilidade do campo de cupom de desconto no fluxo de recarga de créditos. Quando ativo, os usuários veem o campo para inserir um código de cupom antes de confirmar a recarga. Quando desativado, o campo de cupom some completamente da interface — mesmo que existam cupons válidos cadastrados no sistema, nenhum usuário conseguirá resgatá-los. Útil para pausar temporariamente campanhas promocionais."
-                    statusLabel={couponsEnabled ? 'Cupons habilitados' : 'Cupons desabilitados'}
-                    enabled={couponsEnabled}
-                    onChange={setCouponsEnabled}
-                    warningWhenOff="Resgate de cupons está desativado. O campo de cupom não aparece para nenhum usuário."
-                />
+
             </div>
         </div>
     );

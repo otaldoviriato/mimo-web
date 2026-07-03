@@ -1838,7 +1838,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
         if (receiver?.isProfessional && balance < costInCents) {
             console.warn('[handleSend] Saldo insuficiente. Requerido:', costInCents, 'Disponível:', balance);
-            openRechargeModal('Você não tem saldo suficiente para enviar esta mensagem. Por favor, recarregue sua carteira.');
+            openRechargeModal(
+                userData?.hasWelcomeCreditEnded
+                    ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
+                    : 'Você não tem saldo suficiente para enviar esta mensagem. Por favor, recarregue sua carteira.'
+            );
             return;
         }
 
@@ -1945,7 +1949,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             const serverError: string | undefined = e.response?.data?.error;
             setMessages(prev => prev.map(m => m.tempId === tempId ? { ...m, status: 'error' } : m));
             if (serverError?.toLowerCase().includes('saldo insuficiente')) {
-                openRechargeModal('Você não tem saldo suficiente para enviar esta mensagem de áudio. Por favor, recarregue sua carteira.');
+                openRechargeModal(
+                    userData?.hasWelcomeCreditEnded
+                        ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
+                        : 'Você não tem saldo suficiente para enviar esta mensagem de áudio. Por favor, recarregue sua carteira.'
+                );
             } else {
                 alert(`Falha ao enviar mensagem de áudio: ${serverError || e.message || 'Erro de rede'}`);
             }
@@ -2095,7 +2103,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         }
 
         if (balance < priceInCents) {
-            openRechargeModal('Você não tem saldo suficiente para desbloquear este conteúdo. Por favor, recarregue sua carteira.');
+            openRechargeModal(
+                userData?.hasWelcomeCreditEnded
+                    ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
+                    : 'Você não tem saldo suficiente para desbloquear este conteúdo. Por favor, recarregue sua carteira.'
+            );
             return;
         }
         setUnlockData({ id: messageId, price: priceInCents, isVideo: isVideoMessage });
@@ -2107,7 +2119,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         
         if (balance < unlockData.price) {
             setUnlockModalVisible(false);
-            openRechargeModal('Você não tem saldo suficiente para desbloquear este conteúdo. Por favor, recarregue sua carteira.');
+            openRechargeModal(
+                userData?.hasWelcomeCreditEnded
+                    ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
+                    : 'Você não tem saldo suficiente para desbloquear este conteúdo. Por favor, recarregue sua carteira.'
+            );
             return;
         }
 
@@ -2124,7 +2140,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         const giftAmountInCents = parseFloat(giftAmountStr) * 100;
         if (balance < giftAmountInCents) {
             setGiftModalVisible(false);
-            openRechargeModal('Você não tem saldo suficiente para enviar este presente. Por favor, recarregue sua carteira.');
+            openRechargeModal(
+                userData?.hasWelcomeCreditEnded
+                    ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
+                    : 'Você não tem saldo suficiente para enviar este presente. Por favor, recarregue sua carteira.'
+            );
             return;
         }
 
@@ -2146,7 +2166,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             } else {
                 if (data.error?.toLowerCase().includes('saldo') || data.error?.toLowerCase().includes('insuficiente')) {
                     setGiftModalVisible(false);
-                    openRechargeModal('Você não tem saldo suficiente para enviar este presente. Por favor, recarregue sua carteira.');
+                    openRechargeModal(
+                        userData?.hasWelcomeCreditEnded
+                            ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
+                            : 'Você não tem saldo suficiente para enviar este presente. Por favor, recarregue sua carteira.'
+                    );
                 } else {
                     alert(data.error || 'Erro ao enviar presente');
                 }
@@ -3234,7 +3258,13 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                             onSendAudio={handleSendAudio}
                             onStatusChange={setAudioRecordingStatus}
                             maxDurationSeconds={maxAudioDurationSeconds}
-                            onInsufficientBalance={() => openRechargeModal('Você não tem saldo suficiente para enviar uma mensagem de áudio. Por favor, recarregue sua carteira.')}
+                            onInsufficientBalance={() =>
+                                openRechargeModal(
+                                    userData?.hasWelcomeCreditEnded
+                                        ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
+                                        : 'Você não tem saldo suficiente para enviar uma mensagem de áudio. Por favor, recarregue sua carteira.'
+                                )
+                            }
                         />
                     )}
                 </div>

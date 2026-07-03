@@ -35,5 +35,14 @@ export type { ISubscription } from './Subscription';
 export { AuditLog } from './AuditLog';
 export type { IAuditLog } from './AuditLog';
 
+export { CreditCampaign } from './CreditCampaign';
+export type { ICreditCampaign } from './CreditCampaign';
+
+export { CreditGrant } from './CreditGrant';
+export type { ICreditGrant } from './CreditGrant';
+
+export { CreditUsage } from './CreditUsage';
+export type { ICreditUsage } from './CreditUsage';
+
 
 

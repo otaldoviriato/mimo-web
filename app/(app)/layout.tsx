@@ -46,6 +46,41 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const { socket, connected, socketVersion } = useSocket(user?.id);
     const { data: rooms = [] } = useChatRooms();
 
+    const [welcomeNotice, setWelcomeNotice] = React.useState<{
+        grantId: string;
+        amount: number;
+        title: string;
+        description: string;
+    } | null>(null);
+
+    useEffect(() => {
+        if (userData?.welcomeCreditNotice) {
+            setWelcomeNotice(userData.welcomeCreditNotice);
+        }
+    }, [userData]);
+
+    const handleCloseWelcomeNotice = async () => {
+        if (!welcomeNotice) return;
+        const grantId = welcomeNotice.grantId;
+        setWelcomeNotice(null);
+        
+        // Remove do cache local para não reabrir em outras navegações rápidas
+        queryClient.setQueryData(QueryKeys.me, (old: any) =>
+            old ? { ...old, welcomeCreditNotice: null } : old
+        );
+
+        try {
+            await fetch('/api/users/me/welcome-credit-notice-shown', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ grantId })
+            });
+            refetchProfile();
+        } catch (err) {
+            console.error('Falha ao confirmar aviso de boas-vindas visualizado:', err);
+        }
+    };
+
     // ─── Socket Listeners Globais para Sincronização de Estado ──────────────────
     useEffect(() => {
         if (!socket || !user?.id) return;
@@ -624,6 +659,78 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             })}
 
             <NotificationPromptModal />
+
+            {/* Modal de Crédito de Boas-vindas */}
+            {welcomeNotice && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-5 select-none no-select">
+                    <div
+                        className="absolute inset-0 bg-purple-950/35 backdrop-blur-[2px] animate-in fade-in duration-200"
+                        onClick={handleCloseWelcomeNotice}
+                    />
+                    <div className="relative w-full max-w-[360px] animate-in fade-in slide-in-from-bottom-6 zoom-in-95 duration-300">
+                        <div className="relative overflow-hidden rounded-[28px] border border-purple-100 bg-white text-gray-900 shadow-2xl">
+                            <button
+                                type="button"
+                                aria-label="Fechar"
+                                onClick={handleCloseWelcomeNotice}
+                                className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-800"
+                            >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+
+                            <div className="h-1.5 bg-gradient-to-r from-purple-600 via-fuchsia-500 to-purple-500" />
+
+                            <div className="px-6 pb-6 pt-7">
+                                <div className="mb-5 flex items-start gap-4">
+                                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 ring-1 ring-purple-100">
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                                            <rect x="2" y="5" width="20" height="14" rx="2" ry="2"></rect>
+                                            <line x1="2" y1="10" x2="22" y2="10"></line>
+                                        </svg>
+                                    </div>
+                                    <div className="min-w-0 pr-7">
+                                        <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-purple-500">Crédito de Boas-vindas</p>
+                                        <h2 className="text-[22px] font-semibold leading-tight tracking-normal text-gray-900">{welcomeNotice.title}</h2>
+                                    </div>
+                                </div>
+
+                                <div className="mb-5 rounded-2xl border border-purple-100 bg-purple-50/60 px-5 py-4">
+                                    <div className="flex items-end justify-between gap-4">
+                                        <div>
+                                            <p className="mb-1 text-sm text-gray-500">Valor adicionado</p>
+                                            <p className="text-[42px] font-semibold leading-none tracking-normal text-purple-700">
+                                                {((welcomeNotice.amount) / 100).toLocaleString('pt-BR', {
+                                                    style: 'currency',
+                                                    currency: 'BRL',
+                                                    maximumFractionDigits: 0,
+                                                })}
+                                            </p>
+                                        </div>
+                                        <svg className="mb-1 shrink-0 text-emerald-500" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                        </svg>
+                                    </div>
+                                    <div className="mt-4 h-px bg-purple-100" />
+                                    <p className="mt-4 text-sm leading-relaxed text-gray-600">
+                                        {welcomeNotice.description}
+                                    </p>
+                                </div>
+
+                                <button
+                                    onClick={handleCloseWelcomeNotice}
+                                    className="w-full rounded-2xl bg-purple-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-purple-600/20 transition-colors hover:bg-purple-700 active:scale-[0.99]"
+                                >
+                                    Começar a conversar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

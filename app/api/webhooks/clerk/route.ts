@@ -6,6 +6,7 @@ import { User } from '@/models/User';
 import { AppSettings } from '@/models/AppSettings';
 import { Resend } from 'resend';
 import { getCreatorLandingProfileRole } from '@/lib/profileRole';
+import { grantWelcomeCredit } from '@/lib/creditCampaign';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
 const webhookSecret = process.env.CLERK_WEBHOOK_SECRET || '';
@@ -89,6 +90,17 @@ export async function POST(req: Request) {
         );
 
         console.log(`✅ Clerk Webhook: User created: ${generatedUsername} (Professional: ${isProfessional}, Status: ${professionalStatus})`);
+
+        // Se o usuário não for profissional (ou seja, for cliente), concede o crédito de boas-vindas
+        if (isProfessional === false) {
+            try {
+                const reqHeaders = await headers();
+                const ip = reqHeaders.get('x-forwarded-for')?.split(',')[0].trim() || undefined;
+                await grantWelcomeCredit(id, email, ip, undefined, undefined);
+            } catch (creditErr) {
+                console.error('Erro ao conceder crédito de boas-vindas no webhook do Clerk:', creditErr);
+            }
+        }
 
         // Envio de e-mail de notificação para o admin desativado conforme solicitado
     }

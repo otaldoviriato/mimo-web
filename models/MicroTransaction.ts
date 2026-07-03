@@ -3,10 +3,13 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IMicroTransaction extends Document {
     userId: string;
     amount: number; // em centavos
-    type: 'credit' | 'debit' | 'platform_fee';
-    source: 'message' | 'image_unlock' | 'gift' | 'subscription';
+    type: 'credit' | 'debit' | 'platform_fee' | 'promotional_credit_grant' | 'promotional_credit_usage' | 'promotional_credit_expired';
+    source: 'message' | 'image_unlock' | 'gift' | 'subscription' | 'campaign';
     messageId?: string;
     relatedUserId?: string;
+    campaignId?: string;
+    creditGrantId?: string;
+    withdrawable?: boolean;
     timestamp: Date;
     metadata?: Record<string, any>;
     createdAt: Date;
@@ -25,12 +28,12 @@ const MicroTransactionSchema = new Schema<IMicroTransaction>({
     },
     type: {
         type: String,
-        enum: ['credit', 'debit', 'platform_fee'],
+        enum: ['credit', 'debit', 'platform_fee', 'promotional_credit_grant', 'promotional_credit_usage', 'promotional_credit_expired'],
         required: true,
     },
     source: {
         type: String,
-        enum: ['message', 'image_unlock', 'gift', 'subscription'],
+        enum: ['message', 'image_unlock', 'gift', 'subscription', 'campaign'],
         required: true,
     },
     messageId: {
@@ -38,6 +41,16 @@ const MicroTransactionSchema = new Schema<IMicroTransaction>({
     },
     relatedUserId: {
         type: String,
+    },
+    campaignId: {
+        type: String,
+    },
+    creditGrantId: {
+        type: String,
+    },
+    withdrawable: {
+        type: Boolean,
+        default: true,
     },
     timestamp: {
         type: Date,

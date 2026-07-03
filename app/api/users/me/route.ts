@@ -6,6 +6,10 @@ import { Room } from '@/models/Room';
 import { Message } from '@/models/Message';
 import { AppSettings } from '@/models/AppSettings';
 import { GalleryItem } from '@/models/GalleryItem';
+import { CreditGrant } from '@/models/CreditGrant';
+import { Transaction } from '@/models/Transaction';
+import { MicroTransaction } from '@/models/MicroTransaction';
+import { grantWelcomeCredit } from '@/lib/creditCampaign';
 import { Resend } from 'resend';
 import { buildProfileRoleMetadata, getCreatorLandingProfileRole } from '@/lib/profileRole';
 
@@ -106,6 +110,123 @@ export async function GET() {
             }
         }
 
+        // --- EXPIRAÇÃO ON-THE-FLY DE CRÉDITOS PROMOCIONAIS ---
+        try {
+            const expiredGrants = await CreditGrant.find({
+                userId: user.clerkId,
+                expiresAt: { $lt: new Date() },
+                status: 'active'
+            });
+            for (const grant of expiredGrants) {
+                const amountToRevert = grant.amountRemaining;
+                if (amountToRevert > 0) {
+                    user.balance = Math.max(0, user.balance - amountToRevert);
+                    user.promotionalBalance = Math.max(0, (user.promotionalBalance || 0) - amountToRevert);
+                }
+                grant.status = 'expired';
+                await grant.save();
+
+                // Registra transação e microtransação de expiração
+                await Transaction.create({
+                    userId: user.clerkId,
+                    amount: amountToRevert,
+                    status: 'COMPLETED',
+                    type: 'promotional_credit_expired',
+                    source: 'campaign',
+                    campaignId: grant.campaignId.toString(),
+                    creditGrantId: grant._id.toString(),
+                    withdrawable: false,
+                    timestamp: new Date(),
+                    metadata: { reason: 'Expirou o prazo de validade' }
+                });
+                await MicroTransaction.create({
+                    userId: user.clerkId,
+                    amount: amountToRevert,
+                    type: 'promotional_credit_expired',
+                    source: 'campaign',
+                    campaignId: grant.campaignId.toString(),
+                    creditGrantId: grant._id.toString(),
+                    withdrawable: false,
+                    timestamp: new Date(),
+                    metadata: { reason: 'Expirou o prazo de validade' }
+                });
+            }
+            if (expiredGrants.length > 0) {
+                await user.save();
+            }
+        } catch (expirationErr) {
+            console.error('[GET /api/users/me] Erro ao expirar créditos do usuário:', expirationErr);
+        }
+
+        // --- CONTINGÊNCIA: CONCESSÃO AUTOMÁTICA DE CRÉDITO DE BOAS-VINDAS ---
+        if (user.isProfessional === false) {
+            try {
+                const welcomeResult = await grantWelcomeCredit(user.clerkId, user.email, undefined, user.phone, user.taxId);
+                if (welcomeResult.success) {
+                    const updatedUser = await User.findOne({ clerkId: userId });
+                    if (updatedUser) {
+                        user = updatedUser;
+                    }
+                }
+            } catch (contingencyErr) {
+                console.error('[GET /api/users/me] Erro ao tentar conceder crédito de boas-vindas:', contingencyErr);
+            }
+        }
+
+        // --- BUSCA INFORMAÇÃO DE AVISO DE CONCESSÃO (Ainda não mostrado) ---
+        let welcomeCreditNotice = null;
+        if (user.isProfessional === false) {
+            try {
+                const activeUnshownGrant = await CreditGrant.findOne({
+                    userId: user.clerkId,
+                    status: 'active',
+                    noticeShown: false
+                }).populate('campaignId');
+
+                if (activeUnshownGrant) {
+                    const campaign = activeUnshownGrant.campaignId as any;
+                    welcomeCreditNotice = {
+                        grantId: activeUnshownGrant._id.toString(),
+                        amount: activeUnshownGrant.amountGranted,
+                        title: campaign?.appMessageTitle || 'Você recebeu créditos de boas-vindas!',
+                        description: campaign?.appMessageDescription || `Você recebeu R$ ${(activeUnshownGrant.amountGranted / 100).toFixed(2)} em créditos para começar suas conversas.`
+                    };
+                }
+            } catch (noticeErr) {
+                console.error('[GET /api/users/me] Erro ao buscar aviso de crédito:', noticeErr);
+            }
+        }
+
+        // --- VERIFICA SE O CRÉDITO DE BOAS-VINDAS JÁ FOI CONSUMIDO/EXPIROU ---
+        let hasWelcomeCreditEnded = false;
+        if (user.isProfessional === false) {
+            try {
+                const welcomeGrant = await CreditGrant.findOne({ userId: user.clerkId });
+                if (welcomeGrant) {
+                    hasWelcomeCreditEnded = welcomeGrant.amountRemaining === 0 || welcomeGrant.status !== 'active';
+                }
+            } catch (endedErr) {
+                console.error('[GET /api/users/me] Erro ao verificar se crédito acabou:', endedErr);
+            }
+        }
+
+        // --- BUSCA LABEL DO SALDO PROMOCIONAL ---
+        let promotionalBalanceLabel = '';
+        if (user.isProfessional === false && user.promotionalBalance && user.promotionalBalance > 0) {
+            try {
+                const activeGrant = await CreditGrant.findOne({
+                    userId: user.clerkId,
+                    status: 'active'
+                }).populate('campaignId');
+                if (activeGrant) {
+                    const campaign = activeGrant.campaignId as any;
+                    promotionalBalanceLabel = campaign?.balanceLabel || 'Crédito promocional';
+                }
+            } catch (labelErr) {
+                console.error('[GET /api/users/me] Erro ao buscar label de saldo:', labelErr);
+            }
+        }
+
         if (user.isSuspended) {
             return NextResponse.json({ error: 'Account suspended' }, { status: 403 });
         }
@@ -188,6 +309,10 @@ export async function GET() {
                 hideFromExplore: user.hideFromExplore ?? false,
                 publicPhotosCount,
                 avgResponseTimeMinutes: user.avgResponseTimeMinutes,
+                promotionalBalance: user.promotionalBalance || 0,
+                promotionalBalanceLabel,
+                welcomeCreditNotice,
+                hasWelcomeCreditEnded,
             },
         });
     } catch (error: any) {

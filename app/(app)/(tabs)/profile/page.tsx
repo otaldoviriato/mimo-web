@@ -939,6 +939,11 @@ export default function ProfilePage() {
                             <span className="text-2xl font-black text-gray-900 tracking-tight mt-0.5 block">
                                 {((userData?.balance ?? 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </span>
+                            {userData?.promotionalBalance > 0 && (
+                                <span className="text-[10px] text-purple-600 font-bold mt-1 block">
+                                    Sendo {((userData.promotionalBalance) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} de {userData.promotionalBalanceLabel || 'Crédito de boas-vindas'}
+                                </span>
+                            )}
                         </div>
                         <button
                             onClick={openRechargeModal}
