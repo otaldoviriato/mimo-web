@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import mongoose from 'mongoose';
 import { connectToDatabase } from '@/lib/db';
 import { User, Transaction, Subscription } from '@/models';
 import { SubscriptionBillingError, subscriptionPriceBRLToCents } from '@/lib/subscriptionBilling';
@@ -59,83 +58,122 @@ export async function POST(
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 30);
 
-        const session = await mongoose.startSession();
+        let debited = false;
+        let credited = false;
+        let subscriptionActivated = false;
+        let subscriberCached = false;
+
         try {
-            await session.withTransaction(async () => {
-                const activeSubscription = await Subscription.findOne({
-                    subscriberId: requesterId,
-                    professionalId: ownerId,
-                    status: { $in: ['ACTIVE', 'CANCELED'] },
-                    expiresAt: { $gt: new Date() },
-                }).session(session);
+            const activeSubscription = await Subscription.findOne({
+                subscriberId: requesterId,
+                professionalId: ownerId,
+                status: { $in: ['ACTIVE', 'CANCELED'] },
+                expiresAt: { $gt: new Date() },
+            });
 
-                if (activeSubscription) {
-                    throw new SubscriptionBillingError('Voce ja e um assinante');
-                }
+            if (activeSubscription) {
+                throw new SubscriptionBillingError('Voce ja e um assinante');
+            }
 
-                const debitResult = await User.updateOne(
-                    { clerkId: requesterId, balance: { $gte: priceInCents } },
-                    { $inc: { balance: -priceInCents } },
-                    { session }
-                );
+            const debitResult = await User.updateOne(
+                { clerkId: requesterId, balance: { $gte: priceInCents } },
+                { $inc: { balance: -priceInCents } }
+            );
 
-                if (debitResult.modifiedCount === 0) {
-                    throw new SubscriptionBillingError('Saldo insuficiente para assinar');
-                }
+            if (debitResult.modifiedCount === 0) {
+                throw new SubscriptionBillingError('Saldo insuficiente para assinar');
+            }
+            debited = true;
 
-                const creditResult = await User.updateOne(
-                    {
-                        clerkId: ownerId,
-                        isProfessional: true,
-                        professionalStatus: 'approved',
-                        isSubscriptionEnabled: true,
-                    },
-                    { $inc: { balance: priceInCents } },
-                    { session }
-                );
+            const creditResult = await User.updateOne(
+                {
+                    clerkId: ownerId,
+                    isProfessional: true,
+                    professionalStatus: 'approved',
+                    isSubscriptionEnabled: true,
+                },
+                { $inc: { balance: priceInCents } }
+            );
 
-                if (creditResult.modifiedCount === 0) {
-                    throw new SubscriptionBillingError('Perfil nao aceita assinaturas no momento');
-                }
+            if (creditResult.modifiedCount === 0) {
+                throw new SubscriptionBillingError('Perfil nao aceita assinaturas no momento');
+            }
+            credited = true;
 
-                await Transaction.create([
-                    {
-                        userId: requesterId,
-                        type: 'debit',
-                        amount: priceInCents,
-                        source: 'subscription',
-                        status: 'COMPLETED',
-                        relatedUserId: ownerId,
-                    },
-                    {
-                        userId: ownerId,
-                        type: 'credit',
-                        amount: priceInCents,
-                        source: 'subscription',
-                        status: 'COMPLETED',
-                        relatedUserId: requesterId,
-                    },
-                ], { session });
+            await Subscription.findOneAndUpdate(
+                { subscriberId: requesterId, professionalId: ownerId },
+                {
+                    status: 'ACTIVE',
+                    priceInCents,
+                    expiresAt,
+                    renewalCanceledAt: null,
+                },
+                { upsert: true, new: true }
+            );
+            subscriptionActivated = true;
 
-                await Subscription.findOneAndUpdate(
-                    { subscriberId: requesterId, professionalId: ownerId },
-                    {
-                        status: 'ACTIVE',
-                        priceInCents,
-                        expiresAt,
-                        renewalCanceledAt: null,
-                    },
-                    { upsert: true, new: true, session }
-                );
+            await User.updateOne(
+                { clerkId: ownerId },
+                { $addToSet: { subscribers: requesterId } }
+            );
+            subscriberCached = true;
 
+            await Transaction.create([
+                {
+                    userId: requesterId,
+                    type: 'debit',
+                    amount: priceInCents,
+                    source: 'subscription',
+                    status: 'COMPLETED',
+                    relatedUserId: ownerId,
+                },
+                {
+                    userId: ownerId,
+                    type: 'credit',
+                    amount: priceInCents,
+                    source: 'subscription',
+                    status: 'COMPLETED',
+                    relatedUserId: requesterId,
+                },
+            ]);
+        } catch (error) {
+            if (debited) {
+                await User.updateOne(
+                    { clerkId: requesterId },
+                    { $inc: { balance: priceInCents } }
+                ).catch((refundError) => {
+                    console.error('[POST /api/users/[id]/subscribe] Failed to refund subscriber after subscription error:', refundError);
+                });
+            }
+
+            if (credited) {
                 await User.updateOne(
                     { clerkId: ownerId },
-                    { $addToSet: { subscribers: requesterId } },
-                    { session }
-                );
-            });
-        } finally {
-            await session.endSession();
+                    { $inc: { balance: -priceInCents } }
+                ).catch((revertCreditError) => {
+                    console.error('[POST /api/users/[id]/subscribe] Failed to revert professional credit after subscription error:', revertCreditError);
+                });
+            }
+
+            if (subscriptionActivated) {
+                await Subscription.updateOne(
+                    { subscriberId: requesterId, professionalId: ownerId, expiresAt },
+                    { $set: { status: 'EXPIRED' }, $unset: { renewalCanceledAt: '' } }
+                ).catch((subscriptionRevertError) => {
+                    console.error('[POST /api/users/[id]/subscribe] Failed to revert subscription after error:', subscriptionRevertError);
+                });
+            }
+
+            if (subscriberCached) {
+                await User.updateOne(
+                    { clerkId: ownerId },
+                    { $pull: { subscribers: requesterId } }
+                ).catch((subscriberRevertError) => {
+                    console.error('[POST /api/users/[id]/subscribe] Failed to revert subscribers cache after error:', subscriberRevertError);
+                });
+            }
+
+            throw error;
         }
 
         return NextResponse.json({
