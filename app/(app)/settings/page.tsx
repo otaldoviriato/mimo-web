@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useUser, useClerk } from '@clerk/nextjs';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useMyProfile, useUpdateProfile } from '@/hooks/useQueries';
 import { usePWA } from '@/context/PWAContext';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { formatCPF, formatPhone } from '@/components/RechargeModal';
+import { PricingGuideModal, PRICE_PER_CHAR_OPTIONS } from '@/components/PricingGuideModal';
 import Link from 'next/link';
 
 function SkeletonField() {
@@ -32,6 +33,24 @@ const formatDate = (dateString?: string | Date) => {
     }
 };
 
+const formatPriceBRL = (value: string | number) => {
+    let valStr = '';
+    if (typeof value === 'number') {
+        valStr = value.toFixed(2).replace(/\D/g, '');
+    } else {
+        valStr = value.replace(/\D/g, '');
+    }
+    if (!valStr || valStr === '00') return 'R$ 0,00';
+    valStr = valStr.replace(/^0+/, '');
+    if (valStr.length < 3) {
+        valStr = valStr.padStart(3, '0');
+    }
+    const cents = valStr.slice(-2);
+    const whole = valStr.slice(0, -2);
+    const formattedWhole = parseInt(whole, 10).toLocaleString('pt-BR');
+    return `R$ ${formattedWhole},${cents}`;
+};
+
 interface SettingsPageProps {
     isSubPage?: boolean;
     onBack?: () => void;
@@ -49,6 +68,8 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const updateProfileMutation = useUpdateProfile();
 
     const [username, setUsername] = useState('');
+    const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+    const usernameCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [name, setName] = useState('');
     const [taxId, setTaxId] = useState('');
     const [phone, setPhone] = useState('');
@@ -58,6 +79,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const [chargePerCharSubscribers, setChargePerCharSubscribers] = useState('');
     const [chargePerCharNonSubscribers, setChargePerCharNonSubscribers] = useState('');
     const [hideFromExplore, setHideFromExplore] = useState(false);
+    const [subscriberDiscountPercentage, setSubscriberDiscountPercentage] = useState('20');
 
     const [loading, setLoading] = useState(false);
     const [saveError, setSaveError] = useState('');
@@ -65,6 +87,9 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const [loadingSubscription, setLoadingSubscription] = useState(false);
     const [saveSubscriptionError, setSaveSubscriptionError] = useState('');
     const [saveSubscriptionSuccess, setSaveSubscriptionSuccess] = useState(false);
+    const [loadingPricing, setLoadingPricing] = useState(false);
+    const [savePricingError, setSavePricingError] = useState('');
+    const [savePricingSuccess, setSavePricingSuccess] = useState(false);
     const [isAboutExpanded, setIsAboutExpanded] = useState(false);
     const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(false);
     const [savingEmailPref, setSavingEmailPref] = useState(false);
@@ -72,6 +97,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const [accountAction, setAccountAction] = useState<'suspend' | 'delete' | null>(null);
     const [accountActionLoading, setAccountActionLoading] = useState(false);
     const [accountActionError, setAccountActionError] = useState('');
+    const [showPricingGuideModal, setShowPricingGuideModal] = useState(false);
 
     const hasPopulated = useRef(false);
 
@@ -89,18 +115,35 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             setName(userData.name || '');
             setTaxId(userData.taxId ? formatCPF(userData.taxId) : '');
             setPhone(userData.phone ? formatPhone(userData.phone) : '');
-            setSubscriptionPrice(userData.subscriptionPrice?.toString() ?? '0');
+            setSubscriptionPrice(userData.subscriptionPrice ? formatPriceBRL(userData.subscriptionPrice) : 'R$ 0,00');
             setIsSubscriptionEnabled(userData.isSubscriptionEnabled ?? false);
             setBio(userData.bio || '');
             setEmailNotificationsEnabled(userData.emailNotificationsEnabled ?? false);
             setChargePerCharSubscribers(userData.chargePerCharSubscribers?.toString() ?? '0.002');
             setChargePerCharNonSubscribers(userData.chargePerCharNonSubscribers?.toString() ?? '0.005');
+            setSubscriberDiscountPercentage((userData.subscriberDiscountPercentage ?? 20).toString());
             setHideFromExplore(userData.hideFromExplore === true);
             hasPopulated.current = true;
         }
     }, [userData]);
 
+    useEffect(() => {
+        const discount = Number(subscriberDiscountPercentage) || 20;
+        const nonSubPrice = Number(chargePerCharNonSubscribers) || 0;
+        const subPrice = parseFloat((nonSubPrice * (1 - discount / 100)).toFixed(4));
+        setChargePerCharSubscribers(subPrice.toString());
+    }, [subscriberDiscountPercentage, chargePerCharNonSubscribers]);
+
     const handleSaveAll = async () => {
+        if (usernameStatus === 'checking') {
+            setSaveError('Aguarde a verificação do nome de usuário.');
+            return;
+        }
+        if (usernameStatus === 'taken') {
+            setSaveError('Este nome de usuário já está em uso. Escolha outro.');
+            return;
+        }
+
         setLoading(true);
         setSaveError('');
         setSaveSuccess(false);
@@ -116,7 +159,8 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             if (userData?.isProfessional) {
                 const limitMax = userData?.maxSubscriptionPrice ?? 200;
                 const limitMin = userData?.minSubscriptionPrice ?? 10;
-                const price = Number(subscriptionPrice) || 0;
+                const price = Number(subscriptionPrice.replace(/\D/g, '')) / 100;
+                const discount = Number(subscriberDiscountPercentage) || 20;
 
                 if (isSubscriptionEnabled) {
                     if (price <= 0) {
@@ -126,6 +170,11 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                     }
                     if (price < limitMin) {
                         setSaveError(`O preço da assinatura não pode ser menor que o valor mínimo de R$ ${limitMin.toFixed(2)}`);
+                        setLoading(false);
+                        return;
+                    }
+                    if (discount < 20 || discount > 80) {
+                        setSaveError('O desconto da assinatura deve ser entre 20% e 80%');
                         setLoading(false);
                         return;
                     }
@@ -146,6 +195,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
 
                 updateData.isSubscriptionEnabled = isSubscriptionEnabled;
                 updateData.subscriptionPrice = price;
+                updateData.subscriberDiscountPercentage = discount;
                 updateData.bio = bio;
                 updateData.chargePerCharNonSubscribers = charPrice;
                 updateData.chargePerCharSubscribers = Number(chargePerCharSubscribers) || 0;
@@ -177,7 +227,8 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
         try {
             const limitMax = userData?.maxSubscriptionPrice ?? 200;
             const limitMin = userData?.minSubscriptionPrice ?? 10;
-            const price = Number(subscriptionPrice) || 0;
+            const price = Number(subscriptionPrice.replace(/\D/g, '')) / 100;
+            const discount = Number(subscriberDiscountPercentage) || 20;
 
             if (isSubscriptionEnabled) {
                 if (price <= 0) {
@@ -190,6 +241,11 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                     setLoadingSubscription(false);
                     return;
                 }
+                if (discount < 20 || discount > 80) {
+                    setSaveSubscriptionError('O desconto da assinatura deve ser entre 20% e 80%');
+                    setLoadingSubscription(false);
+                    return;
+                }
             }
 
             if (price > limitMax) {
@@ -197,26 +253,12 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                 setLoadingSubscription(false);
                 return;
             }
-            
-            const limitMaxPrice = userData?.maxPricePerChar ?? 0.2;
-            const charPrice = Number(chargePerCharNonSubscribers) || 0;
-            if (charPrice > limitMaxPrice) {
-                setSaveSubscriptionError(`O preço máximo por caractere é R$ ${limitMaxPrice.toFixed(2)}`);
-                setLoadingSubscription(false);
-                return;
-            }
 
             const updateData: any = {
-                name,
-                username,
-                taxId: taxId.replace(/\D/g, ''),
-                phone: phone.replace(/\D/g, ''),
                 isSubscriptionEnabled,
                 subscriptionPrice: price,
-                bio,
-                chargePerCharNonSubscribers: charPrice,
-                chargePerCharSubscribers: Number(chargePerCharSubscribers) || 0,
-                hideFromExplore: hideFromExplore
+                subscriberDiscountPercentage: discount,
+                chargePerCharSubscribers: Number(chargePerCharSubscribers) || 0
             };
 
             await updateProfileMutation.mutateAsync(updateData);
@@ -226,6 +268,41 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             setSaveSubscriptionError('Erro ao salvar alterações de assinatura');
         } finally {
             setLoadingSubscription(false);
+        }
+    };
+
+    const handleSavePricing = async () => {
+        setLoadingPricing(true);
+        setSavePricingError('');
+        setSavePricingSuccess(false);
+
+        try {
+            const limitMaxPrice = userData?.maxPricePerChar ?? 0.2;
+            const charPrice = Number(chargePerCharNonSubscribers) || 0;
+
+            if (charPrice < 0) {
+                setSavePricingError('O preço por caractere não pode ser negativo');
+                setLoadingPricing(false);
+                return;
+            }
+            if (charPrice > limitMaxPrice) {
+                setSavePricingError(`O preço máximo por caractere é R$ ${limitMaxPrice.toFixed(2)}`);
+                setLoadingPricing(false);
+                return;
+            }
+
+            const updateData: any = {
+                chargePerCharNonSubscribers: charPrice,
+                chargePerCharSubscribers: Number(chargePerCharSubscribers) || 0
+            };
+
+            await updateProfileMutation.mutateAsync(updateData);
+            setSavePricingSuccess(true);
+            setTimeout(() => setSavePricingSuccess(false), 3000);
+        } catch (error: any) {
+            setSavePricingError('Erro ao salvar preço por caractere');
+        } finally {
+            setLoadingPricing(false);
         }
     };
 
@@ -270,53 +347,44 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     };
 
 
-    const handleAdjustPrice = (delta: number) => {
-        const limitMax = userData?.maxPricePerChar ?? 0.2;
-        const discountFactor = 1 - (userData?.subscriberDiscountPercentage ?? 20) / 100;
-        const currentPrice = Number(chargePerCharNonSubscribers) || 0;
-        let newPrice = currentPrice + delta;
-
-        if (newPrice > limitMax) {
-            newPrice = limitMax;
-        } else if (newPrice < 0) {
-            newPrice = 0;
-        }
-
-        const newPriceStr = parseFloat(newPrice.toFixed(4)).toString();
-        const subscriberPriceStr = parseFloat((newPrice * discountFactor).toFixed(4)).toString();
-
-        setChargePerCharNonSubscribers(newPriceStr);
-        setChargePerCharSubscribers(subscriberPriceStr);
+    const handleSelectPricePerChar = (option: number) => {
+        const discountFactor = 1 - (Number(subscriberDiscountPercentage) || 20) / 100;
+        setChargePerCharNonSubscribers(option.toString());
+        setChargePerCharSubscribers(parseFloat((option * discountFactor).toFixed(4)).toString());
     };
 
-    const handleInputBlur = () => {
-        const parsed = parseFloat(Number(chargePerCharNonSubscribers).toFixed(4));
-        const limitMax = userData?.maxPricePerChar ?? 0.2;
-        const discountFactor = 1 - (userData?.subscriberDiscountPercentage ?? 20) / 100;
+    const initialUsername = userData?.username || '';
 
-        if (isNaN(parsed) || parsed < 0) {
-            if (userData) {
-                setChargePerCharNonSubscribers(userData.chargePerCharNonSubscribers?.toString() ?? '0.005');
-                setChargePerCharSubscribers(userData.chargePerCharSubscribers?.toString() ?? '0.002');
-            }
+    const checkUsernameAvailability = useCallback(async (val: string) => {
+        if (!val || val === initialUsername || val.length < 2 || !/^[a-z0-9._-]+$/.test(val)) {
+            setUsernameStatus('idle');
             return;
         }
-
-        let nonSubPrice = parsed;
-        if (nonSubPrice > limitMax) {
-            nonSubPrice = limitMax;
+        setUsernameStatus('checking');
+        try {
+            const res = await fetch(`/api/users/check-username?username=${encodeURIComponent(val)}`);
+            if (!res.ok) {
+                setUsernameStatus('idle');
+                return;
+            }
+            const data = await res.json();
+            setUsernameStatus(data.available ? 'available' : 'taken');
+        } catch {
+            setUsernameStatus('idle');
         }
+    }, [initialUsername]);
 
-        const subPrice = parseFloat((nonSubPrice * discountFactor).toFixed(4));
-
-        setChargePerCharNonSubscribers(nonSubPrice.toString());
-        setChargePerCharSubscribers(subPrice.toString());
+    const handleUsernameChange = (value: string) => {
+        const clean = value.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+        setUsername(clean);
+        setUsernameStatus('idle');
+        if (usernameCheckTimerRef.current) clearTimeout(usernameCheckTimerRef.current);
+        usernameCheckTimerRef.current = setTimeout(() => checkUsernameAvailability(clean), 450);
     };
 
     const profileIsProfessional = !!userData?.isProfessional;
 
     const initialName = userData?.name || '';
-    const initialUsername = userData?.username || '';
     const initialPhone = userData?.phone ? formatPhone(userData?.phone) : '';
     const initialBio = userData?.bio || '';
 
@@ -326,14 +394,23 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
         phone !== initialPhone ||
         (profileIsProfessional && (bio !== initialBio || hideFromExplore !== (userData?.hideFromExplore === true)));
 
-    const initialSubscriptionPrice = userData?.subscriptionPrice?.toString() ?? '0';
+    const initialSubscriptionPrice = userData?.subscriptionPrice ?? 0;
     const initialIsSubscriptionEnabled = userData?.isSubscriptionEnabled ?? false;
     const initialChargePerCharNonSubscribers = userData?.chargePerCharNonSubscribers?.toString() ?? '0.005';
+    const initialDiscount = userData?.subscriberDiscountPercentage ?? 20;
+
+    const currentSubscriptionPriceClean = Number(subscriptionPrice.replace(/\D/g, '')) / 100;
+    const currentDiscount = Number(subscriberDiscountPercentage) || 20;
 
     const hasSubscriptionChanges =
         profileIsProfessional && (
-            subscriptionPrice !== initialSubscriptionPrice ||
+            currentSubscriptionPriceClean !== initialSubscriptionPrice ||
             isSubscriptionEnabled !== initialIsSubscriptionEnabled ||
+            currentDiscount !== initialDiscount
+        );
+
+    const hasPricingChanges =
+        profileIsProfessional && (
             chargePerCharNonSubscribers !== initialChargePerCharNonSubscribers
         );
 
@@ -404,11 +481,23 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                             className="flex-1 text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
                                             placeholder="username"
                                             value={username}
-                                            onChange={(e) => setUsername(e.target.value)}
+                                            onChange={(e) => handleUsernameChange(e.target.value)}
                                             autoCapitalize="none"
                                             autoCorrect="off"
                                         />
+                                        {usernameStatus === 'checking' && (
+                                            <svg className="animate-spin h-3.5 w-3.5 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                        )}
+                                        {usernameStatus === 'available' && (
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-emerald-500 shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
+                                        )}
+                                        {usernameStatus === 'taken' && (
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-red-500 shrink-0"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                        )}
                                     </div>
+                                    {usernameStatus === 'taken' && (
+                                        <p className="text-[10px] font-semibold text-red-500 mt-1">Este nome de usuário já está em uso</p>
+                                    )}
                                 </div>
                                 {/* E-mail */}
                                 <div className="px-4 py-3.5 border-b border-gray-50 bg-gray-50/50">
@@ -480,39 +569,44 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                 )}
 
                                 {/* Botão Salvar (e alertas) */}
-                                <div className="px-4 pb-5 pt-2 flex flex-col gap-2">
-                                    {saveError && (
-                                        <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-100 rounded-xl">
-                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                                            <p className="text-xs text-red-600 font-medium">{saveError}</p>
-                                        </div>
-                                    )}
-                                    {saveSuccess && (
-                                        <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-100 rounded-xl">
-                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-600 shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
-                                            <p className="text-xs text-green-700 font-medium">Perfil atualizado com sucesso</p>
-                                        </div>
-                                    )}
-                                    <button
-                                        onClick={handleSaveAll}
-                                        disabled={loading || !hasPersonalChanges}
-                                        className="w-full h-10 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors active:scale-[0.98] flex items-center justify-center gap-2"
-                                    >
-                                        {loading ? (
-                                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                                        ) : (
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                {(hasPersonalChanges || loading || saveSuccess || saveError) && (
+                                    <div className="px-4 pb-5 pt-2 flex flex-col gap-2">
+                                        {saveError && (
+                                            <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-100 rounded-xl">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                                <p className="text-xs text-red-600 font-medium">{saveError}</p>
+                                            </div>
                                         )}
-                                        Salvar Alterações
-                                    </button>
-                                </div>
+                                        {saveSuccess && (
+                                            <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-100 rounded-xl">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-600 shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
+                                                <p className="text-xs text-green-700 font-medium">Perfil atualizado com sucesso</p>
+                                            </div>
+                                        )}
+                                        {(hasPersonalChanges || loading) && (
+                                            <button
+                                                onClick={handleSaveAll}
+                                                disabled={loading || !hasPersonalChanges || usernameStatus === 'checking' || usernameStatus === 'taken'}
+                                                className="w-full h-10 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors active:scale-[0.98] flex items-center justify-center gap-2"
+                                            >
+                                                {loading ? (
+                                                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                                ) : (
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                                )}
+                                                Salvar Alterações
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
 
                         {/* ── SEÇÃO: PREÇOS E GANHOS (Profissionais) ── */}
+                        {/* ── CARD 1: OFERECER ASSINATURA ── */}
                         {profileIsProfessional && (
                             <div>
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Assinatura e Ganhos</p>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Oferecer Assinatura</p>
                                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-50">
                                     {/* Toggle Habilitar Assinatura */}
                                     <div className="px-4 py-3.5 flex items-center justify-between">
@@ -546,96 +640,131 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                         </button>
                                     </div>
 
-                                    {/* Preço da Assinatura (Exibe apenas se habilitado) */}
+                                    {/* Preço da Assinatura e Desconto (Exibe apenas se habilitado) */}
                                     {isSubscriptionEnabled && (
-                                        <div className="px-4 py-3.5 bg-slate-50/30 transition-all">
-                                            <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Preço da Assinatura Mensal (R$)</label>
-                                            <input
-                                                className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
-                                                placeholder="0.00"
-                                                value={subscriptionPrice}
-                                                onChange={(e) => setSubscriptionPrice(e.target.value)}
-                                                type="number"
-                                                step="0.01"
-                                                inputMode="decimal"
-                                                max={userData?.maxSubscriptionPrice ?? 200}
-                                            />
-                                            <div className="flex flex-col gap-0.5 mt-1">
-                                                <span className="text-[9px] text-gray-400">
-                                                    Valor mínimo permitido: R$ {(userData?.minSubscriptionPrice ?? 10).toFixed(2)}
-                                                </span>
-                                                <span className="text-[9px] text-gray-400">
-                                                    Valor máximo permitido: R$ {(userData?.maxSubscriptionPrice ?? 200).toFixed(2)}
-                                                </span>
+                                        <>
+                                            <div className="px-4 py-3.5 bg-slate-50/30 transition-all">
+                                                <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Preço da Assinatura Mensal</label>
+                                                <input
+                                                    className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
+                                                    placeholder="R$ 0,00"
+                                                    value={subscriptionPrice}
+                                                    onChange={(e) => setSubscriptionPrice(formatPriceBRL(e.target.value))}
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                />
+                                                <div className="flex flex-col gap-0.5 mt-1">
+                                                    <span className="text-[9px] text-gray-400">
+                                                        Valor mínimo permitido: R$ {(userData?.minSubscriptionPrice ?? 10).toFixed(2)}
+                                                    </span>
+                                                    <span className="text-[9px] text-gray-400">
+                                                        Valor máximo permitido: R$ {(userData?.maxSubscriptionPrice ?? 200).toFixed(2)}
+                                                    </span>
+                                                </div>
                                             </div>
-                                        </div>
+
+                                            <div className="px-4 py-3.5 bg-slate-50/30 transition-all">
+                                                <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Desconto para Assinantes (%)</label>
+                                                <input
+                                                    className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
+                                                    placeholder="20"
+                                                    value={subscriberDiscountPercentage}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value.replace(/\D/g, '');
+                                                        setSubscriberDiscountPercentage(val);
+                                                    }}
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                />
+                                                <p className="text-[9px] text-gray-400 mt-1">
+                                                    Defina a porcentagem de desconto (de 20% a 80%) para assinantes sobre o preço do caractere.
+                                                </p>
+                                            </div>
+                                        </>
                                     )}
 
+                                    {/* Botão Salvar Assinatura */}
+                                    {(hasSubscriptionChanges || loadingSubscription || saveSubscriptionSuccess || saveSubscriptionError) && (
+                                        <div className="px-4 pb-5 pt-3.5 flex flex-col gap-2 bg-white">
+                                            {saveSubscriptionError && (
+                                                <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-100 rounded-xl">
+                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                                    <p className="text-xs text-red-600 font-medium">{saveSubscriptionError}</p>
+                                                </div>
+                                            )}
+                                            {saveSubscriptionSuccess && (
+                                                <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-100 rounded-xl">
+                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-600 shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
+                                                    <p className="text-xs text-green-700 font-medium">Assinatura atualizada com sucesso</p>
+                                                </div>
+                                            )}
+                                            {(hasSubscriptionChanges || loadingSubscription) && (
+                                                <button
+                                                    onClick={handleSaveSubscription}
+                                                    disabled={loadingSubscription || !hasSubscriptionChanges}
+                                                    className="w-full h-10 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors active:scale-[0.98] flex items-center justify-center gap-2"
+                                                >
+                                                    {loadingSubscription ? (
+                                                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                                    ) : (
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                                    )}
+                                                    Salvar Assinatura
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── CARD 2: PRECIFICAÇÃO POR CARACTERE ── */}
+                        {profileIsProfessional && (
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Precificação por Caractere</p>
+                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-50">
+                                    
                                     {/* Preço por Caractere */}
                                     <div className="px-4 py-3.5 bg-slate-50/20 border-t border-gray-50 flex flex-col gap-3">
                                         <div>
-                                            <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block">Preço por Caractere (Mensagens)</label>
-                                            <p className="text-[9px] text-gray-400 leading-snug mt-0.5">
-                                                Defina o preço base por caractere digitado no chat. Assinantes têm {userData?.subscriberDiscountPercentage ?? 20}% de desconto automaticamente.
-                                            </p>
-                                        </div>
-
-                                        <div className="flex items-center justify-between bg-gray-50 rounded-xl p-2.5 border border-gray-100 mt-1">
-                                            <span className="text-xs font-semibold text-gray-500">Valor Base</span>
-                                            
-                                            <div className="flex items-center gap-2">
-                                                {/* Botão Decrementar */}
+                                            <div className="flex items-center justify-between gap-2">
+                                                <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block">Preço por Caractere (Mensagens)</label>
                                                 <button
                                                     type="button"
-                                                    onClick={() => handleAdjustPrice(-0.001)}
-                                                    disabled={Number(chargePerCharNonSubscribers) <= 0}
-                                                    className="w-7 h-7 rounded-lg bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-600 hover:bg-gray-50 active:scale-95 transition-all disabled:opacity-50"
-                                                    title="Diminuir preço"
+                                                    onClick={() => setShowPricingGuideModal(true)}
+                                                    className="shrink-0 text-[10px] font-bold text-purple-600 hover:text-purple-700 transition-colors underline underline-offset-2 decoration-purple-200"
                                                 >
-                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                        <line x1="5" y1="12" x2="19" y2="12" />
-                                                    </svg>
-                                                </button>
-
-                                                {/* Input de Valor */}
-                                                <div className="relative flex items-center">
-                                                    <span className="absolute left-2 text-xs font-bold text-gray-400">R$</span>
-                                                    <input
-                                                        type="number"
-                                                        step="0.0001"
-                                                        min="0"
-                                                        className="w-20 h-7 pl-6 pr-1 text-center text-xs font-bold text-gray-800 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-600 focus:border-purple-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                        value={chargePerCharNonSubscribers}
-                                                        onChange={(e) => setChargePerCharNonSubscribers(e.target.value)}
-                                                        onBlur={handleInputBlur}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') {
-                                                                handleInputBlur();
-                                                            }
-                                                        }}
-                                                    />
-                                                </div>
-
-                                                {/* Botão Incrementar */}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleAdjustPrice(0.001)}
-                                                    disabled={Number(chargePerCharNonSubscribers) >= (userData?.maxPricePerChar ?? 0.2)}
-                                                    className="w-7 h-7 rounded-lg bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-600 hover:bg-gray-50 active:scale-95 transition-all disabled:opacity-50"
-                                                    title="Aumentar preço"
-                                                >
-                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                                                    </svg>
+                                                    Como saber quanto cobrar?
                                                 </button>
                                             </div>
+                                            <p className="text-[9px] text-gray-400 leading-snug mt-0.5">
+                                                Escolha o preço base por caractere digitado no chat.
+                                                {isSubscriptionEnabled ? ` Assinantes têm ${Number(subscriberDiscountPercentage) || 20}% de desconto automaticamente.` : ' Habilite a assinatura para oferecer desconto aos assinantes.'}
+                                            </p>
                                         </div>
 
-                                        {Number(chargePerCharNonSubscribers) >= (userData?.maxPricePerChar ?? 0.2) && (
-                                            <p className="text-[9px] text-amber-600 font-medium -mt-1 px-1">
-                                                Você atingiu o preço máximo permitido de R$ {(userData?.maxPricePerChar ?? 0.2).toFixed(2)} por caractere.
-                                            </p>
-                                        )}
+                                        <div className="grid grid-cols-4 gap-2 mt-1">
+                                            {PRICE_PER_CHAR_OPTIONS.map((option) => {
+                                                const limitMaxPrice = userData?.maxPricePerChar ?? 0.2;
+                                                const disabled = option > limitMaxPrice;
+                                                const active = Number(chargePerCharNonSubscribers) === option;
+                                                return (
+                                                    <button
+                                                        key={option}
+                                                        type="button"
+                                                        disabled={disabled}
+                                                        onClick={() => handleSelectPricePerChar(option)}
+                                                        className={`h-10 rounded-xl text-xs font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
+                                                            active
+                                                                ? 'bg-purple-600 text-white shadow-sm ring-2 ring-purple-200'
+                                                                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                                                        }`}
+                                                    >
+                                                        R$ {option.toFixed(2).replace('.', ',')}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
 
                                         {/* Detalhes de cálculo dinâmico */}
                                         <div className="grid grid-cols-2 gap-2 bg-purple-50/40 rounded-xl p-2.5 border border-purple-50 text-[10px] mt-0.5">
@@ -649,17 +778,22 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                                 </span>
                                             </div>
                                             
-                                            <div className="flex flex-col gap-0.5 border-l border-purple-100/50 pl-2.5">
+                                            <div className={`flex flex-col gap-0.5 border-l border-purple-100/50 pl-2.5 ${!isSubscriptionEnabled ? 'opacity-40' : ''}`}>
                                                 <span className="font-semibold text-purple-600 uppercase tracking-wider text-[8px] flex items-center gap-0.5">
                                                     Assinantes
-                                                    <span className="bg-purple-100 text-purple-700 text-[7px] font-extrabold px-1 rounded">-{userData?.subscriberDiscountPercentage ?? 20}%</span>
+                                                    <span className="bg-purple-100 text-purple-700 text-[7px] font-extrabold px-1 rounded">-{Number(subscriberDiscountPercentage) || 20}%</span>
                                                 </span>
                                                 <span className="font-bold text-purple-700">
-                                                    {(Number(chargePerCharNonSubscribers) * (1 - (userData?.subscriberDiscountPercentage ?? 20) / 100)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4 })}
+                                                    {(Number(chargePerCharNonSubscribers) * (1 - (Number(subscriberDiscountPercentage) || 20) / 100)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4 })}
                                                 </span>
                                                 <span className="text-[8.5px] text-purple-500 font-medium">
-                                                    100 chars = {((Number(chargePerCharNonSubscribers) || 0) * (1 - (userData?.subscriberDiscountPercentage ?? 20) / 100) * 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })}
+                                                    100 chars = {((Number(chargePerCharNonSubscribers) || 0) * (1 - (Number(subscriberDiscountPercentage) || 20) / 100) * 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })}
                                                 </span>
+                                                {!isSubscriptionEnabled && (
+                                                    <span className="text-[7.5px] text-gray-400 font-medium mt-0.5 italic block">
+                                                        Inativo (Sem assinatura ativa)
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
 
@@ -678,43 +812,52 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                                         {((Number(chargePerCharNonSubscribers) || 0) * (userData?.audioPriceMultiplier ?? 5)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4 })} / seg
                                                     </span>
                                                 </div>
-                                                <div className="flex flex-col gap-0.5 border-l border-purple-100/50 pl-2.5">
+                                                <div className={`flex flex-col gap-0.5 border-l border-purple-100/50 pl-2.5 ${!isSubscriptionEnabled ? 'opacity-40' : ''}`}>
                                                     <span className="font-semibold text-purple-600 uppercase tracking-wider text-[8px]">Assinantes</span>
                                                     <span className="font-bold text-purple-700">
-                                                        {((Number(chargePerCharNonSubscribers) || 0) * (1 - (userData?.subscriberDiscountPercentage ?? 20) / 100) * (userData?.audioPriceMultiplier ?? 5)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4 })} / seg
+                                                        {((Number(chargePerCharNonSubscribers) || 0) * (1 - (Number(subscriberDiscountPercentage) || 20) / 100) * (userData?.audioPriceMultiplier ?? 5)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4 })} / seg
                                                     </span>
+                                                    {!isSubscriptionEnabled && (
+                                                        <span className="text-[7.5px] text-gray-400 font-medium mt-0.5 italic block">
+                                                            Inativo
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Botão Salvar (e alertas) */}
-                                    <div className="px-4 pb-5 pt-3.5 flex flex-col gap-2 bg-white">
-                                        {saveSubscriptionError && (
-                                            <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-100 rounded-xl">
-                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                                                <p className="text-xs text-red-600 font-medium">{saveSubscriptionError}</p>
-                                            </div>
-                                        )}
-                                        {saveSubscriptionSuccess && (
-                                            <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-100 rounded-xl">
-                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-600 shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
-                                                <p className="text-xs text-green-700 font-medium">Assinatura atualizada com sucesso</p>
-                                            </div>
-                                        )}
-                                        <button
-                                            onClick={handleSaveSubscription}
-                                            disabled={loadingSubscription || !hasSubscriptionChanges}
-                                            className="w-full h-10 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors active:scale-[0.98] flex items-center justify-center gap-2"
-                                        >
-                                            {loadingSubscription ? (
-                                                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                                            ) : (
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                    {/* Botão Salvar Preço por Caractere */}
+                                    {(hasPricingChanges || loadingPricing || savePricingSuccess || savePricingError) && (
+                                        <div className="px-4 pb-5 pt-3.5 flex flex-col gap-2 bg-white">
+                                            {savePricingError && (
+                                                <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-100 rounded-xl">
+                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                                    <p className="text-xs text-red-600 font-medium">{savePricingError}</p>
+                                                </div>
                                             )}
-                                            Salvar Alterações
-                                        </button>
-                                    </div>
+                                            {savePricingSuccess && (
+                                                <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-100 rounded-xl">
+                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-600 shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
+                                                    <p className="text-xs text-green-700 font-medium">Preço por caractere atualizado com sucesso</p>
+                                                </div>
+                                            )}
+                                            {(hasPricingChanges || loadingPricing) && (
+                                                <button
+                                                    onClick={handleSavePricing}
+                                                    disabled={loadingPricing || !hasPricingChanges}
+                                                    className="w-full h-10 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors active:scale-[0.98] flex items-center justify-center gap-2"
+                                                >
+                                                    {loadingPricing ? (
+                                                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                                    ) : (
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                                    )}
+                                                    Salvar Preço por Caractere
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -1128,6 +1271,13 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                     </div>
                 </div>
             )}
+            <PricingGuideModal
+                visible={showPricingGuideModal}
+                onClose={() => setShowPricingGuideModal(false)}
+                selectedRate={Number(chargePerCharNonSubscribers) || PRICE_PER_CHAR_OPTIONS[0]}
+                maxPricePerChar={userData?.maxPricePerChar ?? 0.2}
+                onApply={handleSelectPricePerChar}
+            />
         </div>
     );
 }
