@@ -597,14 +597,17 @@ export type MySubscription = {
 };
 
 export function useMySubscriptions() {
+    const { user } = useUser();
+
     return useQuery({
-        queryKey: ['subscriptions', 'me'],
+        queryKey: ['subscriptions', 'me', user?.id ?? ''],
         queryFn: async () => {
             const response = await fetch('/api/users/me/subscriptions');
             if (!response.ok) return { subscriptions: [] as MySubscription[] };
             return response.json() as Promise<{ subscriptions: MySubscription[] }>;
         },
-        staleTime: 60 * 1000,
+        enabled: !!user?.id,
+        staleTime: 30 * 1000,
     });
 }
 
