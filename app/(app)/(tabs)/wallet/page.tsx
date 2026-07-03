@@ -263,7 +263,24 @@ export default function WalletPage() {
     const totalEarningsSum = Object.values(data.earningsByCategory).reduce((a, b) => a + b, 0) || 1;
     const getPercent = (val: number) => {
         return ((val / totalEarningsSum) * 100).toFixed(0) + '%';
-    };    return (
+    };
+
+    // Cálculo da completude do perfil para criadores
+    const hasPhoto = !!userData?.photoUrl && userData.photoUrl.trim() !== '';
+    const hasCover = !!userData?.coverUrl && userData.coverUrl.trim() !== '';
+    const hasBio = !!userData?.bio && userData.bio.trim().length >= 10;
+    const hasPhotos = (userData?.publicPhotosCount ?? 0) >= 3;
+
+    let completedSteps = 0;
+    if (hasPhoto) completedSteps++;
+    if (hasCover) completedSteps++;
+    if (hasBio) completedSteps++;
+    if (hasPhotos) completedSteps++;
+
+    const completenessPercentage = completedSteps * 25;
+    const showEngagementPanel = userData?.isProfessional && userData?.professionalStatus === 'approved' && completenessPercentage < 100;
+
+    return (
         <div className="flex flex-col h-full bg-slate-50 text-gray-850 overflow-y-auto pb-28 md:pb-6 relative no-scrollbar">
             
             {/* Header */}
@@ -348,6 +365,76 @@ export default function WalletPage() {
                         </button>
                     </div>
                 </div>
+
+                {/* ── PAINEL DE ENGAJAMENTO / COMPLETUDE DO PERFIL ── */}
+                {showEngagementPanel && (
+                    <div className="bg-white border border-purple-100 rounded-2xl p-5 shadow-[0_4px_20px_rgb(0,0,0,0.012)] flex flex-col gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div>
+                            <div className="flex items-center justify-between">
+                                <h3 className="font-bold text-gray-900 text-sm">Qualidade do Perfil</h3>
+                                <span className="text-xs font-black text-purple-650 bg-purple-50 px-2 py-0.5 rounded-full uppercase tracking-wider">{completenessPercentage}% Completo</span>
+                            </div>
+                            <p className="text-[11px] text-gray-400 leading-snug mt-1">
+                                Um perfil qualificado atrai muito mais mimos e conversas pagas. Complete todos os requisitos para ser recomendado!
+                            </p>
+                        </div>
+
+                        {/* Barra de Progresso */}
+                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                            <div 
+                                className="bg-gradient-to-r from-purple-600 to-indigo-600 h-full rounded-full transition-all duration-500"
+                                style={{ width: `${completenessPercentage}%` }}
+                            />
+                        </div>
+
+                        {/* Checklist de Requisitos */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+                            <div className="flex items-center gap-2.5 text-xs text-gray-700">
+                                <div className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 border ${
+                                    hasPhoto ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-500 border-rose-100'
+                                }`}>
+                                    {hasPhoto ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                                </div>
+                                <span className={hasPhoto ? 'font-medium' : 'text-gray-400'}>Foto de perfil</span>
+                            </div>
+
+                            <div className="flex items-center gap-2.5 text-xs text-gray-700">
+                                <div className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 border ${
+                                    hasCover ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-500 border-rose-100'
+                                }`}>
+                                    {hasCover ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                                </div>
+                                <span className={hasCover ? 'font-medium' : 'text-gray-400'}>Foto de capa</span>
+                            </div>
+
+                            <div className="flex items-center gap-2.5 text-xs text-gray-700">
+                                <div className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 border ${
+                                    hasBio ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-500 border-rose-100'
+                                }`}>
+                                    {hasBio ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                                </div>
+                                <span className={hasBio ? 'font-medium' : 'text-gray-400'}>Biografia (mín. 10 chars)</span>
+                            </div>
+
+                            <div className="flex items-center gap-2.5 text-xs text-gray-700">
+                                <div className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 border ${
+                                    hasPhotos ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-500 border-rose-100'
+                                }`}>
+                                    {hasPhotos ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                                </div>
+                                <span className={hasPhotos ? 'font-medium' : 'text-gray-400'}>Galeria (mín. 3 fotos)</span>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => router.push('/profile')}
+                            className="w-full h-10 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-100 text-xs font-bold transition-all active:scale-[0.98] mt-1 flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                            Ajustar Perfil
+                            <ArrowUpRight className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                )}
 
                 {/* ── BENTO BLOCK 2: HISTÓRICO DE SAQUES (Substitui Desempenho no Chat) ── */}
                 {(withdrawFeedback || hasActiveWithdrawal) && (

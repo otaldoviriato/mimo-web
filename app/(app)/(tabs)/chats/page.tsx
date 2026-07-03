@@ -70,6 +70,16 @@ export default function ChatsPage() {
     const { user } = useUser();
     const queryClient = useQueryClient();
     const { socket, connected, socketService, socketVersion } = useSocket(user?.id);
+    
+    // Controle do banner de progresso de completude do perfil
+    const [hideProfileProgress, setHideProfileProgress] = useState(true);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const isDismissed = localStorage.getItem('mimo_hide_profile_progress_banner') === 'true';
+            setHideProfileProgress(isDismissed);
+        }
+    }, []);
 
     // Estado de "digitando" por sala: { [roomId]: boolean }
     const [typingRooms, setTypingRooms] = useState<Record<string, boolean>>({});
@@ -180,6 +190,74 @@ export default function ChatsPage() {
         }
 
         return null;
+    };
+
+    const renderProfileProgressBanner = () => {
+        if (!myProfile || !myProfile.isProfessional || myProfile.professionalStatus !== 'approved' || hideProfileProgress) return null;
+
+        const hasPhoto = !!myProfile.photoUrl && myProfile.photoUrl.trim() !== '';
+        const hasCover = !!myProfile.coverUrl && myProfile.coverUrl.trim() !== '';
+        const hasBio = !!myProfile.bio && myProfile.bio.trim().length >= 10;
+        const hasPhotos = (myProfile.publicPhotosCount ?? 0) >= 3;
+
+        let completedSteps = 0;
+        if (hasPhoto) completedSteps++;
+        if (hasCover) completedSteps++;
+        if (hasBio) completedSteps++;
+        if (hasPhotos) completedSteps++;
+
+        const completenessPercentage = completedSteps * 25;
+
+        if (completenessPercentage === 100) return null;
+
+        return (
+            <div className="mx-4 mt-4 mb-4 bg-gradient-to-r from-purple-50 via-indigo-50/50 to-purple-50/30 border border-purple-100 rounded-2xl p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300 relative">
+                <button 
+                    onClick={() => {
+                        setHideProfileProgress(true);
+                        localStorage.setItem('mimo_hide_profile_progress_banner', 'true');
+                    }}
+                    className="absolute top-2.5 right-2.5 p-1 rounded-full text-purple-400 hover:text-purple-600 transition-colors"
+                    title="Dispensar"
+                >
+                    <X size={14} />
+                </button>
+                <div className="flex items-start gap-3">
+                    <div className="min-w-0 flex-1 pr-4">
+                        <h3 className="font-bold text-purple-900 text-xs md:text-sm">Melhore o seu perfil! 🚀</h3>
+                        <p className="text-[10px] md:text-xs text-purple-700 mt-0.5 leading-snug">
+                            Seu perfil está <span className="font-extrabold">{completenessPercentage}% completo</span>. Perfis completos ganham destaque e atraem muito mais clientes!
+                        </p>
+                        
+                        {/* Barra de Progresso */}
+                        <div className="w-full bg-purple-200/50 h-2 rounded-full mt-3 overflow-hidden">
+                            <div 
+                                className="bg-gradient-to-r from-purple-600 to-indigo-600 h-full rounded-full transition-all duration-500"
+                                style={{ width: `${completenessPercentage}%` }}
+                            />
+                        </div>
+                        
+                        {/* Requisitos Pendentes */}
+                        <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[9px] font-bold uppercase tracking-wider text-purple-500/80">
+                            {!hasPhoto && <span>• Falta Foto Perfil</span>}
+                            {!hasCover && <span>• Falta Capa</span>}
+                            {!hasBio && <span>• Falta Bio (min 10)</span>}
+                            {!hasPhotos && <span>• Falta Galeria (min 3)</span>}
+                        </div>
+
+                        <div className="mt-3.5 flex justify-end">
+                            <button
+                                onClick={() => router.push('/profile')}
+                                className="inline-flex items-center justify-center gap-1.5 bg-purple-600 hover:bg-purple-700 active:scale-[0.98] transition-all text-white text-[10px] font-extrabold px-3 py-1.5 rounded-xl shadow-md shadow-purple-600/10 cursor-pointer"
+                            >
+                                Completar Agora
+                                <ChevronRight className="w-3 h-3" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
     };
 
     // ─── Listeners de WebSocket em tempo real ───────────────────────────────
@@ -451,6 +529,9 @@ export default function ChatsPage() {
 
             {/* Banner de Verificação de Identidade */}
             {renderVerificationBanner()}
+
+            {/* Banner de Completude do Perfil */}
+            {renderProfileProgressBanner()}
 
             {/* Modal de crédito promocional */}
             {giftModal && (

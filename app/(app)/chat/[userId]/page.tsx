@@ -722,6 +722,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const loadingMoreRef = useRef(false);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const videoFileInputRef = useRef<HTMLInputElement>(null);
     const typingTimeoutRef = useRef<any>(null);
     const partnerTypingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -2027,12 +2028,12 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     // Envia a mídia selecionada (selectedFile) com o preço/duração já definidos.
     // Usado pelo MediaComposerSheet (profissional configurou preço/duração) e pelo
     // fallback no compose bar (envio durante a janela em que userData ainda está carregando).
-    const sendSelectedMedia = (priceInCents: number, isTemporaryMedia: boolean, expiryMinutes: number) => {
+    const sendSelectedMedia = (priceInCents: number, isTemporaryMedia: boolean, expiryMinutes: number, coverFrameDataUrl?: string) => {
         if (!selectedFile) return;
 
         const file = selectedFile;
         const isVideoFile = isVideo;
-        const preview = previewUrl || '';
+        const preview = coverFrameDataUrl || previewUrl || '';
 
         setSelectedFile(null);
         setPreviewUrl(null);
@@ -3066,13 +3067,16 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 {/* Sheet de Preview e Configuração da Mídia */}
                 {selectedFile && userData?.isProfessional && (
                     <MediaComposerSheet
+                        file={selectedFile}
                         previewUrl={previewUrl}
                         isVideo={isVideo}
                         onCancel={() => {
                             setSelectedFile(null);
                             setPreviewUrl(null);
                         }}
-                        onConfirm={sendSelectedMedia}
+                        onConfirm={(price, isTemp, expiry, coverFrame) => {
+                            sendSelectedMedia(price, isTemp, expiry, coverFrame);
+                        }}
                     />
                 )}
 
@@ -3115,6 +3119,24 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                 <p className="text-[10px] text-gray-500">Galeria ou Câmera</p>
                                             </div>
                                         </button>
+                                        <button
+                                            onClick={() => {
+                                                setAttachMenuVisible(false);
+                                                videoFileInputRef.current?.click();
+                                            }}
+                                            className={`flex items-center gap-3 w-full px-4 py-3.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors ${!userData?.isProfessional ? 'border-b border-gray-50' : ''}`}
+                                        >
+                                            <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center text-rose-500">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M23 7l-7 5 7 5V7z" />
+                                                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-gray-900">Enviar Vídeo</p>
+                                                <p className="text-[10px] text-gray-500">Galeria ou Arquivos</p>
+                                            </div>
+                                        </button>
                                         {!userData?.isProfessional && (
                                             <button
                                                 onClick={() => {
@@ -3141,10 +3163,13 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     )}
                     
                     {audioRecordingStatus === 'idle' && (
-                        <input type="file" className="hidden" ref={fileInputRef} accept="image/*,video/*" onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file?.type.startsWith('video/')) handleFileSelect(e, 'video');
-                            else handleFileSelect(e, 'image');
+                        <input type="file" className="hidden" ref={fileInputRef} accept="image/*" onChange={(e) => {
+                            handleFileSelect(e, 'image');
+                        }} />
+                    )}
+                    {audioRecordingStatus === 'idle' && (
+                        <input type="file" className="hidden" ref={videoFileInputRef} accept="video/*" onChange={(e) => {
+                            handleFileSelect(e, 'video');
                         }} />
                     )}
 

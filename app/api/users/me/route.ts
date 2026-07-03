@@ -5,6 +5,7 @@ import { User, type ICard } from '@/models/User';
 import { Room } from '@/models/Room';
 import { Message } from '@/models/Message';
 import { AppSettings } from '@/models/AppSettings';
+import { GalleryItem } from '@/models/GalleryItem';
 import { Resend } from 'resend';
 import { buildProfileRoleMetadata, getCreatorLandingProfileRole } from '@/lib/profileRole';
 
@@ -131,6 +132,16 @@ export async function GET() {
             }
         }
 
+        let publicPhotosCount = 0;
+        if (user.isProfessional) {
+            publicPhotosCount = await GalleryItem.countDocuments({
+                ownerId: user.clerkId,
+                galleryType: 'public',
+                visibility: 'public',
+                mediaType: 'photo'
+            });
+        }
+
         return NextResponse.json({
             user: {
                 id: user._id,
@@ -175,6 +186,7 @@ export async function GET() {
                 emailNotificationsEnabled: user.emailNotificationsEnabled ?? false,
                 hasPushToken: Boolean(user.fcmToken || (user.fcmTokens && user.fcmTokens.length > 0)),
                 hideFromExplore: user.hideFromExplore ?? false,
+                publicPhotosCount,
             },
         });
     } catch (error: any) {

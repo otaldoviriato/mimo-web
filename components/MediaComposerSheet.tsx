@@ -1,15 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Drawer } from 'vaul';
-import { DollarSign, Timer, Lock, X } from 'lucide-react';
+import { DollarSign, Timer, Lock, X, Play, Pause } from 'lucide-react';
 
 interface MediaComposerSheetProps {
+    file?: File;
     previewUrl: string | null;
     isVideo: boolean;
     onCancel: () => void;
-    onConfirm: (priceInCents: number, isTemporary: boolean, expiryMinutes: number) => void;
+    onConfirm: (priceInCents: number, isTemporary: boolean, expiryMinutes: number, coverFrameDataUrl?: string) => void;
 }
+
 
 const PRICE_OPTIONS = [
     { label: 'Grátis', value: 'free', price: 0 },
@@ -31,7 +33,7 @@ const DURATION_OPTIONS = [
     { label: 'Personalizado', value: 'custom_duration' },
 ] as const;
 
-export function MediaComposerSheet({ previewUrl, isVideo, onCancel, onConfirm }: MediaComposerSheetProps) {
+export function MediaComposerSheet({ file, previewUrl, isVideo, onCancel, onConfirm }: MediaComposerSheetProps) {
     const [mediaPriceStr, setMediaPriceStr] = useState('');
     const [mediaPriceType, setMediaPriceType] = useState<'free' | 'paid'>('free');
     const [mediaPriceFormatted, setMediaPriceFormatted] = useState('R$ 0,00');
@@ -39,6 +41,70 @@ export function MediaComposerSheet({ previewUrl, isVideo, onCancel, onConfirm }:
     const [expiryOption, setExpiryOption] = useState<'permanent' | '10s' | '30s' | '1min' | '30min' | '24h' | '7d' | 'custom'>('permanent');
     const [customExpiryValue, setCustomExpiryValue] = useState<number | "">(1);
     const [customExpiryUnit, setCustomExpiryUnit] = useState<'seconds' | 'minutes' | 'hours' | 'days'>('hours');
+
+    // Estados e refs de controle do vídeo interativo
+    const [videoObjectUrl, setVideoObjectUrl] = useState<string | null>(null);
+    const [duration, setDuration] = useState(0);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    useEffect(() => {
+        if (file && isVideo) {
+            const url = URL.createObjectURL(file);
+            setVideoObjectUrl(url);
+            return () => {
+                URL.revokeObjectURL(url);
+            };
+        }
+    }, [file, isVideo]);
+
+    const formatTime = (timeInSeconds: number) => {
+        if (isNaN(timeInSeconds) || !isFinite(timeInSeconds)) return '0:00';
+        const mins = Math.floor(timeInSeconds / 60);
+        const secs = Math.floor(timeInSeconds % 60);
+        return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    };
+
+    const togglePlay = () => {
+        if (videoRef.current) {
+            if (isPlaying) {
+                videoRef.current.pause();
+                setIsPlaying(false);
+            } else {
+                videoRef.current.play().then(() => {
+                    setIsPlaying(true);
+                }).catch(err => {
+                    console.error("Failed to play video:", err);
+                });
+            }
+        }
+    };
+
+    const handleScrub = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = parseFloat(e.target.value);
+        setCurrentTime(val);
+        if (videoRef.current) {
+            videoRef.current.currentTime = val;
+        }
+    };
+
+    const handleTimeUpdate = () => {
+        if (videoRef.current) {
+            setCurrentTime(videoRef.current.currentTime);
+        }
+    };
+
+    const handleLoadedMetadata = () => {
+        if (videoRef.current) {
+            setDuration(videoRef.current.duration);
+        }
+    };
+
+    const handleEnded = () => {
+        setIsPlaying(false);
+    };
+
 
     const shouldBlur = mediaPriceType === 'paid' || isTemporary;
 
@@ -90,7 +156,25 @@ export function MediaComposerSheet({ previewUrl, isVideo, onCancel, onConfirm }:
             else if (unit === 'days') expiryMinutes = val * 1440;
         }
 
-        onConfirm(Math.round(price * 100), isTemporary, expiryMinutes);
+        let capturedCoverFrameUrl: string | undefined = undefined;
+        if (isVideo && videoRef.current) {
+            try {
+                const video = videoRef.current;
+                const canvas = document.createElement('canvas');
+                // Usa dimensões nativas do vídeo ou fallback
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 480;
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    capturedCoverFrameUrl = canvas.toDataURL('image/jpeg', 0.9);
+                }
+            } catch (err) {
+                console.error("Failed to capture custom video cover frame:", err);
+            }
+        }
+
+        onConfirm(Math.round(price * 100), isTemporary, expiryMinutes, capturedCoverFrameUrl);
     };
 
     return (
@@ -122,19 +206,23 @@ export function MediaComposerSheet({ previewUrl, isVideo, onCancel, onConfirm }:
                     <div className="flex w-full flex-1 flex-col overflow-y-auto min-h-0 px-5 py-4 gap-5">
                         {/* Preview da mídia */}
                         <div className="relative w-full rounded-2xl bg-slate-100 overflow-hidden shrink-0" style={{ height: '240px' }}>
-                            {previewUrl ? (
+                            {videoObjectUrl || previewUrl ? (
                                 isVideo ? (
                                     <video
-                                        src={previewUrl}
-                                        className={`w-full h-full object-cover transition-all duration-300 ${shouldBlur ? 'blur-md scale-105' : ''}`}
+                                        ref={videoRef}
+                                        src={videoObjectUrl || previewUrl || ''}
+                                        className={`w-full h-full object-cover transition-all duration-300 ${shouldBlur ? 'blur-sm scale-102' : ''}`}
                                         muted
                                         playsInline
+                                        onTimeUpdate={handleTimeUpdate}
+                                        onLoadedMetadata={handleLoadedMetadata}
+                                        onEnded={handleEnded}
                                     />
                                 ) : (
                                     <img
-                                        src={previewUrl}
+                                        src={previewUrl || ''}
                                         alt="Prévia da mídia"
-                                        className={`w-full h-full object-cover transition-all duration-300 ${shouldBlur ? 'blur-md scale-105' : ''}`}
+                                        className={`w-full h-full object-cover transition-all duration-300 ${shouldBlur ? 'blur-sm scale-102' : ''}`}
                                     />
                                 )
                             ) : (
@@ -184,6 +272,47 @@ export function MediaComposerSheet({ previewUrl, isVideo, onCancel, onConfirm }:
                                 </div>
                             )}
                         </div>
+
+                        {/* Seletor de Capa (Scrubber) para Vídeo */}
+                        {isVideo && (videoObjectUrl || previewUrl) && (
+                            <div className="rounded-xl border border-gray-100 bg-slate-50 shadow-sm p-3.5 flex flex-col gap-2.5 animate-in slide-in-from-top-1 duration-150 shrink-0">
+                                <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+                                    <span>Selecione a foto de capa do vídeo</span>
+                                    <span className="font-mono bg-slate-200/60 text-slate-700 px-2 py-0.5 rounded text-[10px] tabular-nums">
+                                        {formatTime(currentTime)} / {formatTime(duration)}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={togglePlay}
+                                        className="w-8 h-8 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center transition-colors shrink-0 active:scale-95 shadow-sm"
+                                        aria-label={isPlaying ? 'Pausar' : 'Reproduzir'}
+                                    >
+                                        {isPlaying ? (
+                                            <Pause size={14} fill="currentColor" />
+                                        ) : (
+                                            <Play size={14} fill="currentColor" className="ml-0.5" />
+                                        )}
+                                    </button>
+                                    <input
+                                        type="range"
+                                        min={0}
+                                        max={duration || 100}
+                                        step={0.05}
+                                        value={currentTime}
+                                        onChange={handleScrub}
+                                        className="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600 focus:outline-none"
+                                        style={{
+                                            background: `linear-gradient(to right, #9333ea 0%, #9333ea ${duration ? (currentTime / duration) * 100 : 0}%, #cbd5e1 ${duration ? (currentTime / duration) * 100 : 0}%, #cbd5e1 100%)`
+                                        }}
+                                    />
+                                </div>
+                                <p className="text-[10px] text-slate-400 leading-normal">
+                                    Arraste a barra para escolher qual momento do vídeo será exibido como imagem de capa (com desfoque para o usuário comprador).
+                                </p>
+                            </div>
+                        )}
 
                         {/* Preço */}
                         <div className="rounded-lg border border-gray-100 bg-white shadow-sm">
