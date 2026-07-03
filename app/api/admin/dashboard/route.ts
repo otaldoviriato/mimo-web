@@ -367,6 +367,10 @@ export async function GET(request: NextRequest) {
                 const feeCents = messageId ? (feeMap.get(messageId) || 0) : 0;
                 fee = feeCents / 100;
                 net = tx.val - fee;
+            } else if (tx.source === 'subscription') {
+                const feeCents = tx.metadata?.platformFee || 0;
+                fee = feeCents / 100;
+                net = tx.val - fee;
             }
 
             const { metadata, ...rest } = tx;

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 import { connectToDatabase } from '@/lib/db';
-import { User, Transaction, Subscription } from '@/models';
+import { User, Transaction, Subscription, AppSettings } from '@/models';
 import { SubscriptionBillingError, subscriptionPriceBRLToCents } from '@/lib/subscriptionBilling';
 
 function getNextExpiration(previousExpiresAt: Date, now: Date) {
@@ -30,6 +30,8 @@ export async function GET(request: NextRequest) {
         }
 
         await connectToDatabase();
+        const settings = await AppSettings.findOne({ key: 'global' });
+        const feePercentage = settings?.platformFeePercentage ?? 20;
 
         const now = new Date();
         const expiredSubscriptions = await Subscription.find({
@@ -136,6 +138,9 @@ export async function GET(request: NextRequest) {
 
             try {
                 await session.withTransaction(async () => {
+                    const platformFee = Math.ceil((priceInCents * feePercentage) / 100);
+                    const professionalEarnings = priceInCents - platformFee;
+
                     const debitResult = await User.updateOne(
                         { clerkId: subscriberId, balance: { $gte: priceInCents } },
                         { $inc: { balance: -priceInCents } },
@@ -153,7 +158,7 @@ export async function GET(request: NextRequest) {
                             professionalStatus: 'approved',
                             isSubscriptionEnabled: true,
                         },
-                        { $inc: { balance: priceInCents } },
+                        { $inc: { balance: professionalEarnings } },
                         { session }
                     );
 
@@ -169,14 +174,25 @@ export async function GET(request: NextRequest) {
                             source: 'subscription',
                             status: 'COMPLETED',
                             relatedUserId: professionalId,
+                            metadata: { platformFee }
                         },
                         {
                             userId: professionalId,
                             type: 'credit',
-                            amount: priceInCents,
+                            amount: professionalEarnings,
                             source: 'subscription',
                             status: 'COMPLETED',
                             relatedUserId: subscriberId,
+                            metadata: { platformFee }
+                        },
+                        {
+                            userId: 'platform',
+                            type: 'platform_fee',
+                            amount: platformFee,
+                            source: 'subscription',
+                            status: 'COMPLETED',
+                            relatedUserId: professionalId,
+                            metadata: { senderId: subscriberId, receiverId: professionalId }
                         },
                     ], { session });
 

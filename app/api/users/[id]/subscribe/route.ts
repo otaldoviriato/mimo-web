@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { Resend } from 'resend';
 import { connectToDatabase } from '@/lib/db';
-import { User, Transaction, Subscription } from '@/models';
+import { User, Transaction, Subscription, AppSettings } from '@/models';
 import { sendPushNotification } from '@/lib/push';
 import { SubscriptionBillingError, subscriptionPriceBRLToCents } from '@/lib/subscriptionBilling';
 
@@ -147,6 +147,11 @@ export async function POST(
         let subscriptionActivated = false;
         let subscriberCached = false;
 
+        const settings = await AppSettings.findOne({ key: 'global' });
+        const feePercentage = settings?.platformFeePercentage ?? 20;
+        const platformFee = Math.ceil((priceInCents * feePercentage) / 100);
+        const professionalEarnings = priceInCents - platformFee;
+
         try {
             const activeSubscription = await Subscription.findOne({
                 subscriberId: requesterId,
@@ -176,7 +181,7 @@ export async function POST(
                     professionalStatus: 'approved',
                     isSubscriptionEnabled: true,
                 },
-                { $inc: { balance: priceInCents } }
+                { $inc: { balance: professionalEarnings } }
             );
 
             if (creditResult.modifiedCount === 0) {
@@ -210,15 +215,26 @@ export async function POST(
                     source: 'subscription',
                     status: 'COMPLETED',
                     relatedUserId: ownerId,
+                    metadata: { platformFee }
                 },
                 {
                     userId: ownerId,
                     type: 'credit',
-                    amount: priceInCents,
+                    amount: professionalEarnings,
                     source: 'subscription',
                     status: 'COMPLETED',
                     relatedUserId: requesterId,
+                    metadata: { platformFee }
                 },
+                {
+                    userId: 'platform',
+                    type: 'platform_fee',
+                    amount: platformFee,
+                    source: 'subscription',
+                    status: 'COMPLETED',
+                    relatedUserId: ownerId,
+                    metadata: { senderId: requesterId, receiverId: ownerId }
+                }
             ]);
         } catch (error) {
             if (debited) {
@@ -233,7 +249,7 @@ export async function POST(
             if (credited) {
                 await User.updateOne(
                     { clerkId: ownerId },
-                    { $inc: { balance: -priceInCents } }
+                    { $inc: { balance: -professionalEarnings } }
                 ).catch((revertCreditError) => {
                     console.error('[POST /api/users/[id]/subscribe] Failed to revert professional credit after subscription error:', revertCreditError);
                 });
