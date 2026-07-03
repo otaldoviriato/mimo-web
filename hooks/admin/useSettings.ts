@@ -23,6 +23,7 @@ interface SettingsSnapshot {
     defaultPricePerCharNonSubscribers: number;
     audioPriceMultiplier: number;
     pwaShowAgainIntervalDays: number;
+    identityVerificationPromptIntervalDays: number;
     newProfileDaysThreshold: number;
     adminClerkIds: string[];
 }
@@ -55,6 +56,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     const [defaultPricePerCharNonSubscribers, setDefaultPricePerCharNonSubscribers] = useState(0.005);
     const [audioPriceMultiplier, setAudioPriceMultiplier] = useState(5);
     const [pwaShowAgainIntervalDays, setPwaShowAgainIntervalDays] = useState(7);
+    const [identityVerificationPromptIntervalDays, setIdentityVerificationPromptIntervalDays] = useState(7);
     const [newProfileDaysThreshold, setNewProfileDaysThreshold] = useState(15);
 
     // Gerenciamento de administradores
@@ -85,6 +87,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         defaultPricePerCharNonSubscribers: s.defaultPricePerCharNonSubscribers ?? 0.005,
         audioPriceMultiplier: s.audioPriceMultiplier ?? 5,
         pwaShowAgainIntervalDays: s.pwaShowAgainIntervalDays ?? 7,
+        identityVerificationPromptIntervalDays: s.identityVerificationPromptIntervalDays ?? 7,
         newProfileDaysThreshold: s.newProfileDaysThreshold ?? 15,
         adminClerkIds: richAdmins.map(a => a.clerkId),
     });
@@ -127,6 +130,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     setDefaultPricePerCharNonSubscribers(s.defaultPricePerCharNonSubscribers ?? 0.005);
                     setAudioPriceMultiplier(s.audioPriceMultiplier ?? 5);
                     setPwaShowAgainIntervalDays(s.pwaShowAgainIntervalDays ?? 7);
+                    setIdentityVerificationPromptIntervalDays(s.identityVerificationPromptIntervalDays ?? 7);
                     setNewProfileDaysThreshold(s.newProfileDaysThreshold ?? 15);
                     setSavedSnapshot(buildSnapshot(s, richAdmins));
                     setIsAuthorized(true);
@@ -211,6 +215,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     defaultPricePerCharNonSubscribers,
                     audioPriceMultiplier,
                     pwaShowAgainIntervalDays,
+                    identityVerificationPromptIntervalDays,
                     newProfileDaysThreshold,
                 }),
             });
@@ -237,6 +242,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                 setDefaultPricePerCharNonSubscribers(s.defaultPricePerCharNonSubscribers ?? 0.005);
                 setAudioPriceMultiplier(s.audioPriceMultiplier ?? 5);
                 setPwaShowAgainIntervalDays(s.pwaShowAgainIntervalDays ?? 7);
+                setIdentityVerificationPromptIntervalDays(s.identityVerificationPromptIntervalDays ?? 7);
                 setNewProfileDaysThreshold(s.newProfileDaysThreshold ?? 15);
             } else {
                 const errData = await response.json();
@@ -300,8 +306,10 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         creditCardEnabled !== savedSnapshot.creditCardEnabled ||
         couponsEnabled !== savedSnapshot.couponsEnabled
     );
-    const isDirtyApp = savedSnapshot !== null &&
-        pwaShowAgainIntervalDays !== savedSnapshot.pwaShowAgainIntervalDays;
+    const isDirtyApp = savedSnapshot !== null && (
+        pwaShowAgainIntervalDays !== savedSnapshot.pwaShowAgainIntervalDays ||
+        identityVerificationPromptIntervalDays !== savedSnapshot.identityVerificationPromptIntervalDays
+    );
     const isDirtyAdmins = savedSnapshot !== null && (
         adminListRich.length !== savedSnapshot.adminClerkIds.length ||
         adminListRich.some(a => !savedSnapshot.adminClerkIds.includes(a.clerkId))
@@ -331,6 +339,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         defaultPricePerCharNonSubscribers, setDefaultPricePerCharNonSubscribers,
         audioPriceMultiplier, setAudioPriceMultiplier,
         pwaShowAgainIntervalDays, setPwaShowAgainIntervalDays,
+        identityVerificationPromptIntervalDays, setIdentityVerificationPromptIntervalDays,
         newProfileDaysThreshold, setNewProfileDaysThreshold,
         adminListRich,
         adminSearch, setAdminSearch,

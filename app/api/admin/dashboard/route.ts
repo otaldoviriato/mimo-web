@@ -276,7 +276,8 @@ export async function GET(request: NextRequest) {
                 source: tx.source,
                 time: timeAgo,
                 status: statusLabel,
-                timestamp: txDate
+                timestamp: txDate,
+                metadata: tx.metadata
             };
         });
 
@@ -328,13 +329,53 @@ export async function GET(request: NextRequest) {
                 source: tx.source,
                 time: timeAgo,
                 status: statusLabel,
-                timestamp: txDate
+                timestamp: txDate,
+                metadata: tx.metadata
             };
         });
 
         // Combinar ambas as coleções e ordernar por data decrescente
         const combinedTransactions = [...mappedTransactions, ...mappedMicroTransactions]
             .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+        // Buscar taxas de plataforma para microtransações no dashboard
+        const messageIds = combinedTransactions
+            .filter(tx => ['image_unlock', 'gift', 'message'].includes(tx.source))
+            .map(tx => tx.metadata?.messageId)
+            .filter(Boolean);
+
+        const platformFees = messageIds.length > 0
+            ? await MicroTransaction.find({
+                'metadata.messageId': { $in: messageIds },
+                type: 'platform_fee'
+              }).lean()
+            : [];
+
+        const feeMap = new Map<string, number>();
+        for (const feeTx of platformFees) {
+            if (feeTx.metadata?.messageId) {
+                feeMap.set(feeTx.metadata.messageId, feeTx.amount || 0);
+            }
+        }
+
+        const enrichedCombinedTransactions = combinedTransactions.map(tx => {
+            let fee = 0;
+            let net = tx.val;
+
+            if (['image_unlock', 'gift', 'message'].includes(tx.source)) {
+                const messageId = tx.metadata?.messageId;
+                const feeCents = messageId ? (feeMap.get(messageId) || 0) : 0;
+                fee = feeCents / 100;
+                net = tx.val - fee;
+            }
+
+            const { metadata, ...rest } = tx;
+            return {
+                ...rest,
+                fee,
+                net
+            };
+        });
 
         // 3. Responder
         return NextResponse.json({
@@ -362,7 +403,7 @@ export async function GET(request: NextRequest) {
                 }
             },
             activityData,
-            recentTransactions: combinedTransactions,
+            recentTransactions: enrichedCombinedTransactions,
         });
 
     } catch (error: any) {

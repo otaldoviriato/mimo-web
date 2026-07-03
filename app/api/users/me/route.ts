@@ -315,6 +315,7 @@ export async function GET(request: NextRequest) {
                 minExclusivePhotos: settings?.minExclusivePhotos ?? 2,
                 maxExclusivePhotos: settings?.maxExclusivePhotos ?? 4,
                 pwaShowAgainIntervalDays: settings?.pwaShowAgainIntervalDays ?? 7,
+                identityVerificationPromptIntervalDays: settings?.identityVerificationPromptIntervalDays ?? 7,
                 emailNotificationsEnabled: user.emailNotificationsEnabled ?? false,
                 hasPushToken: Boolean(user.fcmToken || (user.fcmTokens && user.fcmTokens.length > 0)),
                 hideFromExplore: user.hideFromExplore ?? false,

@@ -27,6 +27,7 @@ export interface IAppSettings extends Document {
     defaultPricePerCharNonSubscribers: number;
     audioPriceMultiplier: number;
     pwaShowAgainIntervalDays: number;
+    identityVerificationPromptIntervalDays: number;
     newProfileDaysThreshold: number;
     createdAt: Date;
     updatedAt: Date;
@@ -180,6 +181,12 @@ const AppSettingsSchema = new Schema<IAppSettings>({
         min: 0,
     },
     pwaShowAgainIntervalDays: {
+        type: Number,
+        required: true,
+        default: 7,
+        min: 0,
+    },
+    identityVerificationPromptIntervalDays: {
         type: Number,
         required: true,
         default: 7,

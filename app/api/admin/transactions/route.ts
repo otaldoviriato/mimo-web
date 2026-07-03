@@ -157,7 +157,27 @@ export async function GET(request: NextRequest) {
             allTransactions = combined.slice(offset, offset + limit);
         }
 
-        // 3. Fazer enrich de nomes de usuários baseados nos Clerk IDs (remetente e destinatário)
+        // 3. Buscar taxas de plataforma para microtransações selecionadas nesta página
+        const messageIds = allTransactions
+            .filter(tx => ['image_unlock', 'gift', 'message'].includes(tx.source))
+            .map(tx => tx.metadata?.messageId)
+            .filter(Boolean);
+
+        const platformFees = messageIds.length > 0
+            ? await MicroTransaction.find({
+                'metadata.messageId': { $in: messageIds },
+                type: 'platform_fee'
+              }).lean()
+            : [];
+
+        const feeMap = new Map<string, number>();
+        for (const feeTx of platformFees) {
+            if (feeTx.metadata?.messageId) {
+                feeMap.set(feeTx.metadata.messageId, feeTx.amount || 0);
+            }
+        }
+
+        // 4. Fazer enrich de nomes de usuários baseados nos Clerk IDs (remetente e destinatário)
         const clerkIds = Array.from(new Set([
             ...allTransactions.map(tx => tx.senderId),
             ...allTransactions.map(tx => tx.receiverId)
@@ -186,10 +206,25 @@ export async function GET(request: NextRequest) {
                 receiverName = u ? (u.name || `@${u.username}`) : `Usuário (${tx.receiverId.substring(0, 8)})`;
             }
 
+            let fee = 0;
+            let net = tx.val;
+
+            if (['image_unlock', 'gift', 'message'].includes(tx.source)) {
+                const messageId = tx.metadata?.messageId;
+                const feeCents = messageId ? (feeMap.get(messageId) || 0) : 0;
+                fee = feeCents / 100;
+                net = tx.val - fee;
+            }
+
+            // Remove metadata
+            const { metadata, ...rest } = tx;
+
             return {
-                ...tx,
+                ...rest,
                 senderName,
-                receiverName
+                receiverName,
+                fee,
+                net
             };
         });
 
@@ -272,7 +307,8 @@ function mapTransaction(tx: any) {
         time: formatTimeAgo(txDate),
         status: statusLabel,
         timestamp: txDate,
-        isWithdrawRequest: false
+        isWithdrawRequest: false,
+        metadata: tx.metadata
     };
 }
 
@@ -317,7 +353,8 @@ function mapMicroTransaction(tx: any) {
         time: formatTimeAgo(txDate),
         status: statusLabel,
         timestamp: txDate,
-        isWithdrawRequest: false
+        isWithdrawRequest: false,
+        metadata: tx.metadata
     };
 }
 

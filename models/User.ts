@@ -53,6 +53,7 @@ export interface IUser extends Document {
     identitySelfieUrl?: string;
     identityDocumentType?: string;
     identityStatus?: 'pending' | 'approved' | 'rejected' | null;
+    identityVerificationPromptIntervalDays?: number;
     hideFromExplore?: boolean;
     subscriberDiscountPercentage?: number;
     createdAt: Date;

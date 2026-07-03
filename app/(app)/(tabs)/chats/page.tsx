@@ -82,6 +82,34 @@ export default function ChatsPage() {
         }
     }, []);
 
+    // Controle do banner de incentivo à verificação de identidade
+    const [hideIdentityPrompt, setHideIdentityPrompt] = useState(true);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && myProfile) {
+            if (myProfile.identityStatus === 'approved' || myProfile.identityStatus === 'pending') {
+                setHideIdentityPrompt(true);
+                return;
+            }
+
+            const dismissedAtStr = localStorage.getItem('mimo_identity_prompt_dismissed_at');
+            if (!dismissedAtStr) {
+                setHideIdentityPrompt(false);
+                return;
+            }
+
+            const dismissedAt = parseInt(dismissedAtStr, 10);
+            const intervalDays = myProfile.identityVerificationPromptIntervalDays ?? 7;
+            const intervalMs = intervalDays * 24 * 60 * 60 * 1000;
+
+            if (Date.now() - dismissedAt >= intervalMs) {
+                setHideIdentityPrompt(false);
+            } else {
+                setHideIdentityPrompt(true);
+            }
+        }
+    }, [myProfile]);
+
     // Estado de "digitando" por sala: { [roomId]: boolean }
     const [typingRooms, setTypingRooms] = useState<Record<string, boolean>>({});
     // Rastreia os timeouts ativos de digitação por sala para evitar conflitos concorrentes
@@ -137,23 +165,20 @@ export default function ChatsPage() {
     }, [myProfile]);
 
     const renderVerificationBanner = () => {
-        if (!myProfile || !myProfile.isProfessional) return null;
-        
-        const status = myProfile.professionalStatus;
-        
-        if (status === 'approved') return null;
+        if (!myProfile) return null;
 
-        if (status === 'pending') {
+        // Se estiver pendente
+        if (myProfile.identityStatus === 'pending') {
             return (
                 <div className="mx-4 mt-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-3 md:p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
                     <div className="flex items-center gap-3">
-                        <div className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
-                            <Clock className="w-4.5 h-4.5 animate-pulse" />
+                        <div className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600 animate-pulse">
+                            <Clock className="w-4.5 h-4.5" />
                         </div>
                         <div className="min-w-0">
                             <h3 className="font-bold text-amber-900 text-xs md:text-sm">Verificação em análise ⏳</h3>
                             <p className="text-[11px] md:text-xs text-amber-700 mt-1 leading-snug max-w-xl">
-                                Suas fotos e documentos foram enviados para análise. A liberação ocorrerá em até 48 horas.
+                                Seus documentos foram enviados para análise. A concessão do seu selo de verificado ocorrerá em até 48 horas.
                             </p>
                         </div>
                     </div>
@@ -161,9 +186,10 @@ export default function ChatsPage() {
             );
         }
 
-        if (status === 'rejected') {
+        // Se for recusado
+        if (myProfile.identityStatus === 'rejected') {
             return (
-                <div className="mx-4 mt-4 bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-2xl p-3 md:p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="mx-4 mt-4 bg-gradient-to-r from-red-50 to-rose-50/50 border border-red-200 rounded-2xl p-3 md:p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="flex items-start gap-3">
                             <div className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-600">
@@ -172,18 +198,56 @@ export default function ChatsPage() {
                             <div className="min-w-0">
                                 <h3 className="font-bold text-red-950 text-xs md:text-sm">Verificação recusada ❌</h3>
                                 <p className="text-[11px] md:text-xs text-red-700 mt-1 leading-snug max-w-xl">
-                                    {myProfile.notes || 'Infelizmente sua verificação de identidade não foi aprovada. Entre em contato com o suporte para mais informações.'}
+                                    {myProfile.notes || 'Infelizmente sua verificação de identidade não foi aprovada. Verifique suas fotos enviadas nos Ajustes.'}
                                 </p>
                             </div>
                         </div>
                         <div className="shrink-0 flex justify-end">
-                            <a
-                                href="mailto:suporte@mimochat.com.br"
-                                className="w-full sm:w-auto inline-flex items-center justify-center gap-1 bg-red-600 hover:bg-red-700 active:scale-[0.98] transition-all text-white text-[11px] font-extrabold px-3 py-2 rounded-xl shadow-md shadow-red-600/10 cursor-pointer"
+                            <button
+                                onClick={() => router.replace('/verificacao-identidade')}
+                                className="w-full sm:w-auto inline-flex items-center justify-center gap-1 bg-red-600 hover:bg-red-700 active:scale-[0.98] transition-all text-white text-[11px] font-extrabold px-3 py-2 rounded-xl shadow-md shadow-red-600/10 cursor-pointer animate-pulse"
                             >
-                                Contatar Suporte
+                                Reenviar Documentos
                                 <ChevronRight className="w-3.5 h-3.5" />
-                            </a>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Se não for aprovado e nem pendente, e não estiver ocultado temporariamente
+        if (myProfile.identityStatus !== 'approved' && !hideIdentityPrompt) {
+            return (
+                <div className="mx-4 mt-4 bg-gradient-to-r from-purple-50 via-indigo-50/50 to-purple-50/30 border border-purple-100 rounded-2xl p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300 relative">
+                    <button 
+                        onClick={() => {
+                            setHideIdentityPrompt(true);
+                            localStorage.setItem('mimo_identity_prompt_dismissed_at', Date.now().toString());
+                        }}
+                        className="absolute top-2.5 right-2.5 p-1 rounded-full text-purple-400 hover:text-purple-600 transition-colors"
+                        title="Dispensar"
+                    >
+                        <X size={14} />
+                    </button>
+                    <div className="flex items-start gap-3">
+                        <div className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-600">
+                            <ShieldCheck className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0 flex-1 pr-4">
+                            <h3 className="font-bold text-purple-900 text-xs md:text-sm">Ganhe mais credibilidade com o Selo Verificado! 💜</h3>
+                            <p className="text-[10px] md:text-xs text-purple-700 mt-1 leading-snug">
+                                Perfis verificados por documentos recebem o selo oficial ao lado do nome, gerando muito mais confiança e segurança na nossa comunidade.
+                            </p>
+                            <div className="mt-3.5 flex justify-end">
+                                <button
+                                    onClick={() => router.replace('/verificacao-identidade')}
+                                    className="inline-flex items-center justify-center gap-1.5 bg-purple-600 hover:bg-purple-700 active:scale-[0.98] transition-all text-white text-[10px] font-extrabold px-3 py-1.5 rounded-xl shadow-md shadow-purple-600/10 cursor-pointer font-sans"
+                                >
+                                    Verificar Meu Perfil
+                                    <ChevronRight className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

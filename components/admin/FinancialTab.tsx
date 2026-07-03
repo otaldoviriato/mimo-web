@@ -178,8 +178,24 @@ export function FinancialTab({ dashboardData, loadingDashboard: parentLoading, h
                                         </div>
                                     </td>
                                     <td className="py-4 px-6 text-xs text-slate-500 font-semibold">{tx.type}</td>
-                                    <td className="py-4 px-6 text-sm font-bold text-slate-700">
-                                        {tx.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    <td className="py-4 px-6 text-xs text-slate-700">
+                                        {['subscription', 'image_unlock', 'gift', 'message'].includes(tx.source) ? (
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="text-sm font-bold text-slate-800">
+                                                    Total: {tx.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                </span>
+                                                <span className="text-slate-400 text-[10px] font-semibold">
+                                                    Taxa: {(tx.fee || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                </span>
+                                                <span className="text-emerald-600 text-[10px] font-bold">
+                                                    Líquido: {(tx.net || tx.val).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-sm font-bold text-slate-800">
+                                                {tx.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                            </span>
+                                        )}
                                     </td>
                                     <td className="py-4 px-6 text-xs text-slate-500 font-medium">{tx.time}</td>
                                     <td className="py-4 px-6">

@@ -30,6 +30,7 @@ async function getOrCreateSettings() {
             defaultPricePerCharNonSubscribers: 0.005,
             audioPriceMultiplier: 5,
             pwaShowAgainIntervalDays: 7,
+            identityVerificationPromptIntervalDays: 7,
             newProfileDaysThreshold: 15,
             onlineDelayMinutes: 2,
         });
@@ -50,6 +51,7 @@ async function getOrCreateSettings() {
         if (settings.defaultPricePerCharNonSubscribers === undefined) { settings.defaultPricePerCharNonSubscribers = 0.005; updated = true; }
         if (settings.audioPriceMultiplier === undefined) { settings.audioPriceMultiplier = 5; updated = true; }
         if (settings.pwaShowAgainIntervalDays === undefined) { settings.pwaShowAgainIntervalDays = 7; updated = true; }
+        if (settings.identityVerificationPromptIntervalDays === undefined) { settings.identityVerificationPromptIntervalDays = 7; updated = true; }
         if (settings.newProfileDaysThreshold === undefined) { settings.newProfileDaysThreshold = 15; updated = true; }
         if (settings.onlineDelayMinutes === undefined) { settings.onlineDelayMinutes = 2; updated = true; }
         if (updated) {
@@ -154,6 +156,7 @@ export async function PUT(request: NextRequest) {
             defaultPricePerCharNonSubscribers,
             audioPriceMultiplier,
             pwaShowAgainIntervalDays,
+            identityVerificationPromptIntervalDays,
             newProfileDaysThreshold,
             onlineDelayMinutes,
         } = body;
@@ -308,6 +311,14 @@ export async function PUT(request: NextRequest) {
                 return NextResponse.json({ error: 'Intervalo de reexibição do modal PWA inválido' }, { status: 400 });
             }
             settings.pwaShowAgainIntervalDays = val;
+        }
+
+        if (identityVerificationPromptIntervalDays !== undefined) {
+            const val = Number(identityVerificationPromptIntervalDays);
+            if (isNaN(val) || val < 0) {
+                return NextResponse.json({ error: 'Intervalo de reexibição do banner de verificação de identidade inválido' }, { status: 400 });
+            }
+            settings.identityVerificationPromptIntervalDays = val;
         }
 
         if (newProfileDaysThreshold !== undefined) {
