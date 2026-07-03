@@ -57,7 +57,6 @@ export function Sidebar({ activeTab, setActiveTab, isOpen = false, onClose }: Si
         { id: 'professionals', label: 'Perfis Monetizados', icon: UserCheck },
         { id: 'rooms', label: 'Conversas', icon: MessageSquare },
         { id: 'financial', label: 'Financeiro', icon: DollarSign },
-        { id: 'withdrawals', label: 'Solicitações de Saque', icon: Wallet },
         { id: 'help-tickets', label: 'Tickets de Ajuda', icon: LifeBuoy },
         { id: 'institutional-emails', label: 'E-mails Institucionais', icon: Mail },
     ];

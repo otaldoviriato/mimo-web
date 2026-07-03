@@ -78,3 +78,50 @@ export async function PATCH(
     }
 }
 
+export async function DELETE(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const { userId } = await auth();
+        if (!userId) {
+            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+        }
+
+        const { id } = await params;
+        if (!id) {
+            return NextResponse.json({ error: 'ID da solicitação é obrigatório' }, { status: 400 });
+        }
+
+        await connectToDatabase();
+
+        // 1. Validar se o usuário é administrador
+        const settings = await AppSettings.findOne({ key: 'global' });
+        const isAdmin = settings 
+            ? settings.adminClerkIds.includes(userId) || userId === FALLBACK_ADMIN 
+            : userId === FALLBACK_ADMIN;
+
+        if (!isAdmin) {
+            return NextResponse.json({ error: 'Acesso proibido. Apenas administradores.' }, { status: 403 });
+        }
+
+        // 2. Buscar e atualizar a solicitação de saque
+        const withdraw = await WithdrawRequest.findById(id);
+        if (!withdraw) {
+            return NextResponse.json({ error: 'Solicitação de saque não encontrada' }, { status: 404 });
+        }
+
+        withdraw.hiddenFromUser = true;
+        withdraw.hiddenFromUserAt = new Date();
+        withdraw.hiddenFromUserBy = userId;
+        await withdraw.save();
+
+        return NextResponse.json({ success: true });
+
+    } catch (error: any) {
+        console.error('Erro ao ocultar saque:', error);
+        return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+    }
+}
+
+
