@@ -581,3 +581,50 @@ export function useDepositHistory() {
         staleTime: 60 * 1000,
     });
 }
+
+// ─── Assinaturas do cliente ───────────────────────────────────────────────────
+export type MySubscription = {
+    _id: string;
+    professionalId: string;
+    priceInCents: number;
+    expiresAt: string;
+    status: 'ACTIVE' | 'EXPIRED' | 'CANCELED';
+    professional: {
+        name?: string;
+        username: string;
+        photoUrl?: string;
+    } | null;
+};
+
+export function useMySubscriptions() {
+    return useQuery({
+        queryKey: ['subscriptions', 'me'],
+        queryFn: async () => {
+            const response = await fetch('/api/users/me/subscriptions');
+            if (!response.ok) return { subscriptions: [] as MySubscription[] };
+            return response.json() as Promise<{ subscriptions: MySubscription[] }>;
+        },
+        staleTime: 60 * 1000,
+    });
+}
+
+export function useCancelSubscription() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (subscriptionId: string) => {
+            const response = await fetch(
+                `/api/users/me/subscriptions?subscriptionId=${subscriptionId}`,
+                { method: 'DELETE' }
+            );
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Erro ao cancelar assinatura');
+            }
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['subscriptions', 'me'] });
+            queryClient.invalidateQueries({ queryKey: QueryKeys.me });
+        },
+    });
+}

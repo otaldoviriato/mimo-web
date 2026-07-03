@@ -5,11 +5,11 @@ import { createPortal } from 'react-dom';
 import { useUser } from '@clerk/nextjs';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Avatar } from '@/components/Avatar';
-import { useMyProfile, useUploadPhoto, useUploadCover, useMyGallery, useUploadToGallery, useDeleteFromGallery, useDepositHistory, useChatRooms, useUpdateGalleryItemVisibility } from '@/hooks/useQueries';
+import { useMyProfile, useUploadPhoto, useUploadCover, useMyGallery, useUploadToGallery, useDeleteFromGallery, useDepositHistory, useChatRooms, useUpdateGalleryItemVisibility, useMySubscriptions, useCancelSubscription, type MySubscription } from '@/hooks/useQueries';
 import { ImageCropper } from '@/components/ImageCropper';
 import { usePayment } from '@/context/PaymentContext';
 import { PullToRefresh } from '@/components';
-import { Settings, Share2, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, ShieldAlert, Heart, Globe, Crown, Camera, Gift, CreditCard, QrCode, Star, Info, CheckCircle2, X, MoreVertical, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Settings, Share2, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, ShieldAlert, Heart, Globe, Crown, Camera, Gift, CreditCard, QrCode, Star, Info, CheckCircle2, X, MoreVertical, ChevronLeft, ChevronRight, ExternalLink, CalendarClock, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function ProfilePage() {
@@ -31,6 +31,8 @@ export default function ProfilePage() {
     const updateGalleryItemVisibilityMutation = useUpdateGalleryItemVisibility();
     const { data: depositHistory, isLoading: loadingHistory, refetch: refetchHistory } = useDepositHistory();
     const { data: rooms = [], refetch: refetchRooms } = useChatRooms();
+    const { data: subscriptionsData, refetch: refetchSubscriptions } = useMySubscriptions();
+    const cancelSubscriptionMutation = useCancelSubscription();
 
     const onRefreshCreator = useCallback(async () => {
         await Promise.all([
@@ -43,9 +45,10 @@ export default function ProfilePage() {
     const onRefreshClient = useCallback(async () => {
         await Promise.all([
             refetchProfile(),
-            refetchHistory()
+            refetchHistory(),
+            refetchSubscriptions(),
         ]);
-    }, [refetchProfile, refetchHistory]);
+    }, [refetchProfile, refetchHistory, refetchSubscriptions]);
 
     const [localPhotoUrl, setLocalPhotoUrl] = useState<string | undefined>(undefined);
     const [localCoverUrl, setLocalCoverUrl] = useState<string | undefined>(undefined);
@@ -57,6 +60,8 @@ export default function ProfilePage() {
     const [selectedItem, setSelectedItem] = useState<any | null>(null);
     const [showItemOptionsMenu, setShowItemOptionsMenu] = useState(false);
     const [mounted, setMounted] = useState(false);
+    const [managingSubscription, setManagingSubscription] = useState<MySubscription | null>(null);
+    const [cancellingSubscriptionId, setCancellingSubscriptionId] = useState<string | null>(null);
 
     useEffect(() => {
         setMounted(true);
@@ -1000,7 +1005,186 @@ export default function ProfilePage() {
                     )}
                 </div>
 
+                {/* Card de Assinaturas Ativas */}
+                {(() => {
+                    const mySubscriptions = subscriptionsData?.subscriptions ?? [];
+                    if (mySubscriptions.length === 0) return null;
+                    return (
+                        <div className="mt-3 bg-white rounded-3xl border border-gray-100 p-5 shadow-sm shadow-purple-100/40 flex flex-col gap-3">
+                            <h3 className="text-xs font-bold text-gray-800 uppercase tracking-wider border-b border-gray-50 pb-2.5">Minhas Assinaturas</h3>
+                            <div className="flex flex-col gap-2">
+                                {mySubscriptions.map((sub) => {
+                                    const prof = sub.professional;
+                                    const renewsAt = new Date(sub.expiresAt);
+                                    const daysLeft = Math.max(0, Math.ceil((renewsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+                                    const isExpiringSoon = daysLeft <= 3;
+                                    return (
+                                        <button
+                                            key={sub._id}
+                                            onClick={() => setManagingSubscription(sub)}
+                                            className="w-full flex items-center gap-3 p-3 rounded-2xl border border-slate-100 hover:bg-slate-50 active:bg-slate-100 transition-all duration-75 active:scale-[0.98] text-left"
+                                        >
+                                            {/* Avatar */}
+                                            <div className="relative shrink-0">
+                                                {prof?.photoUrl ? (
+                                                    <img src={prof.photoUrl} alt={prof.name || prof.username} className="w-10 h-10 rounded-full object-cover" />
+                                                ) : (
+                                                    <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                                                        <Crown className="w-4 h-4 text-purple-500" />
+                                                    </div>
+                                                )}
+                                                <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-green-500 border-2 border-white" />
+                                            </div>
+
+                                            {/* Info */}
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-bold text-gray-800 truncate">{prof?.name || `@${prof?.username}`}</p>
+                                                <p className="text-[10px] text-gray-400 mt-0.5">@{prof?.username}</p>
+                                                <div className={`flex items-center gap-1 mt-1 ${isExpiringSoon ? 'text-orange-500' : 'text-gray-400'}`}>
+                                                    {isExpiringSoon ? (
+                                                        <AlertCircle className="w-3 h-3 shrink-0" />
+                                                    ) : (
+                                                        <CalendarClock className="w-3 h-3 shrink-0" />
+                                                    )}
+                                                    <span className="text-[10px] font-medium">
+                                                        {isExpiringSoon
+                                                            ? `Expira em ${daysLeft} dia${daysLeft !== 1 ? 's' : ''}`
+                                                            : `Renova em ${renewsAt.toLocaleDateString('pt-BR')}`
+                                                        }
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Preço */}
+                                            <div className="shrink-0 text-right">
+                                                <span className="text-xs font-black text-purple-700">
+                                                    {(sub.priceInCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                </span>
+                                                <p className="text-[9px] text-gray-400 mt-0.5">/mês</p>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+                })()}
+
             </PullToRefresh>
+
+            {/* Modal de Gerenciamento de Assinatura */}
+            {mounted && managingSubscription && createPortal(
+                <div
+                    className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+                    onClick={(e) => { if (e.target === e.currentTarget) { setManagingSubscription(null); setCancellingSubscriptionId(null); } }}
+                >
+                    <div className="w-full max-w-md bg-white rounded-t-3xl shadow-2xl pb-safe animate-in slide-in-from-bottom-4 duration-300">
+                        {/* Handle */}
+                        <div className="flex justify-center pt-3 pb-1">
+                            <div className="w-10 h-1 bg-gray-200 rounded-full" />
+                        </div>
+
+                        {/* Header */}
+                        <div className="px-5 pt-3 pb-4 border-b border-gray-100 flex items-center gap-3">
+                            {managingSubscription.professional?.photoUrl ? (
+                                <img
+                                    src={managingSubscription.professional.photoUrl}
+                                    alt={managingSubscription.professional.name || managingSubscription.professional.username}
+                                    className="w-12 h-12 rounded-full object-cover border-2 border-purple-100"
+                                />
+                            ) : (
+                                <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
+                                    <Crown className="w-5 h-5 text-purple-500" />
+                                </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                                <h2 className="text-base font-bold text-gray-900 truncate">
+                                    {managingSubscription.professional?.name || `@${managingSubscription.professional?.username}`}
+                                </h2>
+                                <p className="text-xs text-purple-600 font-medium">@{managingSubscription.professional?.username}</p>
+                            </div>
+                            <button
+                                onClick={() => { setManagingSubscription(null); setCancellingSubscriptionId(null); }}
+                                className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-all active:scale-90"
+                            >
+                                <X className="w-4 h-4 text-gray-500" />
+                            </button>
+                        </div>
+
+                        {/* Detalhes */}
+                        <div className="px-5 py-4 flex flex-col gap-3">
+                            <div className="flex items-center justify-between bg-slate-50 rounded-2xl px-4 py-3">
+                                <div>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Valor mensal</p>
+                                    <p className="text-lg font-black text-gray-900 mt-0.5">
+                                        {(managingSubscription.priceInCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Próxima renovação</p>
+                                    <p className="text-sm font-bold text-gray-800 mt-0.5">
+                                        {new Date(managingSubscription.expiresAt).toLocaleDateString('pt-BR')}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Ação: acessar perfil */}
+                            {managingSubscription.professional?.username && (
+                                <button
+                                    onClick={() => {
+                                        setManagingSubscription(null);
+                                        router.push(`/${managingSubscription.professional!.username}`);
+                                    }}
+                                    className="w-full flex items-center justify-center gap-2 h-11 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm transition-all duration-75 active:scale-95 active:bg-purple-800 shadow-sm shadow-purple-500/20"
+                                >
+                                    <ExternalLink className="w-4 h-4" />
+                                    Visitar perfil
+                                </button>
+                            )}
+
+                            {/* Confirmação de cancelamento inline */}
+                            {cancellingSubscriptionId === managingSubscription._id ? (
+                                <div className="border border-red-100 bg-red-50/60 rounded-2xl p-4 flex flex-col gap-3">
+                                    <p className="text-xs font-bold text-red-700 text-center">Tem certeza? Você perderá o acesso ao conteúdo exclusivo imediatamente.</p>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setCancellingSubscriptionId(null)}
+                                            className="flex-1 h-10 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all active:scale-95"
+                                        >
+                                            Voltar
+                                        </button>
+                                        <button
+                                            onClick={async () => {
+                                                try {
+                                                    await cancelSubscriptionMutation.mutateAsync(managingSubscription._id);
+                                                    toast.success('Assinatura cancelada.');
+                                                    setManagingSubscription(null);
+                                                    setCancellingSubscriptionId(null);
+                                                } catch (err: any) {
+                                                    toast.error(err.message || 'Erro ao cancelar assinatura');
+                                                }
+                                            }}
+                                            disabled={cancelSubscriptionMutation.isPending}
+                                            className="flex-1 h-10 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-all active:scale-95 disabled:opacity-60"
+                                        >
+                                            {cancelSubscriptionMutation.isPending ? 'Cancelando...' : 'Confirmar cancelamento'}
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => setCancellingSubscriptionId(managingSubscription._id)}
+                                    className="w-full flex items-center justify-center gap-2 h-11 rounded-2xl border border-red-200 text-red-600 hover:bg-red-50 font-bold text-sm transition-all duration-75 active:scale-95"
+                                >
+                                    Cancelar assinatura
+                                </button>
+                            )}
+                        </div>
+                        <div className="h-6" />
+                    </div>
+                </div>,
+                document.body
+            )}
 
             {mounted && cropperState && cropperState.open && createPortal(
                 <ImageCropper
