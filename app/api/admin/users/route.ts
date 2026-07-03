@@ -145,6 +145,7 @@ export async function GET(request: NextRequest) {
                 subscriptionPrice: u.subscriptionPrice || 0,
                 lastSeen: u.lastSeen ? new Date(u.lastSeen).toISOString() : null,
                 isOnline: u.isOnline || false,
+                onboardingStep: u.onboardingStep || null,
                 totalDeposited: depositsByUser.get(u.clerkId) || 0,
                 totalEarned: (earningsByUser.get(u.clerkId) || 0) + (subscriptionEarningsByUser.get(u.clerkId) || 0),
                 accessCount: u.accessCount || 0,

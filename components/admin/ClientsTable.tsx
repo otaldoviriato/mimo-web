@@ -8,6 +8,35 @@ import { SortableColumnHeader } from './SortableColumnHeader';
 
 type SortKey = 'balance' | 'deposited' | 'access' | 'rooms' | 'messages';
 
+function getOnboardingStepBadge(step: string | undefined | null) {
+    switch (step) {
+        case 'welcome':
+            return (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-850 border border-amber-200">
+                    Boas-vindas
+                </span>
+            );
+        case 'identity':
+            return (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-800 border border-blue-200">
+                    Identidade
+                </span>
+            );
+        case 'profile':
+            return (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-800 border border-purple-200">
+                    Foto / Perfil
+                </span>
+            );
+        default:
+            return (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-650 border border-slate-200">
+                    Início / Pendente
+                </span>
+            );
+    }
+}
+
 export function ClientsTable() {
     const router = useRouter();
     const [users, setUsers] = useState<any[]>([]);
@@ -194,6 +223,9 @@ export function ClientsTable() {
                         <thead>
                             <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
                                 <th className="py-4 px-6">Usuário</th>
+                                {onboardingFilter === 'pending' && (
+                                    <th className="py-4 px-6">Etapa do Onboarding</th>
+                                )}
                                 <th className="py-4 px-6">
                                     <SortableColumnHeader label="Saldo da Carteira" active={sortKey === 'balance'} direction={sortDir} onClick={() => handleSort('balance')} />
                                 </th>
@@ -256,6 +288,11 @@ export function ClientsTable() {
                                                 </div>
                                             </div>
                                         </td>
+                                        {onboardingFilter === 'pending' && (
+                                            <td className="py-4 px-6">
+                                                {getOnboardingStepBadge(user.onboardingStep)}
+                                            </td>
+                                        )}
 
                                         {/* Saldo */}
                                         <td className="py-4 px-6">
@@ -383,7 +420,7 @@ export function ClientsTable() {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={8} className="py-20 text-center text-sm font-semibold text-slate-400">
+                                    <td colSpan={onboardingFilter === 'pending' ? 9 : 8} className="py-20 text-center text-sm font-semibold text-slate-400">
                                         Nenhum usuário encontrado.
                                     </td>
                                 </tr>
