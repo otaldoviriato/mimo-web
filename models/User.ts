@@ -54,6 +54,7 @@ export interface IUser extends Document {
     identityDocumentType?: string;
     hideFromExplore?: boolean;
     subscriberDiscountPercentage?: number;
+    freeCharsForNewClients?: number;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -231,6 +232,11 @@ const UserSchema = new Schema<IUser>({
     hideFromExplore: {
         type: Boolean,
         default: false,
+    },
+    freeCharsForNewClients: {
+        type: Number,
+        default: 500,
+        min: 0,
     },
 }, {
     timestamps: true,

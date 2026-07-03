@@ -314,6 +314,7 @@ export async function GET(request: NextRequest) {
                 promotionalBalanceLabel,
                 welcomeCreditNotice,
                 hasWelcomeCreditEnded,
+                freeCharsForNewClients: user.freeCharsForNewClients ?? 500,
             },
         });
     } catch (error: any) {
@@ -332,7 +333,7 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, subscriptionPrice, isSubscriptionEnabled, chargePerCharSubscribers, chargePerCharNonSubscribers, bio, emailNotificationsEnabled, hideFromExplore, subscriberDiscountPercentage } = body;
+        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, subscriptionPrice, isSubscriptionEnabled, chargePerCharSubscribers, chargePerCharNonSubscribers, bio, emailNotificationsEnabled, hideFromExplore, subscriberDiscountPercentage, freeCharsForNewClients } = body;
 
         await connectToDatabase();
 
@@ -432,6 +433,18 @@ export async function PATCH(request: NextRequest) {
         }
 
         const isProf = isProfessional !== undefined ? isProfessional : (currentUser?.isProfessional ?? false);
+        
+        if (freeCharsForNewClients !== undefined) {
+            const freeChars = Number(freeCharsForNewClients);
+            if (isNaN(freeChars) || freeChars < 0) {
+                return NextResponse.json({ error: 'A quantidade de caracteres grátis deve ser um número não negativo.' }, { status: 400 });
+            }
+            if (freeChars > 0 && !isProf) {
+                return NextResponse.json({ error: 'Apenas profissionais podem configurar caracteres grátis.' }, { status: 400 });
+            }
+            updateData.freeCharsForNewClients = freeChars;
+        }
+
         if (bio !== undefined) {
             if (bio && !isProf) {
                 return NextResponse.json({ error: 'Apenas profissionais podem ter biografia.' }, { status: 400 });
@@ -444,6 +457,7 @@ export async function PATCH(request: NextRequest) {
 
         if (isProfessional === false) {
             updateData.bio = '';
+            updateData.freeCharsForNewClients = 0;
         }
 
         if (emailNotificationsEnabled !== undefined) {

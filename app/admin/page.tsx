@@ -12,7 +12,6 @@ import { ProfessionalsTable } from '@/components/admin/ProfessionalsTable';
 import { RoomsTab } from '@/components/admin/RoomsTab';
 import { FinancialTab } from '@/components/admin/FinancialTab';
 import { WithdrawalsTab } from '@/components/admin/WithdrawalsTab';
-import { CampaignsTab } from '@/components/admin/CampaignsTab';
 import { HelpTicketsTab } from '@/components/admin/HelpTicketsTab';
 import { InstitutionalEmailsTab } from '@/components/admin/InstitutionalEmailsTab';
 import { SettingsPlatformPage } from '@/components/admin/settings/SettingsPlatformPage';
@@ -36,7 +35,6 @@ const TAB_TITLES: Record<string, string> = {
     rooms: 'Auditoria de Conversas',
     financial: 'Movimentações Financeiras',
     withdrawals: 'Solicitações de Saque',
-    coupons: 'Campanhas de Crédito',
     'help-tickets': 'Tickets de Ajuda',
     'institutional-emails': 'E-mails Institucionais',
     'settings-platform': 'Configurações — Plataforma & Operação',
@@ -258,7 +256,6 @@ export default function AdminPage() {
                     {activeTab === 'rooms' && <RoomsTab />}
                     {activeTab === 'financial' && <FinancialTab dashboardData={dashboardData} loadingDashboard={loadingDashboard} handleDeleteTransaction={handleDeleteTransaction} />}
                     {activeTab === 'withdrawals' && <WithdrawalsTab />}
-                    {activeTab === 'coupons' && <CampaignsTab />}
                     {activeTab === 'help-tickets' && <HelpTicketsTab />}
                     {activeTab === 'institutional-emails' && <InstitutionalEmailsTab />}
                     {/* Settings sub-pages */}

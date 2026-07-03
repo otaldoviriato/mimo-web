@@ -46,6 +46,7 @@ interface UserDetail {
     chargePerCharSubscribers: number;
     chargePerCharNonSubscribers: number;
     pixKey?: string;
+    freeCharsForNewClients?: number;
     createdAt?: string;
 }
 
@@ -132,6 +133,7 @@ export default function UserDetailPage() {
     const [subscriptionPrice, setSubscriptionPrice] = useState<number>(0);
     const [chargeSub, setChargeSub] = useState<number>(0.002);
     const [chargeNonSub, setChargeNonSub] = useState<number>(0.005);
+    const [freeCharsForNewClients, setFreeCharsForNewClients] = useState<number>(500);
     const [photoUrl, setPhotoUrl] = useState('');
     const [coverUrl, setCoverUrl] = useState('');
 
@@ -298,6 +300,7 @@ export default function UserDetailPage() {
                     setSubscriptionPrice(data.user.subscriptionPrice || 0);
                     setChargeSub(data.user.chargePerCharSubscribers !== undefined ? data.user.chargePerCharSubscribers : 0.002);
                     setChargeNonSub(data.user.chargePerCharNonSubscribers !== undefined ? data.user.chargePerCharNonSubscribers : 0.005);
+                    setFreeCharsForNewClients(data.user.freeCharsForNewClients !== undefined ? data.user.freeCharsForNewClients : 500);
                     setPhotoUrl(data.user.photoUrl || '');
                     setCoverUrl(data.user.coverUrl || '');
 
@@ -342,6 +345,7 @@ export default function UserDetailPage() {
                     subscriptionPrice,
                     chargePerCharSubscribers: chargeSub,
                     chargePerCharNonSubscribers: chargeNonSub,
+                    freeCharsForNewClients,
                     photoUrl,
                     coverUrl
                 })
@@ -693,6 +697,18 @@ export default function UserDetailPage() {
                                                 onChange={(e) => setChargeNonSub(Number(e.target.value))}
                                                 className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700"
                                             />
+                                        </div>
+
+                                        <div className="space-y-1 sm:col-span-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Isenção para Novos Clientes</label>
+                                            <select 
+                                                value={freeCharsForNewClients}
+                                                onChange={(e) => setFreeCharsForNewClients(Number(e.target.value))}
+                                                className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700"
+                                            >
+                                                <option value={0}>Desativado (Cobrar desde o início)</option>
+                                                <option value={500}>Ativado (Primeiros 500 caracteres grátis)</option>
+                                            </select>
                                         </div>
 
                                         <div className="space-y-1 sm:col-span-2">
