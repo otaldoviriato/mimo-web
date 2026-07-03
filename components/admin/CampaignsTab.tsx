@@ -461,7 +461,7 @@ export function CampaignsTab() {
                         <span className="text-xl font-black text-slate-800 mt-1 block">
                             {loadingMetrics ? '...' : `${metrics.conversionRate || 0}%`}
                         </span>
-                        <span className="text-[10px] text-slate-400 mt-1 block">Usuários que conversaram e gastaram o saldo</span>
+                        <span className="text-[10px] text-slate-400 mt-1 block">Clientes que recarregaram após o crédito</span>
                     </div>
                     <span className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
                         <Users size={22} />

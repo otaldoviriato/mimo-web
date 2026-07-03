@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { CreditGrant } from '@/models/CreditGrant';
+import { Transaction } from '@/models/Transaction';
 import { AppSettings } from '@/models/AppSettings';
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
@@ -35,10 +36,29 @@ export async function GET(request: NextRequest) {
         const grants = await CreditGrant.find(query);
         const totalGrantsCount = grants.length;
 
+        // Busca todas as transações de recarga concluídas dos usuários que ganharam o crédito
+        const userIds = grants.map(g => g.userId);
+        const recharges = await Transaction.find({
+            userId: { $in: userIds },
+            source: 'recharge',
+            type: 'credit'
+        });
+
+        // Mapeia a data da menor recarga (primeira recarga paga) de cada usuário
+        const userRechargeMinDateMap = new Map<string, number>();
+        for (const r of recharges) {
+            const time = new Date(r.timestamp || (r as any).createdAt).getTime();
+            const existing = userRechargeMinDateMap.get(r.userId);
+            if (!existing || time < existing) {
+                userRechargeMinDateMap.set(r.userId, time);
+            }
+        }
+
         let totalGrantedAmount = 0;
         let totalConsumedAmount = 0;
         let totalExpiredAmount = 0;
         let activeUsersCount = 0;
+        let convertedUsersCount = 0;
 
         for (const grant of grants) {
             totalGrantedAmount += grant.amountGranted;
@@ -50,10 +70,16 @@ export async function GET(request: NextRequest) {
             if (grant.amountUsed > 0) {
                 activeUsersCount++;
             }
+
+            // Considera convertido o usuário que efetuou uma recarga paga *após* a criação do crédito de boas-vindas
+            const minRechargeTime = userRechargeMinDateMap.get(grant.userId);
+            if (minRechargeTime && minRechargeTime > new Date(grant.createdAt).getTime()) {
+                convertedUsersCount++;
+            }
         }
 
-        // Taxa de conversão: proporção de usuários que receberam e utilizaram pelo menos parte do saldo
-        const conversionRate = totalGrantsCount > 0 ? (activeUsersCount / totalGrantsCount) * 100 : 0;
+        // Conversão: proporção de usuários que receberam o crédito e recarregaram dinheiro real depois
+        const conversionRate = totalGrantsCount > 0 ? (convertedUsersCount / totalGrantsCount) * 100 : 0;
 
         // Mock enriquecedor de fraudes bloqueadas por duplicidade de IP/CPF (para impressionar o usuário)
         const fraudBlockedCount = 12;
