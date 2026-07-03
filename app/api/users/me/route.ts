@@ -343,6 +343,8 @@ export async function PATCH(request: NextRequest) {
         const globalSubscriberDiscountPercentage = settings?.subscriberDiscountPercentage ?? 20;
 
         const currentUser = await User.findOne({ clerkId: userId });
+        const oldPriceNonSub = currentUser?.chargePerCharNonSubscribers ?? (settings?.defaultPricePerCharNonSubscribers ?? 0.005);
+        const oldPriceSub = currentUser?.chargePerCharSubscribers ?? (settings?.defaultPricePerCharSubscribers ?? 0.002);
 
         // Valida mudança de isProfessional (mesma lógica que era do chargeMode)
         if (isProfessional !== undefined && currentUser && isProfessional !== currentUser.isProfessional) {
@@ -466,6 +468,42 @@ export async function PATCH(request: NextRequest) {
             },
             { returnDocument: 'after', runValidators: true, upsert: true }
         );
+
+        // Verificar se os preços por caractere foram alterados para notificar o servidor de chat
+        const newPriceNonSub = user.chargePerCharNonSubscribers;
+        const newPriceSub = user.chargePerCharSubscribers;
+
+        const priceChanged = 
+            (chargePerCharNonSubscribers !== undefined && Number(chargePerCharNonSubscribers) !== oldPriceNonSub) ||
+            (user.chargePerCharSubscribers !== oldPriceSub);
+
+        if (priceChanged) {
+            try {
+                const chatServerUrl = process.env.NEXT_PUBLIC_CHAT_SERVER_URL || 'http://localhost:3001';
+                fetch(`${chatServerUrl}/api/internal/notify-price-change`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        professionalId: userId,
+                        oldPriceNonSub,
+                        newPriceNonSub,
+                        oldPriceSub,
+                        newPriceSub,
+                    }),
+                }).then(async (notifyResponse) => {
+                    if (!notifyResponse.ok) {
+                        const errText = await notifyResponse.text();
+                        console.error('[notify-price-change] Failed to notify chat server about price change:', errText);
+                    } else {
+                        console.log('[notify-price-change] Successfully notified chat server of price change.');
+                    }
+                }).catch(err => {
+                    console.error('[notify-price-change] Error calling chat server:', err);
+                });
+            } catch (err) {
+                console.error('[notify-price-change] Synchronous error preparing chat server call:', err);
+            }
+        }
 
         // Se isProfessional mudou, deleta todas as conversas do usuário e atualiza metadados
         if (isProfessionalChanging) {

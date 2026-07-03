@@ -5,7 +5,7 @@ import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { useUserByUsername, usePublicGallery, useSubscribe, useMyProfile } from '@/hooks/useQueries';
-import { UserX, Briefcase, Camera, Lock, Eye, EyeOff, X } from 'lucide-react';
+import { UserX, Briefcase, Camera, Lock, Eye, EyeOff, X, MessageSquare } from 'lucide-react';
 
 interface UserProfilePageProps {
     params?: Promise<{ username: string }>;
@@ -277,6 +277,31 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                             <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
                                 Mídias Privadas
                             </span>
+                        </div>
+                    </div>
+                )}
+
+                {/* Preço por Caractere Informativo */}
+                {user.isProfessional && (
+                    <div className="w-full max-w-sm mt-1 mb-4 px-4 py-3 bg-white/80 border border-purple-100/50 rounded-2xl flex items-center justify-between shadow-xs z-10">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-purple-50 flex items-center justify-center border border-purple-100/40">
+                                <MessageSquare className="w-4 h-4 text-purple-600" />
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-[11.5px] font-black text-slate-800 tracking-tight">Custo por caractere</span>
+                                <span className="text-[9.5px] text-slate-400 font-medium leading-tight">Nas mensagens enviadas no chat</span>
+                            </div>
+                        </div>
+                        <div className="text-right flex flex-col items-end">
+                            <span className="text-xs font-black text-purple-700 tracking-tight">
+                                {user.chargePerCharNonSubscribers?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                            </span>
+                            {user.isSubscriptionEnabled && user.chargePerCharSubscribers !== undefined && (
+                                <span className="text-[8px] bg-purple-50 text-purple-600/90 px-1.5 py-0.5 rounded-md font-black mt-0.5 uppercase tracking-wider">
+                                    {user.chargePerCharSubscribers?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 4 })} para assinantes
+                                </span>
+                            )}
                         </div>
                     </div>
                 )}

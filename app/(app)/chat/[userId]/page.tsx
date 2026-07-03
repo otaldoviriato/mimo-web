@@ -2489,10 +2489,10 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     return (
                         <React.Fragment key={item._id}>
                             {item.isSystem ? (
-                                <div className="flex justify-center my-3.5 w-full px-4 select-none">
-                                    <div className="bg-slate-100 text-slate-700 text-[11px] md:text-xs px-4 py-2.5 rounded-2xl font-bold shadow-sm border border-slate-200 text-center max-w-[85%]">
+                                <div className="flex justify-center my-2.5 w-full px-6 select-none animate-in fade-in duration-300">
+                                    <span className="text-[10.5px] text-slate-400 font-medium text-center max-w-[80%] leading-relaxed">
                                         {item.content}
-                                    </div>
+                                    </span>
                                 </div>
                             ) : (
                                 <div
