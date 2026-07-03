@@ -84,6 +84,44 @@ function formatMediaDuration(durationInSeconds?: number) {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
+function isChargeableTextMessage(message: Message) {
+    return !message.isSystem
+        && !message.isAudio
+        && !message.isGift
+        && !message.isLockedImage
+        && !message.isVideo
+        && !message.originalImageUrl
+        && message.status !== 'error';
+}
+
+function getClientTextCharsSent(messages: Message[], clientId: string, professionalId: string) {
+    return messages.reduce((total, message) => {
+        if (
+            message.senderId !== clientId
+            || message.receiverId !== professionalId
+            || !isChargeableTextMessage(message)
+        ) {
+            return total;
+        }
+
+        return total + (message.charCount ?? message.content?.length ?? 0);
+    }, 0);
+}
+
+function getChargeableTextChars(nextCharCount: number, alreadySentChars: number, freeCharsLimit: number) {
+    if (nextCharCount <= 0) return 0;
+    if (freeCharsLimit <= 0) return nextCharCount;
+
+    const remainingFreeChars = Math.max(0, freeCharsLimit - alreadySentChars);
+    return Math.max(0, nextCharCount - remainingFreeChars);
+}
+
+function estimateMessageCostInCents(charCount: number, rate: number) {
+    if (charCount <= 0 || rate <= 0) return 0;
+
+    return Math.max(1, Math.ceil(charCount * rate * 100));
+}
+
 function LockedMediaTypeBadge({ isVideo, duration }: { isVideo?: boolean; duration?: number }) {
     const formattedDuration = isVideo ? formatMediaDuration(duration) : '';
 
@@ -1828,10 +1866,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         
         const charCount = messageText.trim().length;
         let costInCents = 0;
-        if (charCount > 0 && receiver?.isProfessional) {
-            const costPerCharInCents = currentRate * 100;
-            const rawCostInCents = charCount * costPerCharInCents;
-            costInCents = Math.max(1, Math.ceil(rawCostInCents));
+        if (charCount > 0 && receiver?.isProfessional && !monetizationDisabled) {
+            const freeCharsLimit = receiver.freeCharsForNewClients ?? 500;
+            const alreadySentChars = getClientTextCharsSent(messages, user?.id ?? '', otherUserId);
+            const charsToCharge = getChargeableTextChars(charCount, alreadySentChars, freeCharsLimit);
+            costInCents = estimateMessageCostInCents(charsToCharge, currentRate);
         }
 
         console.log('[handleSend] Dados de custo. charCount:', charCount, 'receiverIsProfessional:', receiver?.isProfessional, 'costInCents:', costInCents, 'balance:', balance);
@@ -2195,19 +2234,20 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         }
     };
 
-    const charCount = messageText.length;
+    const charCount = messageText.trim().length;
     const isSubscriber = receiver?.subscribers?.includes(user?.id ?? '');
     const currentRate = (receiver?.isProfessional && !monetizationDisabled)
         ? (isSubscriber 
             ? (receiver.chargePerCharSubscribers ?? 0.002) 
             : (receiver.chargePerCharNonSubscribers ?? 0.005))
         : 0;
+    const freeCharsLimit = receiver?.freeCharsForNewClients ?? 500;
+    const clientTextCharsSent = getClientTextCharsSent(messages, user?.id ?? '', otherUserId);
+    const chargeableCharCount = getChargeableTextChars(charCount, clientTextCharsSent, freeCharsLimit);
 
     let estimatedCostInReais = 0;
-    if (charCount > 0 && receiver?.isProfessional) {
-        const costPerCharInCents = currentRate * 100;
-        const rawCostInCents = charCount * costPerCharInCents;
-        const totalCostInCents = Math.max(1, Math.ceil(rawCostInCents));
+    if (chargeableCharCount > 0 && receiver?.isProfessional && !monetizationDisabled) {
+        const totalCostInCents = estimateMessageCostInCents(chargeableCharCount, currentRate);
         estimatedCostInReais = totalCostInCents / 100;
     }
 
