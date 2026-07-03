@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
+import mongoose from 'mongoose';
 import { connectToDatabase } from '@/lib/db';
 import { User, Transaction, Subscription } from '@/models';
+import { SubscriptionBillingError, subscriptionPriceBRLToCents } from '@/lib/subscriptionBilling';
 
 export async function POST(
     request: NextRequest,
@@ -16,7 +18,7 @@ export async function POST(
         }
 
         if (requesterId === ownerId) {
-            return NextResponse.json({ error: 'Você não pode assinar seu próprio perfil' }, { status: 400 });
+            return NextResponse.json({ error: 'Voce nao pode assinar seu proprio perfil' }, { status: 400 });
         }
 
         await connectToDatabase();
@@ -25,91 +27,128 @@ export async function POST(
         const requester = await User.findOne({ clerkId: requesterId });
 
         if (!owner || !owner.isProfessional || owner.professionalStatus !== 'approved') {
-            return NextResponse.json({ error: 'Perfil não encontrado, não profissional ou não verificado' }, { status: 404 });
+            return NextResponse.json({ error: 'Perfil nao encontrado, nao profissional ou nao verificado' }, { status: 404 });
         }
 
         if (!owner.isSubscriptionEnabled) {
-            return NextResponse.json({ error: 'Este perfil não aceita assinaturas no momento' }, { status: 400 });
+            return NextResponse.json({ error: 'Este perfil nao aceita assinaturas no momento' }, { status: 400 });
         }
 
         if (!requester) {
-            return NextResponse.json({ error: 'Seu perfil não foi encontrado' }, { status: 404 });
+            return NextResponse.json({ error: 'Seu perfil nao foi encontrado' }, { status: 404 });
         }
 
-        // Verificar se já é assinante
-        if (owner.subscribers.includes(requesterId)) {
-            return NextResponse.json({ error: 'Você já é um assinante' }, { status: 400 });
+        const existingActiveSubscription = await Subscription.findOne({
+            subscriberId: requesterId,
+            professionalId: ownerId,
+            status: { $in: ['ACTIVE', 'CANCELED'] },
+            expiresAt: { $gt: new Date() },
+        });
+
+        if (existingActiveSubscription) {
+            return NextResponse.json({ error: 'Voce ja e um assinante' }, { status: 400 });
         }
 
-        // subscriptionPrice é armazenado em reais; balance é em centavos
-        const priceInCents = Math.round((owner.subscriptionPrice || 0) * 100);
+        // User.subscriptionPrice is BRL. User.balance, Transaction.amount and Subscription.priceInCents are cents.
+        const priceInCents = subscriptionPriceBRLToCents(owner.subscriptionPrice || 0);
 
-        if (priceInCents > 0) {
-            // [SEGURAÇA] Verificação de saldo antes de prosseguir
-            if (requester.balance < priceInCents) {
-                return NextResponse.json({ error: 'Saldo insuficiente para assinar' }, { status: 400 });
-            }
-
-            // [SEGURANÇA] Débito atômico: só debita se o saldo ainda for suficiente
-            // Evita race condition caso dois requests simultâneos tentem assinar
-            const debitResult = await User.updateOne(
-                { clerkId: requesterId, balance: { $gte: priceInCents } },
-                { $inc: { balance: -priceInCents } }
-            );
-
-            if (debitResult.modifiedCount === 0) {
-                return NextResponse.json({ error: 'Saldo insuficiente para assinar' }, { status: 400 });
-            }
-
-            // Creditar no perfil da profissional
-            await User.updateOne(
-                { clerkId: ownerId },
-                { $inc: { balance: priceInCents } }
-            );
-
-            // Registrar transações
-            await Transaction.create([
-                {
-                    userId: requesterId,
-                    type: 'debit',
-                    amount: priceInCents,
-                    source: 'subscription',
-                    status: 'COMPLETED',
-                    relatedUserId: ownerId,
-                },
-                {
-                    userId: ownerId,
-                    type: 'credit',
-                    amount: priceInCents,
-                    source: 'subscription',
-                    status: 'COMPLETED',
-                    relatedUserId: requesterId,
-                }
-            ]);
+        if (priceInCents <= 0) {
+            return NextResponse.json({ error: 'Preco da assinatura invalido' }, { status: 400 });
         }
 
-        // Criar ou atualizar a validade da assinatura na coleção Subscription
         const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 30); // 30 dias de validade
+        expiresAt.setDate(expiresAt.getDate() + 30);
 
-        await Subscription.findOneAndUpdate(
-            { subscriberId: requesterId, professionalId: ownerId },
-            {
-                status: 'ACTIVE',
-                priceInCents: priceInCents,
-                expiresAt,
-            },
-            { upsert: true, new: true }
-        );
+        const session = await mongoose.startSession();
+        try {
+            await session.withTransaction(async () => {
+                const activeSubscription = await Subscription.findOne({
+                    subscriberId: requesterId,
+                    professionalId: ownerId,
+                    status: { $in: ['ACTIVE', 'CANCELED'] },
+                    expiresAt: { $gt: new Date() },
+                }).session(session);
 
-        // Adicionar à lista de assinantes
-        await User.updateOne(
-            { clerkId: ownerId },
-            { $addToSet: { subscribers: requesterId } }
-        );
+                if (activeSubscription) {
+                    throw new SubscriptionBillingError('Voce ja e um assinante');
+                }
 
-        return NextResponse.json({ success: true, message: 'Assinatura realizada com sucesso!' });
+                const debitResult = await User.updateOne(
+                    { clerkId: requesterId, balance: { $gte: priceInCents } },
+                    { $inc: { balance: -priceInCents } },
+                    { session }
+                );
+
+                if (debitResult.modifiedCount === 0) {
+                    throw new SubscriptionBillingError('Saldo insuficiente para assinar');
+                }
+
+                const creditResult = await User.updateOne(
+                    {
+                        clerkId: ownerId,
+                        isProfessional: true,
+                        professionalStatus: 'approved',
+                        isSubscriptionEnabled: true,
+                    },
+                    { $inc: { balance: priceInCents } },
+                    { session }
+                );
+
+                if (creditResult.modifiedCount === 0) {
+                    throw new SubscriptionBillingError('Perfil nao aceita assinaturas no momento');
+                }
+
+                await Transaction.create([
+                    {
+                        userId: requesterId,
+                        type: 'debit',
+                        amount: priceInCents,
+                        source: 'subscription',
+                        status: 'COMPLETED',
+                        relatedUserId: ownerId,
+                    },
+                    {
+                        userId: ownerId,
+                        type: 'credit',
+                        amount: priceInCents,
+                        source: 'subscription',
+                        status: 'COMPLETED',
+                        relatedUserId: requesterId,
+                    },
+                ], { session });
+
+                await Subscription.findOneAndUpdate(
+                    { subscriberId: requesterId, professionalId: ownerId },
+                    {
+                        status: 'ACTIVE',
+                        priceInCents,
+                        expiresAt,
+                        renewalCanceledAt: null,
+                    },
+                    { upsert: true, new: true, session }
+                );
+
+                await User.updateOne(
+                    { clerkId: ownerId },
+                    { $addToSet: { subscribers: requesterId } },
+                    { session }
+                );
+            });
+        } finally {
+            await session.endSession();
+        }
+
+        return NextResponse.json({
+            success: true,
+            message: 'Assinatura realizada com sucesso!',
+            priceInCents,
+            expiresAt,
+        });
     } catch (error: any) {
+        if (error instanceof SubscriptionBillingError) {
+            return NextResponse.json({ error: error.message }, { status: error.status });
+        }
+
         console.error('Error in subscription:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }

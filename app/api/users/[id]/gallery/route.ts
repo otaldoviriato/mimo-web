@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
-import { User, GalleryItem } from '@/models';
+import { User, GalleryItem, Subscription } from '@/models';
 
 export async function GET(
     request: NextRequest,
@@ -19,9 +19,36 @@ export async function GET(
             return NextResponse.json({ items: [], privateItems: [], privatePhotosCount: 0, privateVideosCount: 0 });
         }
 
-        // Verificar se quem está pedindo é assinante (assinatura só faz sentido para profissionais com assinatura ativada)
-        const isSubscriber = owner.isProfessional && owner.isSubscriptionEnabled && requesterId && owner.subscribers?.includes(requesterId);
         const isOwner = requesterId === ownerId;
+        let isSubscriber = false;
+
+        if (owner.isProfessional && requesterId && !isOwner) {
+            const now = new Date();
+            const subscription = await Subscription.findOne({
+                subscriberId: requesterId,
+                professionalId: ownerId,
+                status: { $in: ['ACTIVE', 'CANCELED'] },
+            }).sort({ expiresAt: -1 });
+
+            isSubscriber = Boolean(subscription && subscription.expiresAt > now);
+
+            if (isSubscriber && !owner.subscribers?.includes(requesterId)) {
+                await User.updateOne(
+                    { clerkId: ownerId },
+                    { $addToSet: { subscribers: requesterId } }
+                );
+            } else if (subscription && subscription.expiresAt <= now) {
+                if (subscription.status !== 'EXPIRED') {
+                    subscription.status = 'EXPIRED';
+                    await subscription.save();
+                }
+
+                await User.updateOne(
+                    { clerkId: ownerId },
+                    { $pull: { subscribers: requesterId } }
+                );
+            }
+        }
 
         const allItems = await GalleryItem.find({ ownerId }).sort({ createdAt: -1 });
 

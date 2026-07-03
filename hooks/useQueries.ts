@@ -489,6 +489,7 @@ export function useSubscribe() {
         onSuccess: (_, userId) => {
             queryClient.invalidateQueries({ queryKey: QueryKeys.userById(userId) });
             queryClient.invalidateQueries({ queryKey: QueryKeys.me });
+            queryClient.invalidateQueries({ queryKey: ['subscriptions', 'me'] });
             queryClient.invalidateQueries({ queryKey: ['gallery', userId] });
         },
     });
@@ -589,6 +590,8 @@ export type MySubscription = {
     priceInCents: number;
     expiresAt: string;
     status: 'ACTIVE' | 'EXPIRED' | 'CANCELED';
+    renewalCanceledAt?: string | null;
+    cancelAtPeriodEnd?: boolean;
     professional: {
         name?: string;
         username: string;

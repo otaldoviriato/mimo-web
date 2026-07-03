@@ -3,6 +3,7 @@ import { clerkClient } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { AppSettings } from '@/models/AppSettings';
+import { Subscription } from '@/models/Subscription';
 
 // GET /api/users/[id] - Get user by Clerk ID
 export async function GET(
@@ -50,6 +51,17 @@ export async function GET(
         const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
         const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
         const audioPriceMultiplier = settings?.audioPriceMultiplier ?? 5;
+        let effectiveSubscribers = user.subscribers || [];
+
+        if (user.isProfessional) {
+            const activeSubscriptions = await Subscription.find({
+                professionalId: user.clerkId,
+                status: { $in: ['ACTIVE', 'CANCELED'] },
+                expiresAt: { $gt: new Date() },
+            }).select('subscriberId').lean();
+
+            effectiveSubscribers = activeSubscriptions.map((sub) => sub.subscriberId);
+        }
 
         return NextResponse.json({
             user: {
@@ -67,7 +79,7 @@ export async function GET(
                 chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? defaultNonSub,
                 freeCharsForNewClients: user.freeCharsForNewClients ?? 500,
                 audioPriceMultiplier,
-                subscribers: user.subscribers || [],
+                subscribers: effectiveSubscribers,
                 bio: user.bio || '',
                 isOnline: user.isOnline ?? false,
                 lastSeen: user.lastSeen ?? null,

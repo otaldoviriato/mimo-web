@@ -7,6 +7,7 @@ import { GalleryItem } from '@/models/GalleryItem';
 import { WithdrawRequest } from '@/models/WithdrawRequest';
 import { Subscription } from '@/models/Subscription';
 import { buildProfileRoleMetadata } from '@/lib/profileRole';
+import { subscriptionPriceBRLToCents } from '@/lib/subscriptionBilling';
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
@@ -45,8 +46,13 @@ export async function GET(
         const galleryItems = await GalleryItem.find({ ownerId: clerkId }).sort({ createdAt: -1 }).lean();
         const withdrawals = await WithdrawRequest.find({ userId: clerkId }).sort({ createdAt: -1 }).lean() as any[];
 
-        // Buscar assinantes ativos
-        const subscriptions = await Subscription.find({ professionalId: clerkId, status: 'ACTIVE' }).lean();
+        // Buscar assinantes com ciclo pago vigente. Registros CANCELED legados
+        // ainda mantem acesso ate expiresAt.
+        const subscriptions = await Subscription.find({
+            professionalId: clerkId,
+            status: { $in: ['ACTIVE', 'CANCELED'] },
+            expiresAt: { $gt: new Date() },
+        }).lean();
         const subscriberIds = subscriptions.map((s) => s.subscriberId);
         const subscribersList = await User.find(
             { clerkId: { $in: subscriberIds } },
@@ -139,7 +145,26 @@ export async function PATCH(
         if (balance !== undefined) updateFields.balance = Number(balance);
         if (taxId !== undefined) updateFields.taxId = taxId;
         if (phone !== undefined) updateFields.phone = phone;
-        if (subscriptionPrice !== undefined) updateFields.subscriptionPrice = Number(subscriptionPrice);
+        if (subscriptionPrice !== undefined) {
+            const price = Number(subscriptionPrice);
+            const maxSubscriptionPrice = settings?.maxSubscriptionPrice ?? 200;
+            const minSubscriptionPrice = settings?.minSubscriptionPrice ?? 10;
+
+            if (!Number.isFinite(price) || price < 0) {
+                return NextResponse.json({ error: 'Preço de assinatura inválido' }, { status: 400 });
+            }
+
+            if (price > maxSubscriptionPrice) {
+                return NextResponse.json({ error: `O preço da assinatura não pode ser maior que R$ ${maxSubscriptionPrice.toFixed(2)}` }, { status: 400 });
+            }
+
+            if (price > 0 && price < minSubscriptionPrice) {
+                return NextResponse.json({ error: `O preço mínimo da assinatura é R$ ${minSubscriptionPrice.toFixed(2)}` }, { status: 400 });
+            }
+
+            subscriptionPriceBRLToCents(price);
+            updateFields.subscriptionPrice = Number(price.toFixed(2));
+        }
         if (chargePerCharSubscribers !== undefined) updateFields.chargePerCharSubscribers = Number(chargePerCharSubscribers);
         if (chargePerCharNonSubscribers !== undefined) updateFields.chargePerCharNonSubscribers = Number(chargePerCharNonSubscribers);
         if (photoUrl !== undefined) updateFields.photoUrl = photoUrl;

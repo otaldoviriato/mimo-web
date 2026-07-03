@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import { connectToDatabase } from '@/lib/db';
 import { User, Transaction, Subscription } from '@/models';
+import { SubscriptionBillingError, subscriptionPriceBRLToCents } from '@/lib/subscriptionBilling';
+
+function getNextExpiration(previousExpiresAt: Date, now: Date) {
+    const nextExpiresAt = new Date(previousExpiresAt);
+    nextExpiresAt.setDate(nextExpiresAt.getDate() + 30);
+
+    if (nextExpiresAt <= now) {
+        const fromNow = new Date(now);
+        fromNow.setDate(fromNow.getDate() + 30);
+        return fromNow;
+    }
+
+    return nextExpiresAt;
+}
 
 export async function GET(request: NextRequest) {
     try {
@@ -17,29 +32,41 @@ export async function GET(request: NextRequest) {
         await connectToDatabase();
 
         const now = new Date();
-
-        // Buscar assinaturas ativas expiradas (expiresAt <= now)
         const expiredSubscriptions = await Subscription.find({
-            status: 'ACTIVE',
-            expiresAt: { $lte: now }
+            status: { $in: ['ACTIVE', 'CANCELED'] },
+            expiresAt: { $lte: now },
         });
 
         const results = {
             processed: 0,
             renewed: 0,
             expired: 0,
-            details: [] as string[]
+            failed: 0,
+            details: [] as string[],
         };
 
         for (const sub of expiredSubscriptions) {
             results.processed++;
+
             const { subscriberId, professionalId } = sub;
 
-            // Carregar cliente e profissional
+            if (sub.renewalCanceledAt || sub.status === 'CANCELED') {
+                sub.status = 'EXPIRED';
+                await sub.save();
+
+                await User.updateOne(
+                    { clerkId: professionalId },
+                    { $pull: { subscribers: subscriberId } }
+                );
+
+                results.expired++;
+                results.details.push(`Subscription of ${subscriberId} to ${professionalId} expired because renewal was canceled.`);
+                continue;
+            }
+
             const client = await User.findOne({ clerkId: subscriberId });
             const professional = await User.findOne({ clerkId: professionalId });
 
-            // [SEGURANÇA] Verificar se profissional ainda existe, está aprovado e com assinaturas ativas
             if (
                 !professional ||
                 !professional.isProfessional ||
@@ -55,7 +82,7 @@ export async function GET(request: NextRequest) {
                 );
 
                 results.expired++;
-                results.details.push(`Subscription of ${subscriberId} to ${professionalId} expired because professional disabled subscriptions, is not approved, or does not exist.`);
+                results.details.push(`Subscription of ${subscriberId} to ${professionalId} expired because the professional cannot receive subscriptions.`);
                 continue;
             }
 
@@ -69,97 +96,133 @@ export async function GET(request: NextRequest) {
                 );
 
                 results.expired++;
-                results.details.push(`Subscription of ${subscriberId} to ${professionalId} expired because client profile was not found.`);
+                results.details.push(`Subscription of ${subscriberId} to ${professionalId} expired because the client profile was not found.`);
                 continue;
             }
 
-            // [SEGURANÇA] subscriptionPrice é armazenado em reais; balance é em centavos
-            const priceInCents = Math.round((professional.subscriptionPrice || 0) * 100);
+            // User.subscriptionPrice is BRL. User.balance, Transaction.amount and Subscription.priceInCents are cents.
+            const priceInCents = subscriptionPriceBRLToCents(professional.subscriptionPrice || 0);
 
-            if (priceInCents > 0) {
-                // [SEGURANÇA] Verificar se o cliente tem saldo suficiente
-                if (client.balance < priceInCents) {
-                    sub.status = 'EXPIRED';
-                    await sub.save();
+            if (priceInCents <= 0) {
+                sub.status = 'EXPIRED';
+                await sub.save();
 
-                    await User.updateOne(
-                        { clerkId: professionalId },
-                        { $pull: { subscribers: subscriberId } }
-                    );
-
-                    results.expired++;
-                    results.details.push(`Subscription of ${subscriberId} to ${professionalId} expired due to insufficient balance. Price: ${priceInCents} cents, Balance: ${client.balance} cents`);
-                    continue;
-                }
-
-                // [SEGURANÇA] Débito atômico: só debita se ainda tiver saldo suficiente
-                // Evita race condition caso o saldo seja consumido entre a leitura e o débito
-                const debitResult = await User.updateOne(
-                    { clerkId: subscriberId, balance: { $gte: priceInCents } },
-                    { $inc: { balance: -priceInCents } }
-                );
-
-                if (debitResult.modifiedCount === 0) {
-                    // Saldo foi consumido entre a verificação e o débito (race condition)
-                    sub.status = 'EXPIRED';
-                    await sub.save();
-
-                    await User.updateOne(
-                        { clerkId: professionalId },
-                        { $pull: { subscribers: subscriberId } }
-                    );
-
-                    results.expired++;
-                    results.details.push(`Subscription of ${subscriberId} to ${professionalId} expired due to race condition on balance debit.`);
-                    continue;
-                }
-
-                // Creditar na profissional
                 await User.updateOne(
                     { clerkId: professionalId },
-                    { $inc: { balance: priceInCents } }
+                    { $pull: { subscribers: subscriberId } }
                 );
 
-                // Registrar transações de histórico
-                await Transaction.create([
-                    {
-                        userId: subscriberId,
-                        type: 'debit',
-                        amount: priceInCents,
-                        source: 'subscription',
-                        status: 'COMPLETED',
-                        relatedUserId: professionalId,
-                    },
-                    {
-                        userId: professionalId,
-                        type: 'credit',
-                        amount: priceInCents,
-                        source: 'subscription',
-                        status: 'COMPLETED',
-                        relatedUserId: subscriberId,
+                results.expired++;
+                results.details.push(`Subscription of ${subscriberId} to ${professionalId} expired because the subscription price is invalid.`);
+                continue;
+            }
+
+            if (client.balance < priceInCents) {
+                sub.status = 'EXPIRED';
+                await sub.save();
+
+                await User.updateOne(
+                    { clerkId: professionalId },
+                    { $pull: { subscribers: subscriberId } }
+                );
+
+                results.expired++;
+                results.details.push(`Subscription of ${subscriberId} to ${professionalId} expired due to insufficient balance. Price: ${priceInCents} cents, Balance: ${client.balance} cents.`);
+                continue;
+            }
+
+            const nextExpiresAt = getNextExpiration(sub.expiresAt, now);
+            const session = await mongoose.startSession();
+
+            try {
+                await session.withTransaction(async () => {
+                    const debitResult = await User.updateOne(
+                        { clerkId: subscriberId, balance: { $gte: priceInCents } },
+                        { $inc: { balance: -priceInCents } },
+                        { session }
+                    );
+
+                    if (debitResult.modifiedCount === 0) {
+                        throw new SubscriptionBillingError('Saldo insuficiente para renovar assinatura');
                     }
-                ]);
+
+                    const creditResult = await User.updateOne(
+                        {
+                            clerkId: professionalId,
+                            isProfessional: true,
+                            professionalStatus: 'approved',
+                            isSubscriptionEnabled: true,
+                        },
+                        { $inc: { balance: priceInCents } },
+                        { session }
+                    );
+
+                    if (creditResult.modifiedCount === 0) {
+                        throw new SubscriptionBillingError('Profissional nao pode receber assinaturas');
+                    }
+
+                    await Transaction.create([
+                        {
+                            userId: subscriberId,
+                            type: 'debit',
+                            amount: priceInCents,
+                            source: 'subscription',
+                            status: 'COMPLETED',
+                            relatedUserId: professionalId,
+                        },
+                        {
+                            userId: professionalId,
+                            type: 'credit',
+                            amount: priceInCents,
+                            source: 'subscription',
+                            status: 'COMPLETED',
+                            relatedUserId: subscriberId,
+                        },
+                    ], { session });
+
+                    const renewResult = await Subscription.updateOne(
+                        {
+                            _id: sub._id,
+                            status: 'ACTIVE',
+                            expiresAt: { $lte: now },
+                        },
+                        {
+                            $set: {
+                                priceInCents,
+                                expiresAt: nextExpiresAt,
+                                renewalCanceledAt: null,
+                            },
+                        },
+                        { session }
+                    );
+
+                    if (renewResult.modifiedCount === 0) {
+                        throw new SubscriptionBillingError('Assinatura ja foi processada');
+                    }
+                });
+
+                results.renewed++;
+                results.details.push(`Subscription of ${subscriberId} to ${professionalId} successfully renewed. Price: ${priceInCents} cents. New expiration: ${nextExpiresAt.toISOString()}.`);
+            } catch (error) {
+                if (error instanceof SubscriptionBillingError) {
+                    sub.status = 'EXPIRED';
+                    await sub.save();
+
+                    await User.updateOne(
+                        { clerkId: professionalId },
+                        { $pull: { subscribers: subscriberId } }
+                    );
+
+                    results.expired++;
+                    results.details.push(`Subscription of ${subscriberId} to ${professionalId} expired during renewal: ${error.message}.`);
+                } else {
+                    results.failed++;
+                    results.details.push(`Subscription of ${subscriberId} to ${professionalId} failed during renewal.`);
+                    console.error('[renew-subscriptions] Failed to renew subscription:', error);
+                }
+            } finally {
+                await session.endSession();
             }
-
-            // Renovar assinatura (+30 dias a partir da data de expiração anterior)
-            const newExpiresAt = new Date(sub.expiresAt);
-            newExpiresAt.setDate(newExpiresAt.getDate() + 30);
-
-            // Se a data ficou muito atrasada, renovar a partir de agora
-            if (newExpiresAt <= now) {
-                const altExpiresAt = new Date();
-                altExpiresAt.setDate(altExpiresAt.getDate() + 30);
-                sub.expiresAt = altExpiresAt;
-            } else {
-                sub.expiresAt = newExpiresAt;
-            }
-
-            // [CORRIGIDO] Salvar priceInCents correto (era `price`, variável inexistente)
-            sub.priceInCents = priceInCents;
-            await sub.save();
-
-            results.renewed++;
-            results.details.push(`Subscription of ${subscriberId} to ${professionalId} successfully renewed. Price: ${priceInCents} cents. New expiration: ${sub.expiresAt.toISOString()}`);
         }
 
         return NextResponse.json({ success: true, results });

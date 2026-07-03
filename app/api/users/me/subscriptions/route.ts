@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User, Subscription } from '@/models';
+import { normalizeStoredSubscriptionPriceInCents } from '@/lib/subscriptionBilling';
 
 // GET /api/users/me/subscriptions — Retorna as assinaturas ativas do cliente
 export async function GET() {
@@ -13,10 +14,14 @@ export async function GET() {
 
         await connectToDatabase();
 
-        // Busca assinaturas ativas do subscriber
+        const now = new Date();
+
+        // Busca assinaturas vigentes do subscriber. Registros legados CANCELED com
+        // expiresAt futuro ainda representam acesso pago ate o fim do ciclo.
         const subscriptions = await Subscription.find({
             subscriberId: userId,
-            status: 'ACTIVE',
+            expiresAt: { $gt: now },
+            status: { $in: ['ACTIVE', 'CANCELED'] },
         }).lean();
 
         if (subscriptions.length === 0) {
@@ -27,26 +32,55 @@ export async function GET() {
         const professionalIds = subscriptions.map((s) => s.professionalId);
         const professionals = await User.find(
             { clerkId: { $in: professionalIds } },
-            { clerkId: 1, name: 1, username: 1, photoUrl: 1 }
+            { clerkId: 1, name: 1, username: 1, photoUrl: 1, subscriptionPrice: 1 }
         ).lean();
 
-        const profMap: Record<string, { name?: string; username: string; photoUrl?: string }> = {};
+        const profMap: Record<string, { name?: string; username: string; photoUrl?: string; subscriptionPrice?: number }> = {};
         for (const prof of professionals) {
             profMap[prof.clerkId] = {
                 name: prof.name,
                 username: prof.username,
                 photoUrl: prof.photoUrl,
+                subscriptionPrice: prof.subscriptionPrice,
             };
         }
 
-        const result = subscriptions.map((sub) => ({
-            _id: String(sub._id),
-            professionalId: sub.professionalId,
-            priceInCents: sub.priceInCents,
-            expiresAt: sub.expiresAt,
-            status: sub.status,
-            professional: profMap[sub.professionalId] ?? null,
-        }));
+        const repairs: Promise<unknown>[] = [];
+        const result = subscriptions.map((sub) => {
+            const professional = profMap[sub.professionalId] ?? null;
+            const priceInCents = normalizeStoredSubscriptionPriceInCents(
+                sub.priceInCents,
+                professional?.subscriptionPrice
+            );
+
+            if (priceInCents !== sub.priceInCents) {
+                repairs.push(Subscription.updateOne(
+                    { _id: sub._id, status: 'ACTIVE' },
+                    { $set: { priceInCents } }
+                ));
+            }
+
+            return {
+                _id: String(sub._id),
+                professionalId: sub.professionalId,
+                priceInCents,
+                expiresAt: sub.expiresAt,
+                status: sub.status,
+                renewalCanceledAt: sub.renewalCanceledAt ?? (sub.status === 'CANCELED' ? sub.updatedAt : null),
+                cancelAtPeriodEnd: Boolean(sub.renewalCanceledAt || sub.status === 'CANCELED'),
+                professional: professional
+                    ? {
+                        name: professional.name,
+                        username: professional.username,
+                        photoUrl: professional.photoUrl,
+                    }
+                    : null,
+            };
+        });
+
+        if (repairs.length > 0) {
+            await Promise.all(repairs);
+        }
 
         return NextResponse.json({ subscriptions: result });
     } catch (error) {
@@ -70,30 +104,38 @@ export async function DELETE(request: NextRequest) {
 
         await connectToDatabase();
 
-        // Garante que o subscriber só cancele a própria assinatura
+        const now = new Date();
+
+        // Garante que o subscriber so cancele a propria assinatura vigente
         const subscription = await Subscription.findOne({
             _id: subscriptionId,
             subscriberId: userId,
-            status: 'ACTIVE',
+            status: { $in: ['ACTIVE', 'CANCELED'] },
+            expiresAt: { $gt: now },
         });
 
         if (!subscription) {
             return NextResponse.json({ error: 'Assinatura não encontrada' }, { status: 404 });
         }
 
-        const professionalId = subscription.professionalId;
-
-        // Marca como CANCELED
-        subscription.status = 'CANCELED';
+        // Mantem a assinatura vigente ate expiresAt; apenas impede a renovacao automatica.
+        subscription.status = 'ACTIVE';
+        subscription.renewalCanceledAt = subscription.renewalCanceledAt ?? now;
         await subscription.save();
 
-        // Remove da lista de subscribers da profissional
+        // Garante o cache de privilegios ate o vencimento, inclusive para reparar
+        // cancelamentos legados que removeram o assinante cedo demais.
         await User.updateOne(
-            { clerkId: professionalId },
-            { $pull: { subscribers: userId } }
+            { clerkId: subscription.professionalId },
+            { $addToSet: { subscribers: userId } }
         );
 
-        return NextResponse.json({ success: true, message: 'Assinatura cancelada com sucesso.' });
+        return NextResponse.json({
+            success: true,
+            message: 'Renovacao da assinatura cancelada. O acesso permanece ativo ate o fim do ciclo.',
+            expiresAt: subscription.expiresAt,
+            renewalCanceledAt: subscription.renewalCanceledAt,
+        });
     } catch (error) {
         console.error('[DELETE /api/users/me/subscriptions]', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

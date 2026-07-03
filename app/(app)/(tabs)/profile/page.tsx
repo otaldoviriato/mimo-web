@@ -1018,6 +1018,7 @@ export default function ProfilePage() {
                                     const renewsAt = new Date(sub.expiresAt);
                                     const daysLeft = Math.max(0, Math.ceil((renewsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
                                     const isExpiringSoon = daysLeft <= 3;
+                                    const renewalCanceled = Boolean(sub.cancelAtPeriodEnd);
                                     return (
                                         <button
                                             key={sub._id}
@@ -1040,14 +1041,16 @@ export default function ProfilePage() {
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-xs font-bold text-gray-800 truncate">{prof?.name || `@${prof?.username}`}</p>
                                                 <p className="text-[10px] text-gray-400 mt-0.5">@{prof?.username}</p>
-                                                <div className={`flex items-center gap-1 mt-1 ${isExpiringSoon ? 'text-orange-500' : 'text-gray-400'}`}>
-                                                    {isExpiringSoon ? (
+                                                <div className={`flex items-center gap-1 mt-1 ${isExpiringSoon || renewalCanceled ? 'text-orange-500' : 'text-gray-400'}`}>
+                                                    {isExpiringSoon || renewalCanceled ? (
                                                         <AlertCircle className="w-3 h-3 shrink-0" />
                                                     ) : (
                                                         <CalendarClock className="w-3 h-3 shrink-0" />
                                                     )}
                                                     <span className="text-[10px] font-medium">
-                                                        {isExpiringSoon
+                                                        {renewalCanceled
+                                                            ? `Expira em ${daysLeft} dia${daysLeft !== 1 ? 's' : ''}`
+                                                            : isExpiringSoon
                                                             ? `Expira em ${daysLeft} dia${daysLeft !== 1 ? 's' : ''}`
                                                             : `Renova em ${renewsAt.toLocaleDateString('pt-BR')}`
                                                         }
@@ -1121,7 +1124,9 @@ export default function ProfilePage() {
                                     </p>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Próxima renovação</p>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                                        {managingSubscription.cancelAtPeriodEnd ? 'Acesso ate' : 'Proxima renovacao'}
+                                    </p>
                                     <p className="text-sm font-bold text-gray-800 mt-0.5">
                                         {new Date(managingSubscription.expiresAt).toLocaleDateString('pt-BR')}
                                     </p>
@@ -1145,7 +1150,9 @@ export default function ProfilePage() {
                             {/* Confirmação de cancelamento inline */}
                             {cancellingSubscriptionId === managingSubscription._id ? (
                                 <div className="border border-red-100 bg-red-50/60 rounded-2xl p-4 flex flex-col gap-3">
-                                    <p className="text-xs font-bold text-red-700 text-center">Tem certeza? Você perderá o acesso ao conteúdo exclusivo imediatamente.</p>
+                                    <p className="text-xs font-bold text-red-700 text-center">
+                                        Tem certeza? A renovacao sera cancelada, mas seu acesso continua ate {new Date(managingSubscription.expiresAt).toLocaleDateString('pt-BR')}.
+                                    </p>
                                     <div className="flex gap-2">
                                         <button
                                             onClick={() => setCancellingSubscriptionId(null)}
@@ -1157,7 +1164,7 @@ export default function ProfilePage() {
                                             onClick={async () => {
                                                 try {
                                                     await cancelSubscriptionMutation.mutateAsync(managingSubscription._id);
-                                                    toast.success('Assinatura cancelada.');
+                                                    toast.success('Renovacao cancelada. Seu acesso segue ativo ate o fim do ciclo.');
                                                     setManagingSubscription(null);
                                                     setCancellingSubscriptionId(null);
                                                 } catch (err: any) {
@@ -1170,6 +1177,10 @@ export default function ProfilePage() {
                                             {cancelSubscriptionMutation.isPending ? 'Cancelando...' : 'Confirmar cancelamento'}
                                         </button>
                                     </div>
+                                </div>
+                            ) : managingSubscription.cancelAtPeriodEnd ? (
+                                <div className="rounded-2xl border border-amber-100 bg-amber-50/70 px-4 py-3 text-xs font-bold text-amber-700 text-center">
+                                    Renovacao cancelada. Acesso ativo ate {new Date(managingSubscription.expiresAt).toLocaleDateString('pt-BR')}.
                                 </div>
                             ) : (
                                 <button

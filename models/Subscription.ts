@@ -6,6 +6,7 @@ export interface ISubscription extends Document {
     status: 'ACTIVE' | 'EXPIRED' | 'CANCELED';
     priceInCents: number;     // Preço da assinatura na época do pagamento/renovação
     expiresAt: Date;          // Data em que o ciclo expira
+    renewalCanceledAt?: Date | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -35,6 +36,11 @@ const SubscriptionSchema = new Schema<ISubscription>({
         type: Date, 
         required: true, 
         index: true 
+    },
+    renewalCanceledAt: {
+        type: Date,
+        default: null,
+        index: true,
     },
 }, {
     timestamps: true,

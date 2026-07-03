@@ -5,6 +5,7 @@ import { User } from '@/models/User';
 import { WithdrawRequest } from '@/models/WithdrawRequest';
 import { MicroTransaction } from '@/models/MicroTransaction';
 import { Transaction } from '@/models/Transaction';
+import { Subscription } from '@/models/Subscription';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,7 +84,13 @@ export async function GET(request: NextRequest) {
 
         // 4. Ganhos recorrentes mensais previstos (em centavos)
         // quantidade de assinantes * valor da assinatura (que está em reais) * 100
-        const subscribersCount = user.subscribers?.length ?? 0;
+        const activeSubscriptions = await Subscription.find({
+            professionalId: user.clerkId,
+            status: { $in: ['ACTIVE', 'CANCELED'] },
+            expiresAt: { $gt: now },
+        }).select('subscriberId').lean();
+        const activeSubscriberIds = activeSubscriptions.map((subscription) => subscription.subscriberId);
+        const subscribersCount = activeSubscriberIds.length;
         const subscriptionPriceReais = user.subscriptionPrice ?? 0;
         const projectedMonthlyRecurring = subscribersCount * subscriptionPriceReais * 100;
 
@@ -279,7 +286,7 @@ export async function GET(request: NextRequest) {
 
         // 8. Buscar lista de detalhes dos assinantes ativos
         const subscribersList = await User.find({
-            clerkId: { $in: user.subscribers || [] }
+            clerkId: { $in: activeSubscriberIds }
         })
         .select('clerkId name username photoUrl')
         .lean();

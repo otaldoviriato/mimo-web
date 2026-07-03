@@ -9,9 +9,11 @@ import { GalleryItem } from '@/models/GalleryItem';
 import { CreditGrant } from '@/models/CreditGrant';
 import { Transaction } from '@/models/Transaction';
 import { MicroTransaction } from '@/models/MicroTransaction';
+import { Subscription } from '@/models/Subscription';
 import { grantWelcomeCredit } from '@/lib/creditCampaign';
 import { Resend } from 'resend';
 import { buildProfileRoleMetadata, getCreatorLandingProfileRole } from '@/lib/profileRole';
+import { subscriptionPriceBRLToCents } from '@/lib/subscriptionBilling';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
 
@@ -255,6 +257,7 @@ export async function GET(request: NextRequest) {
         }
 
         let publicPhotosCount = 0;
+        let activeSubscriberIds = user.subscribers || [];
         if (user.isProfessional) {
             publicPhotosCount = await GalleryItem.countDocuments({
                 ownerId: user.clerkId,
@@ -262,6 +265,13 @@ export async function GET(request: NextRequest) {
                 visibility: 'public',
                 mediaType: 'photo'
             });
+
+            const activeSubscriptions = await Subscription.find({
+                professionalId: user.clerkId,
+                status: { $in: ['ACTIVE', 'CANCELED'] },
+                expiresAt: { $gt: new Date() },
+            }).select('subscriberId').lean();
+            activeSubscriberIds = activeSubscriptions.map((subscription) => subscription.subscriberId);
         }
 
         return NextResponse.json({
@@ -283,7 +293,7 @@ export async function GET(request: NextRequest) {
                 isSubscriptionEnabled: user.isSubscriptionEnabled ?? false,
                 chargePerCharSubscribers: user.chargePerCharSubscribers ?? (settings?.defaultPricePerCharSubscribers ?? 0.002),
                 chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? (settings?.defaultPricePerCharNonSubscribers ?? 0.005),
-                subscribers: user.subscribers || [],
+                subscribers: activeSubscriberIds,
                 pixKey: user.taxId || user.pixKey,
                 savedCards: (user.savedCards || []).map((card: ICard) => ({
                     id: card.id,
@@ -385,11 +395,12 @@ export async function PATCH(request: NextRequest) {
         const currentSubscriptionPrice = subscriptionPrice !== undefined ? Number(subscriptionPrice) : (currentUser?.subscriptionPrice ?? 0);
 
         if (subscriptionPrice !== undefined) {
-            if (subscriptionPrice < 0) return NextResponse.json({ error: 'Subscription price cannot be negative' }, { status: 400 });
-            if (subscriptionPrice > maxSubscriptionPrice) {
+            if (!Number.isFinite(currentSubscriptionPrice) || currentSubscriptionPrice < 0) return NextResponse.json({ error: 'Subscription price cannot be negative' }, { status: 400 });
+            if (currentSubscriptionPrice > maxSubscriptionPrice) {
                 return NextResponse.json({ error: `O preço da assinatura não pode ser maior que R$ ${maxSubscriptionPrice}` }, { status: 400 });
             }
-            updateData.subscriptionPrice = subscriptionPrice;
+            subscriptionPriceBRLToCents(currentSubscriptionPrice);
+            updateData.subscriptionPrice = Number(currentSubscriptionPrice.toFixed(2));
         }
 
         if (currentIsSubscriptionEnabled) {
@@ -548,6 +559,16 @@ export async function PATCH(request: NextRequest) {
             }
         }
 
+        let updatedActiveSubscriberIds = user.subscribers || [];
+        if (user.isProfessional) {
+            const activeSubscriptions = await Subscription.find({
+                professionalId: user.clerkId,
+                status: { $in: ['ACTIVE', 'CANCELED'] },
+                expiresAt: { $gt: new Date() },
+            }).select('subscriberId').lean();
+            updatedActiveSubscriberIds = activeSubscriptions.map((subscription) => subscription.subscriberId);
+        }
+
         return NextResponse.json({
             user: {
                 id: user._id,
@@ -567,7 +588,7 @@ export async function PATCH(request: NextRequest) {
                 isSubscriptionEnabled: user.isSubscriptionEnabled ?? false,
                 chargePerCharSubscribers: user.chargePerCharSubscribers ?? (settings?.defaultPricePerCharSubscribers ?? 0.002),
                 chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? (settings?.defaultPricePerCharNonSubscribers ?? 0.005),
-                subscribers: user.subscribers || [],
+                subscribers: updatedActiveSubscriberIds,
                 pixKey: user.taxId || user.pixKey,
                 savedCards: (user.savedCards || []).map((card: ICard) => ({
                     id: card.id,

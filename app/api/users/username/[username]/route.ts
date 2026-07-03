@@ -6,6 +6,7 @@ import { AppSettings } from '@/models/AppSettings';
 import { MicroTransaction } from '@/models/MicroTransaction';
 import { Room } from '@/models/Room';
 import { Message } from '@/models/Message';
+import { Subscription } from '@/models/Subscription';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -71,7 +72,7 @@ export async function GET(
                 shouldShowBalance = true;
             } else {
                 // Buscar dados do visualizador no banco
-                const viewer = await User.findOne({ clerkId: viewerClerkId }).select('isProfessional');
+                const viewer = await User.findOne({ clerkId: viewerClerkId }).select('isProfessional freeCharsForNewClients');
                 if (viewer?.isProfessional && !user.isProfessional) {
                     shouldShowBalance = true;
 
@@ -127,23 +128,73 @@ export async function GET(
                         }
                     });
 
-                    // 3. Sala de chat e quantidade de mensagens trocadas
+                    // 3. Sala de chat e caracteres de texto enviados pelo cliente
                     const room = await Room.findOne({
                         participants: { $all: [user.clerkId, viewerClerkId] }
                     });
 
                     let totalMessages = 0;
                     let conversationStart = null;
+                    const freeCharsLimit = viewer.freeCharsForNewClients ?? 500;
+                    let totalClientTextChars = 0;
+                    let freeCharsUsed = 0;
+                    let chargedChars = 0;
+                    let remainingFreeChars = freeCharsLimit;
 
                     if (room) {
-                        totalMessages = await Message.countDocuments({ roomId: room._id.toString() });
+                        const virtualRoomId = [user.clerkId, viewerClerkId].sort().join('_');
+                        const roomIds = [room._id.toString(), virtualRoomId];
+                        const messageRoomFilter = { roomId: { $in: roomIds } };
+
+                        totalMessages = await Message.countDocuments(messageRoomFilter);
                         conversationStart = room.createdAt;
+
+                        const [clientCharsAgg] = await Message.aggregate([
+                            {
+                                $match: {
+                                    ...messageRoomFilter,
+                                    senderId: user.clerkId,
+                                    receiverId: viewerClerkId,
+                                    isSystem: { $ne: true },
+                                    isGift: { $ne: true },
+                                    isLockedImage: { $ne: true },
+                                    isVideo: { $ne: true },
+                                    originalImageUrl: { $in: [null, ''] },
+                                }
+                            },
+                            {
+                                $group: {
+                                    _id: null,
+                                    total: {
+                                        $sum: {
+                                            $ifNull: [
+                                                '$charCount',
+                                                { $strLenCP: { $ifNull: ['$content', ''] } },
+                                            ],
+                                        },
+                                    },
+                                },
+                            },
+                        ]);
+
+                        totalClientTextChars = clientCharsAgg?.total ?? 0;
+                        freeCharsUsed = Math.min(totalClientTextChars, freeCharsLimit);
+                        chargedChars = Math.max(0, totalClientTextChars - freeCharsLimit);
+                        remainingFreeChars = Math.max(0, freeCharsLimit - totalClientTextChars);
                     }
 
                     relationshipStats = {
                         totalSpent,
                         detailStats,
                         totalMessages,
+                        characterStats: {
+                            totalClientTextChars,
+                            freeCharsLimit,
+                            freeCharsUsed,
+                            chargedChars,
+                            remainingFreeChars,
+                            isBeyondFreeAllowance: freeCharsLimit <= 0 || totalClientTextChars >= freeCharsLimit
+                        },
                         conversationStart
                     };
                 }
@@ -153,6 +204,17 @@ export async function GET(
         const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers').lean();
         const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
         const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
+        let effectiveSubscribers = user.subscribers || [];
+
+        if (user.isProfessional) {
+            const activeSubscriptions = await Subscription.find({
+                professionalId: user.clerkId,
+                status: { $in: ['ACTIVE', 'CANCELED'] },
+                expiresAt: { $gt: new Date() },
+            }).select('subscriberId').lean();
+
+            effectiveSubscribers = activeSubscriptions.map((sub) => sub.subscriberId);
+        }
 
         return NextResponse.json({
             user: {
@@ -168,7 +230,7 @@ export async function GET(
                 isSubscriptionEnabled: user.isSubscriptionEnabled ?? false,
                 chargePerCharSubscribers: user.chargePerCharSubscribers ?? defaultSub,
                 chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? defaultNonSub,
-                subscribers: user.subscribers || [],
+                subscribers: effectiveSubscribers,
                 bio: user.bio || '',
                 balance: shouldShowBalance ? (user.balance || 0) : undefined,
                 relationshipStats: relationshipStats || undefined,
