@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Sidebar } from '@/components/admin/Sidebar';
 import { DashboardHeader } from '@/components/admin/DashboardHeader';
 import { StatsCard } from '@/components/admin/StatsCard';
@@ -226,7 +227,13 @@ export default function AdminPage() {
                                                             {tx.status === 'Cancelado' && <AlertCircle size={16} />}
                                                         </div>
                                                         <div className="flex flex-col">
-                                                            <span className="text-xs font-bold text-slate-800">{tx.user}</span>
+                                                            {tx.userId && tx.userId !== 'platform' ? (
+                                                                <Link href={`/admin/users/${tx.userId}`} className="text-xs font-bold text-purple-600 hover:text-purple-800 hover:underline transition-colors text-left">
+                                                                    {tx.user}
+                                                                </Link>
+                                                            ) : (
+                                                                <span className="text-xs font-bold text-slate-800">{tx.user}</span>
+                                                            )}
                                                             <span className="text-[10px] text-slate-400 font-semibold">{tx.type} • {tx.time}</span>
                                                         </div>
                                                     </div>
@@ -235,7 +242,7 @@ export default function AdminPage() {
                                                             <span className="text-xs font-bold text-slate-700 block">{tx.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                                                             {tx.fee > 0 && (
                                                                 <span className="text-[9px] text-emerald-600 font-bold block">
-                                                                    Líq: {tx.net.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                                    = {tx.net.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                                                 </span>
                                                             )}
                                                             <span className="text-[9px] text-slate-400 font-semibold uppercase">{tx.displayId || tx.id}</span>

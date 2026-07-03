@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Trash2, X, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import Link from 'next/link';
 import toast from 'react-hot-toast';
 
 interface FinancialTabProps {
@@ -167,29 +168,66 @@ export function FinancialTab({ dashboardData, loadingDashboard: parentLoading, h
                                     <td className="py-4 px-6 text-xs font-bold text-slate-500 uppercase">{tx.displayId || tx.id}</td>
                                     <td className="py-4 px-6 text-sm font-bold">
                                         <div className="flex flex-col">
-                                            <div className="flex items-center gap-1.5 flex-wrap">
-                                                <span className="text-slate-700 font-extrabold">{tx.senderName}</span>
-                                                <span className="text-slate-400 font-normal">→</span>
-                                                <span className="text-purple-600 font-extrabold">{tx.receiverName}</span>
-                                            </div>
+                                            {tx.source === 'recharge' ? (
+                                                <div className="flex items-center gap-1">
+                                                    {tx.senderId && tx.senderId !== 'platform' ? (
+                                                        <Link href={`/admin/users/${tx.senderId}`} className="text-purple-600 hover:text-purple-800 hover:underline font-extrabold transition-colors">
+                                                            {tx.senderName}
+                                                        </Link>
+                                                    ) : (
+                                                        <span className="text-slate-700 font-extrabold">{tx.senderName}</span>
+                                                    )}
+                                                </div>
+                                            ) : tx.source === 'withdrawal' ? (
+                                                <div className="flex items-center gap-1">
+                                                    {tx.receiverId && tx.receiverId !== 'platform' ? (
+                                                        <Link href={`/admin/users/${tx.receiverId}`} className="text-purple-600 hover:text-purple-800 hover:underline font-extrabold transition-colors">
+                                                            {tx.receiverName}
+                                                        </Link>
+                                                    ) : (
+                                                        <span className="text-slate-700 font-extrabold">{tx.receiverName}</span>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    {tx.senderId && tx.senderId !== 'platform' ? (
+                                                        <Link href={`/admin/users/${tx.senderId}`} className="text-slate-700 hover:text-purple-600 hover:underline font-extrabold transition-colors">
+                                                            {tx.senderName}
+                                                        </Link>
+                                                    ) : (
+                                                        <span className="text-slate-700 font-extrabold">{tx.senderName}</span>
+                                                    )}
+                                                    <span className="text-slate-400 font-normal">→</span>
+                                                    {tx.receiverId && tx.receiverId !== 'platform' ? (
+                                                        <Link href={`/admin/users/${tx.receiverId}`} className="text-purple-600 hover:text-purple-850 hover:underline font-extrabold transition-colors">
+                                                            {tx.receiverName}
+                                                        </Link>
+                                                    ) : (
+                                                        <span className="text-purple-600 font-extrabold">{tx.receiverName}</span>
+                                                    )}
+                                                </div>
+                                            )}
                                             {tx.isWithdrawRequest && tx.pixKey && (
                                                 <span className="text-[10px] font-mono text-slate-400 mt-0.5 break-all">Pix: {tx.pixKey}</span>
                                             )}
                                         </div>
                                     </td>
                                     <td className="py-4 px-6 text-xs text-slate-500 font-semibold">{tx.type}</td>
-                                    <td className="py-4 px-6 text-xs text-slate-700">
+                                    <td className="py-4 px-6 text-xs text-slate-750">
                                         {['subscription', 'image_unlock', 'gift', 'message'].includes(tx.source) ? (
                                             <div className="flex flex-col gap-0.5">
                                                 <span className="text-sm font-bold text-slate-800">
-                                                    Total: {tx.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                    {tx.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                                 </span>
-                                                <span className="text-slate-400 text-[10px] font-semibold">
-                                                    Taxa: {(tx.fee || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                                </span>
-                                                <span className="text-emerald-600 text-[10px] font-bold">
-                                                    Líquido: {(tx.net || tx.val).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                                </span>
+                                                <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-semibold select-none">
+                                                    <span title="Taxa MimoChat" className="text-slate-400">
+                                                        % {(tx.fee || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                    </span>
+                                                    <span className="text-slate-300">•</span>
+                                                    <span title="Valor Líquido" className="text-emerald-600 font-bold">
+                                                        = {(tx.net || tx.val).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                    </span>
+                                                </div>
                                             </div>
                                         ) : (
                                             <span className="text-sm font-bold text-slate-800">
