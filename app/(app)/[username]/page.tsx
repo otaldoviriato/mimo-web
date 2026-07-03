@@ -31,8 +31,12 @@ export default function UserProfilePage({ params, username: propUsername, onBack
     const [revealedItems, setRevealedItems] = useState<Record<string, boolean>>({});
     const [activeViewerIndex, setActiveViewerIndex] = useState<number | null>(null);
     const [isSubscribeModalOpen, setIsSubscribeModalOpen] = useState(false);
+    const [viewerDragOffset, setViewerDragOffset] = useState(0);
+    const [viewerIsDragging, setViewerIsDragging] = useState(false);
+    const [viewerIsAnimating, setViewerIsAnimating] = useState(false);
     const touchStartX = useRef(0);
     const touchEndX = useRef(0);
+    const viewerTransitionTimeoutRef = useRef<number | null>(null);
 
     let resolvedUsername = '';
     if (propUsername) {
@@ -82,6 +86,9 @@ export default function UserProfilePage({ params, username: propUsername, onBack
     const activeViewerItem = activeViewerIndex !== null ? currentGalleryItems[activeViewerIndex] : null;
     const hasPreviousViewerItem = activeViewerIndex !== null && activeViewerIndex > 0;
     const hasNextViewerItem = activeViewerIndex !== null && activeViewerIndex < currentGalleryItems.length - 1;
+    const previousViewerItem = hasPreviousViewerItem ? currentGalleryItems[activeViewerIndex - 1] : null;
+    const nextViewerItem = hasNextViewerItem ? currentGalleryItems[activeViewerIndex + 1] : null;
+    const viewerTransitionMs = 220;
 
     const openViewer = useCallback((itemId: string) => {
         const index = currentGalleryItems.findIndex((item) => item._id === itemId);
@@ -92,38 +99,100 @@ export default function UserProfilePage({ params, username: propUsername, onBack
 
     const closeViewer = useCallback(() => {
         setActiveViewerIndex(null);
+        setViewerDragOffset(0);
+        setViewerIsDragging(false);
+        setViewerIsAnimating(false);
     }, []);
+
+    const animateViewerToIndex = useCallback((nextIndex: number) => {
+        if (activeViewerIndex === null || nextIndex === activeViewerIndex) return;
+
+        if (viewerTransitionTimeoutRef.current !== null) {
+            window.clearTimeout(viewerTransitionTimeoutRef.current);
+        }
+
+        const viewportWidth = window.innerWidth || 1;
+        const directionOffset = nextIndex > activeViewerIndex ? -viewportWidth : viewportWidth;
+
+        setViewerIsDragging(false);
+        setViewerIsAnimating(true);
+        setViewerDragOffset(directionOffset);
+
+        viewerTransitionTimeoutRef.current = window.setTimeout(() => {
+            setActiveViewerIndex(nextIndex);
+            setViewerIsAnimating(false);
+            setViewerDragOffset(0);
+            viewerTransitionTimeoutRef.current = null;
+        }, viewerTransitionMs);
+    }, [activeViewerIndex]);
 
     const showPreviousViewerItem = useCallback(() => {
-        setActiveViewerIndex(current => current !== null && current > 0 ? current - 1 : current);
-    }, []);
+        if (activeViewerIndex !== null && activeViewerIndex > 0) {
+            animateViewerToIndex(activeViewerIndex - 1);
+        }
+    }, [activeViewerIndex, animateViewerToIndex]);
 
     const showNextViewerItem = useCallback(() => {
-        setActiveViewerIndex(current => current !== null && current < currentGalleryItems.length - 1 ? current + 1 : current);
-    }, [currentGalleryItems.length]);
+        if (activeViewerIndex !== null && activeViewerIndex < currentGalleryItems.length - 1) {
+            animateViewerToIndex(activeViewerIndex + 1);
+        }
+    }, [activeViewerIndex, animateViewerToIndex, currentGalleryItems.length]);
 
     const handleViewerTouchStart = (e: React.TouchEvent) => {
+        if (viewerTransitionTimeoutRef.current !== null) return;
+
         touchStartX.current = e.targetTouches[0].clientX;
         touchEndX.current = e.targetTouches[0].clientX;
+        setViewerIsDragging(true);
+        setViewerIsAnimating(false);
     };
 
     const handleViewerTouchMove = (e: React.TouchEvent) => {
-        touchEndX.current = e.targetTouches[0].clientX;
+        if (viewerTransitionTimeoutRef.current !== null) return;
+
+        const currentX = e.targetTouches[0].clientX;
+        const rawOffset = currentX - touchStartX.current;
+        const isPullingPastStart = rawOffset > 0 && !hasPreviousViewerItem;
+        const isPullingPastEnd = rawOffset < 0 && !hasNextViewerItem;
+        const resistedOffset = isPullingPastStart || isPullingPastEnd ? rawOffset * 0.28 : rawOffset;
+
+        touchEndX.current = currentX;
+        setViewerDragOffset(resistedOffset);
     };
 
     const handleViewerTouchEnd = useCallback(() => {
-        const diffX = touchStartX.current - touchEndX.current;
-        const minSwipeDistance = 50;
+        if (viewerTransitionTimeoutRef.current !== null) return;
 
-        if (diffX > minSwipeDistance) {
+        const diffX = touchStartX.current - touchEndX.current;
+        const viewportWidth = window.innerWidth || 1;
+        const minSwipeDistance = Math.min(90, viewportWidth * 0.18);
+
+        if (diffX > minSwipeDistance && hasNextViewerItem) {
             showNextViewerItem();
-        } else if (diffX < -minSwipeDistance) {
+        } else if (diffX < -minSwipeDistance && hasPreviousViewerItem) {
             showPreviousViewerItem();
+        } else {
+            setViewerIsAnimating(true);
+            setViewerDragOffset(0);
+
+            viewerTransitionTimeoutRef.current = window.setTimeout(() => {
+                setViewerIsAnimating(false);
+                viewerTransitionTimeoutRef.current = null;
+            }, viewerTransitionMs);
         }
 
         touchStartX.current = 0;
         touchEndX.current = 0;
-    }, [showNextViewerItem, showPreviousViewerItem]);
+        setViewerIsDragging(false);
+    }, [hasNextViewerItem, hasPreviousViewerItem, showNextViewerItem, showPreviousViewerItem]);
+
+    useEffect(() => {
+        return () => {
+            if (viewerTransitionTimeoutRef.current !== null) {
+                window.clearTimeout(viewerTransitionTimeoutRef.current);
+            }
+        };
+    }, []);
 
     useEffect(() => {
         if (activeViewerIndex === null) return;
@@ -665,26 +734,46 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                     onClick={closeViewer}
                 >
                     <div
-                        className="absolute inset-0 flex items-center justify-center bg-black"
+                        className="absolute inset-0 overflow-hidden bg-black"
                         onClick={(e) => e.stopPropagation()}
                         onTouchStart={handleViewerTouchStart}
                         onTouchMove={handleViewerTouchMove}
                         onTouchEnd={handleViewerTouchEnd}
+                        style={{ touchAction: 'none' }}
                     >
-                        {activeViewerItem.mediaType === 'video' ? (
-                            <video
-                                src={activeViewerItem.imageUrl}
-                                controls
-                                autoPlay
-                                className="w-screen h-screen object-contain bg-black"
-                            />
-                        ) : (
-                            <img
-                                src={activeViewerItem.imageUrl}
-                                alt="Midia da galeria em tela cheia"
-                                className="w-screen h-screen object-contain pointer-events-none"
-                            />
-                        )}
+                        <div
+                            className="flex h-full w-full will-change-transform"
+                            style={{
+                                transform: `translate3d(calc(-100% + ${viewerDragOffset}px), 0, 0)`,
+                                transition: viewerIsDragging || !viewerIsAnimating
+                                    ? 'none'
+                                    : `transform ${viewerTransitionMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+                            }}
+                        >
+                            {[previousViewerItem, activeViewerItem, nextViewerItem].map((item, slideIndex) => (
+                                <div
+                                    key={item?._id ?? `empty-${slideIndex}`}
+                                    className="flex h-screen w-screen shrink-0 items-center justify-center bg-black"
+                                >
+                                    {item?.mediaType === 'video' ? (
+                                        <video
+                                            src={item.imageUrl}
+                                            controls={slideIndex === 1}
+                                            autoPlay={slideIndex === 1}
+                                            preload="metadata"
+                                            className="h-screen w-screen object-contain bg-black"
+                                        />
+                                    ) : item ? (
+                                        <img
+                                            src={item.imageUrl}
+                                            alt="Midia da galeria em tela cheia"
+                                            className="h-screen w-screen object-contain pointer-events-none"
+                                            draggable={false}
+                                        />
+                                    ) : null}
+                                </div>
+                            ))}
+                        </div>
                     </div>
 
                     <button

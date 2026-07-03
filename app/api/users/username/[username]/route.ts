@@ -72,7 +72,7 @@ export async function GET(
                 shouldShowBalance = true;
             } else {
                 // Buscar dados do visualizador no banco
-                const viewer = await User.findOne({ clerkId: viewerClerkId }).select('isProfessional freeCharsForNewClients');
+                const viewer = await User.findOne({ clerkId: viewerClerkId }).select('isProfessional');
                 if (viewer?.isProfessional && !user.isProfessional) {
                     shouldShowBalance = true;
 
@@ -135,11 +135,11 @@ export async function GET(
 
                     let totalMessages = 0;
                     let conversationStart = null;
-                    const freeCharsLimit = viewer.freeCharsForNewClients ?? 500;
+                    const freeCharsLimit = 0;
                     let totalClientTextChars = 0;
                     let freeCharsUsed = 0;
                     let chargedChars = 0;
-                    let remainingFreeChars = freeCharsLimit;
+                    let remainingFreeChars = 0;
 
                     if (room) {
                         const virtualRoomId = [user.clerkId, viewerClerkId].sort().join('_');

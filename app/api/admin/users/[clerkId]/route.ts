@@ -134,8 +134,7 @@ export async function PATCH(
             chargePerCharNonSubscribers,
             photoUrl,
             coverUrl,
-            bio,
-            freeCharsForNewClients
+            bio
         } = body;
 
         const updateFields: any = {};
@@ -169,7 +168,6 @@ export async function PATCH(
         if (chargePerCharNonSubscribers !== undefined) updateFields.chargePerCharNonSubscribers = Number(chargePerCharNonSubscribers);
         if (photoUrl !== undefined) updateFields.photoUrl = photoUrl;
         if (coverUrl !== undefined) updateFields.coverUrl = coverUrl;
-        if (freeCharsForNewClients !== undefined) updateFields.freeCharsForNewClients = Number(freeCharsForNewClients);
 
         if (bio !== undefined) {
             if (bio && bio.length > 300) {
@@ -180,7 +178,6 @@ export async function PATCH(
 
         if (isProfessional === false) {
             updateFields.bio = '';
-            updateFields.freeCharsForNewClients = 0;
         }
 
         const updatedUser = await User.findOneAndUpdate(
