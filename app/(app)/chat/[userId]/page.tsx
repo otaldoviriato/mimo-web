@@ -13,7 +13,7 @@ import { Drawer } from 'vaul';
 import { AudioRecorder } from '@/components/AudioRecorder';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { MediaComposerSheet } from '@/components/MediaComposerSheet';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, MessageSquare } from 'lucide-react';
 
 interface Message {
     _id: string;
@@ -441,6 +441,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
     const [monetizationDisabled, setMonetizationDisabled] = useState(false);
     const [audioRecordingStatus, setAudioRecordingStatus] = useState<'idle' | 'recording' | 'locked'>('idle');
+    const [rateAccepted, setRateAccepted] = useState(true);
 
     // Refs para o gesto de swipe para responder
     const swipingMessage = useRef<Message | null>(null);
@@ -2219,6 +2220,27 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         ? Math.floor(balance / audioCostPerSecondInCents)
         : undefined;
 
+    useEffect(() => {
+        if (!receiver || !user?.id) return;
+        const key = `mimo_chat_rate_accepted_${user.id}_${receiver.clerkId}`;
+        const acceptedRateVal = localStorage.getItem(key);
+        if (acceptedRateVal !== null) {
+            const acceptedRate = parseFloat(acceptedRateVal);
+            if (acceptedRate === currentRate) {
+                setRateAccepted(true);
+                return;
+            }
+        }
+        setRateAccepted(false);
+    }, [receiver, user?.id, currentRate]);
+
+    const handleAcceptRate = () => {
+        if (!receiver || !user?.id) return;
+        const key = `mimo_chat_rate_accepted_${user.id}_${receiver.clerkId}`;
+        localStorage.setItem(key, currentRate.toString());
+        setRateAccepted(true);
+    };
+
     const isClosingOrLeaving = isClosing || isLeaving;
 
     const layoutClass = isSubPage
@@ -2445,6 +2467,29 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
             {/* Messages Container Wrapper */}
             <div className="flex-1 relative overflow-hidden flex flex-col">
+                {!rateAccepted && !userData?.isProfessional && receiver?.isProfessional && currentRate > 0 && (
+                    <div className="bg-purple-50/95 border-b border-purple-100 px-5 py-3 flex items-center justify-between gap-4 animate-in slide-in-from-top duration-300 z-10 shrink-0">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-xl bg-purple-100 flex items-center justify-center text-purple-700 shrink-0">
+                                <MessageSquare className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-xs font-semibold text-slate-800 leading-tight">
+                                    Custo da conversa: <span className="font-bold text-purple-700">{currentRate.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span> por caractere.
+                                </p>
+                                <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                                    Seu saldo será cobrado proporcionalmente ao tamanho do texto enviado.
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={handleAcceptRate}
+                            className="shrink-0 text-xs font-bold text-purple-700 bg-purple-100 hover:bg-purple-200/70 active:scale-95 px-3 py-1.5 rounded-lg transition-all"
+                        >
+                            Entendi
+                        </button>
+                    </div>
+                )}
                 {/* Messages */}
                 <div 
                     ref={messagesContainerRef} 
