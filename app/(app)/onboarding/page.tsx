@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
     User, Crown, Check, CheckCircle2, ShieldCheck, CreditCard, Calendar,
     Camera, ChevronLeft, UserCheck, Loader2, X, Plus, AlertCircle
@@ -134,6 +135,9 @@ export default function OnboardingPage() {
     const coverInputRef = useRef<HTMLInputElement>(null);
     const [profLoading,  setProfLoading]  = useState(false);
     const [profError,    setProfError]    = useState('');
+    const [mounted,      setMounted]      = useState(false);
+
+    useEffect(() => { setMounted(true); return () => setMounted(false); }, []);
 
     // Inicializa dados do perfil existente e determina o step de entrada.
     // Roda apenas uma vez (controlled via ref) para não interferir no fluxo.
@@ -772,7 +776,7 @@ export default function OnboardingPage() {
     // ── Profile ───────────────────────────────────────────────────────────────
     const renderProfile = () => (
         <>
-            {cropperSrc && (
+            {mounted && cropperSrc && createPortal(
                 <ImageCropper
                     imageSrc={cropperSrc}
                     circular={true}
@@ -782,7 +786,8 @@ export default function OnboardingPage() {
                         setCropperSrc(null);
                         if (photoInputRef.current) photoInputRef.current.value = '';
                     }}
-                />
+                />,
+                document.body
             )}
 
             <form onSubmit={handleProfileSubmit} className="flex flex-col h-full bg-slate-50">

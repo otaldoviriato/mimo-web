@@ -661,14 +661,15 @@ export default function ProfilePage() {
                 </div>
             )}
 
-            {cropperState && cropperState.open && (
+            {mounted && cropperState && cropperState.open && createPortal(
                 <ImageCropper
                     imageSrc={cropperState.imageSrc}
                     circular={cropperState.type === 'photo'}
                     aspectRatio={cropperState.type === 'photo' ? 1 : 2.75}
                     onCrop={handleCropConfirm}
                     onCancel={() => setCropperState(null)}
-                />
+                />,
+                document.body
             )}
 
             {/* Modal antigo foi removido daqui e reposicionado fora do PullToRefresh via Portal */}
@@ -996,14 +997,15 @@ export default function ProfilePage() {
 
             </PullToRefresh>
 
-            {cropperState && cropperState.open && (
+            {mounted && cropperState && cropperState.open && createPortal(
                 <ImageCropper
                     imageSrc={cropperState.imageSrc}
                     circular={cropperState.type === 'photo'}
                     aspectRatio={cropperState.type === 'photo' ? 1 : 2.75}
                     onCrop={handleCropConfirm}
                     onCancel={() => setCropperState(null)}
-                />
+                />,
+                document.body
             )}
         </div>
     );

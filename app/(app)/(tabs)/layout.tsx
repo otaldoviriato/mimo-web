@@ -122,7 +122,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
             </aside>
 
             {/* Main content */}
-            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
                 {children}
             </div>
 
