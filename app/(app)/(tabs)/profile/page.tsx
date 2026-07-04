@@ -423,7 +423,7 @@ export default function ProfilePage() {
                         <h1 className="text-2xl font-black text-gray-900 tracking-tight text-center">
                             {userData?.name || `@${userData?.username}`}
                         </h1>
-                        {userData?.identityStatus === 'approved' && (
+                        {userData?.isProfessional && userData?.identityStatus === 'approved' && (
                             <ShieldCheck className="w-5 h-5 text-purple-600 shrink-0" />
                         )}
                     </div>

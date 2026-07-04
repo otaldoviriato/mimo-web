@@ -132,7 +132,7 @@ export default function SearchPage() {
                                 <h2 className="text-sm font-extrabold text-slate-800 truncate hover:text-purple-700 tracking-tight leading-snug">
                                     {user.name || `@${user.username}`}
                                 </h2>
-                                {user.identityStatus === 'approved' && (
+                                {user.isProfessional && user.identityStatus === 'approved' && (
                                     <ShieldCheck className="w-4 h-4 text-purple-600 shrink-0" />
                                 )}
                                 {user.isNew && (

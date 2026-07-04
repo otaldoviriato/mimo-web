@@ -2346,7 +2346,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                     <p className="text-base font-bold text-white truncate tracking-tight">
                                         {receiver?.name || receiver?.username || (otherUserId ? `Usuário ${otherUserId.substring(0, 8)}` : 'Conversa')}
                                     </p>
-                                    {receiver?.identityStatus === 'approved' && (
+                                    {receiver?.isProfessional && receiver?.identityStatus === 'approved' && (
                                         <ShieldCheck className="w-4 h-4 text-white shrink-0" />
                                     )}
                                 </div>

@@ -605,8 +605,9 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                         </div>
 
                         {/* ── SEÇÃO: VERIFICAÇÃO DE IDENTIDADE ── */}
-                        <div>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Verificação de Identidade (Selo de Verificado)</p>
+                        {profileIsProfessional && (
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Verificação de Identidade (Selo de Verificado)</p>
                             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-4 space-y-3.5">
                                 {userData?.identityStatus === 'approved' ? (
                                     <div className="flex items-start gap-3">
@@ -683,8 +684,9 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                         </button>
                                     </div>
                                 )}
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* ── SEÇÃO: PREÇOS E GANHOS (Profissionais) ── */}
                         {/* ── CARD 1: OFERECER ASSINATURA ── */}

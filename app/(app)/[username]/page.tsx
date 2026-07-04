@@ -324,7 +324,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                     <h1 className="text-2xl font-black text-gray-900 tracking-tight text-center">
                         {user.name || `@${user.username}`}
                     </h1>
-                    {user.identityStatus === 'approved' && (
+                    {user.isProfessional && user.identityStatus === 'approved' && (
                         <ShieldCheck className="w-5 h-5 text-purple-600 shrink-0" />
                     )}
                 </div>

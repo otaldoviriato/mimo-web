@@ -207,6 +207,20 @@ export async function POST(request: NextRequest) {
 
         const contentType = request.headers.get('content-type') || '';
         if (contentType.includes('multipart/form-data')) {
+            await connectToDatabase();
+
+            const user = await User.findOne({ clerkId: userId }).select('isProfessional');
+            if (!user) {
+                return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
+            }
+
+            if (user.isProfessional !== true) {
+                return NextResponse.json(
+                    { error: 'Verificação de perfil disponível apenas para usuários profissionais' },
+                    { status: 403 }
+                );
+            }
+
             const formData = await request.formData();
             const documentFile = formData.get('document') as File;
             const selfieFile = formData.get('selfie') as File;
@@ -219,8 +233,6 @@ export async function POST(request: NextRequest) {
             if (!documentFile.type.startsWith('image/') || !selfieFile.type.startsWith('image/')) {
                 return NextResponse.json({ error: 'Os arquivos enviados devem ser imagens' }, { status: 400 });
             }
-
-            await connectToDatabase();
 
             const docExt = documentFile.name.split('.').pop() || 'jpg';
             const selfieExt = selfieFile.name.split('.').pop() || 'jpg';

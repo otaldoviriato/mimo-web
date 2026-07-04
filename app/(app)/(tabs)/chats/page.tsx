@@ -141,6 +141,11 @@ export default function ChatsPage() {
 
     useEffect(() => {
         if (typeof window !== 'undefined' && myProfile) {
+            if (!myProfile.isProfessional) {
+                setHideIdentityPrompt(true);
+                return;
+            }
+
             if (myProfile.identityStatus === 'approved' || myProfile.identityStatus === 'pending') {
                 setHideIdentityPrompt(true);
                 return;
@@ -166,6 +171,7 @@ export default function ChatsPage() {
 
     const renderVerificationBanner = () => {
         if (!myProfile) return null;
+        if (!myProfile.isProfessional) return null;
 
         // Se estiver pendente
         if (myProfile.identityStatus === 'pending') {
@@ -839,7 +845,7 @@ export default function ChatsPage() {
                                                     <span className={`text-base truncate ${hasUnread ? 'font-bold text-gray-900' : 'font-semibold text-gray-800'}`}>
                                                         {room.otherUser?.name || room.otherUser?.username || `Usuário ${otherUserId?.substring(0, 8)}`}
                                                     </span>
-                                                    {room.otherUser?.identityStatus === 'approved' && (
+                                                    {room.otherUser?.isProfessional && room.otherUser?.identityStatus === 'approved' && (
                                                         <ShieldCheck className="w-4 h-4 text-purple-600 shrink-0" />
                                                     )}
                                                     {myProfile?.isProfessional && room.otherUser?.isHighSpender && (
