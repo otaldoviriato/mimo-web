@@ -89,6 +89,9 @@ export default function UserProfilePage({ params, username: propUsername, onBack
     const previousViewerItem = hasPreviousViewerItem ? currentGalleryItems[activeViewerIndex - 1] : null;
     const nextViewerItem = hasNextViewerItem ? currentGalleryItems[activeViewerIndex + 1] : null;
     const viewerTransitionMs = 220;
+    const isGalleryItemLocked = useCallback((item: PublicProfileGalleryItem | null) => {
+        return !!item && item.visibility === 'subscribers' && !isSubscriber && !isOwner;
+    }, [isOwner, isSubscriber]);
 
     const openViewer = useCallback((itemId: string) => {
         const index = currentGalleryItems.findIndex((item) => item._id === itemId);
@@ -222,6 +225,11 @@ export default function UserProfilePage({ params, username: propUsername, onBack
     const handleSubscribe = () => {
         if (!user) return;
         setIsSubscribeModalOpen(true);
+    };
+
+    const handleViewerSubscribe = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        handleSubscribe();
     };
 
     const handleSubscribeConfirm = async () => {
@@ -694,7 +702,42 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                                     key={item?._id ?? `empty-${slideIndex}`}
                                     className="flex h-screen w-screen shrink-0 items-center justify-center bg-black"
                                 >
-                                    {item?.mediaType === 'video' ? (
+                                    {isGalleryItemLocked(item) ? (
+                                        <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-gradient-to-br from-purple-950 via-slate-950 to-fuchsia-950 px-6 text-center">
+                                            <div
+                                                className="absolute inset-0 opacity-[0.16]"
+                                                style={{
+                                                    backgroundImage: 'radial-gradient(rgba(255,255,255,0.8) 1px, transparent 1px)',
+                                                    backgroundSize: '18px 18px'
+                                                }}
+                                            />
+                                            <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/70 to-transparent" />
+                                            <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/80 to-transparent" />
+                                            <div className="relative z-10 flex w-full max-w-xs flex-col items-center">
+                                                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-3xl border border-white/15 bg-white/10 text-white shadow-2xl shadow-purple-950/40 backdrop-blur-md">
+                                                    <Lock className="h-7 w-7" />
+                                                </div>
+                                                <p className="text-[10px] font-black uppercase tracking-[0.28em] text-purple-200">
+                                                    Exclusivo
+                                                </p>
+                                                <h2 className="mt-2 text-2xl font-black leading-tight tracking-tight text-white">
+                                                    Conteúdo para assinantes
+                                                </h2>
+                                                <p className="mt-3 text-sm font-medium leading-relaxed text-white/70">
+                                                    Assine o perfil para liberar esta mídia e acessar a galeria privada.
+                                                </p>
+                                                {showSubscribeButton && (
+                                                    <button
+                                                        onClick={handleViewerSubscribe}
+                                                        disabled={subscribeMutation.isPending}
+                                                        className="mt-6 h-12 w-full rounded-2xl bg-white px-5 text-sm font-black text-purple-700 shadow-xl shadow-black/25 transition-all hover:bg-purple-50 active:scale-[0.98] disabled:opacity-70"
+                                                    >
+                                                        {subscribeMutation.isPending ? 'Processando...' : `Assinar por R$ ${user.subscriptionPrice?.toFixed(2)}`}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ) : item?.mediaType === 'video' ? (
                                         <video
                                             src={item.imageUrl}
                                             controls={slideIndex === 1}
