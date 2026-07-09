@@ -260,6 +260,13 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                     return;
                 }
 
+                // Se o redirecionamento pendente corresponder exatamente à rota atual, não navegamos novamente para evitar travamentos
+                const currentPath = window.location.pathname;
+                if (pendingRedirect === currentPath || (pendingRedirect === '/chats' && currentPath === '/chats')) {
+                    setIsNavInitialized(true);
+                    return;
+                }
+
                 // Marcamos um flag para que o initDeepLinkRoute não reprocesse a URL
                 // depois que o router.replace levar para a nova página (ex: /juaccioli/chat)
                 (window as any).__mimo_handled_pending_redirect = true;

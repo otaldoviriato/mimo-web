@@ -175,8 +175,12 @@ export default function LoginPage() {
             if (flowType === 'signUp') {
                 await signUp!.attemptEmailAddressVerification({ code });
                 if (signUp!.status === 'complete') {
-                    await setSignUpActive!({ session: signUp!.createdSessionId });
-                    router.replace('/chats');
+                    await setSignUpActive!({ 
+                        session: signUp!.createdSessionId,
+                        beforeEmit: () => {
+                            router.replace('/chats');
+                        }
+                    } as any);
                 } else {
                     console.error('[SignUp Error] Status incompleto após verificação:', signUp!.status, 'Campos em falta:', (signUp as any).missingFields);
                     throw new Error(`Cadastro incompleto. Status: ${signUp!.status}. Requisitos pendentes: ${(signUp as any).missingFields?.join(', ') || 'Nenhum'}`);
@@ -184,8 +188,12 @@ export default function LoginPage() {
             } else {
                 await signIn!.attemptFirstFactor({ strategy: 'email_code', code });
                 if (signIn!.status === 'complete') {
-                    await setSignInActive!({ session: signIn!.createdSessionId });
-                    router.replace('/chats');
+                    await setSignInActive!({ 
+                        session: signIn!.createdSessionId,
+                        beforeEmit: () => {
+                            router.replace('/chats');
+                        }
+                    } as any);
                 }
             }
         } catch (err: unknown) {
