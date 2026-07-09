@@ -153,7 +153,19 @@ export default function OnboardingPage() {
         }
         if (userData.photoUrl) setPhotoPreview(userData.photoUrl);
 
-        const needsIdentity = userData.isProfessional !== undefined && (!userData.taxId || !userData.birthDate);
+        const needsIdentity = userData.isProfessional !== undefined && !userData.taxId;
+        const isFullyCompleted =
+            userData.isProfessional !== undefined &&
+            !!userData.taxId &&
+            !!userData.photoUrl &&
+            !!userData.name &&
+            !!userData.username;
+
+        if (isFullyCompleted) {
+            localStorage.removeItem(STEP_KEY);
+            router.replace('/chats');
+            return;
+        }
 
         // 1. Usuário que ainda precisa verificar identidade (via API do servidor)
         if (needsIdentity) {

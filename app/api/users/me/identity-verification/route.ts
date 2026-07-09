@@ -370,6 +370,15 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // Determina dinamicamente o onboardingStep. Se já tiver foto, nome e username, vai para completed.
+        const nextPhoto = user.photoUrl;
+        const nextName = user.name;
+        const nextUsername = user.username;
+        const hasPhotoForStep = !!nextPhoto && nextPhoto.trim() !== '';
+        const hasNameForStep = !!nextName && nextName.trim() !== '';
+        const hasUsernameForStep = !!nextUsername && nextUsername.trim() !== '';
+        const nextOnboardingStep = (hasPhotoForStep && hasNameForStep && hasUsernameForStep) ? 'completed' : 'profile';
+
         // 5. Atualizar usuário no banco de dados e liberar a conta da criadora se for profissional
         const updatedUser = await User.findOneAndUpdate(
             { clerkId: userId },
@@ -379,7 +388,7 @@ export async function POST(request: NextRequest) {
                     birthDate: birthDateObj,
                     professionalStatus: user.isProfessional ? 'approved' : null,
                     isProfessional: user.isProfessional ?? false,
-                    onboardingStep: 'profile',
+                    onboardingStep: nextOnboardingStep,
                     notes: ''
                 }
             },

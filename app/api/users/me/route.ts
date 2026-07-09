@@ -256,6 +256,26 @@ export async function GET(request: NextRequest) {
             }
         }
 
+        // --- AUTO-CORREÇÃO DINÂMICA DO ONBOARDING STEP ---
+        const hasPhoto = !!user.photoUrl && user.photoUrl.trim() !== '';
+        const hasName = !!user.name && user.name.trim() !== '';
+        const hasUsername = !!user.username && user.username.trim() !== '';
+
+        let calculatedStep: 'welcome' | 'identity' | 'profile' | 'completed' = 'welcome';
+        if (hasPhoto && hasName && hasUsername) {
+            calculatedStep = 'completed';
+        } else if (user.taxId && user.taxId.trim() !== '') {
+            calculatedStep = 'profile';
+        } else if (user.isProfessional !== undefined && user.isProfessional !== null) {
+            calculatedStep = 'identity';
+        }
+
+        if (user.onboardingStep !== calculatedStep) {
+            console.log(`[GET /api/users/me] Corrigindo onboardingStep de ${user.onboardingStep} para ${calculatedStep}`);
+            user.onboardingStep = calculatedStep;
+            await user.save();
+        }
+
         let publicPhotosCount = 0;
         let activeSubscriberIds = user.subscribers || [];
         if (user.isProfessional) {
@@ -280,6 +300,7 @@ export async function GET(request: NextRequest) {
                 clerkId: user.clerkId,
                 username: user.username,
                 name: user.name,
+                onboardingStep: user.onboardingStep,
                 email: user.email,
                 phone: user.phone,
                 taxId: user.taxId,
@@ -382,9 +403,27 @@ export async function PATCH(request: NextRequest) {
         
         if (isProfessional !== undefined) {
             updateData.isProfessional = isProfessional;
-            updateData.onboardingStep = 'identity';
-        } else if (username !== undefined || name !== undefined || photoUrl !== undefined) {
+        }
+
+        // Determina dinamicamente o onboardingStep para o updateData
+        const nextPhoto = photoUrl !== undefined ? photoUrl : currentUser?.photoUrl;
+        const nextName = name !== undefined ? name.trim() : currentUser?.name;
+        const nextUsername = username !== undefined ? username : currentUser?.username;
+        const nextTaxId = taxId !== undefined ? taxId : currentUser?.taxId;
+        const nextIsProfessional = isProfessional !== undefined ? isProfessional : currentUser?.isProfessional;
+
+        const hasPhotoForStep = !!nextPhoto && nextPhoto.trim() !== '';
+        const hasNameForStep = !!nextName && nextName.trim() !== '';
+        const hasUsernameForStep = !!nextUsername && nextUsername.trim() !== '';
+
+        if (hasPhotoForStep && hasNameForStep && hasUsernameForStep) {
             updateData.onboardingStep = 'completed';
+        } else if (nextTaxId && nextTaxId.trim() !== '') {
+            updateData.onboardingStep = 'profile';
+        } else if (nextIsProfessional !== undefined && nextIsProfessional !== null) {
+            updateData.onboardingStep = 'identity';
+        } else {
+            updateData.onboardingStep = 'welcome';
         }
         
         if (isSubscriptionEnabled !== undefined) {

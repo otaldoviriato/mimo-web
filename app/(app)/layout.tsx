@@ -28,10 +28,21 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     
     // Garante que o perfil carregado no cache/Query pertence ao usuário atualmente logado no Clerk
     const isProfileValid = !!(userData && user && userData.clerkId === user.id);
+    
+    // O usuário precisa de validação de identidade se ele escolheu a role mas não tem CPF (taxId)
     const userNeedsIdentity =
         isProfileValid &&
         userData.isProfessional !== undefined &&
-        (!userData.taxId || !userData.birthDate);
+        !userData.taxId;
+
+    // Determina dinamicamente se o usuário já preencheu absolutamente todos os dados
+    const isFullyCompleted =
+        isProfileValid &&
+        userData.isProfessional !== undefined &&
+        !!userData.taxId &&
+        !!userData.photoUrl &&
+        !!userData.name &&
+        !!userData.username;
 
     const router = useRouter();
     const pathname = usePathname();
@@ -441,11 +452,23 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     }, [isSignedIn, user, getToken]);
 
     useEffect(() => {
+        if (isFullyCompleted && typeof window !== 'undefined') {
+            const step = localStorage.getItem('mimo_onboarding_step');
+            if (step) {
+                console.log('[Layout] Limpando mimo_onboarding_step obsoleto do localStorage');
+                localStorage.removeItem('mimo_onboarding_step');
+            }
+        }
+    }, [isFullyCompleted]);
+
+    useEffect(() => {
         // Redireciona para o onboarding em três casos:
         // 1. Usuário ainda não escolheu seu papel (cliente ou profissional)
         // 2. Profissional que precisa completar a verificação de identidade
         // 3. Usuário no meio do onboarding (step salvo no localStorage) que tentou acessar outra rota
         if (pathname === '/onboarding') return;
+        if (isFullyCompleted) return; // Se já está completamente completo, não redireciona!
+
         if (isProfileValid && userData?.isProfessional === undefined) {
             router.replace('/onboarding');
             return;
@@ -460,7 +483,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                 router.replace('/onboarding');
             }
         }
-    }, [isProfileValid, userData?.isProfessional, userNeedsIdentity, pathname, router]);
+    }, [isProfileValid, userData?.isProfessional, userNeedsIdentity, isFullyCompleted, pathname, router]);
 
     if (!isLoaded || (isSignedIn && !isNavInitialized)) {
         return (
@@ -558,13 +581,15 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     //  3. mimo_onboarding_step no localStorage → no meio do fluxo de cadastro
     const hasPendingOnboardingStep =
         isProfileValid &&
+        !isFullyCompleted &&
         typeof window !== 'undefined' &&
         (['identity', 'profile'].includes(localStorage.getItem('mimo_onboarding_step') ?? ''));
 
     const needsOnboarding =
-        (isProfileValid && userData?.isProfessional === undefined) ||
+        !isFullyCompleted &&
+        ((isProfileValid && userData?.isProfessional === undefined) ||
         userNeedsIdentity ||
-        hasPendingOnboardingStep;
+        hasPendingOnboardingStep);
 
     if (needsOnboarding) {
         return (

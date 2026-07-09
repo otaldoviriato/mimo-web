@@ -244,6 +244,26 @@ const UserSchema = new Schema<IUser>({
     timestamps: true,
 });
 
+UserSchema.pre('save', function (next: any) {
+    const user = this;
+    
+    const hasPhoto = !!user.photoUrl && user.photoUrl.trim() !== '';
+    const hasName = !!user.name && user.name.trim() !== '';
+    const hasUsername = !!user.username && user.username.trim() !== '';
+
+    if (hasPhoto && hasName && hasUsername) {
+        user.onboardingStep = 'completed';
+    } else if (user.taxId && user.taxId.trim() !== '') {
+        user.onboardingStep = 'profile';
+    } else if (user.isProfessional !== undefined && user.isProfessional !== null) {
+        user.onboardingStep = 'identity';
+    } else {
+        user.onboardingStep = 'welcome';
+    }
+
+    next();
+});
+
 // No Next.js dev mode, o modelo pode ficar em cache com schema antigo.
 if (process.env.NODE_ENV === 'development' && mongoose.models.User) {
     delete mongoose.models.User;
