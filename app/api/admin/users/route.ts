@@ -99,10 +99,10 @@ export async function GET(request: NextRequest) {
         ]);
         const earningsByUser = new Map(earningsAgg.map(e => [e._id, e.total]));
 
-        // Total de assinaturas recebidas (em reais, convertidas para centavos)
+        // Total de assinaturas recebidas (já salvas em centavos no banco)
         const subscriptionEarningsAgg = await Transaction.aggregate([
             { $match: { userId: { $in: clerkIds }, type: 'credit', source: 'subscription', status: 'COMPLETED' } },
-            { $group: { _id: '$userId', total: { $sum: { $multiply: ['$amount', 100] } } } }
+            { $group: { _id: '$userId', total: { $sum: '$amount' } } }
         ]);
         const subscriptionEarningsByUser = new Map(subscriptionEarningsAgg.map(s => [s._id, Math.round(s.total)]));
 

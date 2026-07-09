@@ -100,12 +100,12 @@ export async function GET(request: NextRequest) {
             { $group: { _id: '$source', total: { $sum: '$amount' } } }
         ]);
 
-        // Assinaturas são registradas na coleção Transaction (em reais). Somamos os créditos e multiplicamos por 100 para ter em centavos.
+        // Assinaturas são registradas na coleção Transaction (já salvas em centavos). Somamos os créditos sem multiplicar por 100.
         const subscriptionEarningsResult = await Transaction.aggregate([
             { $match: { userId: user.clerkId, type: 'credit', source: 'subscription', status: 'COMPLETED' } },
             { $group: { _id: null, total: { $sum: '$amount' } } }
         ]);
-        const subscriptionEarnings = Math.round((subscriptionEarningsResult[0]?.total || 0) * 100);
+        const subscriptionEarnings = Math.round(subscriptionEarningsResult[0]?.total || 0);
 
         const earningsByCategory = {
             subscription: subscriptionEarnings,
@@ -238,7 +238,7 @@ export async function GET(request: NextRequest) {
             const subMatch = monthlySubEarnings.find((item) => item._id === monthNumber);
 
             const microTotal = microMatch ? microMatch.total : 0;
-            const subTotal = subMatch ? Math.round(subMatch.total * 100) : 0;
+            const subTotal = subMatch ? Math.round(subMatch.total) : 0;
 
             monthlyHistory.push({
                 date: monthNames[i],
