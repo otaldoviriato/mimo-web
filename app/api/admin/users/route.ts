@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
         const searchParams = request.nextUrl.searchParams;
         const query = searchParams.get('q') || '';
-        const onboardingStatus = searchParams.get('onboardingStatus') || 'completed';
+        const onboardingStatus = searchParams.get('onboardingStatus') || 'all';
         
         let filter: any = {};
         

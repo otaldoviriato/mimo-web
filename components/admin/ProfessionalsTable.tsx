@@ -8,41 +8,11 @@ import { SortableColumnHeader } from './SortableColumnHeader';
 
 type SortKey = 'balance' | 'earned' | 'access' | 'rooms' | 'messages';
 
-function getOnboardingStepBadge(step: string | undefined | null) {
-    switch (step) {
-        case 'welcome':
-            return (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-855 border border-amber-200">
-                    Boas-vindas
-                </span>
-            );
-        case 'identity':
-            return (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-800 border border-blue-200">
-                    Identidade
-                </span>
-            );
-        case 'profile':
-            return (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-800 border border-purple-200">
-                    Foto / Perfil
-                </span>
-            );
-        default:
-            return (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-655 border border-slate-200">
-                    Início / Pendente
-                </span>
-            );
-    }
-}
-
 export function ProfessionalsTable() {
     const router = useRouter();
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [onboardingFilter, setOnboardingFilter] = useState<'completed' | 'pending'>('completed');
     const [selectedUserMenu, setSelectedUserMenu] = useState<string | null>(null);
     const [sortKey, setSortKey] = useState<SortKey | null>(null);
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -75,10 +45,10 @@ export function ProfessionalsTable() {
     }, [users, sortKey, sortDir]);
 
     // Busca os usuários da API
-    const fetchUsers = async (query: string = '', onboarding = onboardingFilter) => {
+    const fetchUsers = async (query: string = '') => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/admin/users?q=${encodeURIComponent(query)}&onboardingStatus=${onboarding}`);
+            const res = await fetch(`/api/admin/users?q=${encodeURIComponent(query)}&onboardingStatus=all`);
             if (res.ok) {
                 const data = await res.json();
                 // Filtra apenas profissionais (isProfessional)
@@ -99,10 +69,10 @@ export function ProfessionalsTable() {
     // Debounce para a barra de pesquisa
     useEffect(() => {
         const timer = setTimeout(() => {
-            fetchUsers(searchQuery, onboardingFilter);
+            fetchUsers(searchQuery);
         }, searchQuery ? 400 : 0);
         return () => clearTimeout(timer);
-    }, [searchQuery, onboardingFilter]);
+    }, [searchQuery]);
 
     // Ação: Excluir Usuário permanentemente do banco e do Clerk
     const handleDeleteUser = async (clerkId: string, name: string) => {
@@ -194,32 +164,6 @@ export function ProfessionalsTable() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-center gap-3">
-                    {/* Seletor de Onboarding */}
-                    <div className="bg-slate-100 p-1 rounded-xl flex items-center shadow-inner text-xs font-semibold">
-                        <button
-                            type="button"
-                            onClick={() => setOnboardingFilter('completed')}
-                            className={`px-3 py-1.5 rounded-lg transition-all ${
-                                onboardingFilter === 'completed'
-                                    ? 'bg-white text-purple-700 shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700'
-                            }`}
-                        >
-                            Concluído
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setOnboardingFilter('pending')}
-                            className={`px-3 py-1.5 rounded-lg transition-all ${
-                                onboardingFilter === 'pending'
-                                    ? 'bg-white text-purple-700 shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700'
-                            }`}
-                        >
-                            Em Onboarding
-                        </button>
-                    </div>
-
                     {/* Barra de Busca */}
                     <div className="relative w-full sm:w-64">
                         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
@@ -246,9 +190,6 @@ export function ProfessionalsTable() {
                         <thead>
                             <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
                                 <th className="py-4 px-6">Perfil Monetizado</th>
-                                {onboardingFilter === 'pending' && (
-                                    <th className="py-4 px-6">Etapa do Onboarding</th>
-                                )}
                                 <th className="py-4 px-6">
                                     <div className="flex flex-col gap-1.5">
                                         <SortableColumnHeader label="Saldo" active={sortKey === 'balance'} direction={sortDir} onClick={() => handleSort('balance')} />
@@ -310,11 +251,6 @@ export function ProfessionalsTable() {
                                                 </div>
                                             </div>
                                         </td>
-                                        {onboardingFilter === 'pending' && (
-                                            <td className="py-4 px-6">
-                                                {getOnboardingStepBadge(user.onboardingStep)}
-                                            </td>
-                                        )}
 
                                         {/* Saldo & Arrecadação */}
                                         <td className="py-4 px-6">
@@ -436,7 +372,7 @@ export function ProfessionalsTable() {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={onboardingFilter === 'pending' ? 7 : 6} className="py-20 text-center text-sm font-semibold text-slate-400">
+                                    <td colSpan={6} className="py-20 text-center text-sm font-semibold text-slate-400">
                                         Nenhum perfil monetizado encontrado.
                                     </td>
                                 </tr>
