@@ -244,7 +244,7 @@ const UserSchema = new Schema<IUser>({
     timestamps: true,
 });
 
-UserSchema.pre('save', function (next: any) {
+UserSchema.pre('save', async function () {
     const user = this;
     
     const hasPhoto = !!user.photoUrl && user.photoUrl.trim() !== '';
@@ -260,8 +260,6 @@ UserSchema.pre('save', function (next: any) {
     } else {
         user.onboardingStep = 'welcome';
     }
-
-    next();
 });
 
 // No Next.js dev mode, o modelo pode ficar em cache com schema antigo.
