@@ -35,14 +35,20 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         userData.isProfessional !== undefined &&
         !userData.taxId;
 
-    // Determina dinamicamente se o usuário já preencheu absolutamente todos os dados
+    const hasPhoto = !!userData?.photoUrl && userData.photoUrl.trim() !== '';
+    const hasName = !!userData?.name && userData.name.trim() !== '';
+    const hasUsername = !!userData?.username && userData.username.trim() !== '';
+    const hasTaxId = !!userData?.taxId;
+
+    // Determina dinamicamente se o usuário já preencheu absolutamente todos os dados.
+    // Se o usuário já tem a foto de perfil cadastrada, ele completou o onboarding e nunca deve voltar.
     const isFullyCompleted =
         isProfileValid &&
-        userData.isProfessional !== undefined &&
-        !!userData.taxId &&
-        !!userData.photoUrl &&
-        !!userData.name &&
-        !!userData.username;
+        (hasPhoto ||
+         (userData.isProfessional !== undefined &&
+          (!userData.isProfessional || hasTaxId) &&
+          hasName &&
+          hasUsername));
 
     const router = useRouter();
     const pathname = usePathname();
