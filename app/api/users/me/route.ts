@@ -20,26 +20,21 @@ const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
 // GET /api/users/me - Get current user
 export async function GET(request: NextRequest) {
     try {
-        console.log('[GET /api/users/me] Início do processamento da rota.');
-        
         let userId: string | null = null;
         try {
             const authData = await auth();
             userId = authData.userId;
-            console.log('[GET /api/users/me] userId extraído do Clerk:', userId);
         } catch (authErr: any) {
             console.error('[GET /api/users/me] Erro crítico no Clerk auth():', authErr);
             throw new Error(`Erro na inicialização do auth do Clerk: ${authErr.message || authErr}`);
         }
 
         if (!userId) {
-            console.warn('[GET /api/users/me] Sem userId válido, retornando 401');
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
         try {
             await connectToDatabase();
-            console.log('[GET /api/users/me] Conexão com MongoDB OK');
         } catch (dbErr: any) {
             console.error('[GET /api/users/me] Erro de conexão com MongoDB:', dbErr);
             throw new Error(`Erro ao conectar ao MongoDB: ${dbErr.message || dbErr}`);
@@ -48,7 +43,6 @@ export async function GET(request: NextRequest) {
         let settings: any = null;
         try {
             settings = await AppSettings.findOne({ key: 'global' });
-            console.log('[GET /api/users/me] AppSettings buscado com sucesso');
         } catch (settingsErr: any) {
             console.error('[GET /api/users/me] Erro ao buscar AppSettings:', settingsErr);
             throw new Error(`Erro ao buscar AppSettings no banco: ${settingsErr.message || settingsErr}`);
@@ -63,14 +57,12 @@ export async function GET(request: NextRequest) {
         let user: any = null;
         try {
             user = await User.findOne({ clerkId: userId });
-            console.log('[GET /api/users/me] Busca do usuário no banco concluída. Encontrado:', !!user);
         } catch (userFindErr: any) {
             console.error('[GET /api/users/me] Erro ao buscar usuário no banco (User.findOne):', userFindErr);
             throw new Error(`Erro de query User.findOne: ${userFindErr.message || userFindErr}`);
         }
 
         if (!user) {
-            console.log(`[GET /api/users/me] Usuário não encontrado no banco. Iniciando lazy create para clerkId: ${userId}`);
             try {
                 const client = await clerkClient();
                 const clerkUser = await client.users.getUser(userId);
@@ -99,15 +91,10 @@ export async function GET(request: NextRequest) {
                     userFields.isProfessional = isProfessional;
                 }
 
-                console.log('[GET /api/users/me] Salvando novo usuário com campos:', JSON.stringify(userFields));
                 user = await User.create(userFields);
-                console.log('[GET /api/users/me] Novo usuário salvo por lazy create com ID:', user?._id);
             } catch (createError: any) {
                 if (createError.code === 11000) {
                     user = await User.findOne({ clerkId: userId });
-                    if (user) {
-                        console.log(`💡 Concorrência de cadastro: Usuário ${userId} já inserido por outra thread.`);
-                    }
                 }
                 if (!user) {
                     console.error("[GET /api/users/me] Erro crítico no lazy create do usuário:", createError);
@@ -121,7 +108,6 @@ export async function GET(request: NextRequest) {
                     user.isProfessional = false;
                     try {
                         await user.save();
-                        console.log('[GET /api/users/me] isProfessional default setado para false');
                     } catch (saveProfessionalErr: any) {
                         console.error('[GET /api/users/me] Erro ao salvar isProfessional default:', saveProfessionalErr);
                         throw new Error(`Erro ao salvar isProfessional default no MongoDB: ${saveProfessionalErr.message || saveProfessionalErr}`);
@@ -139,7 +125,6 @@ export async function GET(request: NextRequest) {
                     user.isProfessional = true;
                     user.professionalStatus = null;
                     await user.save();
-                    console.log(`[GET /api/users/me] Sincronizado status profissional para o usuário ${userId} baseado nos metadados do Clerk.`);
                 }
             } catch (syncErr: any) {
                 console.warn('[GET /api/users/me] Falha ao sincronizar metadados do Clerk:', syncErr);
@@ -148,13 +133,11 @@ export async function GET(request: NextRequest) {
 
         // --- EXPIRAÇÃO ON-THE-FLY DE CRÉDITOS PROMOCIONAIS ---
         try {
-            console.log('[GET /api/users/me] Verificando expiração de créditos...');
             const expiredGrants = await CreditGrant.find({
                 userId: user.clerkId,
                 expiresAt: { $lt: new Date() },
                 status: 'active'
             });
-            console.log('[GET /api/users/me] Expired grants encontrados:', expiredGrants.length);
             for (const grant of expiredGrants) {
                 const amountToRevert = grant.amountRemaining;
                 if (amountToRevert > 0) {
@@ -190,7 +173,6 @@ export async function GET(request: NextRequest) {
             }
             if (expiredGrants.length > 0) {
                 await user.save();
-                console.log('[GET /api/users/me] user.save() chamado após expirar créditos');
             }
         } catch (expirationErr: any) {
             console.error('[GET /api/users/me] Erro ao expirar créditos do usuário:', expirationErr);
@@ -199,10 +181,8 @@ export async function GET(request: NextRequest) {
         // --- CONTINGÊNCIA: CONCESSÃO AUTOMÁTICA DE CRÉDITO DE BOAS-VINDAS ---
         if (user.isProfessional === false) {
             try {
-                console.log('[GET /api/users/me] Tentando conceder crédito de contingência...');
                 const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() || undefined;
                 const welcomeResult = await grantWelcomeCredit(user.clerkId, user.email, ip, user.phone, user.taxId);
-                console.log('[GET /api/users/me] Resultado da concessão de contingência:', JSON.stringify(welcomeResult));
                 if (welcomeResult.success) {
                     const updatedUser = await User.findOne({ clerkId: userId });
                     if (updatedUser) {
@@ -218,7 +198,6 @@ export async function GET(request: NextRequest) {
         let welcomeCreditNotice = null;
         if (user.isProfessional === false) {
             try {
-                console.log('[GET /api/users/me] Buscando aviso de boas-vindas...');
                 const activeUnshownGrant = await CreditGrant.findOne({
                     userId: user.clerkId,
                     status: 'active',
@@ -233,7 +212,6 @@ export async function GET(request: NextRequest) {
                         title: campaign?.appMessageTitle || 'Você recebeu créditos de boas-vindas!',
                         description: campaign?.appMessageDescription || `Você recebeu R$ ${(activeUnshownGrant.amountGranted / 100).toFixed(2)} em créditos para começar suas conversas.`
                     };
-                    console.log('[GET /api/users/me] Aviso de boas-vindas encontrado');
                 }
             } catch (noticeErr: any) {
                 console.error('[GET /api/users/me] Erro ao buscar aviso de crédito:', noticeErr);
@@ -244,7 +222,6 @@ export async function GET(request: NextRequest) {
         let hasWelcomeCreditEnded = false;
         if (user.isProfessional === false) {
             try {
-                console.log('[GET /api/users/me] Verificando se crédito acabou...');
                 const welcomeGrant = await CreditGrant.findOne({ userId: user.clerkId });
                 if (welcomeGrant) {
                     hasWelcomeCreditEnded = welcomeGrant.amountRemaining === 0 || welcomeGrant.status !== 'active';
@@ -258,7 +235,6 @@ export async function GET(request: NextRequest) {
         let promotionalBalanceLabel = '';
         if (user.isProfessional === false && user.promotionalBalance && user.promotionalBalance > 0) {
             try {
-                console.log('[GET /api/users/me] Buscando label do saldo promocional...');
                 const activeGrant = await CreditGrant.findOne({
                     userId: user.clerkId,
                     status: 'active'
@@ -273,13 +249,11 @@ export async function GET(request: NextRequest) {
         }
 
         if (user.isSuspended) {
-            console.warn('[GET /api/users/me] Usuário suspenso, retornando 403');
             return NextResponse.json({ error: 'Account suspended' }, { status: 403 });
         }
 
         if (user.email.includes('@placeholder.com')) {
             try {
-                console.log('[GET /api/users/me] Sincronizando email real do Clerk...');
                 const client = await clerkClient();
                 const clerkUser = await client.users.getUser(userId);
                 const realEmail = clerkUser.emailAddresses[0]?.emailAddress;
@@ -287,7 +261,6 @@ export async function GET(request: NextRequest) {
                     try {
                         user.email = realEmail;
                         await user.save();
-                        console.log('[GET /api/users/me] Email real sincronizado no banco');
                     } catch (saveErr: any) {
                         if (saveErr.code === 11000) {
                             console.warn('Email already exists in another account, skipping sync:', realEmail);
@@ -302,7 +275,6 @@ export async function GET(request: NextRequest) {
         }
 
         // --- AUTO-CORREÇÃO DINÂMICA DO ONBOARDING STEP ---
-        console.log('[GET /api/users/me] Calculando onboardingStep...');
         const hasPhoto = !!user.photoUrl && user.photoUrl.trim() !== '';
         const hasName = !!user.name && user.name.trim() !== '';
         const hasUsername = !!user.username && user.username.trim() !== '';
@@ -317,11 +289,9 @@ export async function GET(request: NextRequest) {
         }
 
         if (user.onboardingStep !== calculatedStep) {
-            console.log(`[GET /api/users/me] Corrigindo onboardingStep de ${user.onboardingStep} para ${calculatedStep}`);
             user.onboardingStep = calculatedStep;
             try {
                 await user.save();
-                console.log('[GET /api/users/me] onboardingStep atualizado no banco');
             } catch (saveOnboardingErr: any) {
                 console.error('[GET /api/users/me] Erro ao salvar auto-correção de onboardingStep:', saveOnboardingErr);
                 throw new Error(`Erro de persistência de onboardingStep: ${saveOnboardingErr.message || saveOnboardingErr}`);
@@ -332,7 +302,6 @@ export async function GET(request: NextRequest) {
         let activeSubscriberIds = user.subscribers || [];
         if (user.isProfessional) {
             try {
-                console.log('[GET /api/users/me] Buscando fotos da galeria...');
                 publicPhotosCount = await GalleryItem.countDocuments({
                     ownerId: user.clerkId,
                     galleryType: 'public',
@@ -345,7 +314,6 @@ export async function GET(request: NextRequest) {
             }
 
             try {
-                console.log('[GET /api/users/me] Buscando inscrições ativas...');
                 const activeSubscriptions = await Subscription.find({
                     professionalId: user.clerkId,
                     status: { $in: ['ACTIVE', 'CANCELED'] },
@@ -358,7 +326,6 @@ export async function GET(request: NextRequest) {
             }
         }
 
-        console.log('[GET /api/users/me] Sucesso completo, retornando resposta JSON');
         return NextResponse.json({
             user: {
                 id: user._id,

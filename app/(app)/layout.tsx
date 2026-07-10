@@ -24,7 +24,7 @@ const isTabRoute = (path: string) => {
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const { isLoaded, isSignedIn, getToken } = useAuth();
     const { user } = useUser();
-    const { data: userData, refetch: refetchProfile, isError, error: profileError } = useMyProfile();
+    const { data: userData, refetch: refetchProfile } = useMyProfile();
     
     // Garante que o perfil carregado no cache/Query pertence ao usuário atualmente logado no Clerk
     const isProfileValid = !!(userData && user && userData.clerkId === user.id);
@@ -492,35 +492,6 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         }
     }, [isProfileValid, userData?.isProfessional, userNeedsIdentity, isFullyCompleted, pathname, router]);
 
-    // ─── LOGS E ETAPAS DE INICIALIZAÇÃO PARA RASTREAR TRAVAMENTO ─────────────────
-    const [debugSteps, setDebugSteps] = React.useState<string[]>([]);
-    const [clerkLogState, setClerkLogState] = React.useState('');
-
-    useEffect(() => {
-        const steps: string[] = [];
-        steps.push(`[1/5] Carregando Clerk (isLoaded: ${isLoaded ? 'OK' : 'Pendente'})`);
-        
-        if (isLoaded) {
-            steps.push(`[2/5] Estado de autenticação (isSignedIn: ${isSignedIn ? 'Logado' : 'Não logado'})`);
-            if (isSignedIn && user) {
-                steps.push(`[3/5] Usuário autenticado: ${user.emailAddresses[0]?.emailAddress} (ID: ${user.id})`);
-                steps.push(`[4/5] Perfil MongoDB (isProfileValid: ${isProfileValid ? 'OK' : 'Pendente / Carregando do Banco'})`);
-                if (isProfileValid && userData) {
-                    steps.push(`[5/5] Roteamento Inicial (isNavInitialized: ${isNavInitialized ? 'OK' : 'Inicializando Rota...'})`);
-                } else {
-                    steps.push(`[5/5] Carregando dados de useMyProfile()... (Verifique API /api/users/me)`);
-                }
-            } else {
-                steps.push(`[3/5] Aguardando login...`);
-            }
-        }
-        
-        setDebugSteps(steps);
-        const logContent = `isLoaded=${isLoaded}, isSignedIn=${isSignedIn}, isProfileValid=${isProfileValid}, isNavInitialized=${isNavInitialized}, userNeedsIdentity=${userNeedsIdentity}, isFullyCompleted=${isFullyCompleted}, hasUser=${!!user}, hasUserData=${!!userData}`;
-        setClerkLogState(logContent);
-        console.log(`[MimoDebugSplash] ${logContent}`);
-    }, [isLoaded, isSignedIn, isProfileValid, isNavInitialized, userNeedsIdentity, isFullyCompleted, user, userData]);
-
     // Se o banco local oficial nos disser que o perfil é pendente, limpamos qualquer resíduo local de liberação anterior
     if (typeof window !== 'undefined' && isProfileValid && userData?.isProfessional && userData?.professionalStatus === 'pending') {
         if (localStorage.getItem('mimo_professional_released') !== null) {
@@ -534,49 +505,30 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
     if (shouldShowSplash) {
         return (
-            <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gradient-to-br from-[#4C1D95] via-[#6D28D9] to-[#8B5CF6] select-none text-white">
-                <div className="flex flex-col items-center animate-fade-in-up w-full max-w-md px-6 text-center">
+            <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gradient-to-br from-[#4C1D95] via-[#6D28D9] to-[#8B5CF6] select-none">
+                <div className="flex flex-col items-center animate-fade-in-up">
                     {/* Logo do MimoChat */}
-                    <div className="relative w-24 h-24 md:w-28 md:h-28 mb-4 rounded-3xl overflow-hidden shadow-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 animate-pulse">
+                    <div className="relative w-28 h-28 md:w-32 md:h-32 mb-6 rounded-3xl overflow-hidden shadow-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 animate-pulse">
                         <img 
                             src="/Logo.svg" 
                             alt="MimoChat Logo" 
-                            className="w-16 h-16 md:w-20 md:h-20 object-contain"
+                            className="w-20 h-20 md:w-24 md:h-24 object-contain"
                         />
                     </div>
                     {/* Nome do Aplicativo */}
-                    <h1 className="text-white text-2xl md:text-3xl font-extrabold tracking-wider drop-shadow-md">
+                    <h1 className="text-white text-3xl md:text-4xl font-extrabold tracking-wider drop-shadow-md">
                         MimoChat
                     </h1>
-                    <p className="text-purple-200 text-xs tracking-widest mt-1 uppercase font-semibold opacity-80">
+                    <p className="text-purple-200 text-xs md:text-sm tracking-widest mt-1 uppercase font-semibold opacity-80">
                         Conectando você de verdade
                     </p>
-
-                    {/* Step-by-Step Log visível na tela para depuração */}
-                    <div className="mt-8 p-4 w-full bg-black/35 backdrop-blur-md border border-white/10 rounded-2xl text-left font-mono text-[11px] text-purple-200 space-y-1.5 shadow-inner">
-                        <p className="text-purple-300 font-bold border-b border-white/10 pb-1 mb-2 flex justify-between items-center">
-                            <span>Status da Inicialização:</span>
-                            <span className="text-[10px] bg-purple-500/35 px-1.5 py-0.5 rounded text-white animate-pulse">Debug</span>
-                        </p>
-                        {debugSteps.map((step, idx) => (
-                            <div key={idx} className="flex gap-2 items-start">
-                                <span className={step.includes('OK') ? 'text-green-400 font-bold' : 'text-yellow-400'}>
-                                    {step.includes('OK') ? '✓' : '➔'}
-                                </span>
-                                <span className="break-all">{step}</span>
-                            </div>
-                        ))}
-                        <div className="pt-2 text-[9px] text-purple-300/60 border-t border-white/5 mt-2 break-all font-sans">
-                            <strong>Estado:</strong> {clerkLogState}
-                        </div>
-                    </div>
                 </div>
                 {/* Loader Sutil */}
-                <div className="absolute bottom-6 flex flex-col items-center">
+                <div className="absolute bottom-12 flex flex-col items-center">
                     <div className="flex space-x-1.5 justify-center items-center">
-                        <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        <div className="w-2.5 h-2.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2.5 h-2.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2.5 h-2.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                     </div>
                 </div>
             </div>
