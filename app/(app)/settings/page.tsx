@@ -34,6 +34,36 @@ const formatDate = (dateString?: string | Date) => {
     }
 };
 
+const BRAZILIAN_STATES = [
+    { uf: 'AC', name: 'Acre' },
+    { uf: 'AL', name: 'Alagoas' },
+    { uf: 'AP', name: 'Amapá' },
+    { uf: 'AM', name: 'Amazonas' },
+    { uf: 'BA', name: 'Bahia' },
+    { uf: 'CE', name: 'Ceará' },
+    { uf: 'DF', name: 'Distrito Federal' },
+    { uf: 'ES', name: 'Espírito Santo' },
+    { uf: 'GO', name: 'Goiás' },
+    { uf: 'MA', name: 'Maranhão' },
+    { uf: 'MT', name: 'Mato Grosso' },
+    { uf: 'MS', name: 'Mato Grosso do Sul' },
+    { uf: 'MG', name: 'Minas Gerais' },
+    { uf: 'PA', name: 'Pará' },
+    { uf: 'PB', name: 'Paraíba' },
+    { uf: 'PR', name: 'Paraná' },
+    { uf: 'PE', name: 'Pernambuco' },
+    { uf: 'PI', name: 'Piauí' },
+    { uf: 'RJ', name: 'Rio de Janeiro' },
+    { uf: 'RN', name: 'Rio Grande do Norte' },
+    { uf: 'RS', name: 'Rio Grande do Sul' },
+    { uf: 'RO', name: 'Rondônia' },
+    { uf: 'RR', name: 'Roraima' },
+    { uf: 'SC', name: 'Santa Catarina' },
+    { uf: 'SP', name: 'São Paulo' },
+    { uf: 'SE', name: 'Sergipe' },
+    { uf: 'TO', name: 'Tocantins' },
+];
+
 const formatPriceBRL = (value: string | number) => {
     let valStr = '';
     if (typeof value === 'number') {
@@ -100,6 +130,14 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const [accountActionError, setAccountActionError] = useState('');
     const [showPricingGuideModal, setShowPricingGuideModal] = useState(false);
 
+    const [birthDate, setBirthDate] = useState('');
+    const [state, setState] = useState('');
+    const [city, setCity] = useState('');
+    const [citiesList, setCitiesList] = useState<string[]>([]);
+    const [loadingCities, setLoadingCities] = useState(false);
+    const [citySearchQuery, setCitySearchQuery] = useState('');
+    const [showCityDropdown, setShowCityDropdown] = useState(false);
+
     const hasPopulated = useRef(false);
 
     // Resolve a transição de visualização imediatamente para não travar a animação de slide-in
@@ -124,9 +162,38 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             setChargePerCharNonSubscribers(userData.chargePerCharNonSubscribers?.toString() ?? '0.005');
             setSubscriberDiscountPercentage((userData.subscriberDiscountPercentage ?? 20).toString());
             setHideFromExplore(userData.hideFromExplore === true);
-                        hasPopulated.current = true;
+            setBirthDate(userData.birthDate ? new Date(userData.birthDate).toISOString().split('T')[0] : '');
+            setState(userData.state || '');
+            setCity(userData.city || '');
+            setCitySearchQuery(userData.city || '');
+            hasPopulated.current = true;
         }
     }, [userData]);
+
+    useEffect(() => {
+        if (!state) {
+            setCitiesList([]);
+            return;
+        }
+
+        const fetchCities = async () => {
+            setLoadingCities(true);
+            try {
+                const response = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${state}/municipios`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const names = data.map((item: any) => item.nome).sort((a: string, b: string) => a.localeCompare(b));
+                    setCitiesList(names);
+                }
+            } catch (err) {
+                console.error('Erro ao buscar cidades do IBGE:', err);
+            } finally {
+                setLoadingCities(false);
+            }
+        };
+
+        fetchCities();
+    }, [state]);
 
     useEffect(() => {
         const discount = Number(subscriberDiscountPercentage) || 20;
@@ -150,11 +217,35 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
         setSaveSuccess(false);
 
         try {
+            if (birthDate) {
+                const birthDateObj = new Date(birthDate);
+                const today = new Date();
+                let age = today.getFullYear() - birthDateObj.getFullYear();
+                const monthDiff = today.getMonth() - birthDateObj.getMonth();
+                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) {
+                    age--;
+                }
+                
+                if (age < 18) {
+                    setSaveError('Você precisa ter pelo menos 18 anos de idade.');
+                    setLoading(false);
+                    return;
+                }
+                if (age > 120) {
+                    setSaveError('Data de nascimento inválida (idade máxima: 120 anos).');
+                    setLoading(false);
+                    return;
+                }
+            }
+
             const updateData: any = {
                 name,
                 username,
                 taxId: taxId.replace(/\D/g, ''),
-                phone: phone.replace(/\D/g, '')
+                phone: phone.replace(/\D/g, ''),
+                birthDate: birthDate ? new Date(birthDate).toISOString() : null,
+                city: city ? city.trim() : '',
+                state: state ? state.trim() : ''
             };
 
             if (userData?.isProfessional) {
@@ -388,11 +479,17 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const initialName = userData?.name || '';
     const initialPhone = userData?.phone ? formatPhone(userData?.phone) : '';
     const initialBio = userData?.bio || '';
+    const initialBirthDate = userData?.birthDate ? new Date(userData.birthDate).toISOString().split('T')[0] : '';
+    const initialCity = userData?.city || '';
+    const initialState = userData?.state || '';
 
     const hasPersonalChanges =
         name !== initialName ||
         username !== initialUsername ||
         phone !== initialPhone ||
+        birthDate !== initialBirthDate ||
+        city !== initialCity ||
+        state !== initialState ||
         (profileIsProfessional && (bio !== initialBio || hideFromExplore !== (userData?.hideFromExplore === true)));
 
     const initialSubscriptionPrice = userData?.subscriptionPrice ?? 0;
@@ -524,15 +621,78 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                     />
                                 </div>
                                 {/* Data de Nascimento */}
-                                <div className="px-4 py-3.5 border-b border-gray-50 bg-gray-50/50">
+                                <div className="px-4 py-3.5 border-b border-gray-50">
                                     <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Data de Nascimento</label>
                                     <input
-                                        className="w-full text-sm text-gray-500 font-medium bg-transparent focus:outline-none cursor-not-allowed"
-                                        placeholder="Não informada"
-                                        value={userData?.birthDate ? formatDate(userData.birthDate) : ''}
-                                        readOnly
-                                        disabled
+                                        type="date"
+                                        className="w-full text-sm text-gray-900 font-medium bg-transparent focus:outline-none"
+                                        value={birthDate}
+                                        onChange={(e) => setBirthDate(e.target.value)}
                                     />
+                                </div>
+                                {/* Estado */}
+                                <div className="px-4 py-3.5 border-b border-gray-50">
+                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Estado (Naturalidade)</label>
+                                    <select
+                                        value={state}
+                                        onChange={(e) => {
+                                            setState(e.target.value);
+                                            setCity('');
+                                            setCitySearchQuery('');
+                                        }}
+                                        className="w-full text-sm text-gray-900 font-medium bg-transparent focus:outline-none cursor-pointer"
+                                    >
+                                        <option value="">Selecione seu Estado</option>
+                                        {BRAZILIAN_STATES.map(s => (
+                                            <option key={s.uf} value={s.uf}>{s.name} ({s.uf})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                {/* Cidade */}
+                                <div className="px-4 py-3.5 border-b border-gray-50 relative">
+                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Cidade / Município</label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            disabled={!state}
+                                            placeholder={state ? (loadingCities ? "Carregando municípios..." : "Digite para buscar seu município") : "Selecione o estado primeiro"}
+                                            className={`w-full text-sm text-gray-900 font-medium bg-transparent focus:outline-none ${!state ? 'cursor-not-allowed text-gray-400' : ''}`}
+                                            value={citySearchQuery}
+                                            onChange={(e) => {
+                                                setCitySearchQuery(e.target.value);
+                                                setShowCityDropdown(true);
+                                            }}
+                                            onFocus={() => setShowCityDropdown(true)}
+                                            onBlur={() => {
+                                                setTimeout(() => setShowCityDropdown(false), 200);
+                                            }}
+                                        />
+                                        {loadingCities && (
+                                            <svg className="animate-spin h-3.5 w-3.5 text-purple-600 shrink-0" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                        )}
+                                    </div>
+                                    
+                                    {showCityDropdown && state && citiesList.length > 0 && (
+                                        <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-150 rounded-xl shadow-lg z-50 no-scrollbar">
+                                            {citiesList
+                                                .filter(c => c.toLowerCase().includes(citySearchQuery.toLowerCase()))
+                                                .slice(0, 50)
+                                                .map((c, i) => (
+                                                    <button
+                                                        key={i}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setCity(c);
+                                                            setCitySearchQuery(c);
+                                                            setShowCityDropdown(false);
+                                                        }}
+                                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 active:bg-purple-100 border-b border-gray-50/50 last:border-b-0 transition-all cursor-pointer"
+                                                    >
+                                                        {c}
+                                                    </button>
+                                                ))
+                                            }
+                                        </div>
+                                    )}
                                 </div>
                                 {/* Telefone */}
                                 <div className="px-4 py-3.5 border-b border-gray-50">

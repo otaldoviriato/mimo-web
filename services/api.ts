@@ -50,6 +50,9 @@ export const userApi = {
         chargePerCharSubscribers?: number;
         chargePerCharNonSubscribers?: number;
         pixKey?: string;
+        birthDate?: string | Date | null;
+        city?: string;
+        state?: string;
     }) => {
         const response = await api.patch('/api/users/me', data);
         return response.data;

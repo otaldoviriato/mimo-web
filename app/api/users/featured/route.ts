@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
                 { createdAt: { $gte: activeLimitDate } }
             ]
         })
-        .select('clerkId username name email photoUrl coverUrl isProfessional subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers bio createdAt avgResponseTimeMinutes isOnline lastSeen')
+        .select('clerkId username name email photoUrl coverUrl isProfessional subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers bio createdAt avgResponseTimeMinutes isOnline lastSeen birthDate city state')
         .limit(200)
         .lean() as any[];
 
@@ -119,7 +119,11 @@ export async function GET(request: NextRequest) {
                 score: completeness, // mantido para compatibilidade com a tipagem do frontend
                 completeness,
                 lastActiveTime,
-                publicPhotosCount: photosCount
+                publicPhotosCount: photosCount,
+                isOnline: !!u.isOnline,
+                birthDate: u.birthDate ?? null,
+                city: u.city ?? '',
+                state: u.state ?? '',
             };
         });
 

@@ -337,6 +337,8 @@ export async function GET(request: NextRequest) {
                 phone: user.phone,
                 taxId: user.taxId,
                 birthDate: user.birthDate,
+                city: user.city,
+                state: user.state,
                 photoUrl: user.photoUrl,
                 coverUrl: user.coverUrl,
                 balance: user.balance,
@@ -396,7 +398,7 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, subscriptionPrice, isSubscriptionEnabled, chargePerCharSubscribers, chargePerCharNonSubscribers, bio, emailNotificationsEnabled, hideFromExplore, subscriberDiscountPercentage } = body;
+        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, subscriptionPrice, isSubscriptionEnabled, chargePerCharSubscribers, chargePerCharNonSubscribers, bio, emailNotificationsEnabled, hideFromExplore, subscriberDiscountPercentage, birthDate, city, state } = body;
 
         await connectToDatabase();
 
@@ -538,6 +540,40 @@ export async function PATCH(request: NextRequest) {
             updateData.hideFromExplore = Boolean(hideFromExplore);
         }
 
+        if (birthDate !== undefined) {
+            if (birthDate === null || birthDate === '') {
+                updateData.birthDate = null;
+            } else {
+                const birthDateObj = new Date(birthDate);
+                if (isNaN(birthDateObj.getTime())) {
+                    return NextResponse.json({ error: 'Data de nascimento inválida.' }, { status: 400 });
+                }
+                
+                const today = new Date();
+                let age = today.getFullYear() - birthDateObj.getFullYear();
+                const monthDiff = today.getMonth() - birthDateObj.getMonth();
+                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) {
+                    age--;
+                }
+                
+                if (age < 18) {
+                    return NextResponse.json({ error: 'Você precisa ter pelo menos 18 anos de idade.' }, { status: 400 });
+                }
+                if (age > 120) {
+                    return NextResponse.json({ error: 'Idade inválida (máximo 120 anos).' }, { status: 400 });
+                }
+                updateData.birthDate = birthDateObj;
+            }
+        }
+
+        if (city !== undefined) {
+            updateData.city = city ? city.trim() : '';
+        }
+
+        if (state !== undefined) {
+            updateData.state = state ? state.trim() : '';
+        }
+
         const user = await User.findOneAndUpdate(
             { clerkId: userId },
             {
@@ -638,6 +674,8 @@ export async function PATCH(request: NextRequest) {
                 phone: user.phone,
                 taxId: user.taxId,
                 birthDate: user.birthDate,
+                city: user.city,
+                state: user.state,
                 photoUrl: user.photoUrl,
                 coverUrl: user.coverUrl,
                 balance: user.balance,

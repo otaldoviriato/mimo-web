@@ -20,6 +20,8 @@ export interface IUser extends Document {
     email: string;
     taxId?: string;
     birthDate?: Date;
+    city?: string;
+    state?: string;
     phone?: string;
     photoUrl?: string;
     coverUrl?: string;
@@ -86,6 +88,12 @@ const UserSchema = new Schema<IUser>({
     },
     birthDate: {
         type: Date,
+    },
+    city: {
+        type: String,
+    },
+    state: {
+        type: String,
     },
     phone: {
         type: String,

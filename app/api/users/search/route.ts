@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
             professionalStatus: 'approved',
             isSuspended: { $ne: true },
             photoUrl: { $exists: true, $ne: '' }
-        }).select('clerkId username name email photoUrl coverUrl isProfessional subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers bio createdAt avgResponseTimeMinutes isOnline lastSeen').limit(40).lean() as any[];
+        }).select('clerkId username name email photoUrl coverUrl isProfessional subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers bio createdAt avgResponseTimeMinutes isOnline lastSeen birthDate city state').limit(40).lean() as any[];
 
         if (!foundUsers || foundUsers.length === 0) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -152,7 +152,11 @@ export async function GET(request: NextRequest) {
                 publicPhotos: publicPhotos.slice(0, 4),
                 avgResponseTimeMinutes: u.avgResponseTimeMinutes ?? null,
                 score: finalScore,
-                isQualified
+                isQualified,
+                isOnline: !!u.isOnline,
+                birthDate: u.birthDate ?? null,
+                city: u.city ?? '',
+                state: u.state ?? ''
             };
         });
 

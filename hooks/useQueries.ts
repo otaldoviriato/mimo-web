@@ -196,6 +196,9 @@ export function useUpdateProfile() {
             taxId?: string;
             phone?: string;
             emailNotificationsEnabled?: boolean;
+            birthDate?: string | Date | null;
+            city?: string;
+            state?: string;
         }) => userApi.updateMe(data),
         onSuccess: (response) => {
             if (response?.user) {

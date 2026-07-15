@@ -7,7 +7,24 @@ import { Button } from '@/components/Button';
 import { Avatar } from '@/components/Avatar';
 import { userApi } from '@/services/api';
 import { useMyProfile } from '@/hooks/useQueries';
-import { ShieldAlert, ShieldCheck } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, Search, X, MapPin } from 'lucide-react';
+
+const calculateAge = (birthDateString?: string | Date) => {
+    if (!birthDateString) return null;
+    try {
+        const birthDateObj = new Date(birthDateString);
+        if (isNaN(birthDateObj.getTime())) return null;
+        const today = new Date();
+        let age = today.getFullYear() - birthDateObj.getFullYear();
+        const monthDiff = today.getMonth() - birthDateObj.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) {
+            age--;
+        }
+        return age;
+    } catch {
+        return null;
+    }
+};
 
 export default function SearchPage() {
     const router = useRouter();
@@ -19,6 +36,27 @@ export default function SearchPage() {
     const [loadingFeatured, setLoadingFeatured] = useState(false);
     const [error, setError] = useState('');
     const [lightbox, setLightbox] = useState<{ photos: string[]; index: number } | null>(null);
+
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [activeFilter, setActiveFilter] = useState<'todos' | 'novos' | 'proximos'>('todos');
+
+    const getFilteredUsers = () => {
+        return featuredUsers.filter(user => {
+            if (activeFilter === 'novos') {
+                return !!user.isNew;
+            }
+            if (activeFilter === 'proximos') {
+                return userData?.state ? user.state === userData.state : true;
+            }
+            return true;
+        });
+    };
+
+    const allCount = featuredUsers.length;
+    const newCount = featuredUsers.filter(u => u.isNew).length;
+    const nearbyCount = featuredUsers.filter(u => {
+        return userData?.state ? u.state === userData.state : true;
+    }).length;
 
     const openLightbox = (e: React.MouseEvent, photos: string[], index: number) => {
         e.stopPropagation();
@@ -110,77 +148,60 @@ export default function SearchPage() {
     }, [username]);
 
     const renderUserCard = (user: any) => {
-        const photos: string[] = user.publicPhotos || [];
+        const age = calculateAge(user.birthDate);
+        const displayName = age !== null 
+            ? `${user.name || `@${user.username}`}, ${age}` 
+            : (user.name || `@${user.username}`);
+        const locationStr = user.city && user.state ? `${user.city}, ${user.state}` : 'Brasil';
+        const mainPhoto = user.photoUrl || (user.publicPhotos && user.publicPhotos[0]) || '/Logo.svg';
 
         return (
             <div
                 key={user.clerkId}
                 onClick={() => router.push(`/${user.username}`)}
-                className="bg-white rounded-3xl border border-slate-100/80 shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:border-purple-100/50 transition-all duration-300 overflow-hidden flex flex-col p-4 gap-3.5 animate-in fade-in slide-in-from-bottom-4 duration-500 cursor-pointer active:scale-[0.99]"
+                className="relative aspect-[3/4] rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer active:scale-[0.98] border border-slate-100/50 bg-slate-100 animate-in fade-in zoom-in-95 duration-300 group"
             >
-                {/* Top Section: Avatar e Informações */}
-                <div className="flex items-start gap-3.5">
-                    {/* Avatar simples, sem badge */}
-                    <div className="shrink-0">
-                        <Avatar uri={user.photoUrl} size={64} />
-                    </div>
+                {/* Imagem de fundo */}
+                <img
+                    src={mainPhoto}
+                    alt={user.name || user.username}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
 
-                    {/* Nome (com badge Novo inline) e Bio */}
-                    <div className="min-w-0 flex-1 space-y-1.5">
-                        <div>
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                                <h2 className="text-sm font-extrabold text-slate-800 truncate hover:text-purple-700 tracking-tight leading-snug">
-                                    {user.name || `@${user.username}`}
-                                </h2>
-                                {user.isProfessional && user.identityStatus === 'approved' && (
-                                    <ShieldCheck className="w-4 h-4 text-purple-600 shrink-0" />
-                                )}
-                                {user.isNew && (
-                                    <span className="shrink-0 bg-purple-600 text-white text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shadow-sm">
-                                        Novo
-                                    </span>
-                                )}
-                            </div>
-                            {user.bio && (
-                                <p className="text-slate-500 text-[11px] leading-relaxed font-normal mt-0.5 line-clamp-1">
-                                    {user.bio}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                </div>
+                {/* Overlay gradiente escuro (apenas na parte inferior para leitura do texto) */}
+                <div className="absolute bottom-0 inset-x-0 h-1/3 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
 
-                {/* Galeria Pública Compacta com Scroll Horizontal */}
-                {photos.length > 0 && (
-                    <div className="mt-0.5">
-                        <div className="flex overflow-x-auto gap-2.5 pb-1 no-scrollbar scroll-smooth snap-x">
-                            {photos.map((photoUrl: string, idx: number) => (
-                                <div
-                                    key={idx}
-                                    onClick={(e) => openLightbox(e, photos, idx)}
-                                    className="w-24 h-24 aspect-square rounded-2xl overflow-hidden cursor-pointer relative group bg-slate-50 border border-slate-100 shrink-0 snap-start shadow-sm hover:border-purple-200 transition-all duration-300"
-                                >
-                                    <img
-                                        src={photoUrl}
-                                        alt={`Foto pública de ${user.name || user.username}`}
-                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                    />
-                                </div>
-                            ))}
-                        </div>
+                {/* Badge Novo (top left) */}
+                {user.isNew && (
+                    <div className="absolute top-2.5 left-2.5 bg-purple-600 text-white text-[8px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-full shadow-md z-10">
+                        Novo
+                    </div>
+                )}
+                {/* Badge Online (top right) */}
+                {!!user.isOnline && (
+                    <div className="absolute top-2.5 right-2.5 bg-black/40 backdrop-blur-md text-white text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1.5 z-10 border border-white/10">
+                        <span className="relative flex h-1.5 w-1.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                        </span>
+                        <span>Online</span>
                     </div>
                 )}
 
-                {/* Rodapé: Indicador de clique para o perfil */}
-                <div className="flex items-center justify-end pt-0.5 border-t border-slate-50">
-                    <span className="flex items-center gap-1 text-[10px] font-bold text-purple-500 group-hover:text-purple-700 transition-colors">
-                        Ver perfil
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M5 12h14M12 5l7 7-7 7"/>
-                        </svg>
+                {/* Conteúdo inferior */}
+                <div className="absolute bottom-0 inset-x-0 p-3 text-white flex flex-col gap-0.5 z-10">
+                    <div className="flex items-center gap-1 flex-wrap">
+                        <h3 className="text-sm font-extrabold tracking-tight leading-none truncate max-w-[85%]">
+                            {displayName}
+                        </h3>
+                        {user.isProfessional && user.identityStatus === 'approved' && (
+                            <ShieldCheck className="w-3.5 h-3.5 text-purple-400 fill-purple-400 shrink-0 animate-in zoom-in duration-300" />
+                        )}
+                    </div>
+                    <span className="text-[10px] text-slate-300 font-medium tracking-tight">
+                        {locationStr}
                     </span>
                 </div>
-
             </div>
         );
     };
@@ -260,60 +281,84 @@ export default function SearchPage() {
                         className="w-8 h-8 object-contain shrink-0"
                     />
                     <h1 className="text-2xl font-black text-white tracking-tighter">Mimo</h1>
-                    <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">Buscar</span>
+                    <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">
+                        Buscar
+                    </span>
                 </div>
-                {userData?.isAdmin && (
+                
+                <div className="flex items-center gap-1.5">
+                    {/* Botão de Busca Discreto (Lupa) */}
                     <button
-                        onClick={() => router.push('/admin')}
-                        className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center"
-                        title="Painel Admin"
+                        onClick={() => setIsSearchOpen(prev => !prev)}
+                        className={`p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center cursor-pointer ${
+                            isSearchOpen ? 'bg-white/15' : ''
+                        }`}
+                        title="Buscar usuário"
                     >
-                        <ShieldAlert className="w-5 h-5" />
+                        <Search className="w-5 h-5 text-white" />
                     </button>
-                )}
-            </div>
 
-            {/* Modern Search Bar */}
-            <div className="bg-white px-4 pt-5 pb-3 shrink-0">
-                <div className="relative group">
-                    <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none transition-colors group-focus-within:text-purple-600 text-gray-400">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
-                        </svg>
-                    </div>
-                    <input
-                        className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-600/10 transition-all font-medium"
-                        placeholder="Digite o @username..."
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        autoCapitalize="none"
-                        autoCorrect="off"
-                    />
-                    {username.length > 0 && !loading && (
-                        <button 
-                            onClick={() => setUsername('')}
-                            className="absolute inset-y-0 right-4 flex items-center text-gray-400 hover:text-gray-600 appearance-none"
+                    {userData?.isAdmin && (
+                        <button
+                            onClick={() => router.push('/admin')}
+                            className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center cursor-pointer"
+                            title="Painel Admin"
                         >
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M18 6 6 18M6 6l12 12"/>
-                            </svg>
+                            <ShieldAlert className="w-5 h-5" />
                         </button>
                     )}
-                    {loading && (
-                        <div className="absolute inset-y-0 right-4 flex items-center">
-                            <svg className="animate-spin h-5 w-5 text-purple-600" viewBox="0 0 24 24" fill="none">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                            </svg>
-                        </div>
-                    )}
                 </div>
             </div>
+
+            {/* Modern Search Bar - Expandível */}
+            {isSearchOpen && (
+                <div className="bg-white px-4 py-3 shrink-0 border-b border-slate-100 flex items-center gap-2 animate-in slide-in-from-top-2 duration-200 z-10 relative shadow-sm">
+                    <div className="relative flex-1 group">
+                        <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-purple-600">
+                            <Search className="w-4.5 h-4.5" />
+                        </div>
+                        <input
+                            className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-600/10 transition-all font-medium"
+                            placeholder="Digite o @username..."
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            autoCapitalize="none"
+                            autoCorrect="off"
+                            autoFocus
+                        />
+                        {username.length > 0 && !loading && (
+                            <button 
+                                onClick={() => setUsername('')}
+                                className="absolute inset-y-0 right-3.5 flex items-center text-gray-400 hover:text-gray-600 appearance-none"
+                            >
+                                <X className="w-4.5 h-4.5" />
+                            </button>
+                        )}
+                        {loading && (
+                            <div className="absolute inset-y-0 right-3.5 flex items-center">
+                                <svg className="animate-spin h-4.5 w-4.5 text-purple-600" viewBox="0 0 24 24" fill="none">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                            </div>
+                        )}
+                    </div>
+                    <button
+                        onClick={() => {
+                            setIsSearchOpen(false);
+                            setUsername('');
+                        }}
+                        className="text-xs font-bold text-slate-500 hover:text-purple-600 px-2 py-2 transition-colors cursor-pointer"
+                    >
+                        Fechar
+                    </button>
+                </div>
+            )}
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-4 pb-16 md:pb-4">
                 {error && username.length > 2 && (
-                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-5 animate-in fade-in zoom-in">
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 animate-in fade-in zoom-in">
                         <p className="text-sm font-semibold text-red-600 flex items-center gap-2">
                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
@@ -323,52 +368,74 @@ export default function SearchPage() {
                     </div>
                 )}
 
-                {/* Exibição de Resultados da Busca */}
-                {username.trim().length > 0 && (
-                    <div className="flex flex-col gap-4">
-                        {foundUsers.map((user) => renderUserCard(user))}
-                    </div>
-                )}
-
                 {/* Seção Explorar */}
                 {!username.trim() && (
                     <div className="flex flex-col gap-4 animate-in fade-in duration-500 pt-1">
-                        <div className="mb-2">
-                            <h2 className="text-lg font-black text-gray-900 tracking-tight">Explorar</h2>
-                            <p className="text-gray-400 text-xs">Conecte-se com novos perfis disponíveis no MimoChat.</p>
+                        {/* Filtros em Pílulas */}
+                        <div className="flex gap-2 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar -mx-4 px-4">
+                            <button
+                                onClick={() => setActiveFilter('todos')}
+                                className={`shrink-0 text-xs font-bold px-4 py-2 rounded-full transition-all border ${
+                                    activeFilter === 'todos'
+                                        ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
+                                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95'
+                                }`}
+                            >
+                                Todos {allCount}
+                            </button>
+                            <button
+                                onClick={() => setActiveFilter('novos')}
+                                className={`shrink-0 text-xs font-bold px-4 py-2 rounded-full transition-all border ${
+                                    activeFilter === 'novos'
+                                        ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
+                                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95'
+                                }`}
+                            >
+                                Novos {newCount}
+                            </button>
+                            <button
+                                onClick={() => setActiveFilter('proximos')}
+                                className={`shrink-0 text-xs font-bold px-4 py-2 rounded-full transition-all border ${
+                                    activeFilter === 'proximos'
+                                        ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
+                                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95'
+                                }`}
+                            >
+                                Próximos {nearbyCount}
+                            </button>
                         </div>
 
                         {loadingFeatured ? (
-                            <div className="flex flex-col gap-4 animate-pulse">
-                                {[1, 2, 3].map((n) => (
-                                    <div key={n} className="bg-white rounded-2xl border border-gray-100 p-4 flex flex-col gap-3">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-14 h-14 bg-gray-200 rounded-full" />
-                                                <div className="space-y-2">
-                                                    <div className="h-4 w-32 bg-gray-200 rounded" />
-                                                    <div className="h-3 w-20 bg-gray-200 rounded" />
-                                                </div>
-                                            </div>
-                                            <div className="h-9 w-24 bg-gray-200 rounded-xl" />
-                                        </div>
-                                        <div className="grid grid-cols-4 gap-2">
-                                            {[1, 2, 3, 4].map((m) => (
-                                                <div key={m} className="aspect-square bg-gray-200 rounded-xl" />
-                                            ))}
-                                        </div>
-                                    </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 animate-pulse">
+                                {[1, 2, 3, 4, 5, 6].map((n) => (
+                                    <div key={n} className="aspect-[3/4] bg-gray-200 rounded-3xl" />
                                 ))}
                             </div>
                         ) : (
-                            <div className="flex flex-col gap-4">
-                                {featuredUsers.map((user) => renderUserCard(user))}
+                            <>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                    {getFilteredUsers().map((user) => renderUserCard(user))}
+                                </div>
                                 
-                                {featuredUsers.length === 0 && (
-                                    <div className="text-center py-10 text-gray-400 text-xs">
-                                        Nenhum perfil sugerido encontrado no momento.
+                                {getFilteredUsers().length === 0 && (
+                                    <div className="text-center py-12 text-gray-400 text-xs">
+                                        Nenhum perfil sugerido encontrado para este filtro.
                                     </div>
                                 )}
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {/* Exibição de Resultados da Busca */}
+                {username.trim().length > 0 && (
+                    <div className="flex flex-col gap-4 animate-in fade-in duration-300 pt-1">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                            {foundUsers.map((user) => renderUserCard(user))}
+                        </div>
+                        {foundUsers.length === 0 && !loading && (
+                            <div className="text-center py-12 text-gray-400 text-xs">
+                                Nenhum perfil encontrado para "@ {username}".
                             </div>
                         )}
                     </div>
