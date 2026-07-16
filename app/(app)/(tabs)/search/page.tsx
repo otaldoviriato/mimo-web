@@ -204,15 +204,16 @@ export default function SearchPage() {
                             <ShieldCheck className="w-3.5 h-3.5 text-purple-400 shrink-0 animate-in zoom-in duration-300" />
                         )}
                         {!user.isProfessional && userData?.isProfessional && user.clientLevel && (
-                            <span className={`text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded-md leading-none tracking-wider shrink-0 flex items-center justify-center ${
-                                user.clientLevel === 'VIP' ? 'bg-purple-600 text-white animate-pulse' :
-                                user.clientLevel === 'Ouro' ? 'bg-yellow-500 text-yellow-950' :
-                                user.clientLevel === 'Prata' ? 'bg-slate-300 text-slate-800' :
-                                user.clientLevel === 'Bronze' ? 'bg-amber-600 text-white' :
-                                'bg-slate-500 text-white opacity-75'
-                            }`}>
-                                {user.clientLevel}
-                            </span>
+                            <span 
+                                className={`w-2 h-2 rounded-full shrink-0 flex-shrink-0 ml-1.5 shadow-sm transition-all duration-300 ${
+                                    user.clientLevel === 'VIP' ? 'bg-purple-500 ring-[3px] ring-purple-500/30 animate-pulse' :
+                                    user.clientLevel === 'Ouro' ? 'bg-yellow-400 ring-[3px] ring-yellow-400/35' :
+                                    user.clientLevel === 'Prata' ? 'bg-slate-300 ring-[3px] ring-slate-300/35' :
+                                    user.clientLevel === 'Bronze' ? 'bg-amber-600 ring-[3px] ring-amber-600/35' :
+                                    'bg-slate-500 ring-[3px] ring-slate-500/30'
+                                }`}
+                                title={`Nível ${user.clientLevel}`}
+                            />
                         )}
                     </div>
                     <span className="text-[10px] text-slate-300 font-medium tracking-tight">
