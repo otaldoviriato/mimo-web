@@ -344,6 +344,7 @@ export async function GET(request: NextRequest) {
                 balance: user.balance,
                 isProfessional: user.isProfessional,
                 professionalStatus: user.professionalStatus,
+                identityStatus: user.identityStatus || null,
                 subscriptionPrice: user.subscriptionPrice || 0,
                 isSubscriptionEnabled: user.isSubscriptionEnabled ?? false,
                 chargePerCharSubscribers: user.chargePerCharSubscribers ?? (settings?.defaultPricePerCharSubscribers ?? 0.002),

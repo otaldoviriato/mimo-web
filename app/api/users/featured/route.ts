@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
         // Encontrar criadores/clientes em destaque
         const featuredUsers = await User.find(queryFilter)
-        .select('clerkId username name email photoUrl coverUrl isProfessional subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers bio createdAt avgResponseTimeMinutes isOnline lastSeen birthDate city state isHighSpender')
+        .select('clerkId username name email photoUrl coverUrl isProfessional identityStatus subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers bio createdAt avgResponseTimeMinutes isOnline lastSeen birthDate city state isHighSpender')
         .limit(200)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .lean() as any[];
@@ -203,6 +203,7 @@ export async function GET(request: NextRequest) {
                 photoUrl: u.photoUrl,
                 coverUrl: u.coverUrl,
                 isProfessional: u.isProfessional,
+                identityStatus: u.identityStatus || null,
                 subscriptionPrice: u.subscriptionPrice || 0,
                 chargePerCharSubscribers: u.chargePerCharSubscribers ?? defaultSub,
                 chargePerCharNonSubscribers: u.chargePerCharNonSubscribers ?? defaultNonSub,
