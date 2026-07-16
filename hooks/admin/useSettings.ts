@@ -26,6 +26,7 @@ interface SettingsSnapshot {
     pwaShowAgainIntervalDays: number;
     identityVerificationPromptIntervalDays: number;
     newProfileDaysThreshold: number;
+    exploreSortingCriteria: string[];
     adminClerkIds: string[];
 }
 
@@ -60,6 +61,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     const [pwaShowAgainIntervalDays, setPwaShowAgainIntervalDays] = useState(7);
     const [identityVerificationPromptIntervalDays, setIdentityVerificationPromptIntervalDays] = useState(7);
     const [newProfileDaysThreshold, setNewProfileDaysThreshold] = useState(15);
+    const [exploreSortingCriteria, setExploreSortingCriteria] = useState<string[]>(['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness']);
 
     // Gerenciamento de administradores
     const [adminListRich, setAdminListRich] = useState<RichAdmin[]>([]);
@@ -92,6 +94,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         pwaShowAgainIntervalDays: s.pwaShowAgainIntervalDays ?? 7,
         identityVerificationPromptIntervalDays: s.identityVerificationPromptIntervalDays ?? 7,
         newProfileDaysThreshold: s.newProfileDaysThreshold ?? 15,
+        exploreSortingCriteria: s.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'],
         adminClerkIds: richAdmins.map(a => a.clerkId),
     });
 
@@ -136,6 +139,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     setPwaShowAgainIntervalDays(s.pwaShowAgainIntervalDays ?? 7);
                     setIdentityVerificationPromptIntervalDays(s.identityVerificationPromptIntervalDays ?? 7);
                     setNewProfileDaysThreshold(s.newProfileDaysThreshold ?? 15);
+                    setExploreSortingCriteria(s.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness']);
                     setSavedSnapshot(buildSnapshot(s, richAdmins));
                     setIsAuthorized(true);
                 } else if (response.status === 403) {
@@ -222,6 +226,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     pwaShowAgainIntervalDays,
                     identityVerificationPromptIntervalDays,
                     newProfileDaysThreshold,
+                    exploreSortingCriteria,
                 }),
             });
             if (response.ok) {
@@ -250,6 +255,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                 setPwaShowAgainIntervalDays(s.pwaShowAgainIntervalDays ?? 7);
                 setIdentityVerificationPromptIntervalDays(s.identityVerificationPromptIntervalDays ?? 7);
                 setNewProfileDaysThreshold(s.newProfileDaysThreshold ?? 15);
+                setExploreSortingCriteria(s.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness']);
             } else {
                 const errData = await response.json();
                 toast.error(errData.error || 'Erro ao salvar configurações.');
@@ -321,11 +327,15 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         adminListRich.length !== savedSnapshot.adminClerkIds.length ||
         adminListRich.some(a => !savedSnapshot.adminClerkIds.includes(a.clerkId))
     );
+    const isDirtyExplore = savedSnapshot !== null && (
+        exploreSortingCriteria.length !== savedSnapshot.exploreSortingCriteria.length ||
+        exploreSortingCriteria.some((c, idx) => c !== savedSnapshot.exploreSortingCriteria[idx])
+    );
 
     return {
         settings, loadingSettings, isAuthorized, saving, savedSnapshot,
         isDirtyPlatform, isDirtyChat, isDirtyPricing, isDirtyProfiles,
-        isDirtyPayments, isDirtyApp, isDirtyAdmins,
+        isDirtyPayments, isDirtyApp, isDirtyAdmins, isDirtyExplore,
         platformFee, setPlatformFee,
         uploadLimit, setUploadLimit,
         comparisonPeriod, setComparisonPeriod,
@@ -349,6 +359,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         pwaShowAgainIntervalDays, setPwaShowAgainIntervalDays,
         identityVerificationPromptIntervalDays, setIdentityVerificationPromptIntervalDays,
         newProfileDaysThreshold, setNewProfileDaysThreshold,
+        exploreSortingCriteria, setExploreSortingCriteria,
         adminListRich,
         adminSearch, setAdminSearch,
         adminSearchResults,

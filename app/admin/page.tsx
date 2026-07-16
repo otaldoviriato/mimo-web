@@ -22,6 +22,7 @@ import { SettingsProfilesPage } from '@/components/admin/settings/SettingsProfil
 import { SettingsPaymentsPage } from '@/components/admin/settings/SettingsPaymentsPage';
 import { SettingsAppPage } from '@/components/admin/settings/SettingsAppPage';
 import { SettingsAdminsPage } from '@/components/admin/settings/SettingsAdminsPage';
+import { SettingsExplorePage } from '@/components/admin/settings/SettingsExplorePage';
 import { useSettings } from '@/hooks/admin/useSettings';
 import {
     Users, MessageSquare, MessageCircle, Coins, TrendingUp,
@@ -40,6 +41,7 @@ const TAB_TITLES: Record<string, string> = {
     'identity-verifications': 'Verificações de Selos de Autenticidade',
     'settings-platform': 'Configurações — Plataforma & Operação',
     'settings-chat': 'Configurações — Chat & Sessões',
+    'settings-explore': 'Configurações — Explorar & Desempate',
     'settings-pricing': 'Configurações — Precificação & Assinaturas',
     'settings-profiles': 'Configurações — Perfis & Galeria',
     'settings-payments': 'Configurações — Meios de Pagamento',
@@ -286,6 +288,13 @@ export default function AdminPage() {
                             onlineDelayMinutes={settings.onlineDelayMinutes} setOnlineDelayMinutes={settings.setOnlineDelayMinutes}
                             chatInactivityHours={settings.chatInactivityHours} setChatInactivityHours={settings.setChatInactivityHours}
                             isDirtyChat={settings.isDirtyChat}
+                            saving={settings.saving} saveSettings={settings.saveSettings}
+                        />
+                    )}
+                    {activeTab === 'settings-explore' && (
+                        <SettingsExplorePage
+                            exploreSortingCriteria={settings.exploreSortingCriteria} setExploreSortingCriteria={settings.setExploreSortingCriteria}
+                            isDirtyExplore={settings.isDirtyExplore}
                             saving={settings.saving} saveSettings={settings.saveSettings}
                         />
                     )}

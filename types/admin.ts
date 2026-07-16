@@ -27,6 +27,7 @@ export interface SettingsData {
     identityVerificationPromptIntervalDays: number;
     newProfileDaysThreshold: number;
     chatInactivityHours?: number;
+    exploreSortingCriteria?: string[];
 }
 
 export interface ChatMessage {

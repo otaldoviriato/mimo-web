@@ -7,7 +7,8 @@ import { AppSettings } from '@/models/AppSettings';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// GET /api/users/featured
+const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
+
 export async function GET(request: NextRequest) {
     try {
         const { userId } = await auth();
@@ -18,45 +19,48 @@ export async function GET(request: NextRequest) {
 
         await connectToDatabase();
 
-        // Limite de inatividade de 30 dias para exibição no explorar
-        const activeLimitDate = new Date();
-        activeLimitDate.setDate(activeLimitDate.getDate() - 30);
+        // Verificar permissão administrativa
+        const settings = await AppSettings.findOne({ key: 'global' }).lean();
+        const adminClerkIds = settings?.adminClerkIds || [FALLBACK_ADMIN];
+        const isAdmin = adminClerkIds.includes(userId) || userId === FALLBACK_ADMIN;
 
-        const currentUser = await User.findOne({ clerkId: userId }).select('isProfessional').lean();
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const queryFilter: any = {
-            clerkId: { $ne: userId },
-            isSuspended: { $ne: true },
-            $or: [
-                { lastSeen: { $gte: activeLimitDate } },
-                { isOnline: true },
-                { createdAt: { $gte: activeLimitDate } }
-            ]
-        };
-
-        if (currentUser?.isProfessional) {
-            queryFilter.isProfessional = { $ne: true };
-            queryFilter.hideFromExplore = { $ne: true };
-        } else {
-            queryFilter.isProfessional = true;
-            queryFilter.professionalStatus = 'approved';
-            queryFilter.hideFromExplore = { $ne: true };
+        if (!isAdmin) {
+            return NextResponse.json({ error: 'Acesso proibido. Apenas administradores.' }, { status: 403 });
         }
 
-        // Encontrar criadores/clientes em destaque
-        const featuredUsers = await User.find(queryFilter)
-        .select('clerkId username name email photoUrl coverUrl isProfessional subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers bio createdAt avgResponseTimeMinutes isOnline lastSeen birthDate city state isHighSpender')
-        .limit(200)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .lean() as any[];
+        // Ler critérios passados por query params ou pegar do banco
+        const { searchParams } = new URL(request.url);
+        const criteriaParam = searchParams.get('criteria');
+        let exploreSortingCriteria: string[];
 
-        if (!featuredUsers || featuredUsers.length === 0) {
+        if (criteriaParam) {
+            exploreSortingCriteria = criteriaParam.split(',').filter(Boolean);
+        } else {
+            exploreSortingCriteria = settings?.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'];
+        }
+
+        const chatInactivityHours = settings?.chatInactivityHours ?? 48;
+        const thresholdDays = settings?.newProfileDaysThreshold ?? 15;
+
+        // Buscar todos os profissionais reais ativos e aprovados
+        const queryFilter: any = {
+            isProfessional: true,
+            professionalStatus: 'approved',
+            isSuspended: { $ne: true },
+            hideFromExplore: { $ne: true }
+        };
+
+        const professionals = await User.find(queryFilter)
+            .select('clerkId username name email photoUrl coverUrl isProfessional subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers bio createdAt avgResponseTimeMinutes isOnline lastSeen birthDate city state isHighSpender')
+            .lean() as any[];
+
+        if (!professionals || professionals.length === 0) {
             return NextResponse.json({ users: [] });
         }
 
-        // Buscar fotos públicas livres da galeria para estes usuários
-        const clerkIds = featuredUsers.map(u => u.clerkId);
+        const clerkIds = professionals.map(u => u.clerkId);
+
+        // Buscar fotos públicas livres da galeria
         const galleryItems = await GalleryItem.find({
             ownerId: { $in: clerkIds },
             galleryType: 'public',
@@ -66,8 +70,6 @@ export async function GET(request: NextRequest) {
         .sort({ createdAt: -1 })
         .lean();
 
-        // Mapear fotos por ownerId
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const photosByOwner = galleryItems.reduce((acc: Record<string, string[]>, item: any) => {
             if (!acc[item.ownerId]) {
                 acc[item.ownerId] = [];
@@ -76,18 +78,8 @@ export async function GET(request: NextRequest) {
             return acc;
         }, {});
 
-        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers newProfileDaysThreshold exploreSortingCriteria chatInactivityHours').lean();
-        const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
-        const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
-        const thresholdDays = settings?.newProfileDaysThreshold ?? 15;
-        const exploreSortingCriteria = settings?.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'];
-        const chatInactivityHours = settings?.chatInactivityHours ?? 48;
-
-        const activeLimit = new Date(Date.now() - chatInactivityHours * 60 * 60 * 1000);
-        const oneWeekAgo = new Date();
-        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-
         // Agregação de conversas ativas
+        const activeLimit = new Date(Date.now() - chatInactivityHours * 60 * 60 * 1000);
         const activeRoomsGroup = await Room.aggregate([
             {
                 $match: {
@@ -118,6 +110,8 @@ export async function GET(request: NextRequest) {
         activeRoomsGroup.forEach((g: any) => activeRoomsMap.set(g._id, g.count));
 
         // Agregação de mensagens na última semana
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
         const messagesGroup = await Message.aggregate([
             {
                 $match: {
@@ -157,31 +151,26 @@ export async function GET(request: NextRequest) {
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - thresholdDays);
 
-        // Mapear usuários, calcular a completude do perfil e anexar até 4 fotos públicas
-        const usersWithPhotos = featuredUsers.map(u => {
+        const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
+        const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
+
+        // Mapear usuários e preencher métricas
+        const usersWithMetrics = professionals.map(u => {
             const publicPhotos = photosByOwner[u.clerkId] || [];
             const photosCount = publicPhotos.length;
 
-            // 1. Calcular completude (peso de 25% por requisito preenchido ou simplificado para clientes)
             const hasPhoto = !!u.photoUrl && u.photoUrl.trim() !== '';
             const hasCover = !!u.coverUrl && u.coverUrl.trim() !== '';
             const hasBio = !!u.bio && u.bio.trim().length >= 10;
             const hasPhotos = photosCount >= 3;
 
-            let completeness = 0;
-            if (currentUser?.isProfessional) {
-                // Para clientes, a completude é 100% se tiver foto. Se for High Spender, ganha prioridade
-                completeness = hasPhoto ? (u.isHighSpender ? 100 : 80) : 0;
-            } else {
-                let completedSteps = 0;
-                if (hasPhoto) completedSteps++;
-                if (hasCover) completedSteps++;
-                if (hasBio) completedSteps++;
-                if (hasPhotos) completedSteps++;
-                completeness = completedSteps * 25;
-            }
+            let completedSteps = 0;
+            if (hasPhoto) completedSteps++;
+            if (hasCover) completedSteps++;
+            if (hasBio) completedSteps++;
+            if (hasPhotos) completedSteps++;
+            const completeness = completedSteps * 25;
 
-            // 2. Determinar timestamp de última atividade (online ou mais recente)
             let lastActiveTime = 0;
             if (u.isOnline) {
                 lastActiveTime = Date.now();
@@ -210,11 +199,12 @@ export async function GET(request: NextRequest) {
                 isNew: u.createdAt ? new Date(u.createdAt) >= cutoffDate : false,
                 publicPhotos: publicPhotos.slice(0, 4),
                 avgResponseTimeMinutes: u.avgResponseTimeMinutes ?? null,
-                score: completeness, // mantido para compatibilidade com a tipagem do frontend
+                score: completeness,
                 completeness,
                 lastActiveTime,
                 publicPhotosCount: photosCount,
                 isOnline: !!u.isOnline,
+                lastSeen: u.lastSeen || null,
                 birthDate: u.birthDate ?? null,
                 city: u.city ?? '',
                 state: u.state ?? '',
@@ -224,40 +214,37 @@ export async function GET(request: NextRequest) {
         });
 
         // Ordenar dinamicamente:
-        const sorted = usersWithPhotos
-            .sort((a, b) => {
-                for (const criterion of exploreSortingCriteria) {
-                    if (criterion === 'activeConversations') {
-                        const diff = (b.activeConversationsCount || 0) - (a.activeConversationsCount || 0);
-                        if (diff !== 0) return diff;
-                    }
-                    else if (criterion === 'messagesLastWeek') {
-                        const diff = (b.messagesLastWeekCount || 0) - (a.messagesLastWeekCount || 0);
-                        if (diff !== 0) return diff;
-                    }
-                    else if (criterion === 'online') {
-                        const valA = a.isOnline ? 1 : 0;
-                        const valB = b.isOnline ? 1 : 0;
-                        const diff = valB - valA;
-                        if (diff !== 0) return diff;
-                    }
-                    else if (criterion === 'recentAccess') {
-                        const diff = (b.lastActiveTime || 0) - (a.lastActiveTime || 0);
-                        if (diff !== 0) return diff;
-                    }
-                    else if (criterion === 'completeness') {
-                        const diff = (b.completeness || 0) - (a.completeness || 0);
-                        if (diff !== 0) return diff;
-                    }
+        const sorted = usersWithMetrics.sort((a, b) => {
+            for (const criterion of exploreSortingCriteria) {
+                if (criterion === 'activeConversations') {
+                    const diff = (b.activeConversationsCount || 0) - (a.activeConversationsCount || 0);
+                    if (diff !== 0) return diff;
                 }
-                return 0;
-            })
-            .slice(0, 12);
+                else if (criterion === 'messagesLastWeek') {
+                    const diff = (b.messagesLastWeekCount || 0) - (a.messagesLastWeekCount || 0);
+                    if (diff !== 0) return diff;
+                }
+                else if (criterion === 'online') {
+                    const valA = a.isOnline ? 1 : 0;
+                    const valB = b.isOnline ? 1 : 0;
+                    const diff = valB - valA;
+                    if (diff !== 0) return diff;
+                }
+                else if (criterion === 'recentAccess') {
+                    const diff = (b.lastActiveTime || 0) - (a.lastActiveTime || 0);
+                    if (diff !== 0) return diff;
+                }
+                else if (criterion === 'completeness') {
+                    const diff = (b.completeness || 0) - (a.completeness || 0);
+                    if (diff !== 0) return diff;
+                }
+            }
+            return 0;
+        });
 
         return NextResponse.json({ users: sorted });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
-        console.error('Error fetching featured users:', error);
+        console.error('Error fetching explore preview:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }

@@ -23,6 +23,7 @@ import {
     Smartphone,
     ShieldCheck,
     ChevronDown,
+    Compass,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -36,6 +37,7 @@ interface SidebarProps {
 const SETTINGS_TABS = [
     { id: 'settings-platform', label: 'Plataforma & Operação', icon: Globe },
     { id: 'settings-chat', label: 'Chat & Sessões', icon: Clock },
+    { id: 'settings-explore', label: 'Explorar', icon: Compass },
     { id: 'settings-pricing', label: 'Precificação & Assinaturas', icon: Coins },
     { id: 'settings-profiles', label: 'Perfis & Galeria', icon: Camera },
     { id: 'settings-payments', label: 'Meios de Pagamento', icon: CreditCard },

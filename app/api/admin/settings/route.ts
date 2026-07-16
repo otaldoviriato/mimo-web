@@ -34,6 +34,7 @@ async function getOrCreateSettings() {
             newProfileDaysThreshold: 15,
             onlineDelayMinutes: 2,
             chatInactivityHours: 48,
+            exploreSortingCriteria: ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'],
         });
     } else {
         // Garantir que novos campos sejam populados se não existirem
@@ -56,6 +57,10 @@ async function getOrCreateSettings() {
         if (settings.newProfileDaysThreshold === undefined) { settings.newProfileDaysThreshold = 15; updated = true; }
         if (settings.onlineDelayMinutes === undefined) { settings.onlineDelayMinutes = 2; updated = true; }
         if (settings.chatInactivityHours === undefined) { settings.chatInactivityHours = 48; updated = true; }
+        if (settings.exploreSortingCriteria === undefined || settings.exploreSortingCriteria.length === 0) {
+            settings.exploreSortingCriteria = ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'];
+            updated = true;
+        }
         if (updated) {
             await settings.save();
         }
@@ -162,6 +167,7 @@ export async function PUT(request: NextRequest) {
             newProfileDaysThreshold,
             onlineDelayMinutes,
             chatInactivityHours,
+            exploreSortingCriteria,
         } = body;
 
         // Validações básicas
@@ -338,6 +344,18 @@ export async function PUT(request: NextRequest) {
                 return NextResponse.json({ error: 'Limite de dias para perfil novo inválido' }, { status: 400 });
             }
             settings.newProfileDaysThreshold = val;
+        }
+
+        if (exploreSortingCriteria !== undefined) {
+            if (!Array.isArray(exploreSortingCriteria) || exploreSortingCriteria.length === 0) {
+                return NextResponse.json({ error: 'Critérios de ordenação do explorar inválidos' }, { status: 400 });
+            }
+            const allowed = ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'];
+            const isValid = exploreSortingCriteria.every((c: any) => allowed.includes(c));
+            if (!isValid) {
+                return NextResponse.json({ error: 'Um ou mais critérios de ordenação fornecidos são inválidos' }, { status: 400 });
+            }
+            settings.exploreSortingCriteria = exploreSortingCriteria;
         }
 
         // Validação de consistência
