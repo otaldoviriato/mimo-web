@@ -209,6 +209,8 @@ export async function GET(
 
         let activeConversationsCount = 0;
         let messagesLastWeekCount = 0;
+        let conversationsLastWeekCount = 0;
+        let mediaGiftsLastWeekCount = 0;
 
         if (user.isProfessional) {
             const activeSubscriptions = await Subscription.find({
@@ -263,7 +265,53 @@ export async function GET(
                 timestamp: { $gte: oneWeekAgo },
                 isSystem: { $ne: true }
             });
+
+            // Conversas na semana
+            const conversationsLastWeekCountAgg = await Message.aggregate([
+                {
+                    $match: {
+                        $or: [
+                            { senderId: user.clerkId },
+                            { receiverId: user.clerkId }
+                        ],
+                        timestamp: { $gte: oneWeekAgo },
+                        isSystem: { $ne: true }
+                    }
+                },
+                {
+                    $group: {
+                        _id: '$roomId'
+                    }
+                },
+                {
+                    $count: 'total'
+                }
+            ]);
+            conversationsLastWeekCount = conversationsLastWeekCountAgg[0]?.total ?? 0;
+
+            // Mídias e presentes na semana
+            mediaGiftsLastWeekCount = await Message.countDocuments({
+                $and: [
+                    {
+                        $or: [
+                            { senderId: user.clerkId },
+                            { receiverId: user.clerkId }
+                        ]
+                    },
+                    {
+                        $or: [
+                            { isGift: true },
+                            { isLockedImage: true },
+                            { isVideo: true },
+                            { originalImageUrl: { $nin: [null, ''] } }
+                        ]
+                    }
+                ],
+                timestamp: { $gte: oneWeekAgo },
+                isSystem: { $ne: true }
+            });
         }
+
 
         return NextResponse.json({
             user: {
@@ -286,7 +334,9 @@ export async function GET(
                 relationshipStats: relationshipStats || undefined,
                 avgResponseTimeMinutes: user.avgResponseTimeMinutes ?? null,
                 activeConversationsCount,
-                messagesLastWeekCount,
+                conversationsLastWeekCount: user.isProfessional ? conversationsLastWeekCount : 0,
+                messagesLastWeekCount: user.isProfessional ? messagesLastWeekCount : 0,
+                mediaGiftsLastWeekCount: user.isProfessional ? mediaGiftsLastWeekCount : 0,
             },
         });
     } catch (error: any) {
