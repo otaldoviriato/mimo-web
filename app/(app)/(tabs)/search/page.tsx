@@ -201,7 +201,7 @@ export default function SearchPage() {
                             {displayName}
                         </h3>
                         {user.isProfessional && user.identityStatus === 'approved' && (
-                            <ShieldCheck className="w-3.5 h-3.5 text-purple-400 fill-purple-400 shrink-0 animate-in zoom-in duration-300" />
+                            <ShieldCheck className="w-3.5 h-3.5 text-purple-400 shrink-0 animate-in zoom-in duration-300" />
                         )}
                     </div>
                     <span className="text-[10px] text-slate-300 font-medium tracking-tight">
