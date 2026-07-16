@@ -103,7 +103,7 @@ export function PullToRefresh({ onRefresh, children, className = '' }: PullToRef
         >
             {/* Indicador de Refresh flutuante */}
             <div 
-                className="absolute left-1/2 -translate-x-1/2 z-50 flex items-center justify-center bg-white rounded-full shadow-lg border border-purple-100 pointer-events-none transition-all duration-150"
+                className="absolute left-1/2 z-50 flex items-center justify-center bg-white rounded-full shadow-lg border border-purple-100 pointer-events-none transition-all duration-150"
                 style={{
                     top: `${pullDistance - 50}px`,
                     width: '40px',
