@@ -128,6 +128,36 @@ export async function GET(request: NextRequest) {
         ]);
         const messagesByUser = new Map(messagesAgg.map(m => [m._id, m.total]));
 
+        // Nível de recargas dos últimos 30 dias para classificar o nível do cliente
+        const startOf30Days = new Date();
+        startOf30Days.setDate(startOf30Days.getDate() - 30);
+        
+        const recharges30DaysAgg = await Transaction.aggregate([
+            {
+                $match: {
+                    userId: { $in: clerkIds },
+                    source: 'recharge',
+                    status: { $in: ['PAID', 'COMPLETED'] },
+                    timestamp: { $gte: startOf30Days }
+                }
+            },
+            {
+                $group: {
+                    _id: '$userId',
+                    total: { $sum: '$amount' } // já está em reais no banco
+                }
+            }
+        ]);
+        const recharges30DaysMap = new Map(recharges30DaysAgg.map(r => [r._id, r.total]));
+
+        const getClientLevel = (amount: number): string => {
+            if (amount <= 0) return 'Novo';
+            if (amount <= 100) return 'Bronze';
+            if (amount <= 500) return 'Prata';
+            if (amount <= 1000) return 'Ouro';
+            return 'VIP';
+        };
+
         return NextResponse.json({
             users: usersList.map(u => ({
                 id: u.clerkId,
@@ -152,6 +182,7 @@ export async function GET(request: NextRequest) {
                 lastAccessAt: u.lastAccessAt ? new Date(u.lastAccessAt).toISOString() : null,
                 roomsCount: roomsByUser.get(u.clerkId) || 0,
                 messagesCount: messagesByUser.get(u.clerkId) || 0,
+                clientLevel: u.isProfessional ? null : getClientLevel(recharges30DaysMap.get(u.clerkId) || 0),
             }))
         });
 

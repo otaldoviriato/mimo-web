@@ -263,6 +263,23 @@ export async function GET(request: NextRequest) {
             ]);
             const depositsMap = new Map<string, number>(depositsAgg.map(d => [d._id, d.total]));
 
+            // Agregação de recargas nos últimos 30 dias para obter o nível do cliente
+            const startOf30Days = new Date();
+            startOf30Days.setDate(startOf30Days.getDate() - 30);
+            const recharges30DaysAgg = await Transaction.aggregate([
+                { $match: { userId: { $in: activeClerkIds }, source: 'recharge', status: 'PAID', timestamp: { $gte: startOf30Days } } },
+                { $group: { _id: '$userId', total: { $sum: '$amount' } } }
+            ]);
+            const recharges30DaysMap = new Map<string, number>(recharges30DaysAgg.map(r => [r._id, r.total]));
+
+            const getClientLevel = (amount: number): string => {
+                if (amount <= 0) return 'Novo';
+                if (amount <= 100) return 'Bronze';
+                if (amount <= 500) return 'Prata';
+                if (amount <= 1000) return 'Ouro';
+                return 'VIP';
+            };
+
             // 3. Faturamento obtido por profissionais (em reais)
             const earningsAgg = await MicroTransaction.aggregate([
                 { $match: { userId: { $in: activeClerkIds }, type: 'credit' } },
@@ -314,7 +331,8 @@ export async function GET(request: NextRequest) {
                         activeRoomsCount,
                         totalRecharged,
                         totalMessages,
-                        messagesLastWeek
+                        messagesLastWeek,
+                        clientLevel: getClientLevel(recharges30DaysMap.get(u.clerkId) || 0)
                     };
                 })
                 .sort((a, b) => b.activeRoomsCount - a.activeRoomsCount || b.totalRecharged - a.totalRecharged)

@@ -26,7 +26,7 @@ import { SettingsExplorePage } from '@/components/admin/settings/SettingsExplore
 import { useSettings } from '@/hooks/admin/useSettings';
 import {
     Users, UserCheck, MessageSquare, MessageCircle, Coins, TrendingUp,
-    Lock, ArrowLeft, CheckCircle2, Clock, AlertCircle, Sliders, Trash2
+    Lock, ArrowLeft, CheckCircle2, Clock, AlertCircle, Sliders, Trash2, Award
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -209,8 +209,21 @@ export default function AdminPage() {
                                                         </div>
                                                     )}
                                                     <div className="flex flex-col min-w-0 flex-1">
-                                                        <Link href={`/admin/users/${client.clerkId}`} className="text-xs font-bold text-purple-600 hover:text-purple-800 hover:underline transition-colors text-left truncate">
+                                                        <Link href={`/admin/users/${client.clerkId}`} className="text-xs font-bold text-purple-600 hover:text-purple-800 hover:underline transition-colors text-left truncate flex items-center gap-1">
                                                             {client.name}
+                                                            {client.clientLevel && client.clientLevel !== 'Novo' && (
+                                                                <span title={`Nível ${client.clientLevel}`} className="inline-flex shrink-0">
+                                                                    <Award 
+                                                                        size={12} 
+                                                                        className={`shrink-0 ${
+                                                                            client.clientLevel === 'VIP' ? 'text-purple-650' :
+                                                                            client.clientLevel === 'Ouro' ? 'text-yellow-600' :
+                                                                            client.clientLevel === 'Prata' ? 'text-slate-500' :
+                                                                            'text-amber-700'
+                                                                        }`} 
+                                                                    />
+                                                                </span>
+                                                            )}
                                                         </Link>
                                                         <span className="text-[10px] text-slate-400 font-semibold truncate">
                                                             {client.activeRoomsCount} {client.activeRoomsCount === 1 ? 'conversa' : 'conversas'} · {client.totalMessages} msgs

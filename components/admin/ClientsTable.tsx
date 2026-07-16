@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, MoreVertical, ShieldCheck, Mail, Calendar, Coins, Edit, Trash2, X, Phone, TrendingUp, Activity, MessageCircle } from 'lucide-react';
+import { Search, MoreVertical, ShieldCheck, Mail, Calendar, Coins, Edit, Trash2, X, Phone, TrendingUp, Activity, MessageCircle, Award } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { SortableColumnHeader } from './SortableColumnHeader';
@@ -206,8 +206,21 @@ export function ClientsTable() {
                                                     </div>
                                                 )}
                                                 <div className="flex flex-col">
-                                                    <span className="text-sm font-bold text-slate-800 group-hover:text-purple-600 transition-colors">
+                                                    <span className="text-sm font-bold text-slate-800 group-hover:text-purple-600 transition-colors flex items-center gap-1">
                                                         {user.name}
+                                                        {user.clientLevel && user.clientLevel !== 'Novo' && (
+                                                            <span title={`Nível ${user.clientLevel}`} className="inline-flex shrink-0">
+                                                                <Award 
+                                                                    size={13} 
+                                                                    className={`shrink-0 ${
+                                                                        user.clientLevel === 'VIP' ? 'text-purple-650' :
+                                                                        user.clientLevel === 'Ouro' ? 'text-yellow-600' :
+                                                                        user.clientLevel === 'Prata' ? 'text-slate-500' :
+                                                                        'text-amber-700'
+                                                                    }`} 
+                                                                />
+                                                            </span>
+                                                        )}
                                                     </span>
                                                     <span className="text-xs text-slate-400 font-medium flex items-center gap-1 mt-0.5">
                                                         <Mail size={12} />

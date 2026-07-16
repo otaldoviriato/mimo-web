@@ -62,12 +62,47 @@ export async function GET(
         const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
         const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
 
+        // Nível de recargas nos últimos 30 dias
+        let clientLevel = null;
+        if (!userObj.isProfessional) {
+            const startOf30Days = new Date();
+            startOf30Days.setDate(startOf30Days.getDate() - 30);
+            
+            const rechargesAgg = await Transaction.aggregate([
+                {
+                    $match: {
+                        userId: clerkId,
+                        source: 'recharge',
+                        status: { $in: ['PAID', 'COMPLETED'] },
+                        timestamp: { $gte: startOf30Days }
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        total: { $sum: '$amount' }
+                    }
+                }
+            ]);
+            const total30Days = rechargesAgg[0]?.total ?? 0;
+
+            const getClientLevel = (amount: number): string => {
+                if (amount <= 0) return 'Novo';
+                if (amount <= 100) return 'Bronze';
+                if (amount <= 500) return 'Prata';
+                if (amount <= 1000) return 'Ouro';
+                return 'VIP';
+            };
+            clientLevel = getClientLevel(total30Days);
+        }
+
         return NextResponse.json({
             user: {
                 ...userObj,
                 chargePerCharSubscribers: userObj.chargePerCharSubscribers ?? defaultSub,
                 chargePerCharNonSubscribers: userObj.chargePerCharNonSubscribers ?? defaultNonSub,
                 createdAt: userObj.createdAt ? new Date(userObj.createdAt).toLocaleDateString('pt-BR') : 'N/A',
+                clientLevel: clientLevel,
             },
             gallery: galleryItems,
             subscribers: subscribersList.map((sub: any) => ({

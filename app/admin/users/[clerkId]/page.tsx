@@ -27,7 +27,8 @@ import {
     Lock,
     Unlock,
     ChevronDown,
-    ChevronUp
+    ChevronUp,
+    Award
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -559,7 +560,23 @@ export default function UserDetailPage() {
                                 </div>
                             )}
                             <div className="text-center sm:text-left flex-1 pb-1">
-                                <h2 className="text-xl font-bold text-slate-800 tracking-tight">{name || username}</h2>
+                                 <h2 className="text-xl font-bold text-slate-800 tracking-tight flex items-center justify-center sm:justify-start gap-2">
+                                     {name || username}
+                                     {!isProfessional && (user as any)?.clientLevel && (
+                                         <span 
+                                             className={`text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 border tracking-wide uppercase select-none ${
+                                                 (user as any).clientLevel === 'VIP' ? 'bg-purple-500/10 border-purple-300 text-purple-700' :
+                                                 (user as any).clientLevel === 'Ouro' ? 'bg-yellow-500/10 border-yellow-300 text-yellow-800' :
+                                                 (user as any).clientLevel === 'Prata' ? 'bg-slate-300/15 border-slate-300 text-slate-600' :
+                                                 (user as any).clientLevel === 'Bronze' ? 'bg-amber-600/10 border-amber-300 text-amber-700' :
+                                                 'bg-slate-100 border-slate-200 text-slate-500'
+                                             }`}
+                                         >
+                                             <Award size={12} className="shrink-0" />
+                                             {(user as any).clientLevel}
+                                         </span>
+                                     )}
+                                 </h2>
                                 <p className="text-xs text-slate-400 font-semibold">@{username} • Clerk: {clerkId}</p>
                             </div>
                         </div>
