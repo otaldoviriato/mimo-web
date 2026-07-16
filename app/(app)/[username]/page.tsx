@@ -342,7 +342,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                 {/* Painel de Perfil do Cliente */}
                 {me?.isProfessional && !user.isProfessional && relationshipStats && (() => {
                     const totalRecharge = relationshipStats.totalHistoricalRecharge ?? 0;
-                    const totalRechargeInReais = totalRecharge / 100;
+                    const totalRechargeInReais = totalRecharge;
                     const totalSpentWithMe = (relationshipStats.totalSpent ?? 0) / 100;
                     const hasGift = relationshipStats.hasEverSentGift ?? false;
                     const openCount = relationshipStats.messageOpenRate90 ?? 0;

@@ -6,6 +6,7 @@ import { AppSettings } from '@/models/AppSettings';
 import { GalleryItem } from '@/models/GalleryItem';
 import { WithdrawRequest } from '@/models/WithdrawRequest';
 import { Subscription } from '@/models/Subscription';
+import { Transaction } from '@/models/Transaction';
 import { buildProfileRoleMetadata } from '@/lib/profileRole';
 import { subscriptionPriceBRLToCents } from '@/lib/subscriptionBilling';
 
