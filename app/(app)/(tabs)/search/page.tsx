@@ -7,7 +7,7 @@ import { Button } from '@/components/Button';
 import { Avatar } from '@/components/Avatar';
 import { userApi } from '@/services/api';
 import { useMyProfile } from '@/hooks/useQueries';
-import { ShieldAlert, ShieldCheck, Search, X, MapPin } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, Search, X, MapPin, Award } from 'lucide-react';
 
 const calculateAge = (birthDateString?: string | Date) => {
     if (!birthDateString) return null;
@@ -183,6 +183,23 @@ export default function SearchPage() {
                         Novo
                     </div>
                 )}
+
+                {/* Medalha de Nível (top left) */}
+                {!user.isProfessional && userData?.isProfessional && user.clientLevel && user.clientLevel !== 'Novo' && (
+                    <div 
+                        className={`absolute top-2.5 ${user.isNew ? 'left-[55px]' : 'left-2.5'} w-6 h-6 rounded-xl flex items-center justify-center shadow-md backdrop-blur-md border z-10 transition-all duration-300 ${
+                            user.clientLevel === 'VIP' ? 'bg-purple-600/90 border-purple-400 text-purple-100' :
+                            user.clientLevel === 'Ouro' ? 'bg-yellow-500/90 border-yellow-300 text-yellow-50' :
+                            user.clientLevel === 'Prata' ? 'bg-slate-300/95 border-slate-200 text-slate-700' :
+                            user.clientLevel === 'Bronze' ? 'bg-amber-600/90 border-amber-400 text-amber-100' :
+                            'bg-slate-500/90 border-slate-400 text-white'
+                        }`}
+                        title={`Nível ${user.clientLevel}`}
+                    >
+                        <Award className="w-3.5 h-3.5" />
+                    </div>
+                )}
+
                 {/* Badge Online (top right) */}
                 {!!user.isOnline && (
                     <div className="absolute top-2.5 right-2.5 bg-black/40 backdrop-blur-md text-white text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1.5 z-10 border border-white/10">
@@ -202,18 +219,6 @@ export default function SearchPage() {
                         </h3>
                         {user.isProfessional && user.identityStatus === 'approved' && (
                             <ShieldCheck className="w-3.5 h-3.5 text-purple-400 shrink-0 animate-in zoom-in duration-300" />
-                        )}
-                        {!user.isProfessional && userData?.isProfessional && user.clientLevel && (
-                            <span 
-                                className={`w-2 h-2 rounded-full shrink-0 flex-shrink-0 ml-1.5 shadow-sm transition-all duration-300 ${
-                                    user.clientLevel === 'VIP' ? 'bg-purple-500 ring-[3px] ring-purple-500/30 animate-pulse' :
-                                    user.clientLevel === 'Ouro' ? 'bg-yellow-400 ring-[3px] ring-yellow-400/35' :
-                                    user.clientLevel === 'Prata' ? 'bg-slate-300 ring-[3px] ring-slate-300/35' :
-                                    user.clientLevel === 'Bronze' ? 'bg-amber-600 ring-[3px] ring-amber-600/35' :
-                                    'bg-slate-500 ring-[3px] ring-slate-500/30'
-                                }`}
-                                title={`Nível ${user.clientLevel}`}
-                            />
                         )}
                     </div>
                     <span className="text-[10px] text-slate-300 font-medium tracking-tight">

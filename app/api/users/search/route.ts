@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
         }
 
         const getClientLevel = (amountCents: number): string => {
-            const amount = amountCents / 100;
+            const amount = amountCents;
             if (amount <= 0) return 'Novo';
             if (amount <= 100) return 'Bronze';
             if (amount <= 500) return 'Prata';
