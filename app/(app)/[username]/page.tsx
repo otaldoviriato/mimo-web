@@ -349,159 +349,197 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                     const totalSent = relationshipStats.last10MessagesSentCount ?? 0;
                     const isVeryAttentive = totalSent >= 5 && openCount >= Math.ceil(totalSent * 0.9);
 
-                    // Determinar nível baseado no total histórico de recargas
                     type ClientLevel = {
                         label: string;
-                        color: string;
-                        bgColor: string;
-                        borderColor: string;
+                        sublabel: string;
+                        gradient: string;
+                        iconBg: string;
                         textColor: string;
+                        subtextColor: string;
                         icon: React.ReactNode;
-                        description: string;
+                        pillBg: string;
+                        pillText: string;
                     };
 
                     const getLevel = (): ClientLevel => {
-                        if (totalRechargeInReais <= 0) {
-                            return {
-                                label: 'Novo',
-                                color: '#64748b',
-                                bgColor: 'bg-slate-50',
-                                borderColor: 'border-slate-200',
-                                textColor: 'text-slate-600',
-                                icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>,
-                                description: 'Ainda não fez recargas'
-                            };
-                        }
-                        if (totalRechargeInReais <= 100) {
-                            return {
-                                label: 'Bronze',
-                                color: '#92400e',
-                                bgColor: 'bg-amber-50',
-                                borderColor: 'border-amber-200',
-                                textColor: 'text-amber-800',
-                                icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.1 9.1H2L7.5 13.5L5.5 20.5L12 16.5L18.5 20.5L16.5 13.5L22 9.1H14.9L12 2Z" opacity="0.85"/></svg>,
-                                description: 'Até R$ 100 em recargas'
-                            };
-                        }
-                        if (totalRechargeInReais <= 500) {
-                            return {
-                                label: 'Prata',
-                                color: '#475569',
-                                bgColor: 'bg-slate-100',
-                                borderColor: 'border-slate-300',
-                                textColor: 'text-slate-700',
-                                icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.1 9.1H2L7.5 13.5L5.5 20.5L12 16.5L18.5 20.5L16.5 13.5L22 9.1H14.9L12 2Z"/></svg>,
-                                description: 'R$ 100 a R$ 500 em recargas'
-                            };
-                        }
-                        if (totalRechargeInReais <= 1000) {
-                            return {
-                                label: 'Ouro',
-                                color: '#854d0e',
-                                bgColor: 'bg-yellow-50',
-                                borderColor: 'border-yellow-300',
-                                textColor: 'text-yellow-800',
-                                icon: <Crown width={18} height={18} />,
-                                description: 'R$ 500 a R$ 1.000 em recargas'
-                            };
-                        }
+                        if (totalRechargeInReais <= 0) return {
+                            label: 'Novo',
+                            sublabel: 'Ainda não fez recargas',
+                            gradient: 'from-slate-100 to-slate-50',
+                            iconBg: 'bg-slate-200/80',
+                            textColor: 'text-slate-700',
+                            subtextColor: 'text-slate-400',
+                            pillBg: 'bg-slate-200',
+                            pillText: 'text-slate-600',
+                            icon: (
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500">
+                                    <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
+                                </svg>
+                            )
+                        };
+                        if (totalRechargeInReais <= 100) return {
+                            label: 'Bronze',
+                            sublabel: 'Até R$ 100 em recargas',
+                            gradient: 'from-amber-100 via-orange-50 to-amber-50',
+                            iconBg: 'bg-amber-200/70',
+                            textColor: 'text-amber-900',
+                            subtextColor: 'text-amber-600/80',
+                            pillBg: 'bg-amber-200',
+                            pillText: 'text-amber-800',
+                            icon: (
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="text-amber-600">
+                                    <path d="M12 2L9.1 9.1H2L7.5 13.5L5.5 20.5L12 16.5L18.5 20.5L16.5 13.5L22 9.1H14.9L12 2Z"/>
+                                </svg>
+                            )
+                        };
+                        if (totalRechargeInReais <= 500) return {
+                            label: 'Prata',
+                            sublabel: 'R$ 100 a R$ 500 em recargas',
+                            gradient: 'from-slate-200 via-slate-100 to-slate-50',
+                            iconBg: 'bg-slate-300/60',
+                            textColor: 'text-slate-800',
+                            subtextColor: 'text-slate-500',
+                            pillBg: 'bg-slate-300',
+                            pillText: 'text-slate-700',
+                            icon: (
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="text-slate-500">
+                                    <path d="M12 2L9.1 9.1H2L7.5 13.5L5.5 20.5L12 16.5L18.5 20.5L16.5 13.5L22 9.1H14.9L12 2Z"/>
+                                </svg>
+                            )
+                        };
+                        if (totalRechargeInReais <= 1000) return {
+                            label: 'Ouro',
+                            sublabel: 'R$ 500 a R$ 1.000 em recargas',
+                            gradient: 'from-yellow-200 via-amber-100 to-yellow-50',
+                            iconBg: 'bg-yellow-300/70',
+                            textColor: 'text-yellow-900',
+                            subtextColor: 'text-yellow-700/80',
+                            pillBg: 'bg-yellow-300',
+                            pillText: 'text-yellow-900',
+                            icon: <Crown className="w-[22px] h-[22px] text-yellow-600" />
+                        };
                         return {
                             label: 'VIP',
-                            color: '#6b21a8',
-                            bgColor: 'bg-purple-50',
-                            borderColor: 'border-purple-300',
-                            textColor: 'text-purple-800',
-                            icon: <Crown width={18} height={18} />,
-                            description: 'Acima de R$ 1.000 em recargas'
+                            sublabel: 'Acima de R$ 1.000 em recargas',
+                            gradient: 'from-purple-200 via-violet-100 to-purple-50',
+                            iconBg: 'bg-purple-300/60',
+                            textColor: 'text-purple-900',
+                            subtextColor: 'text-purple-600/80',
+                            pillBg: 'bg-purple-300',
+                            pillText: 'text-purple-900',
+                            icon: <Crown className="w-[22px] h-[22px] text-purple-600" />
                         };
                     };
 
                     const level = getLevel();
 
                     return (
-                        <div className="w-full max-w-md mt-6 z-10 animate-in fade-in slide-in-from-bottom-3 duration-500 space-y-3">
+                        <div className="w-full max-w-md mt-5 z-10 animate-in fade-in slide-in-from-bottom-3 duration-500 space-y-3">
 
-                            {/* Card principal: Nível do Cliente */}
-                            <div className={`w-full ${level.bgColor} border ${level.borderColor} rounded-2xl p-4 shadow-sm`}>
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2.5">
-                                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${level.bgColor} border ${level.borderColor} shadow-sm`}
-                                            style={{ color: level.color }}>
+                            {/* Card de Nível — visual rico com gradiente */}
+                            <div className={`w-full rounded-3xl bg-gradient-to-br ${level.gradient} overflow-hidden shadow-md`}>
+                                <div className="px-5 pt-5 pb-4">
+                                    {/* Topo: label e pill */}
+                                    <div className="flex items-center justify-between mb-4">
+                                        <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Nível do Cliente</span>
+                                        <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full ${level.pillBg} ${level.pillText}`}>
+                                            {level.label}
+                                        </span>
+                                    </div>
+
+                                    {/* Centro: ícone + nome do nível */}
+                                    <div className="flex items-center gap-4">
+                                        <div className={`w-14 h-14 rounded-2xl ${level.iconBg} flex items-center justify-center shadow-sm flex-shrink-0`}>
                                             {level.icon}
                                         </div>
                                         <div>
-                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Nível do Cliente</p>
-                                            <p className={`text-lg font-black tracking-tight ${level.textColor}`}>{level.label}</p>
+                                            <p className={`text-2xl font-black tracking-tight leading-none ${level.textColor}`}>{level.label}</p>
+                                            <p className={`text-xs font-medium mt-1 leading-tight ${level.subtextColor}`}>{level.sublabel}</p>
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Gastou com você</p>
-                                        <p className="text-base font-black text-purple-700">
-                                            R$ {totalSpentWithMe.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+
+                                    {/* Rodapé: divisor + gasto comigo */}
+                                    <div className="mt-4 pt-4 border-t border-black/5 flex items-center justify-between">
+                                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Gastou com você</span>
+                                        <span className="text-base font-black text-purple-700">
+                                            {totalSpentWithMe.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Seção de Conquistas */}
+                            <div className="w-full bg-white/90 backdrop-blur-md border border-slate-100/80 rounded-3xl overflow-hidden shadow-sm">
+                                <div className="px-5 pt-4 pb-1">
+                                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Conquistas</span>
+                                </div>
+
+                                {/* Badge: Primeiro Mimo */}
+                                <div className={`mx-3 mb-3 mt-2 rounded-2xl border p-4 flex items-center gap-4 transition-all ${
+                                    hasGift
+                                        ? 'bg-gradient-to-r from-pink-50 to-rose-50 border-pink-200'
+                                        : 'bg-slate-50/80 border-slate-100'
+                                }`}>
+                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+                                        hasGift
+                                            ? 'bg-gradient-to-br from-pink-400 to-rose-500 shadow-md shadow-pink-300/40'
+                                            : 'bg-slate-200/70'
+                                    }`}>
+                                        {hasGift ? (
+                                            <Gift className="w-5 h-5 text-white" />
+                                        ) : (
+                                            <Lock className="w-4 h-4 text-slate-300" />
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <p className={`text-sm font-black leading-tight ${hasGift ? 'text-rose-700' : 'text-slate-400'}`}>
+                                                Primeiro Mimo
+                                            </p>
+                                            {hasGift && (
+                                                <span className="text-[9px] font-black uppercase tracking-wider bg-pink-100 text-pink-600 px-1.5 py-0.5 rounded-full">Conquistado</span>
+                                            )}
+                                        </div>
+                                        <p className={`text-[11px] font-medium mt-0.5 leading-tight ${hasGift ? 'text-rose-500/80' : 'text-slate-400'}`}>
+                                            {hasGift ? 'Enviou pelo menos um presente' : 'Ainda não enviou nenhum presente'}
                                         </p>
                                     </div>
                                 </div>
-                                <p className="text-[10px] font-medium text-slate-400 mt-2">{level.description}</p>
-                            </div>
 
-                            {/* Seção de Conquistas/Badges */}
-                            <div className="w-full bg-white/85 backdrop-blur-md border border-slate-100 rounded-2xl p-4 shadow-sm">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Conquistas</p>
-                                <div className="grid grid-cols-2 gap-2.5">
-
-                                    {/* Badge: Primeiro Mimo */}
-                                    <div className={`flex items-center gap-2.5 p-3 rounded-xl border transition-all ${
-                                        hasGift
-                                            ? 'bg-pink-50 border-pink-200 shadow-sm'
-                                            : 'bg-slate-50 border-slate-100 opacity-50'
-                                    }`}>
-                                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                                            hasGift ? 'bg-pink-100' : 'bg-slate-100'
-                                        }`}>
-                                            {hasGift ? (
-                                                <Gift className="w-4 h-4 text-pink-500" />
-                                            ) : (
-                                                <Lock className="w-4 h-4 text-slate-300" />
-                                            )}
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className={`text-[11px] font-black leading-tight ${
-                                                hasGift ? 'text-pink-700' : 'text-slate-400'
-                                            }`}>Primeiro Mimo</p>
-                                            <p className="text-[9px] font-medium text-slate-400 leading-tight mt-0.5">
-                                                {hasGift ? 'Já enviou um presente' : 'Nunca enviou presente'}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {/* Badge: Muito Atento */}
-                                    <div className={`flex items-center gap-2.5 p-3 rounded-xl border transition-all ${
+                                {/* Badge: Muito Atento */}
+                                <div className={`mx-3 mb-3 rounded-2xl border p-4 flex items-center gap-4 transition-all ${
+                                    isVeryAttentive
+                                        ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200'
+                                        : 'bg-slate-50/80 border-slate-100'
+                                }`}>
+                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${
                                         isVeryAttentive
-                                            ? 'bg-emerald-50 border-emerald-200 shadow-sm'
-                                            : 'bg-slate-50 border-slate-100 opacity-50'
+                                            ? 'bg-gradient-to-br from-emerald-400 to-teal-500 shadow-md shadow-emerald-300/40'
+                                            : 'bg-slate-200/70'
                                     }`}>
-                                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                                            isVeryAttentive ? 'bg-emerald-100' : 'bg-slate-100'
-                                        }`}>
-                                            {isVeryAttentive ? (
-                                                <Eye className="w-4 h-4 text-emerald-500" />
-                                            ) : (
-                                                <Lock className="w-4 h-4 text-slate-300" />
+                                        {isVeryAttentive ? (
+                                            <Eye className="w-5 h-5 text-white" />
+                                        ) : (
+                                            <Lock className="w-4 h-4 text-slate-300" />
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <p className={`text-sm font-black leading-tight ${isVeryAttentive ? 'text-emerald-700' : 'text-slate-400'}`}>
+                                                Muito Atento
+                                            </p>
+                                            {isVeryAttentive && (
+                                                <span className="text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full">Conquistado</span>
                                             )}
                                         </div>
-                                        <div className="min-w-0">
-                                            <p className={`text-[11px] font-black leading-tight ${
-                                                isVeryAttentive ? 'text-emerald-700' : 'text-slate-400'
-                                            }`}>Muito Atento</p>
-                                            <p className="text-[9px] font-medium text-slate-400 leading-tight mt-0.5">
-                                                {isVeryAttentive
-                                                    ? `Abriu ${openCount} das últimas ${totalSent} msgs`
-                                                    : 'Abre menos de 90% das msgs'}
-                                            </p>
-                                        </div>
+                                        <p className={`text-[11px] font-medium mt-0.5 leading-tight ${isVeryAttentive ? 'text-emerald-600/80' : 'text-slate-400'}`}>
+                                            {isVeryAttentive
+                                                ? `Abriu ${openCount} das últimas ${totalSent} mensagens suas`
+                                                : 'Abre menos de 90% das suas mensagens'}
+                                        </p>
                                     </div>
-
                                 </div>
+
                             </div>
 
                         </div>
