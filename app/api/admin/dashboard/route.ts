@@ -211,39 +211,50 @@ export async function GET(request: NextRequest) {
         let activeProfessionalsData: any[] = [];
 
         if (activeClerkIds.length > 0) {
-            // 1. Quantidade de salas ativas por usuário
+            // 1. Quantidade de salas ativas por usuário (com bidirecionalidade obrigatória)
             const activeRoomsLimit = new Date(Date.now() - chatInactivityHours * 60 * 60 * 1000);
-            const activeRoomsAgg = await Room.aggregate([
-                {
-                    $match: {
-                        participants: { $in: activeClerkIds },
-                        lastMessageTime: { $gte: activeRoomsLimit }
-                    }
-                },
-                {
-                    $lookup: {
-                        from: 'messages',
-                        let: { rid: { $toString: '$_id' } },
-                        pipeline: [
-                            {
-                                $match: {
-                                    $expr: { $eq: ['$roomId', '$$rid'] },
-                                    isSystem: { $ne: true }
-                                }
-                            },
-                            { $group: { _id: '$senderId' } }
-                        ],
-                        as: 'senders'
-                    }
-                },
-                // Exige bidirecionalidade: ambos os participantes enviaram mensagens
-                { $match: { 'senders.1': { $exists: true } } },
-                { $unwind: '$participants' },
-                { $match: { participants: { $in: activeClerkIds } } },
-                { $group: { _id: '$participants', count: { $sum: 1 } } }
-            ]);
 
-            const activeRoomsMap = new Map<string, number>(activeRoomsAgg.map(r => [r._id, r.count]));
+            // Buscar salas ativas na janela de tempo
+            const activeRoomsDocs = await Room.find({
+                participants: { $in: activeClerkIds },
+                lastMessageTime: { $gte: activeRoomsLimit }
+            }).select('participants').lean();
+
+            const activeRoomsMap = new Map<string, number>();
+
+            if (activeRoomsDocs.length > 0) {
+                // Montar virtualRoomIds (formato usado pelas mensagens: p1_p2 ordenado)
+                const roomVirtualMap = new Map<string, string[]>(); // virtualRoomId → participants
+                for (const room of activeRoomsDocs) {
+                    const vId = (room.participants as string[]).slice().sort().join('_');
+                    roomVirtualMap.set(vId, room.participants as string[]);
+                }
+                const virtualRoomIds = Array.from(roomVirtualMap.keys());
+
+                // Quais roomIds têm mensagens de pelo menos 2 remetentes distintos?
+                const biSendersAgg = await Message.aggregate([
+                    {
+                        $match: {
+                            roomId: { $in: virtualRoomIds },
+                            isSystem: { $ne: true }
+                        }
+                    },
+                    { $group: { _id: { roomId: '$roomId', senderId: '$senderId' } } },
+                    { $group: { _id: '$_id.roomId', senderCount: { $sum: 1 } } },
+                    { $match: { senderCount: { $gte: 2 } } }
+                ]);
+
+                // Montar mapa userId → count de salas bilaterais ativas
+                for (const { _id: vId } of biSendersAgg) {
+                    const participants = roomVirtualMap.get(vId) ?? [];
+                    for (const p of participants) {
+                        if (activeClerkIds.includes(p)) {
+                            activeRoomsMap.set(p, (activeRoomsMap.get(p) ?? 0) + 1);
+                        }
+                    }
+                }
+            }
+
 
             // 2. Total recarregado por clientes (em reais)
             const depositsAgg = await Transaction.aggregate([

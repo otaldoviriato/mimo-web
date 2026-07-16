@@ -221,35 +221,35 @@ export async function GET(
 
             // Calcular conversas ativas com bidirecionalidade obrigatória
             const activeLimit = new Date(Date.now() - chatInactivityHours * 60 * 60 * 1000);
-            const activeConvsAgg = await Room.aggregate([
 
-                {
-                    $match: {
-                        participants: user.clerkId,
-                        lastMessageTime: { $gte: activeLimit }
-                    }
-                },
-                {
-                    $lookup: {
-                        from: 'messages',
-                        let: { rid: { $toString: '$_id' } },
-                        pipeline: [
-                            {
-                                $match: {
-                                    $expr: { $eq: ['$roomId', '$$rid'] },
-                                    isSystem: { $ne: true }
-                                }
-                            },
-                            { $group: { _id: '$senderId' } }
-                        ],
-                        as: 'senders'
-                    }
-                },
-                // Exige que pelo menos 2 participantes distintos tenham enviado mensagens
-                { $match: { 'senders.1': { $exists: true } } },
-                { $count: 'total' }
-            ]);
-            activeConversationsCount = activeConvsAgg[0]?.total ?? 0;
+            // 1. Buscar salas ativas na janela de tempo
+            const activeRooms = await Room.find({
+                participants: user.clerkId,
+                lastMessageTime: { $gte: activeLimit }
+            }).select('participants').lean();
+
+            if (activeRooms.length > 0) {
+                // 2. Montar virtualRoomIds (formato usado pelas mensagens: p1_p2 ordenado)
+                const virtualRoomIds = activeRooms.map(r =>
+                    (r.participants as string[]).slice().sort().join('_')
+                );
+
+                // 3. Uma só query: quais roomIds têm mensagens de pelo menos 2 remetentes distintos?
+                const biSenders = await Message.aggregate([
+                    {
+                        $match: {
+                            roomId: { $in: virtualRoomIds },
+                            isSystem: { $ne: true }
+                        }
+                    },
+                    { $group: { _id: { roomId: '$roomId', senderId: '$senderId' } } },
+                    { $group: { _id: '$_id.roomId', senderCount: { $sum: 1 } } },
+                    { $match: { senderCount: { $gte: 2 } } },
+                    { $count: 'total' }
+                ]);
+                activeConversationsCount = biSenders[0]?.total ?? 0;
+            }
+
 
 
             // Calcular mensagens na semana (últimos 7 dias)
