@@ -320,28 +320,32 @@ export async function GET(
                 isSystem: { $ne: true }
             });
 
-            // Conversas na semana
-            const conversationsLastWeekCountAgg = await Message.aggregate([
-                {
-                    $match: {
-                        $or: [
-                            { senderId: user.clerkId },
-                            { receiverId: user.clerkId }
-                        ],
-                        timestamp: { $gte: oneWeekAgo },
-                        isSystem: { $ne: true }
-                    }
-                },
-                {
-                    $group: {
-                        _id: '$roomId'
-                    }
-                },
-                {
-                    $count: 'total'
-                }
-            ]);
-            conversationsLastWeekCount = conversationsLastWeekCountAgg[0]?.total ?? 0;
+            // Conversas bilaterais na semana (ambos enviaram mensagens nos últimos 7 dias)
+            const weekRooms = await Room.find({
+                participants: user.clerkId,
+                lastMessageTime: { $gte: oneWeekAgo }
+            }).select('participants').lean();
+
+            if (weekRooms.length > 0) {
+                const weekVirtualIds = weekRooms.map(r =>
+                    (r.participants as string[]).slice().sort().join('_')
+                );
+                const weekBiSenders = await Message.aggregate([
+                    {
+                        $match: {
+                            roomId: { $in: weekVirtualIds },
+                            timestamp: { $gte: oneWeekAgo },
+                            isSystem: { $ne: true }
+                        }
+                    },
+                    { $group: { _id: { roomId: '$roomId', senderId: '$senderId' } } },
+                    { $group: { _id: '$_id.roomId', senderCount: { $sum: 1 } } },
+                    { $match: { senderCount: { $gte: 2 } } },
+                    { $count: 'total' }
+                ]);
+                conversationsLastWeekCount = weekBiSenders[0]?.total ?? 0;
+            }
+
 
             // Mídias e presentes na semana
             mediaGiftsLastWeekCount = await Message.countDocuments({
