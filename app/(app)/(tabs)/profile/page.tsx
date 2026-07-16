@@ -448,30 +448,35 @@ export default function ProfilePage() {
                     </button>
 
                     {/* Painel de Estatísticas de Credibilidade */}
-                    <div className="w-full max-w-sm mt-6 grid grid-cols-3 gap-2 border-y border-slate-200/50 py-3.5 px-4 mb-2 bg-white/40 backdrop-blur-sm rounded-xl">
-                        <div className="flex flex-col items-center text-center">
-                            <span className="text-sm font-bold text-slate-800 tabular-nums">
-                                {userData?.subscribers?.length ?? 0}
-                            </span>
-                            <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
-                                Assinantes
-                            </span>
-                        </div>
-                        <div className="flex flex-col items-center text-center border-x border-slate-200/50">
-                            <span className="text-sm font-bold text-slate-800 tabular-nums">
-                                {publicItemsCount}
-                            </span>
-                            <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
-                                Mídias Públicas
-                            </span>
-                        </div>
-                        <div className="flex flex-col items-center text-center">
-                            <span className="text-sm font-bold text-slate-800 tabular-nums">
-                                {galleryData?.privateItems?.length ?? 0}
-                            </span>
-                            <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
-                                Mídias Privadas
-                            </span>
+                    <div className="w-full max-w-sm mt-6 flex flex-col items-center border-y border-slate-200/50 py-3 px-4 mb-2 bg-white/40 backdrop-blur-sm rounded-xl animate-in fade-in duration-300">
+                        <span className="text-[8px] font-bold text-slate-400/80 tracking-wider uppercase mb-2">
+                            Últimos 7 dias
+                        </span>
+                        <div className="w-full grid grid-cols-3 gap-2">
+                            <div className="flex flex-col items-center text-center border-r border-slate-200/50">
+                                <span className="text-sm font-bold text-slate-800 tabular-nums">
+                                    {userData?.conversationsLastWeekCount ?? 0}
+                                </span>
+                                <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
+                                    Conversas
+                                </span>
+                            </div>
+                            <div className="flex flex-col items-center text-center border-r border-slate-200/50">
+                                <span className="text-sm font-bold text-slate-800 tabular-nums">
+                                    {(userData?.messagesLastWeekCount ?? 0).toLocaleString('pt-BR')}
+                                </span>
+                                <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
+                                    Mensagens
+                                </span>
+                            </div>
+                            <div className="flex flex-col items-center text-center">
+                                <span className="text-sm font-bold text-slate-800 tabular-nums">
+                                    {(userData?.mediaGiftsLastWeekCount ?? 0).toLocaleString('pt-BR')}
+                                </span>
+                                <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
+                                    Mídia/presentes
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>

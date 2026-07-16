@@ -298,6 +298,10 @@ export async function GET(request: NextRequest) {
             }
         }
 
+        let conversationsLastWeekCount = 0;
+        let messagesLastWeekCount = 0;
+        let mediaGiftsLastWeekCount = 0;
+
         let publicPhotosCount = 0;
         let activeSubscriberIds = user.subscribers || [];
         if (user.isProfessional) {
@@ -323,6 +327,67 @@ export async function GET(request: NextRequest) {
             } catch (subErr: any) {
                 console.error('[GET /api/users/me] Erro ao buscar inscrições ativas:', subErr);
                 throw new Error(`Erro na query Subscription: ${subErr.message || subErr}`);
+            }
+
+            try {
+                // Calcular estatísticas dos últimos 7 dias
+                const oneWeekAgo = new Date();
+                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+                messagesLastWeekCount = await Message.countDocuments({
+                    $or: [
+                        { senderId: user.clerkId },
+                        { receiverId: user.clerkId }
+                    ],
+                    timestamp: { $gte: oneWeekAgo },
+                    isSystem: { $ne: true }
+                });
+
+                // Conversas na semana
+                const conversationsLastWeekCountAgg = await Message.aggregate([
+                    {
+                        $match: {
+                            $or: [
+                                { senderId: user.clerkId },
+                                { receiverId: user.clerkId }
+                            ],
+                            timestamp: { $gte: oneWeekAgo },
+                            isSystem: { $ne: true }
+                        }
+                    },
+                    {
+                        $group: {
+                            _id: '$roomId'
+                        }
+                    },
+                    {
+                        $count: 'total'
+                    }
+                ]);
+                conversationsLastWeekCount = conversationsLastWeekCountAgg[0]?.total ?? 0;
+
+                // Mídias e presentes na semana
+                mediaGiftsLastWeekCount = await Message.countDocuments({
+                    $and: [
+                        {
+                            $or: [
+                                { senderId: user.clerkId },
+                                { receiverId: user.clerkId }
+                            ]
+                        },
+                        {
+                            $or: [
+                                { isGift: true },
+                                { isLockedImage: true },
+                                { isVideo: true },
+                                { originalImageUrl: { $nin: [null, ''] } }
+                            ]
+                        }
+                    ],
+                    timestamp: { $gte: oneWeekAgo },
+                    isSystem: { $ne: true }
+                });
+            } catch (statsErr) {
+                console.error('[GET /api/users/me] Erro ao calcular estatísticas semanais:', statsErr);
             }
         }
 
@@ -381,6 +446,9 @@ export async function GET(request: NextRequest) {
                 promotionalBalanceLabel,
                 welcomeCreditNotice,
                 hasWelcomeCreditEnded,
+                conversationsLastWeekCount,
+                messagesLastWeekCount,
+                mediaGiftsLastWeekCount,
             },
         });
     } catch (error: any) {

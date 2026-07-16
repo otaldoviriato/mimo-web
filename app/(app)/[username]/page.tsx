@@ -558,7 +558,10 @@ export default function UserProfilePage({ params, username: propUsername, onBack
 
                 {/* Painel Elegante de Estatísticas (Stats) para Credibilidade */}
                 {user.isProfessional && (
-                    <div className="w-full max-w-sm mt-5 flex flex-col items-center border-y border-slate-200/50 py-3.5 px-4 mb-4 z-10 bg-white/40 backdrop-blur-sm rounded-xl animate-in fade-in duration-300">
+                    <div className="w-full max-w-sm mt-5 flex flex-col items-center border-y border-slate-200/50 py-3 px-4 mb-4 z-10 bg-white/40 backdrop-blur-sm rounded-xl animate-in fade-in duration-300">
+                        <span className="text-[8px] font-bold text-slate-400/80 tracking-wider uppercase mb-2">
+                            Últimos 7 dias
+                        </span>
                         <div className="w-full grid grid-cols-3 gap-2">
                             <div className="flex flex-col items-center text-center border-r border-slate-200/50">
                                 <span className="text-sm font-bold text-slate-800 tabular-nums">
@@ -585,9 +588,6 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                                 </span>
                             </div>
                         </div>
-                        <span className="text-[8px] font-semibold text-slate-400/80 tracking-wider mt-2.5 uppercase">
-                            Últimos 7 dias
-                        </span>
                     </div>
                 )}
 
