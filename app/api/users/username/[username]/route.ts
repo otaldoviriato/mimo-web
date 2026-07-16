@@ -201,10 +201,14 @@ export async function GET(
             }
         }
 
-        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers').lean();
+        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers chatInactivityHours').lean();
         const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
         const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
+        const chatInactivityHours = settings?.chatInactivityHours ?? 48;
         let effectiveSubscribers = user.subscribers || [];
+
+        let activeConversationsCount = 0;
+        let messagesLastWeekCount = 0;
 
         if (user.isProfessional) {
             const activeSubscriptions = await Subscription.find({
@@ -214,6 +218,28 @@ export async function GET(
             }).select('subscriberId').lean();
 
             effectiveSubscribers = activeSubscriptions.map((sub) => sub.subscriberId);
+
+            // Calcular conversas ativas (janela parametrizada)
+            const activeLimit = new Date(Date.now() - chatInactivityHours * 60 * 60 * 1000);
+            activeConversationsCount = await Room.countDocuments({
+                participants: user.clerkId,
+                $or: [
+                    { lastMessageTime: { $gte: activeLimit } },
+                    { lastMessageTime: { $exists: false }, createdAt: { $gte: activeLimit } }
+                ]
+            });
+
+            // Calcular mensagens na semana (últimos 7 dias)
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+            messagesLastWeekCount = await Message.countDocuments({
+                $or: [
+                    { senderId: user.clerkId },
+                    { receiverId: user.clerkId }
+                ],
+                timestamp: { $gte: oneWeekAgo },
+                isSystem: { $ne: true }
+            });
         }
 
         return NextResponse.json({
@@ -236,6 +262,8 @@ export async function GET(
                 balance: shouldShowBalance ? (user.balance || 0) : undefined,
                 relationshipStats: relationshipStats || undefined,
                 avgResponseTimeMinutes: user.avgResponseTimeMinutes ?? null,
+                activeConversationsCount,
+                messagesLastWeekCount,
             },
         });
     } catch (error: any) {

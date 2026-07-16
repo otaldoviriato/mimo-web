@@ -430,29 +430,21 @@ export default function UserProfilePage({ params, username: propUsername, onBack
 
                 {/* Painel Elegante de Estatísticas (Stats) para Credibilidade */}
                 {user.isProfessional && (
-                    <div className="w-full max-w-sm mt-5 grid grid-cols-3 gap-2 border-y border-slate-200/50 py-3.5 px-4 mb-4 z-10 bg-white/40 backdrop-blur-sm rounded-xl">
-                        <div className="flex flex-col items-center text-center">
+                    <div className="w-full max-w-sm mt-5 grid grid-cols-2 gap-2 border-y border-slate-200/50 py-3.5 px-4 mb-4 z-10 bg-white/40 backdrop-blur-sm rounded-xl">
+                        <div className="flex flex-col items-center text-center border-r border-slate-200/50">
                             <span className="text-sm font-bold text-slate-800 tabular-nums">
-                                {user.subscribers?.length ?? 0}
+                                {(user as any).activeConversationsCount || 0}
                             </span>
                             <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
-                                Assinantes
-                            </span>
-                        </div>
-                        <div className="flex flex-col items-center text-center border-x border-slate-200/50">
-                            <span className="text-sm font-bold text-slate-800 tabular-nums">
-                                {galleryData?.items?.length ?? 0}
-                            </span>
-                            <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
-                                Mídias Públicas
+                                Conversas Ativas
                             </span>
                         </div>
                         <div className="flex flex-col items-center text-center">
                             <span className="text-sm font-bold text-slate-800 tabular-nums">
-                                {(galleryData?.privatePhotosCount ?? 0) + (galleryData?.privateVideosCount ?? 0)}
+                                {((user as any).messagesLastWeekCount || 0).toLocaleString('pt-BR')}
                             </span>
                             <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
-                                Mídias Privadas
+                                Mensagens na Semana
                             </span>
                         </div>
                     </div>
