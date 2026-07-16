@@ -196,167 +196,146 @@ export default function AdminPage() {
                                 <StatsCard title="Mensagens Enviadas" value={loadingDashboard ? '...' : dashboardData?.metrics?.messages?.value || '0'} change={loadingDashboard ? undefined : dashboardData?.metrics?.messages?.change || undefined} isPositive={loadingDashboard ? true : dashboardData?.metrics?.messages?.isPositive} icon={MessageCircle} color="green" />
                             </div>
 
-                            <div className="bg-white border border-slate-200/80 p-6 rounded-2xl shadow-sm flex flex-col">
-                                <div className="mb-6">
-                                    <h3 className="text-lg font-bold text-slate-800 tracking-tight flex items-center gap-2">
-                                        <TrendingUp size={20} className="text-purple-600" />
-                                        Últimos Depósitos
-                                    </h3>
-                                    <p className="text-xs text-slate-505 font-medium">Últimas recargas de saldo efetuadas via AbacatePay.</p>
-                                </div>
-                                <div className="space-y-4 flex-1">
-                                    {loadingDashboard ? (
-                                        <div className="py-20 flex flex-col items-center justify-center gap-2">
-                                            <div className="animate-spin h-6 w-6 text-purple-600 rounded-full border-2 border-slate-200 border-t-purple-600" />
-                                            <span className="text-[10px] text-slate-400 font-semibold">Carregando depósitos...</span>
-                                        </div>
-                                    ) : dashboardData?.recentTransactions?.length > 0 ? (
-                                        dashboardData.recentTransactions.map((tx: any) => (
-                                            <div key={tx.id} className="flex items-center justify-between p-3.5 hover:bg-slate-50 rounded-xl transition-all border border-transparent hover:border-slate-100 group">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
-                                                        <CheckCircle2 size={16} />
-                                                    </div>
-                                                    <div className="flex flex-col">
-                                                        {tx.userId ? (
-                                                            <Link href={`/admin/users/${tx.userId}`} className="text-xs font-bold text-purple-600 hover:text-purple-800 hover:underline transition-colors text-left">
-                                                                {tx.user}
-                                                            </Link>
-                                                        ) : (
-                                                            <span className="text-xs font-bold text-slate-800">{tx.user}</span>
-                                                        )}
-                                                        <span className="text-[10px] text-slate-400 font-semibold">{tx.type} • {tx.time}</span>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right flex items-center gap-2">
-                                                    <div className="flex flex-col text-right">
-                                                        <span className="text-xs font-bold text-slate-700 block">{tx.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                                                        <span className="text-[9px] text-slate-400 font-semibold uppercase">{tx.displayId || tx.id}</span>
-                                                    </div>
-                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(tx.id, tx.displayId || tx.id); }} className="p-1 hover:text-rose-600 rounded-lg text-slate-350 hover:bg-rose-50 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" title="Excluir Transação">
-                                                        <Trash2 size={13} />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <div className="py-20 text-center text-xs font-semibold text-slate-400">Nenhum depósito recente efetuado.</div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Principais Usuários Ativos Side-by-Side */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            {/* Principais Usuários e Últimos Depósitos — 3 colunas no desktop */}
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                 {/* Clientes Ativos */}
-                                <div className="bg-white border border-slate-200/80 p-6 rounded-2xl shadow-sm flex flex-col">
-                                    <div className="mb-6">
-                                        <h3 className="text-lg font-bold text-slate-800 tracking-tight flex items-center gap-2">
-                                            <Users size={20} className="text-purple-650" />
-                                            Principais Clientes Ativos
+                                <div className="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-sm flex flex-col">
+                                    <div className="mb-4">
+                                        <h3 className="text-base font-bold text-slate-800 tracking-tight flex items-center gap-2">
+                                            <Users size={18} className="text-purple-600" />
+                                            Clientes Ativos
                                         </h3>
-                                        <p className="text-xs text-slate-500 font-medium">Clientes mais ativos e engajados recentemente.</p>
+                                        <p className="text-[11px] text-slate-500 font-medium">Mais engajados recentemente.</p>
                                     </div>
-                                    <div className="space-y-4 flex-1">
+                                    <div className="space-y-2 flex-1">
                                         {loadingDashboard ? (
-                                            <div className="py-20 flex flex-col items-center justify-center gap-2">
+                                            <div className="py-16 flex flex-col items-center justify-center gap-2">
                                                 <div className="animate-spin h-6 w-6 text-purple-600 rounded-full border-2 border-slate-200 border-t-purple-600" />
-                                                <span className="text-[10px] text-slate-400 font-semibold">Carregando clientes...</span>
+                                                <span className="text-[10px] text-slate-400 font-semibold">Carregando...</span>
                                             </div>
                                         ) : dashboardData?.activeClientsData?.length > 0 ? (
                                             dashboardData.activeClientsData.map((client: any) => (
-                                                <div key={client.clerkId} className="flex items-center justify-between p-3.5 hover:bg-slate-50 rounded-xl transition-all border border-transparent hover:border-slate-100 group">
-                                                    <div className="flex items-center gap-3">
-                                                        {client.photoUrl ? (
-                                                            <img src={client.photoUrl} alt={client.name} className="w-10 h-10 rounded-xl object-cover border border-slate-100" />
-                                                        ) : (
-                                                            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-sm">
-                                                                {client.name[0]?.toUpperCase() || 'C'}
-                                                            </div>
-                                                        )}
-                                                        <div className="flex flex-col">
-                                                            <Link href={`/admin/users/${client.clerkId}`} className="text-xs font-bold text-purple-655 hover:text-purple-800 hover:underline transition-colors text-left">
-                                                                {client.name}
-                                                            </Link>
-                                                            <span className="text-[10px] text-slate-400 font-semibold">@{client.username}</span>
+                                                <div key={client.clerkId} className="flex items-center gap-3 p-2.5 hover:bg-slate-50 rounded-xl transition-all border border-transparent hover:border-slate-100">
+                                                    {client.photoUrl ? (
+                                                        <img src={client.photoUrl} alt={client.name} className="w-9 h-9 rounded-lg object-cover border border-slate-100 shrink-0" />
+                                                    ) : (
+                                                        <div className="w-9 h-9 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-xs shrink-0">
+                                                            {client.name[0]?.toUpperCase() || 'C'}
                                                         </div>
+                                                    )}
+                                                    <div className="flex flex-col min-w-0 flex-1">
+                                                        <Link href={`/admin/users/${client.clerkId}`} className="text-xs font-bold text-purple-600 hover:text-purple-800 hover:underline transition-colors text-left truncate">
+                                                            {client.name}
+                                                        </Link>
+                                                        <span className="text-[10px] text-slate-400 font-semibold truncate">
+                                                            {client.activeRoomsCount} {client.activeRoomsCount === 1 ? 'conversa' : 'conversas'} · {client.totalMessages} msgs
+                                                        </span>
                                                     </div>
-                                                    <div className="flex items-center gap-6">
-                                                        <div className="text-right flex flex-col">
-                                                            <span className="text-xs font-bold text-slate-700 block">
-                                                                {client.activeRoomsCount} {client.activeRoomsCount === 1 ? 'conversa ativa' : 'conversas ativas'}
-                                                            </span>
-                                                            <span className="text-[10px] text-slate-500 font-medium">
-                                                                {client.totalMessages} msgs ({client.messagesLastWeek} na semana)
-                                                            </span>
-                                                        </div>
-                                                        <div className="text-right flex flex-col min-w-[100px]">
-                                                            <span className="text-xs font-extrabold text-slate-800 block">
-                                                                {client.totalRecharged.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                                            </span>
-                                                            <span className="text-[9px] text-slate-400 font-semibold uppercase">Recarregado</span>
-                                                        </div>
+                                                    <div className="text-right shrink-0">
+                                                        <span className="text-[11px] font-extrabold text-slate-800 block">
+                                                            {client.totalRecharged.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                        </span>
+                                                        <span className="text-[9px] text-slate-400 font-semibold uppercase">Recarregado</span>
                                                     </div>
                                                 </div>
                                             ))
                                         ) : (
-                                            <div className="py-20 text-center text-xs font-semibold text-slate-400">Nenhum cliente ativo recente.</div>
+                                            <div className="py-16 text-center text-xs font-semibold text-slate-400">Nenhum cliente ativo recente.</div>
                                         )}
                                     </div>
                                 </div>
 
                                 {/* Profissionais Ativas */}
-                                <div className="bg-white border border-slate-200/80 p-6 rounded-2xl shadow-sm flex flex-col">
-                                    <div className="mb-6">
-                                        <h3 className="text-lg font-bold text-slate-800 tracking-tight flex items-center gap-2">
-                                            <UserCheck size={20} className="text-amber-600" />
-                                            Principais Profissionais Ativas
+                                <div className="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-sm flex flex-col">
+                                    <div className="mb-4">
+                                        <h3 className="text-base font-bold text-slate-800 tracking-tight flex items-center gap-2">
+                                            <UserCheck size={18} className="text-amber-600" />
+                                            Profissionais Ativas
                                         </h3>
-                                        <p className="text-xs text-slate-500 font-medium">Profissionais com maior desempenho recente.</p>
+                                        <p className="text-[11px] text-slate-500 font-medium">Maior desempenho recente.</p>
                                     </div>
-                                    <div className="space-y-4 flex-1">
+                                    <div className="space-y-2 flex-1">
                                         {loadingDashboard ? (
-                                            <div className="py-20 flex flex-col items-center justify-center gap-2">
+                                            <div className="py-16 flex flex-col items-center justify-center gap-2">
                                                 <div className="animate-spin h-6 w-6 text-purple-600 rounded-full border-2 border-slate-200 border-t-purple-600" />
-                                                <span className="text-[10px] text-slate-400 font-semibold">Carregando profissionais...</span>
+                                                <span className="text-[10px] text-slate-400 font-semibold">Carregando...</span>
                                             </div>
                                         ) : dashboardData?.activeProfessionalsData?.length > 0 ? (
                                             dashboardData.activeProfessionalsData.map((prof: any) => (
-                                                <div key={prof.clerkId} className="flex items-center justify-between p-3.5 hover:bg-slate-50 rounded-xl transition-all border border-transparent hover:border-slate-100 group">
-                                                    <div className="flex items-center gap-3">
-                                                        {prof.photoUrl ? (
-                                                            <img src={prof.photoUrl} alt={prof.name} className="w-10 h-10 rounded-xl object-cover border border-slate-100" />
-                                                        ) : (
-                                                            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-sm">
-                                                                {prof.name[0]?.toUpperCase() || 'P'}
-                                                            </div>
-                                                        )}
-                                                        <div className="flex flex-col">
-                                                            <Link href={`/admin/users/${prof.clerkId}`} className="text-xs font-bold text-purple-655 hover:text-purple-800 hover:underline transition-colors text-left">
-                                                                {prof.name}
-                                                            </Link>
-                                                            <span className="text-[10px] text-slate-400 font-semibold">@{prof.username}</span>
+                                                <div key={prof.clerkId} className="flex items-center gap-3 p-2.5 hover:bg-slate-50 rounded-xl transition-all border border-transparent hover:border-slate-100">
+                                                    {prof.photoUrl ? (
+                                                        <img src={prof.photoUrl} alt={prof.name} className="w-9 h-9 rounded-lg object-cover border border-slate-100 shrink-0" />
+                                                    ) : (
+                                                        <div className="w-9 h-9 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-xs shrink-0">
+                                                            {prof.name[0]?.toUpperCase() || 'P'}
                                                         </div>
+                                                    )}
+                                                    <div className="flex flex-col min-w-0 flex-1">
+                                                        <Link href={`/admin/users/${prof.clerkId}`} className="text-xs font-bold text-purple-600 hover:text-purple-800 hover:underline transition-colors text-left truncate">
+                                                            {prof.name}
+                                                        </Link>
+                                                        <span className="text-[10px] text-slate-400 font-semibold truncate">
+                                                            {prof.activeRoomsCount} {prof.activeRoomsCount === 1 ? 'conversa' : 'conversas'} · {prof.totalMessages} msgs
+                                                        </span>
                                                     </div>
-                                                    <div className="flex items-center gap-6">
-                                                        <div className="text-right flex flex-col">
-                                                            <span className="text-xs font-bold text-slate-700 block">
-                                                                {prof.activeRoomsCount} {prof.activeRoomsCount === 1 ? 'conversa ativa' : 'conversas ativas'}
-                                                            </span>
-                                                            <span className="text-[10px] text-slate-500 font-medium">
-                                                                {prof.totalMessages} msgs ({prof.messagesLastWeek} na semana)
-                                                            </span>
-                                                        </div>
-                                                        <div className="text-right flex flex-col min-w-[100px]">
-                                                            <span className="text-xs font-extrabold text-slate-800 block">
-                                                                {prof.totalEarned.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                                            </span>
-                                                            <span className="text-[9px] text-slate-400 font-semibold uppercase">Faturado</span>
-                                                        </div>
+                                                    <div className="text-right shrink-0">
+                                                        <span className="text-[11px] font-extrabold text-slate-800 block">
+                                                            {prof.totalEarned.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                        </span>
+                                                        <span className="text-[9px] text-slate-400 font-semibold uppercase">Faturado</span>
                                                     </div>
                                                 </div>
                                             ))
                                         ) : (
-                                            <div className="py-20 text-center text-xs font-semibold text-slate-400">Nenhuma profissional ativa recente.</div>
+                                            <div className="py-16 text-center text-xs font-semibold text-slate-400">Nenhuma profissional ativa recente.</div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Últimos Depósitos */}
+                                <div className="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-sm flex flex-col">
+                                    <div className="mb-4">
+                                        <h3 className="text-base font-bold text-slate-800 tracking-tight flex items-center gap-2">
+                                            <TrendingUp size={18} className="text-emerald-600" />
+                                            Últimos Depósitos
+                                        </h3>
+                                        <p className="text-[11px] text-slate-500 font-medium">Recargas recentes via AbacatePay.</p>
+                                    </div>
+                                    <div className="space-y-2 flex-1">
+                                        {loadingDashboard ? (
+                                            <div className="py-16 flex flex-col items-center justify-center gap-2">
+                                                <div className="animate-spin h-6 w-6 text-purple-600 rounded-full border-2 border-slate-200 border-t-purple-600" />
+                                                <span className="text-[10px] text-slate-400 font-semibold">Carregando...</span>
+                                            </div>
+                                        ) : dashboardData?.recentTransactions?.length > 0 ? (
+                                            dashboardData.recentTransactions.map((tx: any) => (
+                                                <div key={tx.id} className="flex items-center gap-3 p-2.5 hover:bg-slate-50 rounded-xl transition-all border border-transparent hover:border-slate-100 group">
+                                                    <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 shrink-0">
+                                                        <CheckCircle2 size={14} />
+                                                    </div>
+                                                    <div className="flex flex-col min-w-0 flex-1">
+                                                        {tx.userId ? (
+                                                            <Link href={`/admin/users/${tx.userId}`} className="text-xs font-bold text-purple-600 hover:text-purple-800 hover:underline transition-colors text-left truncate">
+                                                                {tx.user}
+                                                            </Link>
+                                                        ) : (
+                                                            <span className="text-xs font-bold text-slate-800 truncate">{tx.user}</span>
+                                                        )}
+                                                        <span className="text-[10px] text-slate-400 font-semibold truncate">{tx.type} · {tx.time}</span>
+                                                    </div>
+                                                    <div className="text-right flex items-center gap-1.5 shrink-0">
+                                                        <div className="flex flex-col text-right">
+                                                            <span className="text-[11px] font-bold text-slate-700 block">{tx.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                                            <span className="text-[8px] text-slate-400 font-semibold uppercase">{tx.displayId || tx.id}</span>
+                                                        </div>
+                                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(tx.id, tx.displayId || tx.id); }} className="p-1 hover:text-rose-600 rounded-lg text-slate-350 hover:bg-rose-50 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" title="Excluir Transação">
+                                                            <Trash2 size={12} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="py-16 text-center text-xs font-semibold text-slate-400">Nenhum depósito recente.</div>
                                         )}
                                     </div>
                                 </div>
