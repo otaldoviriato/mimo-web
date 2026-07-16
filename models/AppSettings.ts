@@ -30,6 +30,7 @@ export interface IAppSettings extends Document {
     identityVerificationPromptIntervalDays: number;
     newProfileDaysThreshold: number;
     chatInactivityHours: number;
+    activeUserThresholdDays: number;
     exploreSortingCriteria: string[];
     createdAt: Date;
     updatedAt: Date;
@@ -204,6 +205,12 @@ const AppSettingsSchema = new Schema<IAppSettings>({
         type: Number,
         required: true,
         default: 48,
+        min: 1,
+    },
+    activeUserThresholdDays: {
+        type: Number,
+        required: true,
+        default: 7,
         min: 1,
     },
     exploreSortingCriteria: {

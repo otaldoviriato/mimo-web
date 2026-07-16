@@ -78,26 +78,72 @@ export async function GET(request: NextRequest) {
             ]
         };
 
-        // A. Total de Usuários
-        const totalUsers = await User.countDocuments(onboardingCompletedFilter);
-        let usersChange = '';
-        let isUsersPositive = true;
+        const chatInactivityHours = settings?.chatInactivityHours || 48;
+        const activeUserThresholdDays = settings?.activeUserThresholdDays || 7;
+        const activeThresholdDate = new Date(now.getTime() - activeUserThresholdDays * 24 * 60 * 60 * 1000);
+
+        // A. Clientes Ativos & B. Profissionais Ativos
+        let activeClients = 0;
+        let activeClientsChange = '';
+        let isActiveClientsPositive = true;
+
+        let activeProfessionals = 0;
+        let activeProfessionalsChange = '';
+        let isActiveProfessionalsPositive = true;
+
+        const baseClientFilter = {
+            ...onboardingCompletedFilter,
+            isProfessional: { $ne: true }
+        };
+
+        const baseProfessionalFilter = {
+            ...onboardingCompletedFilter,
+            isProfessional: true
+        };
 
         if (startDate && prevStartDate) {
-            const currUsers = await User.countDocuments({ ...onboardingCompletedFilter, createdAt: { $gte: startDate } });
-            const prevUsers = await User.countDocuments({ ...onboardingCompletedFilter, createdAt: { $gte: prevStartDate, $lt: startDate } });
-            const res = calculateChange(currUsers, prevUsers);
-            usersChange = res.change;
-            isUsersPositive = res.isPositive;
+            const currActiveClients = await User.countDocuments({
+                ...baseClientFilter,
+                lastAccessAt: { $gte: startDate }
+            });
+            const prevActiveClients = await User.countDocuments({
+                ...baseClientFilter,
+                lastAccessAt: { $gte: prevStartDate, $lt: startDate }
+            });
+            const resClients = calculateChange(currActiveClients, prevActiveClients);
+            activeClients = currActiveClients;
+            activeClientsChange = resClients.change;
+            isActiveClientsPositive = resClients.isPositive;
+
+            const currActiveProfs = await User.countDocuments({
+                ...baseProfessionalFilter,
+                lastAccessAt: { $gte: startDate }
+            });
+            const prevActiveProfs = await User.countDocuments({
+                ...baseProfessionalFilter,
+                lastAccessAt: { $gte: prevStartDate, $lt: startDate }
+            });
+            const resProfs = calculateChange(currActiveProfs, prevActiveProfs);
+            activeProfessionals = currActiveProfs;
+            activeProfessionalsChange = resProfs.change;
+            isActiveProfessionalsPositive = resProfs.isPositive;
+        } else {
+            activeClients = await User.countDocuments({
+                ...baseClientFilter,
+                lastAccessAt: { $gte: activeThresholdDate }
+            });
+            activeProfessionals = await User.countDocuments({
+                ...baseProfessionalFilter,
+                lastAccessAt: { $gte: activeThresholdDate }
+            });
         }
 
-        // B. Conversas Ativas
+        // C. Conversas Ativas
         let activeChats = 0;
         let chatsChange = '';
         let isChatsPositive = true;
 
         if (startDate && prevStartDate) {
-            // Conversas ativas no período atual (salas com pelo menos uma mensagem no intervalo)
             const currActiveRooms = await Message.distinct('roomId', { timestamp: { $gte: startDate } });
             activeChats = currActiveRooms.length;
 
@@ -106,12 +152,11 @@ export async function GET(request: NextRequest) {
             chatsChange = res.change;
             isChatsPositive = res.isPositive;
         } else {
-            // Sem relação: total geral de salas no sistema que possuem alguma mensagem
             const allActiveRooms = await Message.distinct('roomId');
             activeChats = allActiveRooms.length;
         }
 
-        // C. Mensagens Enviadas
+        // D. Mensagens Enviadas
         let totalMessages = 0;
         let messagesChange = '';
         let isMessagesPositive = true;
@@ -126,42 +171,6 @@ export async function GET(request: NextRequest) {
             isMessagesPositive = res.isPositive;
         } else {
             totalMessages = await Message.countDocuments();
-        }
-
-        // D. Total Recarregado (Faturamento via AbacatePay)
-        // Lembrar que transações com source 'recharge' guardam valor em REAIS no banco de dados.
-        let totalRevenue = 0;
-        let revenueChange = '';
-        let isRevenuePositive = true;
-
-        const getRevenueSum = async (start: Date | null, end: Date | null) => {
-            const query: any = {
-                source: 'recharge',
-                status: 'PAID',
-            };
-            if (start || end) {
-                query.timestamp = {};
-                if (start) query.timestamp.$gte = start;
-                if (end) query.timestamp.$lt = end;
-            }
-
-            const result = await Transaction.aggregate([
-                { $match: query },
-                { $group: { _id: null, total: { $sum: '$amount' } } }
-            ]);
-            return result.length > 0 ? result[0].total : 0;
-        };
-
-        if (startDate && prevStartDate) {
-            const currRevenue = await getRevenueSum(startDate, null);
-            totalRevenue = currRevenue;
-
-            const prevRevenue = await getRevenueSum(prevStartDate, startDate);
-            const res = calculateChange(currRevenue, prevRevenue);
-            revenueChange = res.change;
-            isRevenuePositive = res.isPositive;
-        } else {
-            totalRevenue = await getRevenueSum(null, null);
         }
 
         // --- GRÁFICO DE DESEMPENHO (Últimos 7 dias) ---
@@ -188,69 +197,148 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        // --- TRANSAÇÕES DA TABELA TRANSACTION ---
+        // --- LISTAS COMPARATIVAS DE PRINCIPAIS USUÁRIOS ATIVOS ---
+        const activeUsersList = await User.find({
+            ...onboardingCompletedFilter,
+            lastAccessAt: { $gte: activeThresholdDate }
+        })
+            .select('clerkId username name photoUrl isProfessional')
+            .lean() as any[];
+
+        const activeClerkIds = activeUsersList.map(u => u.clerkId);
+
+        let activeClientsData: any[] = [];
+        let activeProfessionalsData: any[] = [];
+
+        if (activeClerkIds.length > 0) {
+            // 1. Quantidade de salas ativas por usuário
+            const activeRoomsLimit = new Date(Date.now() - chatInactivityHours * 60 * 60 * 1000);
+            const activeRoomsAgg = await Room.aggregate([
+                {
+                    $match: {
+                        participants: { $in: activeClerkIds },
+                        $or: [
+                            { lastMessageTime: { $gte: activeRoomsLimit } },
+                            { lastMessageTime: { $exists: false }, createdAt: { $gte: activeRoomsLimit } }
+                        ]
+                    }
+                },
+                { $unwind: "$participants" },
+                { $match: { participants: { $in: activeClerkIds } } },
+                { $group: { _id: "$participants", count: { $sum: 1 } } }
+            ]);
+            const activeRoomsMap = new Map<string, number>(activeRoomsAgg.map(r => [r._id, r.count]));
+
+            // 2. Total recarregado por clientes (em reais)
+            const depositsAgg = await Transaction.aggregate([
+                { $match: { userId: { $in: activeClerkIds }, source: 'recharge', status: 'PAID' } },
+                { $group: { _id: '$userId', total: { $sum: '$amount' } } }
+            ]);
+            const depositsMap = new Map<string, number>(depositsAgg.map(d => [d._id, d.total]));
+
+            // 3. Faturamento obtido por profissionais (em reais)
+            const earningsAgg = await MicroTransaction.aggregate([
+                { $match: { userId: { $in: activeClerkIds }, type: 'credit' } },
+                { $group: { _id: '$userId', total: { $sum: '$amount' } } }
+            ]);
+            const earningsMap = new Map<string, number>(earningsAgg.map(e => [e._id, e.total / 100]));
+
+            const subscriptionEarningsAgg = await Transaction.aggregate([
+                { $match: { userId: { $in: activeClerkIds }, type: 'credit', source: 'subscription', status: 'COMPLETED' } },
+                { $group: { _id: '$userId', total: { $sum: '$amount' } } }
+            ]);
+            const subscriptionEarningsMap = new Map<string, number>(subscriptionEarningsAgg.map(s => [s._id, s.total / 100]));
+
+            // 4. Mensagens trocadas por usuário
+            const messagesAgg = await Message.aggregate([
+                { $match: { isSystem: { $ne: true }, $or: [{ senderId: { $in: activeClerkIds } }, { receiverId: { $in: activeClerkIds } }] } },
+                { $project: { parties: { $setUnion: [['$senderId'], ['$receiverId']] } } },
+                { $unwind: '$parties' },
+                { $match: { parties: { $in: activeClerkIds } } },
+                { $group: { _id: '$parties', total: { $sum: 1 } } }
+            ]);
+            const messagesMap = new Map<string, number>(messagesAgg.map(m => [m._id, m.total]));
+
+            // 5. Mensagens trocadas na última semana
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+            const messagesLastWeekAgg = await Message.aggregate([
+                { $match: { isSystem: { $ne: true }, timestamp: { $gte: oneWeekAgo }, $or: [{ senderId: { $in: activeClerkIds } }, { receiverId: { $in: activeClerkIds } }] } },
+                { $project: { parties: { $setUnion: [['$senderId'], ['$receiverId']] } } },
+                { $unwind: '$parties' },
+                { $match: { parties: { $in: activeClerkIds } } },
+                { $group: { _id: '$parties', total: { $sum: 1 } } }
+            ]);
+            const messagesLastWeekMap = new Map<string, number>(messagesLastWeekAgg.map(m => [m._id, m.total]));
+
+            // Agrupar Clientes
+            activeClientsData = activeUsersList
+                .filter(u => !u.isProfessional)
+                .map(u => {
+                    const totalRecharged = depositsMap.get(u.clerkId) || 0;
+                    const activeRoomsCount = activeRoomsMap.get(u.clerkId) || 0;
+                    const totalMessages = messagesMap.get(u.clerkId) || 0;
+                    const messagesLastWeek = messagesLastWeekMap.get(u.clerkId) || 0;
+                    return {
+                        clerkId: u.clerkId,
+                        username: u.username,
+                        name: u.name || u.username,
+                        photoUrl: u.photoUrl || null,
+                        activeRoomsCount,
+                        totalRecharged,
+                        totalMessages,
+                        messagesLastWeek
+                    };
+                })
+                .sort((a, b) => b.activeRoomsCount - a.activeRoomsCount || b.totalRecharged - a.totalRecharged)
+                .slice(0, 5);
+
+            // Agrupar Profissionais
+            activeProfessionalsData = activeUsersList
+                .filter(u => u.isProfessional)
+                .map(u => {
+                    const totalEarned = (earningsMap.get(u.clerkId) || 0) + (subscriptionEarningsMap.get(u.clerkId) || 0);
+                    const activeRoomsCount = activeRoomsMap.get(u.clerkId) || 0;
+                    const totalMessages = messagesMap.get(u.clerkId) || 0;
+                    const messagesLastWeek = messagesLastWeekMap.get(u.clerkId) || 0;
+                    return {
+                        clerkId: u.clerkId,
+                        username: u.username,
+                        name: u.name || u.username,
+                        photoUrl: u.photoUrl || null,
+                        activeRoomsCount,
+                        totalEarned,
+                        totalMessages,
+                        messagesLastWeek
+                    };
+                })
+                .sort((a, b) => b.activeRoomsCount - a.activeRoomsCount || b.totalEarned - a.totalEarned)
+                .slice(0, 5);
+        }
+
+        // --- ÚLTIMOS DEPÓSITOS (Apenas recharge PAID) ---
         const rawTransactions = await Transaction.find({
-            type: { $ne: 'promotional_credit_usage' },
-            $or: [
-                { source: { $ne: 'subscription' } },
-                { type: 'debit' }
-            ]
+            source: 'recharge',
+            status: 'PAID'
         })
             .sort({ timestamp: -1 })
-            .limit(100)
+            .limit(5)
             .lean() as any[];
 
-        // --- TRANSAÇÕES DA TABELA MICROTRANSACTION ---
-        const rawMicroTransactions = await MicroTransaction.find({
-            source: { $in: ['image_unlock', 'gift', 'message'] },
-            type: 'debit'
-        })
-            .sort({ timestamp: -1 })
-            .limit(100)
-            .lean() as any[];
+        const txClerkIds = rawTransactions.map(tx => tx.userId).filter(Boolean) as string[];
 
-        // Obter os Clerk IDs dos envolvidos de ambas as fontes
-        const clerkIds = Array.from(new Set([
-            ...rawTransactions.map(tx => tx.userId),
-            ...rawMicroTransactions.map(tx => tx.userId)
-        ])).filter(Boolean) as string[];
-
-        const usersList = await User.find({ clerkId: { $in: clerkIds } })
+        const txUsersList = await User.find({ clerkId: { $in: txClerkIds } })
             .select('clerkId name username')
             .lean();
 
         const mappedTransactions = rawTransactions.map(tx => {
-            const relatedUser = usersList.find(u => u.clerkId === tx.userId);
+            const relatedUser = txUsersList.find(u => u.clerkId === tx.userId);
             const userName = relatedUser 
                 ? (relatedUser.name || `@${relatedUser.username}`) 
                 : `Usuário (${tx.userId.substring(0, 8)}...)`;
 
-            // Transações com source 'gift', 'subscription' ou 'campaign' salvam amount em centavos
-            const valInReais = (tx.source === 'gift' || tx.source === 'subscription' || tx.source === 'campaign')
-                ? ((tx.amount || 0) / 100)
-                : (tx.amount || 0);
-
-            // Mapeia o tipo amigável
-            let typeLabel = 'Movimentação';
-            if (tx.source === 'recharge') {
-                typeLabel = tx.type === 'PIX' ? 'Recarga Pix' : 'Recarga Cartão';
-            } else if (tx.source === 'withdrawal') {
-                typeLabel = 'Saque';
-            } else if (tx.source === 'gift') {
-                typeLabel = 'Resgate de Cupom';
-            } else if (tx.source === 'subscription') {
-                typeLabel = 'Assinatura';
-            } else if (tx.source === 'campaign') {
-                typeLabel = 'Crédito Promocional';
-            }
-
-            // Mapeia o status amigável
-            let statusLabel = 'Pendente';
-            if (tx.status === 'PAID' || tx.status === 'COMPLETED' || tx.status === 'debit') {
-                statusLabel = 'Aprovado';
-            } else if (tx.status === 'CANCELLED') {
-                statusLabel = 'Cancelado';
-            }
+            const valInReais = tx.amount || 0;
+            const typeLabel = tx.type === 'PIX' ? 'Recarga Pix' : 'Recarga Cartão';
 
             // Formatação do tempo
             const txDate = tx.timestamp ? new Date(tx.timestamp) : new Date();
@@ -276,110 +364,10 @@ export async function GET(request: NextRequest) {
                 type: typeLabel,
                 source: tx.source,
                 time: timeAgo,
-                status: statusLabel,
+                status: 'Aprovado',
                 timestamp: txDate,
-                metadata: tx.metadata
-            };
-        });
-
-        const mappedMicroTransactions = rawMicroTransactions.map(tx => {
-            const relatedUser = usersList.find(u => u.clerkId === tx.userId);
-            const userName = relatedUser 
-                ? (relatedUser.name || `@${relatedUser.username}`) 
-                : `Usuário (${tx.userId.substring(0, 8)}...)`;
-
-            // MicroTransaction sempre salva em centavos
-            const valInReais = (tx.amount || 0) / 100;
-
-            // Mapeia o tipo amigável
-            let typeLabel = 'Movimentação';
-            if (tx.source === 'image_unlock') {
-                typeLabel = 'Desbloqueio de Mídia';
-            } else if (tx.source === 'gift') {
-                typeLabel = 'Mimo enviado';
-            } else if (tx.source === 'message') {
-                typeLabel = 'Mensagem Chat';
-            } else if (tx.source === 'campaign') {
-                typeLabel = 'Crédito Promocional';
-            }
-
-            // MicroTransactions na base já são consideradas de status efetivado
-            const statusLabel = tx.type === 'debit' ? 'Débito' : 'Crédito';
-
-            // Formatação do tempo
-            const txDate = tx.timestamp ? new Date(tx.timestamp) : new Date();
-            const diffMs = now.getTime() - txDate.getTime();
-            const diffMin = Math.floor(diffMs / 60000);
-            const diffHrs = Math.floor(diffMin / 60);
-
-            let timeAgo = txDate.toLocaleDateString('pt-BR');
-            if (diffMin < 60) {
-                timeAgo = diffMin <= 1 ? 'Agora mesmo' : `Há ${diffMin} min`;
-            } else if (diffHrs < 24) {
-                timeAgo = `Há ${diffHrs} ${diffHrs === 1 ? 'hora' : 'horas'}`;
-            } else if (diffHrs < 48) {
-                timeAgo = 'Ontem';
-            }
-
-            return {
-                id: tx._id?.toString(),
-                displayId: tx._id?.toString() || `MTX-${Math.floor(Math.random() * 100000)}`,
-                user: userName,
-                userId: tx.userId,
-                val: valInReais,
-                type: typeLabel,
-                source: tx.source,
-                time: timeAgo,
-                status: statusLabel,
-                timestamp: txDate,
-                metadata: tx.metadata
-            };
-        });
-
-        // Combinar ambas as coleções e ordernar por data decrescente
-        const combinedTransactions = [...mappedTransactions, ...mappedMicroTransactions]
-            .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-
-        // Buscar taxas de plataforma para microtransações no dashboard
-        const messageIds = combinedTransactions
-            .filter(tx => ['image_unlock', 'gift', 'message'].includes(tx.source))
-            .map(tx => tx.metadata?.messageId)
-            .filter(Boolean);
-
-        const platformFees = messageIds.length > 0
-            ? await MicroTransaction.find({
-                'metadata.messageId': { $in: messageIds },
-                type: 'platform_fee'
-              }).lean()
-            : [];
-
-        const feeMap = new Map<string, number>();
-        for (const feeTx of platformFees) {
-            if (feeTx.metadata?.messageId) {
-                feeMap.set(feeTx.metadata.messageId, feeTx.amount || 0);
-            }
-        }
-
-        const enrichedCombinedTransactions = combinedTransactions.map(tx => {
-            let fee = 0;
-            let net = tx.val;
-
-            if (['image_unlock', 'gift', 'message'].includes(tx.source)) {
-                const messageId = tx.metadata?.messageId;
-                const feeCents = messageId ? (feeMap.get(messageId) || 0) : 0;
-                fee = feeCents / 100;
-                net = tx.val - fee;
-            } else if (tx.source === 'subscription') {
-                const feeCents = tx.metadata?.platformFee || 0;
-                fee = feeCents / 100;
-                net = tx.val - fee;
-            }
-
-            const { metadata, ...rest } = tx;
-            return {
-                ...rest,
-                fee,
-                net
+                fee: 0,
+                net: valInReais
             };
         });
 
@@ -387,13 +375,18 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
             period,
             metrics: {
-                users: {
-                    value: totalUsers.toLocaleString('pt-BR'),
-                    change: period !== 'none' ? usersChange : null,
-                    isPositive: isUsersPositive
+                activeClients: {
+                    value: activeClients.toLocaleString('pt-BR'),
+                    change: period !== 'none' ? activeClientsChange : null,
+                    isPositive: isActiveClientsPositive
+                },
+                activeProfessionals: {
+                    value: activeProfessionals.toLocaleString('pt-BR'),
+                    change: period !== 'none' ? activeProfessionalsChange : null,
+                    isPositive: isActiveProfessionalsPositive
                 },
                 activeChats: {
-                    value: activeChats.toString(),
+                    value: activeChats.toLocaleString('pt-BR'),
                     change: period !== 'none' ? chatsChange : null,
                     isPositive: isChatsPositive
                 },
@@ -401,15 +394,12 @@ export async function GET(request: NextRequest) {
                     value: totalMessages.toLocaleString('pt-BR'),
                     change: period !== 'none' ? messagesChange : null,
                     isPositive: isMessagesPositive
-                },
-                revenue: {
-                    value: totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
-                    change: period !== 'none' ? revenueChange : null,
-                    isPositive: isRevenuePositive
                 }
             },
             activityData,
-            recentTransactions: enrichedCombinedTransactions,
+            recentTransactions: mappedTransactions,
+            activeClientsData,
+            activeProfessionalsData,
         });
 
     } catch (error: any) {

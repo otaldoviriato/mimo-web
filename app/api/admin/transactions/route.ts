@@ -37,6 +37,16 @@ export async function GET(request: NextRequest) {
         const limit = parseInt(searchParams.get('limit') || '20', 10);
         const typeFilter = searchParams.get('type') || 'all';
 
+        const monthParam = parseInt(searchParams.get('month') || '', 10);
+        const yearParam = parseInt(searchParams.get('year') || '', 10);
+
+        const now = new Date();
+        const targetMonth = !isNaN(monthParam) ? monthParam - 1 : now.getMonth();
+        const targetYear = !isNaN(yearParam) ? yearParam : now.getFullYear();
+
+        const startDate = new Date(targetYear, targetMonth, 1, 0, 0, 0, 0);
+        const endDate = new Date(targetYear, targetMonth + 1, 1, 0, 0, 0, 0);
+
         const offset = (page - 1) * limit;
         const maxFetch = page * limit;
         
@@ -46,7 +56,7 @@ export async function GET(request: NextRequest) {
         // Definição dos tipos e buscas
         if (typeFilter === 'recharge') {
             // Depósitos
-            const query = { source: 'recharge' };
+            const query = { source: 'recharge', timestamp: { $gte: startDate, $lt: endDate } };
             totalItems = await Transaction.countDocuments(query);
             const raw = await Transaction.find(query)
                 .sort({ timestamp: -1 })
@@ -57,10 +67,13 @@ export async function GET(request: NextRequest) {
 
         } else if (typeFilter === 'withdrawal') {
             // Saques (WithdrawRequest + Transactions de saque não associadas)
-            const withdrawalsRaw = await WithdrawRequest.find().sort({ createdAt: -1 }).lean();
+            const withdrawalsRaw = await WithdrawRequest.find({
+                createdAt: { $gte: startDate, $lt: endDate }
+            }).sort({ createdAt: -1 }).lean();
             const transactionsRaw = await Transaction.find({ 
                 source: 'withdrawal', 
-                'metadata.withdrawRequestId': { $exists: false } 
+                'metadata.withdrawRequestId': { $exists: false },
+                timestamp: { $gte: startDate, $lt: endDate }
             }).sort({ timestamp: -1 }).lean();
 
             const mappedWithdrawals = withdrawalsRaw.map(w => mapWithdrawRequest(w));
@@ -74,7 +87,7 @@ export async function GET(request: NextRequest) {
 
         } else if (typeFilter === 'subscription') {
             // Assinaturas
-            const query = { source: 'subscription', type: 'debit' };
+            const query = { source: 'subscription', type: 'debit', timestamp: { $gte: startDate, $lt: endDate } };
             totalItems = await Transaction.countDocuments(query);
             const raw = await Transaction.find(query)
                 .sort({ timestamp: -1 })
@@ -85,7 +98,7 @@ export async function GET(request: NextRequest) {
 
         } else if (typeFilter === 'image_unlock') {
             // Desbloqueios de mídia
-            const query = { source: 'image_unlock', type: 'debit' };
+            const query = { source: 'image_unlock', type: 'debit', timestamp: { $gte: startDate, $lt: endDate } };
             totalItems = await MicroTransaction.countDocuments(query);
             const raw = await MicroTransaction.find(query)
                 .sort({ timestamp: -1 })
@@ -96,8 +109,8 @@ export async function GET(request: NextRequest) {
 
         } else if (typeFilter === 'gift') {
             // Mimos / Cupons
-            const queryMicro = { source: 'gift', type: 'debit' };
-            const queryTx = { source: 'gift' };
+            const queryMicro = { source: 'gift', type: 'debit', timestamp: { $gte: startDate, $lt: endDate } };
+            const queryTx = { source: 'gift', timestamp: { $gte: startDate, $lt: endDate } };
 
             const microRaw = await MicroTransaction.find(queryMicro).sort({ timestamp: -1 }).lean();
             const txRaw = await Transaction.find(queryTx).sort({ timestamp: -1 }).lean();
@@ -110,7 +123,7 @@ export async function GET(request: NextRequest) {
 
         } else if (typeFilter === 'message') {
             // Mensagens
-            const query = { source: 'message', type: 'debit' };
+            const query = { source: 'message', type: 'debit', timestamp: { $gte: startDate, $lt: endDate } };
             totalItems = await MicroTransaction.countDocuments(query);
             const raw = await MicroTransaction.find(query)
                 .sort({ timestamp: -1 })
@@ -123,6 +136,7 @@ export async function GET(request: NextRequest) {
             // 'all' - Combinado
             const txQuery = { 
                 type: { $ne: 'promotional_credit_usage' },
+                timestamp: { $gte: startDate, $lt: endDate },
                 $or: [
                     { source: { $ne: 'withdrawal' } },
                     { 'metadata.withdrawRequestId': { $exists: false } }
@@ -136,17 +150,21 @@ export async function GET(request: NextRequest) {
             };
             const mtxQuery = { 
                 source: { $in: ['image_unlock', 'gift', 'message'] },
-                type: 'debit' 
+                type: 'debit',
+                timestamp: { $gte: startDate, $lt: endDate }
+            };
+            const wrQuery = {
+                createdAt: { $gte: startDate, $lt: endDate }
             };
 
             const countTx = await Transaction.countDocuments(txQuery);
             const countMtx = await MicroTransaction.countDocuments(mtxQuery);
-            const countWr = await WithdrawRequest.countDocuments();
+            const countWr = await WithdrawRequest.countDocuments(wrQuery);
             totalItems = countTx + countMtx + countWr;
 
             const txs = await Transaction.find(txQuery).sort({ timestamp: -1 }).limit(maxFetch).lean();
             const mtxs = await MicroTransaction.find(mtxQuery).sort({ timestamp: -1 }).limit(maxFetch).lean();
-            const wrs = await WithdrawRequest.find().sort({ createdAt: -1 }).limit(maxFetch).lean();
+            const wrs = await WithdrawRequest.find(wrQuery).sort({ createdAt: -1 }).limit(maxFetch).lean();
 
             const combined = [
                 ...txs.map(t => mapTransaction(t)),

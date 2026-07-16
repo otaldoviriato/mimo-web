@@ -9,6 +9,7 @@ type Props = Pick<UseSettingsReturn,
     | 'chatSessionTimeoutMinutes' | 'setChatSessionTimeoutMinutes'
     | 'onlineDelayMinutes' | 'setOnlineDelayMinutes'
     | 'chatInactivityHours' | 'setChatInactivityHours'
+    | 'activeUserThresholdDays' | 'setActiveUserThresholdDays'
     | 'isDirtyChat' | 'saving' | 'saveSettings'
 >;
 
@@ -16,6 +17,7 @@ export function SettingsChatPage({
     chatSessionTimeoutMinutes, setChatSessionTimeoutMinutes,
     onlineDelayMinutes, setOnlineDelayMinutes,
     chatInactivityHours, setChatInactivityHours,
+    activeUserThresholdDays, setActiveUserThresholdDays,
     isDirtyChat, saving, saveSettings,
 }: Props) {
     const inputCls = 'w-full max-w-xs px-3.5 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700 shadow-sm';
@@ -30,7 +32,7 @@ export function SettingsChatPage({
                 </div>
                 <div>
                     <h2 className="text-xl font-bold text-slate-800 tracking-tight">Chat & Sessões</h2>
-                    <p className="text-sm text-slate-500 font-medium mt-0.5">
+                    <p className="text-sm text-slate-505 font-medium mt-0.5">
                         Controles de comportamento das sessões de conversa entre usuários e profissionais.
                     </p>
                 </div>
@@ -61,7 +63,7 @@ export function SettingsChatPage({
                                     max={1440}
                                     className={inputCls}
                                 />
-                                <span className="text-sm font-bold text-slate-500">min</span>
+                                <span className="text-sm font-bold text-slate-505">min</span>
                             </div>
                             <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
                                 <p className="text-[11px] text-blue-700 font-semibold">
@@ -98,7 +100,7 @@ export function SettingsChatPage({
                                     max={1440}
                                     className={inputCls}
                                 />
-                                <span className="text-sm font-bold text-slate-500">min</span>
+                                <span className="text-sm font-bold text-slate-505">min</span>
                             </div>
                             <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
                                 <p className="text-[11px] text-blue-700 font-semibold">
@@ -138,11 +140,45 @@ export function SettingsChatPage({
                                     max={8760}
                                     className={inputCls}
                                 />
-                                <span className="text-sm font-bold text-slate-500">horas</span>
+                                <span className="text-sm font-bold text-slate-505">horas</span>
                             </div>
                             <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
                                 <p className="text-[11px] text-blue-700 font-semibold">
                                     Configuração atual: conversas sem interações bilaterais há mais de <strong>{chatInactivityHours} horas</strong> serão exibidas como inativas.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="border-t border-slate-100 my-6" />
+
+                <div className="py-6">
+                    <div className="flex flex-col md:flex-row md:items-start gap-4 md:gap-8">
+                        <div className="md:w-1/2 space-y-1">
+                            <h4 className="text-sm font-bold text-slate-800">Limite de Dias para Usuário Ativo (dias)</h4>
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                                Define o período limite, em dias, para que o sistema considere um cliente ou profissional como "Ativo" no painel geral com base no seu acesso recente.
+                            </p>
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2">
+                                O valor padrão recomendado é de <strong className="text-slate-600">7 dias</strong>.
+                            </p>
+                        </div>
+                        <div className="md:w-1/2 space-y-4">
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="number"
+                                    value={activeUserThresholdDays}
+                                    onChange={(e) => setActiveUserThresholdDays(Number(e.target.value))}
+                                    min={1}
+                                    max={365}
+                                    className={inputCls}
+                                />
+                                <span className="text-sm font-bold text-slate-505">dias</span>
+                            </div>
+                            <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+                                <p className="text-[11px] text-blue-700 font-semibold">
+                                    Configuração atual: usuários com acesso nos últimos <strong>{activeUserThresholdDays} dias</strong> serão considerados ativos.
                                 </p>
                             </div>
                         </div>

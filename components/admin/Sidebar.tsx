@@ -55,8 +55,8 @@ export function Sidebar({ activeTab, setActiveTab, isOpen = false, onClose }: Si
 
     const menuItems = [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { id: 'clients', label: 'Usuários', icon: Users },
-        { id: 'professionals', label: 'Perfis Monetizados', icon: UserCheck },
+        { id: 'clients', label: 'Clientes', icon: Users },
+        { id: 'professionals', label: 'Profissionais', icon: UserCheck },
         { id: 'rooms', label: 'Conversas', icon: MessageSquare },
         { id: 'financial', label: 'Financeiro', icon: DollarSign },
         { id: 'help-tickets', label: 'Tickets de Ajuda', icon: LifeBuoy },

@@ -25,15 +25,15 @@ import { SettingsAdminsPage } from '@/components/admin/settings/SettingsAdminsPa
 import { SettingsExplorePage } from '@/components/admin/settings/SettingsExplorePage';
 import { useSettings } from '@/hooks/admin/useSettings';
 import {
-    Users, MessageSquare, MessageCircle, Coins, TrendingUp,
+    Users, UserCheck, MessageSquare, MessageCircle, Coins, TrendingUp,
     Lock, ArrowLeft, CheckCircle2, Clock, AlertCircle, Sliders, Trash2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const TAB_TITLES: Record<string, string> = {
     dashboard: 'Painel Geral',
-    clients: 'Gerenciamento de Usuários',
-    professionals: 'Gerenciamento de Perfis Monetizados',
+    clients: 'Gerenciamento de Clientes',
+    professionals: 'Gerenciamento de Profissionais',
     rooms: 'Auditoria de Conversas',
     financial: 'Movimentações Financeiras',
     'help-tickets': 'Tickets de Ajuda',
@@ -186,82 +186,181 @@ export default function AdminPage() {
                 </DashboardHeader>
 
                 <main className={`flex-1 overflow-y-auto max-w-7xl w-full mx-auto ${isSettingsTab ? 'p-4 md:p-8' : 'p-4 md:p-8 space-y-4 md:space-y-8'}`}>
-
                     {/* Dashboard */}
                     {activeTab === 'dashboard' && (
                         <>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                                <StatsCard title="Total de Usuários" value={loadingDashboard ? '...' : dashboardData?.metrics?.users?.value || '0'} change={loadingDashboard ? undefined : dashboardData?.metrics?.users?.change || undefined} isPositive={loadingDashboard ? true : dashboardData?.metrics?.users?.isPositive} icon={Users} color="purple" />
+                                <StatsCard title="Clientes Ativos" value={loadingDashboard ? '...' : dashboardData?.metrics?.activeClients?.value || '0'} change={loadingDashboard ? undefined : dashboardData?.metrics?.activeClients?.change || undefined} isPositive={loadingDashboard ? true : dashboardData?.metrics?.activeClients?.isPositive} icon={Users} color="purple" />
+                                <StatsCard title="Profissionais Ativas" value={loadingDashboard ? '...' : dashboardData?.metrics?.activeProfessionals?.value || '0'} change={loadingDashboard ? undefined : dashboardData?.metrics?.activeProfessionals?.change || undefined} isPositive={loadingDashboard ? true : dashboardData?.metrics?.activeProfessionals?.isPositive} icon={UserCheck} color="amber" />
                                 <StatsCard title="Conversas Ativas" value={loadingDashboard ? '...' : dashboardData?.metrics?.activeChats?.value || '0'} change={loadingDashboard ? undefined : dashboardData?.metrics?.activeChats?.change || undefined} isPositive={loadingDashboard ? true : dashboardData?.metrics?.activeChats?.isPositive} icon={MessageSquare} color="blue" />
                                 <StatsCard title="Mensagens Enviadas" value={loadingDashboard ? '...' : dashboardData?.metrics?.messages?.value || '0'} change={loadingDashboard ? undefined : dashboardData?.metrics?.messages?.change || undefined} isPositive={loadingDashboard ? true : dashboardData?.metrics?.messages?.isPositive} icon={MessageCircle} color="green" />
-                                <StatsCard title="Total Recarregado" value={loadingDashboard ? '...' : dashboardData?.metrics?.revenue?.value || 'R$ 0,00'} change={loadingDashboard ? undefined : dashboardData?.metrics?.revenue?.change || undefined} isPositive={loadingDashboard ? true : dashboardData?.metrics?.revenue?.isPositive} icon={Coins} color="amber" />
                             </div>
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                                <div className="lg:col-span-2">
-                                    {loadingDashboard ? (
-                                        <div className="bg-white border border-slate-200/80 p-6 rounded-2xl shadow-sm h-full flex flex-col items-center justify-center min-h-55">
-                                            <div className="animate-spin h-8 w-8 text-purple-600 rounded-full border-4 border-slate-200 border-t-purple-600" />
-                                            <span className="text-sm font-semibold text-slate-500 mt-2">Buscando dados de atividade...</span>
-                                        </div>
-                                    ) : <ActivityChart data={dashboardData?.activityData} />}
+
+                            <div className="bg-white border border-slate-200/80 p-6 rounded-2xl shadow-sm flex flex-col">
+                                <div className="mb-6">
+                                    <h3 className="text-lg font-bold text-slate-800 tracking-tight flex items-center gap-2">
+                                        <TrendingUp size={20} className="text-purple-600" />
+                                        Últimos Depósitos
+                                    </h3>
+                                    <p className="text-xs text-slate-505 font-medium">Últimas recargas de saldo efetuadas via AbacatePay.</p>
                                 </div>
+                                <div className="space-y-4 flex-1">
+                                    {loadingDashboard ? (
+                                        <div className="py-20 flex flex-col items-center justify-center gap-2">
+                                            <div className="animate-spin h-6 w-6 text-purple-600 rounded-full border-2 border-slate-200 border-t-purple-600" />
+                                            <span className="text-[10px] text-slate-400 font-semibold">Carregando depósitos...</span>
+                                        </div>
+                                    ) : dashboardData?.recentTransactions?.length > 0 ? (
+                                        dashboardData.recentTransactions.map((tx: any) => (
+                                            <div key={tx.id} className="flex items-center justify-between p-3.5 hover:bg-slate-50 rounded-xl transition-all border border-transparent hover:border-slate-100 group">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
+                                                        <CheckCircle2 size={16} />
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        {tx.userId ? (
+                                                            <Link href={`/admin/users/${tx.userId}`} className="text-xs font-bold text-purple-600 hover:text-purple-800 hover:underline transition-colors text-left">
+                                                                {tx.user}
+                                                            </Link>
+                                                        ) : (
+                                                            <span className="text-xs font-bold text-slate-800">{tx.user}</span>
+                                                        )}
+                                                        <span className="text-[10px] text-slate-400 font-semibold">{tx.type} • {tx.time}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right flex items-center gap-2">
+                                                    <div className="flex flex-col text-right">
+                                                        <span className="text-xs font-bold text-slate-700 block">{tx.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                                        <span className="text-[9px] text-slate-400 font-semibold uppercase">{tx.displayId || tx.id}</span>
+                                                    </div>
+                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(tx.id, tx.displayId || tx.id); }} className="p-1 hover:text-rose-600 rounded-lg text-slate-350 hover:bg-rose-50 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" title="Excluir Transação">
+                                                        <Trash2 size={13} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="py-20 text-center text-xs font-semibold text-slate-400">Nenhum depósito recente efetuado.</div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Principais Usuários Ativos Side-by-Side */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                {/* Clientes Ativos */}
                                 <div className="bg-white border border-slate-200/80 p-6 rounded-2xl shadow-sm flex flex-col">
                                     <div className="mb-6">
                                         <h3 className="text-lg font-bold text-slate-800 tracking-tight flex items-center gap-2">
-                                            <TrendingUp size={20} className="text-purple-600" />
-                                            Últimas Transações
+                                            <Users size={20} className="text-purple-650" />
+                                            Principais Clientes Ativos
                                         </h3>
-                                        <p className="text-xs text-slate-500 font-medium">Logs de recarga e saques via AbacatePay.</p>
+                                        <p className="text-xs text-slate-500 font-medium">Clientes mais ativos e engajados recentemente.</p>
                                     </div>
                                     <div className="space-y-4 flex-1">
                                         {loadingDashboard ? (
                                             <div className="py-20 flex flex-col items-center justify-center gap-2">
                                                 <div className="animate-spin h-6 w-6 text-purple-600 rounded-full border-2 border-slate-200 border-t-purple-600" />
-                                                <span className="text-[10px] text-slate-400 font-semibold">Carregando logs...</span>
+                                                <span className="text-[10px] text-slate-400 font-semibold">Carregando clientes...</span>
                                             </div>
-                                        ) : dashboardData?.recentTransactions?.length > 0 ? (
-                                            dashboardData.recentTransactions.map((tx: any) => (
-                                                <div key={tx.id} className="flex items-center justify-between p-3.5 hover:bg-slate-50 rounded-xl transition-all border border-transparent hover:border-slate-100 group">
+                                        ) : dashboardData?.activeClientsData?.length > 0 ? (
+                                            dashboardData.activeClientsData.map((client: any) => (
+                                                <div key={client.clerkId} className="flex items-center justify-between p-3.5 hover:bg-slate-50 rounded-xl transition-all border border-transparent hover:border-slate-100 group">
                                                     <div className="flex items-center gap-3">
-                                                        <div className={`p-2 rounded-lg ${tx.status === 'Aprovado' || tx.status === 'Débito' ? 'bg-emerald-50 text-emerald-600' : tx.status === 'Pendente' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'}`}>
-                                                            {(tx.status === 'Aprovado' || tx.status === 'Débito') && <CheckCircle2 size={16} />}
-                                                            {tx.status === 'Pendente' && <Clock size={16} />}
-                                                            {tx.status === 'Cancelado' && <AlertCircle size={16} />}
-                                                        </div>
+                                                        {client.photoUrl ? (
+                                                            <img src={client.photoUrl} alt={client.name} className="w-10 h-10 rounded-xl object-cover border border-slate-100" />
+                                                        ) : (
+                                                            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-sm">
+                                                                {client.name[0]?.toUpperCase() || 'C'}
+                                                            </div>
+                                                        )}
                                                         <div className="flex flex-col">
-                                                            {tx.userId && tx.userId !== 'platform' ? (
-                                                                <Link href={`/admin/users/${tx.userId}`} className="text-xs font-bold text-purple-600 hover:text-purple-800 hover:underline transition-colors text-left">
-                                                                    {tx.user}
-                                                                </Link>
-                                                            ) : (
-                                                                <span className="text-xs font-bold text-slate-800">{tx.user}</span>
-                                                            )}
-                                                            <span className="text-[10px] text-slate-400 font-semibold">{tx.type} • {tx.time}</span>
+                                                            <Link href={`/admin/users/${client.clerkId}`} className="text-xs font-bold text-purple-655 hover:text-purple-800 hover:underline transition-colors text-left">
+                                                                {client.name}
+                                                            </Link>
+                                                            <span className="text-[10px] text-slate-400 font-semibold">@{client.username}</span>
                                                         </div>
                                                     </div>
-                                                    <div className="text-right flex items-center gap-2">
-                                                        <div className="flex flex-col text-right">
-                                                            <span className="text-xs font-bold text-slate-700 block">{tx.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                                                            {tx.fee > 0 && (
-                                                                <span className="text-[9px] text-emerald-600 font-bold block">
-                                                                    = {tx.net.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                                                </span>
-                                                            )}
-                                                            <span className="text-[9px] text-slate-400 font-semibold uppercase">{tx.displayId || tx.id}</span>
+                                                    <div className="flex items-center gap-6">
+                                                        <div className="text-right flex flex-col">
+                                                            <span className="text-xs font-bold text-slate-700 block">
+                                                                {client.activeRoomsCount} {client.activeRoomsCount === 1 ? 'conversa ativa' : 'conversas ativas'}
+                                                            </span>
+                                                            <span className="text-[10px] text-slate-500 font-medium">
+                                                                {client.totalMessages} msgs ({client.messagesLastWeek} na semana)
+                                                            </span>
                                                         </div>
-                                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(tx.id, tx.displayId || tx.id); }} className="p-1 hover:text-rose-600 rounded-lg text-slate-350 hover:bg-rose-50 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" title="Excluir Transação">
-                                                            <Trash2 size={13} />
-                                                        </button>
+                                                        <div className="text-right flex flex-col min-w-[100px]">
+                                                            <span className="text-xs font-extrabold text-slate-800 block">
+                                                                {client.totalRecharged.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                            </span>
+                                                            <span className="text-[9px] text-slate-400 font-semibold uppercase">Recarregado</span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             ))
                                         ) : (
-                                            <div className="py-20 text-center text-xs font-semibold text-slate-400">Nenhuma transação recente cadastrada.</div>
+                                            <div className="py-20 text-center text-xs font-semibold text-slate-400">Nenhum cliente ativo recente.</div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Profissionais Ativas */}
+                                <div className="bg-white border border-slate-200/80 p-6 rounded-2xl shadow-sm flex flex-col">
+                                    <div className="mb-6">
+                                        <h3 className="text-lg font-bold text-slate-800 tracking-tight flex items-center gap-2">
+                                            <UserCheck size={20} className="text-amber-600" />
+                                            Principais Profissionais Ativas
+                                        </h3>
+                                        <p className="text-xs text-slate-500 font-medium">Profissionais com maior desempenho recente.</p>
+                                    </div>
+                                    <div className="space-y-4 flex-1">
+                                        {loadingDashboard ? (
+                                            <div className="py-20 flex flex-col items-center justify-center gap-2">
+                                                <div className="animate-spin h-6 w-6 text-purple-600 rounded-full border-2 border-slate-200 border-t-purple-600" />
+                                                <span className="text-[10px] text-slate-400 font-semibold">Carregando profissionais...</span>
+                                            </div>
+                                        ) : dashboardData?.activeProfessionalsData?.length > 0 ? (
+                                            dashboardData.activeProfessionalsData.map((prof: any) => (
+                                                <div key={prof.clerkId} className="flex items-center justify-between p-3.5 hover:bg-slate-50 rounded-xl transition-all border border-transparent hover:border-slate-100 group">
+                                                    <div className="flex items-center gap-3">
+                                                        {prof.photoUrl ? (
+                                                            <img src={prof.photoUrl} alt={prof.name} className="w-10 h-10 rounded-xl object-cover border border-slate-100" />
+                                                        ) : (
+                                                            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-sm">
+                                                                {prof.name[0]?.toUpperCase() || 'P'}
+                                                            </div>
+                                                        )}
+                                                        <div className="flex flex-col">
+                                                            <Link href={`/admin/users/${prof.clerkId}`} className="text-xs font-bold text-purple-655 hover:text-purple-800 hover:underline transition-colors text-left">
+                                                                {prof.name}
+                                                            </Link>
+                                                            <span className="text-[10px] text-slate-400 font-semibold">@{prof.username}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-6">
+                                                        <div className="text-right flex flex-col">
+                                                            <span className="text-xs font-bold text-slate-700 block">
+                                                                {prof.activeRoomsCount} {prof.activeRoomsCount === 1 ? 'conversa ativa' : 'conversas ativas'}
+                                                            </span>
+                                                            <span className="text-[10px] text-slate-500 font-medium">
+                                                                {prof.totalMessages} msgs ({prof.messagesLastWeek} na semana)
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-right flex flex-col min-w-[100px]">
+                                                            <span className="text-xs font-extrabold text-slate-800 block">
+                                                                {prof.totalEarned.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                            </span>
+                                                            <span className="text-[9px] text-slate-400 font-semibold uppercase">Faturado</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="py-20 text-center text-xs font-semibold text-slate-400">Nenhuma profissional ativa recente.</div>
                                         )}
                                     </div>
                                 </div>
                             </div>
-                            <div className="w-full"><ClientsTable /></div>
                         </>
                     )}
 
@@ -287,6 +386,7 @@ export default function AdminPage() {
                             chatSessionTimeoutMinutes={settings.chatSessionTimeoutMinutes} setChatSessionTimeoutMinutes={settings.setChatSessionTimeoutMinutes}
                             onlineDelayMinutes={settings.onlineDelayMinutes} setOnlineDelayMinutes={settings.setOnlineDelayMinutes}
                             chatInactivityHours={settings.chatInactivityHours} setChatInactivityHours={settings.setChatInactivityHours}
+                            activeUserThresholdDays={settings.activeUserThresholdDays} setActiveUserThresholdDays={settings.setActiveUserThresholdDays}
                             isDirtyChat={settings.isDirtyChat}
                             saving={settings.saving} saveSettings={settings.saveSettings}
                         />

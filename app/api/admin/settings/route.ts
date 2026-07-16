@@ -34,6 +34,7 @@ async function getOrCreateSettings() {
             newProfileDaysThreshold: 15,
             onlineDelayMinutes: 2,
             chatInactivityHours: 48,
+            activeUserThresholdDays: 7,
             exploreSortingCriteria: ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'],
         });
     } else {
@@ -57,6 +58,7 @@ async function getOrCreateSettings() {
         if (settings.newProfileDaysThreshold === undefined) { settings.newProfileDaysThreshold = 15; updated = true; }
         if (settings.onlineDelayMinutes === undefined) { settings.onlineDelayMinutes = 2; updated = true; }
         if (settings.chatInactivityHours === undefined) { settings.chatInactivityHours = 48; updated = true; }
+        if (settings.activeUserThresholdDays === undefined) { settings.activeUserThresholdDays = 7; updated = true; }
         if (settings.exploreSortingCriteria === undefined || settings.exploreSortingCriteria.length === 0) {
             settings.exploreSortingCriteria = ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'];
             updated = true;
@@ -167,6 +169,7 @@ export async function PUT(request: NextRequest) {
             newProfileDaysThreshold,
             onlineDelayMinutes,
             chatInactivityHours,
+            activeUserThresholdDays,
             exploreSortingCriteria,
         } = body;
 
@@ -296,6 +299,14 @@ export async function PUT(request: NextRequest) {
                 return NextResponse.json({ error: 'Tempo de inatividade de conversa deve ser de pelo menos 1 hora' }, { status: 400 });
             }
             settings.chatInactivityHours = val;
+        }
+
+        if (activeUserThresholdDays !== undefined) {
+            const val = Number(activeUserThresholdDays);
+            if (isNaN(val) || val < 1) {
+                return NextResponse.json({ error: 'Limite de dias para usuário ativo deve ser de pelo menos 1 dia' }, { status: 400 });
+            }
+            settings.activeUserThresholdDays = val;
         }
 
         if (defaultPricePerCharSubscribers !== undefined) {

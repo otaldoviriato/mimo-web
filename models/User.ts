@@ -58,6 +58,7 @@ export interface IUser extends Document {
     identityVerificationPromptIntervalDays?: number;
     hideFromExplore?: boolean;
     subscriberDiscountPercentage?: number;
+    financialLastViewedAt?: Date;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -247,6 +248,9 @@ const UserSchema = new Schema<IUser>({
     hideFromExplore: {
         type: Boolean,
         default: false,
+    },
+    financialLastViewedAt: {
+        type: Date,
     },
 }, {
     timestamps: true,

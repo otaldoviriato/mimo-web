@@ -600,11 +600,12 @@ export default function ChatsPage() {
                 )}
             </div>
 
-            {/* Banner de Verificação de Identidade */}
-            {renderVerificationBanner()}
-
-            {/* Banner de Completude do Perfil */}
-            {renderProfileProgressBanner()}
+            {/* Banner de Verificação de Identidade ou Completude do Perfil (exibido apenas um de cada vez) */}
+            {(() => {
+                const verificationBanner = renderVerificationBanner();
+                if (verificationBanner) return verificationBanner;
+                return renderProfileProgressBanner();
+            })()}
 
             {/* Modal de crédito promocional */}
             {giftModal && (
