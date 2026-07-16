@@ -3,6 +3,8 @@ import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { Room } from '@/models/Room';
 import { User } from '@/models/User';
+import { Message } from '@/models/Message';
+import { AppSettings } from '@/models/AppSettings';
 import mongoose from 'mongoose';
 
 export async function GET(
@@ -34,7 +36,10 @@ export async function GET(
             .sort({ lastMessageTime: -1, updatedAt: -1 })
             .lean();
 
-        // Enriquece cada sala com os dados do OUTRO participante
+        const settings = await AppSettings.findOne({ key: 'global' }).select('chatInactivityHours').lean();
+        const inactivityHours = settings?.chatInactivityHours ?? 48;
+
+        // Enriquece cada sala com os dados do OUTRO participante e a inatividade da conversa
         const enrichedRooms = await Promise.all(rooms.map(async (room) => {
             const otherParticipantId = room.participants.find(p => p !== userId);
             
@@ -57,9 +62,28 @@ export async function GET(
                 }
             }
 
+            // Cálculo inteligente de inatividade de conversa
+            const [p1, p2] = room.participants;
+            const rId = room.roomId ?? room.participants.slice().sort().join('_');
+            const [lastMsgP1, lastMsgP2] = await Promise.all([
+                Message.findOne({ roomId: rId, senderId: p1 }).sort({ timestamp: -1 }).select('timestamp').lean(),
+                Message.findOne({ roomId: rId, senderId: p2 }).sort({ timestamp: -1 }).select('timestamp').lean()
+            ]);
+
+            let lastExchangeTime = room.createdAt ? new Date(room.createdAt) : new Date();
+            if (lastMsgP1 && lastMsgP2) {
+                lastExchangeTime = new Date(Math.min(new Date(lastMsgP1.timestamp).getTime(), new Date(lastMsgP2.timestamp).getTime()));
+            }
+
+            const diffMs = Date.now() - lastExchangeTime.getTime();
+            const diffHours = diffMs / (1000 * 60 * 60);
+            const isInactive = diffHours > inactivityHours;
+
             return {
                 ...room,
-                otherUser
+                otherUser,
+                isInactive,
+                lastExchangeTime: lastExchangeTime.toISOString(),
             };
         }));
 

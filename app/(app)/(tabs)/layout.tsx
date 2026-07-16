@@ -31,26 +31,40 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                 </svg>
             ),
         },
-        isProfessional ? {
-            href: '/wallet',
-            label: 'Carteira',
-            icon: (active: boolean) => (
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                    <rect x="2" y="5" width="20" height="14" rx="2" ry="2" stroke="currentColor" strokeWidth={active ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round" />
-                    <line x1="2" y1="10" x2="22" y2="10" stroke="currentColor" strokeWidth={active ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M16 14h2" stroke="currentColor" strokeWidth={active ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-            ),
-        } : {
-            href: '/search',
-            label: 'Buscar',
-            icon: (active: boolean) => (
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                    <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth={active ? 2.5 : 2} />
-                    <path d="m21 21-4.35-4.35" stroke="currentColor" strokeWidth={active ? 2.5 : 2} strokeLinecap="round" />
-                </svg>
-            ),
-        },
+        ...(isProfessional ? [
+            {
+                href: '/wallet',
+                label: 'Carteira',
+                icon: (active: boolean) => (
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                        <rect x="2" y="5" width="20" height="14" rx="2" ry="2" stroke="currentColor" strokeWidth={active ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round" />
+                        <line x1="2" y1="10" x2="22" y2="10" stroke="currentColor" strokeWidth={active ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M16 14h2" stroke="currentColor" strokeWidth={active ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                ),
+            },
+            {
+                href: '/search',
+                label: 'Buscar',
+                icon: (active: boolean) => (
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                        <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth={active ? 2.5 : 2} />
+                        <path d="m21 21-4.35-4.35" stroke="currentColor" strokeWidth={active ? 2.5 : 2} strokeLinecap="round" />
+                    </svg>
+                ),
+            }
+        ] : [
+            {
+                href: '/search',
+                label: 'Buscar',
+                icon: (active: boolean) => (
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                        <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth={active ? 2.5 : 2} />
+                        <path d="m21 21-4.35-4.35" stroke="currentColor" strokeWidth={active ? 2.5 : 2} strokeLinecap="round" />
+                    </svg>
+                ),
+            }
+        ]),
         {
             href: '/profile',
             label: 'Perfil',

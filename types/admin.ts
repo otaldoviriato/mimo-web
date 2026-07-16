@@ -26,6 +26,7 @@ export interface SettingsData {
     pwaShowAgainIntervalDays: number;
     identityVerificationPromptIntervalDays: number;
     newProfileDaysThreshold: number;
+    chatInactivityHours?: number;
 }
 
 export interface ChatMessage {

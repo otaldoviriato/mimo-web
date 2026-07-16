@@ -18,7 +18,7 @@ import SettingsPage from './settings/page';
 
 
 const isTabRoute = (path: string) => {
-    return ['/chats', '/search', '/profile', '/'].includes(path);
+    return ['/chats', '/search', '/profile', '/wallet', '/'].includes(path);
 };
 
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
@@ -118,6 +118,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             lastMessage: string;
             lastMessageTime: string;
             senderId: string;
+            isInactive?: boolean;
+            lastExchangeTime?: string;
         }) => {
             let matchedRoom = false;
             queryClient.setQueryData(
@@ -137,6 +139,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                                 lastMessage: data.lastMessage,
                                 lastMessageTime: data.lastMessageTime,
                                 updatedAt: data.lastMessageTime,
+                                isInactive: data.isInactive,
+                                lastExchangeTime: data.lastExchangeTime,
                                 unreadCount: {
                                     ...room.unreadCount,
                                     [user.id!]: isMe ? currentUnread : currentUnread + 1,

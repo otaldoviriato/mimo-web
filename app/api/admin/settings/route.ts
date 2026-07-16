@@ -33,6 +33,7 @@ async function getOrCreateSettings() {
             identityVerificationPromptIntervalDays: 7,
             newProfileDaysThreshold: 15,
             onlineDelayMinutes: 2,
+            chatInactivityHours: 48,
         });
     } else {
         // Garantir que novos campos sejam populados se não existirem
@@ -54,6 +55,7 @@ async function getOrCreateSettings() {
         if (settings.identityVerificationPromptIntervalDays === undefined) { settings.identityVerificationPromptIntervalDays = 7; updated = true; }
         if (settings.newProfileDaysThreshold === undefined) { settings.newProfileDaysThreshold = 15; updated = true; }
         if (settings.onlineDelayMinutes === undefined) { settings.onlineDelayMinutes = 2; updated = true; }
+        if (settings.chatInactivityHours === undefined) { settings.chatInactivityHours = 48; updated = true; }
         if (updated) {
             await settings.save();
         }
@@ -159,6 +161,7 @@ export async function PUT(request: NextRequest) {
             identityVerificationPromptIntervalDays,
             newProfileDaysThreshold,
             onlineDelayMinutes,
+            chatInactivityHours,
         } = body;
 
         // Validações básicas
@@ -279,6 +282,14 @@ export async function PUT(request: NextRequest) {
                 return NextResponse.json({ error: 'Tempo de atraso para status offline deve ser de pelo menos 0 minutos' }, { status: 400 });
             }
             settings.onlineDelayMinutes = delay;
+        }
+
+        if (chatInactivityHours !== undefined) {
+            const val = Number(chatInactivityHours);
+            if (isNaN(val) || val < 1) {
+                return NextResponse.json({ error: 'Tempo de inatividade de conversa deve ser de pelo menos 1 hora' }, { status: 400 });
+            }
+            settings.chatInactivityHours = val;
         }
 
         if (defaultPricePerCharSubscribers !== undefined) {

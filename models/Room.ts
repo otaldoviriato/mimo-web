@@ -6,6 +6,7 @@ export interface IRoom extends Document {
     lastMessageTime?: Date;
     unreadCount?: Map<string, number>;
     deletedBy?: string[]; // clerkIds que excluíram esta conversa
+    roomId?: string;
     createdAt: Date;
     updatedAt: Date;
 }

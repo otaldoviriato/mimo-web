@@ -428,7 +428,11 @@ export async function PATCH(request: NextRequest) {
             isProfessional !== currentUser.isProfessional;
 
         const updateData: any = {};
-        if (username !== undefined) updateData.username = username;
+        if (username !== undefined) {
+            updateData.username = typeof username === 'string'
+                ? username.trim().toLowerCase().replace('@', '')
+                : username;
+        }
         if (name !== undefined) updateData.name = name.trim();
         if (photoUrl !== undefined) updateData.photoUrl = photoUrl;
         if (coverUrl !== undefined) updateData.coverUrl = coverUrl;

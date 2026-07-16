@@ -27,18 +27,29 @@ export async function GET(request: NextRequest) {
 
         await connectToDatabase();
 
+        const currentUser = await User.findOne({ clerkId: userId }).select('isProfessional').lean();
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const queryFilter: any = {
+            clerkId: { $ne: userId },
+            isSuspended: { $ne: true },
+            photoUrl: { $exists: true, $ne: '' }
+        };
+
+        if (currentUser?.isProfessional) {
+            queryFilter.isProfessional = { $ne: true };
+        } else {
+            queryFilter.isProfessional = true;
+            queryFilter.professionalStatus = 'approved';
+        }
 
         const foundUsers = await User.find({
             $or: [
                 { username: { $regex: new RegExp(cleanQuery, 'i') } },
                 { name: { $regex: new RegExp(cleanQuery, 'i') } }
             ],
-            clerkId: { $ne: userId },
-            isProfessional: true,
-            professionalStatus: 'approved',
-            isSuspended: { $ne: true },
-            photoUrl: { $exists: true, $ne: '' }
+            ...queryFilter
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }).select('clerkId username name email photoUrl coverUrl isProfessional subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers bio createdAt avgResponseTimeMinutes isOnline lastSeen birthDate city state').limit(40).lean() as any[];
 
         if (!foundUsers || foundUsers.length === 0) {
@@ -57,6 +68,7 @@ export async function GET(request: NextRequest) {
         .lean();
 
         // Mapear fotos por ownerId
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const photosByOwner = galleryItems.reduce((acc: Record<string, string[]>, item: any) => {
             if (!acc[item.ownerId]) {
                 acc[item.ownerId] = [];
@@ -128,12 +140,13 @@ export async function GET(request: NextRequest) {
 
             // Critérios de qualificação booleana rígida
             const isOnlineOrRecent = u.isOnline || (u.lastSeen && new Date(u.lastSeen) >= activeLimitDate) || (u.createdAt && new Date(u.createdAt) >= activeLimitDate);
-            const isQualified = 
-                !!u.photoUrl && u.photoUrl.trim() !== '' &&
-                !!u.coverUrl && u.coverUrl.trim() !== '' &&
-                !!u.bio && u.bio.trim() !== '' &&
-                photosCount >= 3 &&
-                isOnlineOrRecent;
+            const isQualified = currentUser?.isProfessional
+                ? (!!u.photoUrl && u.photoUrl.trim() !== '' && isOnlineOrRecent)
+                : (!!u.photoUrl && u.photoUrl.trim() !== '' &&
+                   !!u.coverUrl && u.coverUrl.trim() !== '' &&
+                   !!u.bio && u.bio.trim() !== '' &&
+                   photosCount >= 3 &&
+                   isOnlineOrRecent);
 
             return {
                 id: u._id,
@@ -175,6 +188,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
             users: sortedUsers
         });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
         console.error('Error searching user:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

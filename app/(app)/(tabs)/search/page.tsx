@@ -158,7 +158,13 @@ export default function SearchPage() {
         return (
             <div
                 key={user.clerkId}
-                onClick={() => router.push(`/${user.username}`)}
+                onClick={() => {
+                    if (userData?.isProfessional) {
+                        router.push(`/chat/${user.clerkId}`);
+                    } else {
+                        router.push(`/${user.username}`);
+                    }
+                }}
                 className="relative aspect-[3/4] rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer active:scale-[0.98] border border-slate-100/50 bg-slate-100 animate-in fade-in zoom-in-95 duration-300 group"
             >
                 {/* Imagem de fundo */}

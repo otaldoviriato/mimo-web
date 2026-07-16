@@ -22,21 +22,33 @@ export async function GET(request: NextRequest) {
         const activeLimitDate = new Date();
         activeLimitDate.setDate(activeLimitDate.getDate() - 30);
 
-        // Encontrar criadores profissionais aprovados (excluindo a si mesmo e suspensos, e quem optou por ocultar do explorar)
-        const featuredUsers = await User.find({
+        const currentUser = await User.findOne({ clerkId: userId }).select('isProfessional').lean();
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const queryFilter: any = {
             clerkId: { $ne: userId },
-            isProfessional: true,
-            professionalStatus: 'approved',
             isSuspended: { $ne: true },
-            hideFromExplore: { $ne: true },
             $or: [
                 { lastSeen: { $gte: activeLimitDate } },
                 { isOnline: true },
                 { createdAt: { $gte: activeLimitDate } }
             ]
-        })
-        .select('clerkId username name email photoUrl coverUrl isProfessional subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers bio createdAt avgResponseTimeMinutes isOnline lastSeen birthDate city state')
+        };
+
+        if (currentUser?.isProfessional) {
+            queryFilter.isProfessional = { $ne: true };
+            queryFilter.hideFromExplore = { $ne: true };
+        } else {
+            queryFilter.isProfessional = true;
+            queryFilter.professionalStatus = 'approved';
+            queryFilter.hideFromExplore = { $ne: true };
+        }
+
+        // Encontrar criadores/clientes em destaque
+        const featuredUsers = await User.find(queryFilter)
+        .select('clerkId username name email photoUrl coverUrl isProfessional subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers bio createdAt avgResponseTimeMinutes isOnline lastSeen birthDate city state isHighSpender')
         .limit(200)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .lean() as any[];
 
         if (!featuredUsers || featuredUsers.length === 0) {
@@ -55,6 +67,7 @@ export async function GET(request: NextRequest) {
         .lean();
 
         // Mapear fotos por ownerId
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const photosByOwner = galleryItems.reduce((acc: Record<string, string[]>, item: any) => {
             if (!acc[item.ownerId]) {
                 acc[item.ownerId] = [];
@@ -76,19 +89,24 @@ export async function GET(request: NextRequest) {
             const publicPhotos = photosByOwner[u.clerkId] || [];
             const photosCount = publicPhotos.length;
 
-            // 1. Calcular completude (peso de 25% por requisito preenchido)
+            // 1. Calcular completude (peso de 25% por requisito preenchido ou simplificado para clientes)
             const hasPhoto = !!u.photoUrl && u.photoUrl.trim() !== '';
             const hasCover = !!u.coverUrl && u.coverUrl.trim() !== '';
             const hasBio = !!u.bio && u.bio.trim().length >= 10;
             const hasPhotos = photosCount >= 3;
 
-            let completedSteps = 0;
-            if (hasPhoto) completedSteps++;
-            if (hasCover) completedSteps++;
-            if (hasBio) completedSteps++;
-            if (hasPhotos) completedSteps++;
-
-            const completeness = completedSteps * 25;
+            let completeness = 0;
+            if (currentUser?.isProfessional) {
+                // Para clientes, a completude é 100% se tiver foto. Se for High Spender, ganha prioridade
+                completeness = hasPhoto ? (u.isHighSpender ? 100 : 80) : 0;
+            } else {
+                let completedSteps = 0;
+                if (hasPhoto) completedSteps++;
+                if (hasCover) completedSteps++;
+                if (hasBio) completedSteps++;
+                if (hasPhotos) completedSteps++;
+                completeness = completedSteps * 25;
+            }
 
             // 2. Determinar timestamp de última atividade (online ou mais recente)
             let lastActiveTime = 0;
@@ -140,6 +158,7 @@ export async function GET(request: NextRequest) {
             .slice(0, 12);
 
         return NextResponse.json({ users: sorted });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
         console.error('Error fetching featured users:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
