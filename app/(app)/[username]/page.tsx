@@ -7,7 +7,7 @@ import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { SubscribeModal } from '@/components/SubscribeModal';
 import { useUserByUsername, usePublicGallery, useSubscribe, useMyProfile } from '@/hooks/useQueries';
-import { UserX, Briefcase, Camera, Lock, Eye, EyeOff, X, MessageSquare, ChevronLeft, ChevronRight, ShieldCheck } from 'lucide-react';
+import { UserX, Camera, Lock, Eye, EyeOff, X, ChevronLeft, ChevronRight, ShieldCheck, Crown, Gift } from 'lucide-react';
 
 interface UserProfilePageProps {
     params?: Promise<{ username: string }>;
@@ -275,8 +275,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
     }
 
     const relationshipStats = (user as any).relationshipStats;
-    const characterStats = relationshipStats?.characterStats;
-    const totalClientTextChars = characterStats?.totalClientTextChars ?? 0;
+
 
 
     return (
@@ -340,84 +339,175 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                     @{user.username}
                 </p>
 
-                {/* Painel de Estatísticas de Interação */}
-                {me?.isProfessional && !user.isProfessional && relationshipStats && (
-                    <div className="w-full max-w-md mt-6 bg-white/85 backdrop-blur-md border border-purple-100 rounded-2xl p-5 shadow-lg shadow-purple-950/5 z-10 animate-in fade-in slide-in-from-bottom-3 duration-500">
-                        <div className="flex items-center justify-between border-b border-purple-50 pb-3 mb-4">
-                            <div className="flex items-center gap-2">
-                                <Briefcase className="w-4 h-4 text-purple-600 shrink-0" />
-                                <h3 className="font-black text-slate-800 text-sm tracking-tight uppercase">Estatísticas da Conversa</h3>
-                            </div>
-                            <span className="text-[10px] bg-purple-100 text-purple-700 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                Privado
-                            </span>
-                        </div>
+                {/* Painel de Perfil do Cliente */}
+                {me?.isProfessional && !user.isProfessional && relationshipStats && (() => {
+                    const totalRecharge = relationshipStats.totalHistoricalRecharge ?? 0;
+                    const totalRechargeInReais = totalRecharge / 100;
+                    const totalSpentWithMe = (relationshipStats.totalSpent ?? 0) / 100;
+                    const hasGift = relationshipStats.hasEverSentGift ?? false;
+                    const openCount = relationshipStats.messageOpenRate90 ?? 0;
+                    const totalSent = relationshipStats.last10MessagesSentCount ?? 0;
+                    const isVeryAttentive = totalSent >= 5 && openCount >= Math.ceil(totalSent * 0.9);
 
-                        {/* Top Highlights: Saldo e Total Gasto */}
-                        <div className="grid grid-cols-2 gap-3 mb-4">
-                            <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-3 flex flex-col hover:bg-slate-50 transition-colors">
-                                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Saldo da Carteira</span>
-                                <span className="text-lg font-black text-slate-800 tracking-tight mt-1">
-                                    R$ {(((user as any).balance ?? 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </span>
-                            </div>
-                            <div className="bg-purple-50/50 border border-purple-100/50 rounded-xl p-3 flex flex-col hover:bg-purple-50 transition-colors">
-                                <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider">Gastou com Você</span>
-                                <span className="text-lg font-black text-purple-700 tracking-tight mt-1">
-                                    R$ {(((user as any).relationshipStats.totalSpent ?? 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </span>
-                            </div>
-                        </div>
+                    // Determinar nível baseado no total histórico de recargas
+                    type ClientLevel = {
+                        label: string;
+                        color: string;
+                        bgColor: string;
+                        borderColor: string;
+                        textColor: string;
+                        icon: React.ReactNode;
+                        description: string;
+                    };
 
-                        {/* Detalhamento de Gastos */}
-                        <div className="space-y-2.5 mb-4 bg-slate-50/40 border border-slate-100/80 rounded-xl p-3 w-full">
-                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Origem dos Gastos</h4>
-                            
-                            <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
-                                <span className="flex items-center gap-1.5">💬 Mensagens Pagas ({(user as any).relationshipStats.detailStats?.message?.count ?? 0})</span>
-                                <span className="font-bold text-slate-800">
-                                    R$ {(((user as any).relationshipStats.detailStats?.message?.amount ?? 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
-                                <span className="flex items-center gap-1.5">📸 Mídias Desbloqueadas ({(user as any).relationshipStats.detailStats?.image_unlock?.count ?? 0})</span>
-                                <span className="font-bold text-slate-800">
-                                    R$ {(((user as any).relationshipStats.detailStats?.image_unlock?.amount ?? 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
-                                <span className="flex items-center gap-1.5">🎁 Presentes Enviados ({(user as any).relationshipStats.detailStats?.gift?.count ?? 0})</span>
-                                <span className="font-bold text-slate-800">
-                                    R$ {(((user as any).relationshipStats.detailStats?.gift?.amount ?? 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
-                                <span className="flex items-center gap-1.5">👑 Assinatura do Canal ({(user as any).relationshipStats.detailStats?.subscription?.count ?? 0})</span>
-                                <span className="font-bold text-slate-800">
-                                    R$ {(((user as any).relationshipStats.detailStats?.subscription?.amount ?? 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </span>
-                            </div>
-                        </div>
+                    const getLevel = (): ClientLevel => {
+                        if (totalRechargeInReais <= 0) {
+                            return {
+                                label: 'Novo',
+                                color: '#64748b',
+                                bgColor: 'bg-slate-50',
+                                borderColor: 'border-slate-200',
+                                textColor: 'text-slate-600',
+                                icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>,
+                                description: 'Ainda não fez recargas'
+                            };
+                        }
+                        if (totalRechargeInReais <= 100) {
+                            return {
+                                label: 'Bronze',
+                                color: '#92400e',
+                                bgColor: 'bg-amber-50',
+                                borderColor: 'border-amber-200',
+                                textColor: 'text-amber-800',
+                                icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.1 9.1H2L7.5 13.5L5.5 20.5L12 16.5L18.5 20.5L16.5 13.5L22 9.1H14.9L12 2Z" opacity="0.85"/></svg>,
+                                description: 'Até R$ 100 em recargas'
+                            };
+                        }
+                        if (totalRechargeInReais <= 500) {
+                            return {
+                                label: 'Prata',
+                                color: '#475569',
+                                bgColor: 'bg-slate-100',
+                                borderColor: 'border-slate-300',
+                                textColor: 'text-slate-700',
+                                icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.1 9.1H2L7.5 13.5L5.5 20.5L12 16.5L18.5 20.5L16.5 13.5L22 9.1H14.9L12 2Z"/></svg>,
+                                description: 'R$ 100 a R$ 500 em recargas'
+                            };
+                        }
+                        if (totalRechargeInReais <= 1000) {
+                            return {
+                                label: 'Ouro',
+                                color: '#854d0e',
+                                bgColor: 'bg-yellow-50',
+                                borderColor: 'border-yellow-300',
+                                textColor: 'text-yellow-800',
+                                icon: <Crown width={18} height={18} />,
+                                description: 'R$ 500 a R$ 1.000 em recargas'
+                            };
+                        }
+                        return {
+                            label: 'VIP',
+                            color: '#6b21a8',
+                            bgColor: 'bg-purple-50',
+                            borderColor: 'border-purple-300',
+                            textColor: 'text-purple-800',
+                            icon: <Crown width={18} height={18} />,
+                            description: 'Acima de R$ 1.000 em recargas'
+                        };
+                    };
 
-                        {/* Estatísticas de Conversa */}
-                        <div className="grid grid-cols-2 gap-3 text-[11px] text-slate-400 border-t border-purple-50 pt-3.5 w-full">
-                            <div className="flex flex-col border-r border-slate-100 pr-3 text-left justify-center">
-                                <span className="font-black text-slate-800 text-base tabular-nums">
-                                    {totalClientTextChars.toLocaleString('pt-BR')}
-                                </span>
-                                <span className="mt-0.5 font-semibold text-[9px] uppercase tracking-wider">caracteres do cliente</span>
+                    const level = getLevel();
+
+                    return (
+                        <div className="w-full max-w-md mt-6 z-10 animate-in fade-in slide-in-from-bottom-3 duration-500 space-y-3">
+
+                            {/* Card principal: Nível do Cliente */}
+                            <div className={`w-full ${level.bgColor} border ${level.borderColor} rounded-2xl p-4 shadow-sm`}>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${level.bgColor} border ${level.borderColor} shadow-sm`}
+                                            style={{ color: level.color }}>
+                                            {level.icon}
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Nível do Cliente</p>
+                                            <p className={`text-lg font-black tracking-tight ${level.textColor}`}>{level.label}</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Gastou com você</p>
+                                        <p className="text-base font-black text-purple-700">
+                                            R$ {totalSpentWithMe.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </p>
+                                    </div>
+                                </div>
+                                <p className="text-[10px] font-medium text-slate-400 mt-2">{level.description}</p>
                             </div>
-                            <div className="flex flex-col justify-center text-center">
-                                <span className="font-bold text-slate-700 text-sm">
-                                    {(user as any).relationshipStats.conversationStart 
-                                        ? new Date((user as any).relationshipStats.conversationStart).toLocaleDateString('pt-BR') 
-                                        : 'N/A'}
-                                </span>
-                                <span className="mt-0.5 font-semibold text-[9px] uppercase tracking-wider">início do contato</span>
+
+                            {/* Seção de Conquistas/Badges */}
+                            <div className="w-full bg-white/85 backdrop-blur-md border border-slate-100 rounded-2xl p-4 shadow-sm">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Conquistas</p>
+                                <div className="grid grid-cols-2 gap-2.5">
+
+                                    {/* Badge: Primeiro Mimo */}
+                                    <div className={`flex items-center gap-2.5 p-3 rounded-xl border transition-all ${
+                                        hasGift
+                                            ? 'bg-pink-50 border-pink-200 shadow-sm'
+                                            : 'bg-slate-50 border-slate-100 opacity-50'
+                                    }`}>
+                                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                                            hasGift ? 'bg-pink-100' : 'bg-slate-100'
+                                        }`}>
+                                            {hasGift ? (
+                                                <Gift className="w-4 h-4 text-pink-500" />
+                                            ) : (
+                                                <Lock className="w-4 h-4 text-slate-300" />
+                                            )}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className={`text-[11px] font-black leading-tight ${
+                                                hasGift ? 'text-pink-700' : 'text-slate-400'
+                                            }`}>Primeiro Mimo</p>
+                                            <p className="text-[9px] font-medium text-slate-400 leading-tight mt-0.5">
+                                                {hasGift ? 'Já enviou um presente' : 'Nunca enviou presente'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Badge: Muito Atento */}
+                                    <div className={`flex items-center gap-2.5 p-3 rounded-xl border transition-all ${
+                                        isVeryAttentive
+                                            ? 'bg-emerald-50 border-emerald-200 shadow-sm'
+                                            : 'bg-slate-50 border-slate-100 opacity-50'
+                                    }`}>
+                                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                                            isVeryAttentive ? 'bg-emerald-100' : 'bg-slate-100'
+                                        }`}>
+                                            {isVeryAttentive ? (
+                                                <Eye className="w-4 h-4 text-emerald-500" />
+                                            ) : (
+                                                <Lock className="w-4 h-4 text-slate-300" />
+                                            )}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className={`text-[11px] font-black leading-tight ${
+                                                isVeryAttentive ? 'text-emerald-700' : 'text-slate-400'
+                                            }`}>Muito Atento</p>
+                                            <p className="text-[9px] font-medium text-slate-400 leading-tight mt-0.5">
+                                                {isVeryAttentive
+                                                    ? `Abriu ${openCount} das últimas ${totalSent} msgs`
+                                                    : 'Abre menos de 90% das msgs'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                </div>
                             </div>
+
                         </div>
-                    </div>
-                )}
+                    );
+                })()}
+
 
 
 
@@ -430,23 +520,36 @@ export default function UserProfilePage({ params, username: propUsername, onBack
 
                 {/* Painel Elegante de Estatísticas (Stats) para Credibilidade */}
                 {user.isProfessional && (
-                    <div className="w-full max-w-sm mt-5 grid grid-cols-2 gap-2 border-y border-slate-200/50 py-3.5 px-4 mb-4 z-10 bg-white/40 backdrop-blur-sm rounded-xl">
-                        <div className="flex flex-col items-center text-center border-r border-slate-200/50">
-                            <span className="text-sm font-bold text-slate-800 tabular-nums">
-                                {(user as any).activeConversationsCount || 0}
-                            </span>
-                            <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
-                                Conversas Ativas
-                            </span>
+                    <div className="w-full max-w-sm mt-5 flex flex-col items-center border-y border-slate-200/50 py-3.5 px-4 mb-4 z-10 bg-white/40 backdrop-blur-sm rounded-xl animate-in fade-in duration-300">
+                        <div className="w-full grid grid-cols-3 gap-2">
+                            <div className="flex flex-col items-center text-center border-r border-slate-200/50">
+                                <span className="text-sm font-bold text-slate-800 tabular-nums">
+                                    {(user as any).conversationsLastWeekCount || 0}
+                                </span>
+                                <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
+                                    Conversas
+                                </span>
+                            </div>
+                            <div className="flex flex-col items-center text-center border-r border-slate-200/50">
+                                <span className="text-sm font-bold text-slate-800 tabular-nums">
+                                    {((user as any).messagesLastWeekCount || 0).toLocaleString('pt-BR')}
+                                </span>
+                                <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
+                                    Mensagens
+                                </span>
+                            </div>
+                            <div className="flex flex-col items-center text-center">
+                                <span className="text-sm font-bold text-slate-800 tabular-nums">
+                                    {((user as any).mediaGiftsLastWeekCount || 0).toLocaleString('pt-BR')}
+                                </span>
+                                <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
+                                    Mídia/presentes
+                                </span>
+                            </div>
                         </div>
-                        <div className="flex flex-col items-center text-center">
-                            <span className="text-sm font-bold text-slate-800 tabular-nums">
-                                {((user as any).messagesLastWeekCount || 0).toLocaleString('pt-BR')}
-                            </span>
-                            <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
-                                Mensagens na Semana
-                            </span>
-                        </div>
+                        <span className="text-[8px] font-semibold text-slate-400/80 tracking-wider mt-2.5 uppercase">
+                            Últimos 7 dias
+                        </span>
                     </div>
                 )}
 

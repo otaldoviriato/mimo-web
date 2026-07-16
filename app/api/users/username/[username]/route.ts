@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { AppSettings } from '@/models/AppSettings';
 import { MicroTransaction } from '@/models/MicroTransaction';
+import { Transaction } from '@/models/Transaction';
 import { Room } from '@/models/Room';
 import { Message } from '@/models/Message';
 import { Subscription } from '@/models/Subscription';
@@ -183,10 +184,63 @@ export async function GET(
                         remainingFreeChars = Math.max(0, freeCharsLimit - totalClientTextChars);
                     }
 
+                    // 4. Total histórico de recargas do cliente (para determinar o nível)
+                    const totalHistoricalRechargeAgg = await Transaction.aggregate([
+                        {
+                            $match: {
+                                userId: user.clerkId,
+                                source: 'recharge',
+                                status: { $in: ['PAID', 'COMPLETED'] }
+                            }
+                        },
+                        {
+                            $group: {
+                                _id: null,
+                                total: { $sum: '$amount' }
+                            }
+                        }
+                    ]);
+                    const totalHistoricalRecharge = totalHistoricalRechargeAgg[0]?.total ?? 0;
+
+                    // 5. Verificar se o cliente já enviou algum presente (badge "Primeiro Mimo")
+                    const giftCount = await Message.countDocuments({
+                        senderId: user.clerkId,
+                        isGift: true
+                    });
+                    const hasEverSentGift = giftCount > 0;
+
+                    // 6. Taxa de abertura das últimas 10 mensagens enviadas pela profissional para o cliente
+                    let messageOpenRate90 = 0;
+                    let last10MessagesSentCount = 0;
+                    if (room) {
+                        const virtualRoomId = [user.clerkId, viewerClerkId].sort().join('_');
+                        const roomIds = [room._id.toString(), virtualRoomId];
+                        const last10Messages = await Message.find({
+                            roomId: { $in: roomIds },
+                            senderId: viewerClerkId,
+                            receiverId: user.clerkId,
+                            isSystem: { $ne: true }
+                        })
+                            .sort({ timestamp: -1 })
+                            .limit(10)
+                            .select('isRead')
+                            .lean();
+
+                        last10MessagesSentCount = last10Messages.length;
+                        if (last10Messages.length > 0) {
+                            const readCount = last10Messages.filter((m: any) => m.isRead).length;
+                            messageOpenRate90 = readCount;
+                        }
+                    }
+
                     relationshipStats = {
                         totalSpent,
                         detailStats,
                         totalMessages,
+                        totalHistoricalRecharge,
+                        hasEverSentGift,
+                        messageOpenRate90,
+                        last10MessagesSentCount,
                         characterStats: {
                             totalClientTextChars,
                             freeCharsLimit,
