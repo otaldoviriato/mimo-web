@@ -71,10 +71,23 @@ export async function GET(
                 Message.findOne({ roomId: rId, senderId: p2 }).sort({ timestamp: -1 }).select('timestamp').lean()
             ]);
 
-            let lastExchangeTime = room.createdAt ? new Date(room.createdAt) : new Date();
-            if (lastMsgP1 && lastMsgP2) {
-                lastExchangeTime = new Date(Math.min(new Date(lastMsgP1.timestamp).getTime(), new Date(lastMsgP2.timestamp).getTime()));
+
+            // Sem bidirecionalidade: apenas um lado enviou mensagens → inativa por definição
+            if (!lastMsgP1 || !lastMsgP2) {
+                return {
+                    ...room,
+                    otherUser,
+                    isInactive: true,
+                    lastExchangeTime: new Date().toISOString(),
+                };
             }
+
+            const lastExchangeTime = new Date(
+                Math.min(
+                    new Date(lastMsgP1.timestamp).getTime(),
+                    new Date(lastMsgP2.timestamp).getTime()
+                )
+            );
 
             const diffMs = Date.now() - lastExchangeTime.getTime();
             const diffHours = diffMs / (1000 * 60 * 60);
@@ -86,6 +99,7 @@ export async function GET(
                 isInactive,
                 lastExchangeTime: lastExchangeTime.toISOString(),
             };
+
         }));
 
         return NextResponse.json(enrichedRooms);

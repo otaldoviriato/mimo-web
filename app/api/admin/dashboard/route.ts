@@ -217,16 +217,32 @@ export async function GET(request: NextRequest) {
                 {
                     $match: {
                         participants: { $in: activeClerkIds },
-                        $or: [
-                            { lastMessageTime: { $gte: activeRoomsLimit } },
-                            { lastMessageTime: { $exists: false }, createdAt: { $gte: activeRoomsLimit } }
-                        ]
+                        lastMessageTime: { $gte: activeRoomsLimit }
                     }
                 },
-                { $unwind: "$participants" },
+                {
+                    $lookup: {
+                        from: 'messages',
+                        let: { rid: { $toString: '$_id' } },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: { $eq: ['$roomId', '$$rid'] },
+                                    isSystem: { $ne: true }
+                                }
+                            },
+                            { $group: { _id: '$senderId' } }
+                        ],
+                        as: 'senders'
+                    }
+                },
+                // Exige bidirecionalidade: ambos os participantes enviaram mensagens
+                { $match: { 'senders.1': { $exists: true } } },
+                { $unwind: '$participants' },
                 { $match: { participants: { $in: activeClerkIds } } },
-                { $group: { _id: "$participants", count: { $sum: 1 } } }
+                { $group: { _id: '$participants', count: { $sum: 1 } } }
             ]);
+
             const activeRoomsMap = new Map<string, number>(activeRoomsAgg.map(r => [r._id, r.count]));
 
             // 2. Total recarregado por clientes (em reais)

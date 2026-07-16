@@ -219,15 +219,38 @@ export async function GET(
 
             effectiveSubscribers = activeSubscriptions.map((sub) => sub.subscriberId);
 
-            // Calcular conversas ativas (janela parametrizada)
+            // Calcular conversas ativas com bidirecionalidade obrigatória
             const activeLimit = new Date(Date.now() - chatInactivityHours * 60 * 60 * 1000);
-            activeConversationsCount = await Room.countDocuments({
-                participants: user.clerkId,
-                $or: [
-                    { lastMessageTime: { $gte: activeLimit } },
-                    { lastMessageTime: { $exists: false }, createdAt: { $gte: activeLimit } }
-                ]
-            });
+            const activeConvsAgg = await Room.aggregate([
+
+                {
+                    $match: {
+                        participants: user.clerkId,
+                        lastMessageTime: { $gte: activeLimit }
+                    }
+                },
+                {
+                    $lookup: {
+                        from: 'messages',
+                        let: { rid: { $toString: '$_id' } },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: { $eq: ['$roomId', '$$rid'] },
+                                    isSystem: { $ne: true }
+                                }
+                            },
+                            { $group: { _id: '$senderId' } }
+                        ],
+                        as: 'senders'
+                    }
+                },
+                // Exige que pelo menos 2 participantes distintos tenham enviado mensagens
+                { $match: { 'senders.1': { $exists: true } } },
+                { $count: 'total' }
+            ]);
+            activeConversationsCount = activeConvsAgg[0]?.total ?? 0;
+
 
             // Calcular mensagens na semana (últimos 7 dias)
             const oneWeekAgo = new Date();
