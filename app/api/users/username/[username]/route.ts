@@ -184,13 +184,17 @@ export async function GET(
                         remainingFreeChars = Math.max(0, freeCharsLimit - totalClientTextChars);
                     }
 
-                    // 4. Total histórico de recargas do cliente (para determinar o nível)
+                    // 4. Total histórico de recargas do cliente nos últimos 30 dias (para determinar o nível)
+                    const startOf30Days = new Date();
+                    startOf30Days.setDate(startOf30Days.getDate() - 30);
+
                     const totalHistoricalRechargeAgg = await Transaction.aggregate([
                         {
                             $match: {
                                 userId: user.clerkId,
                                 source: 'recharge',
-                                status: { $in: ['PAID', 'COMPLETED'] }
+                                status: { $in: ['PAID', 'COMPLETED'] },
+                                timestamp: { $gte: startOf30Days }
                             }
                         },
                         {

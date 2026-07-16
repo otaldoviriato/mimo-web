@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
-import { User, GalleryItem } from '@/models';
+import { User, GalleryItem, Transaction } from '@/models';
 import { AppSettings } from '@/models/AppSettings';
 
 export const dynamic = 'force-dynamic';
@@ -88,6 +88,42 @@ export async function GET(request: NextRequest) {
         const activeLimitDate = new Date();
         activeLimitDate.setDate(activeLimitDate.getDate() - 30);
 
+        // 1. Agregação de recargas nos últimos 30 dias para os usuários listados (se for profissional)
+        const clientRechargesMap = new Map<string, number>();
+        if (currentUser?.isProfessional) {
+            const startOf30Days = new Date();
+            startOf30Days.setDate(startOf30Days.getDate() - 30);
+
+            const rechargeAgg = await Transaction.aggregate([
+                {
+                    $match: {
+                        userId: { $in: clerkIds },
+                        source: 'recharge',
+                        status: { $in: ['PAID', 'COMPLETED'] },
+                        timestamp: { $gte: startOf30Days }
+                    }
+                },
+                {
+                    $group: {
+                        _id: '$userId',
+                        total: { $sum: '$amount' }
+                    }
+                }
+            ]);
+            rechargeAgg.forEach((item: any) => {
+                clientRechargesMap.set(item._id, item.total);
+            });
+        }
+
+        const getClientLevel = (amountCents: number): string => {
+            const amount = amountCents / 100;
+            if (amount <= 0) return 'Novo';
+            if (amount <= 100) return 'Bronze';
+            if (amount <= 500) return 'Prata';
+            if (amount <= 1000) return 'Ouro';
+            return 'VIP';
+        };
+
         // Mapear usuários e calcular scores
         const usersWithScores = foundUsers.map(u => {
             const publicPhotos = photosByOwner[u.clerkId] || [];
@@ -170,7 +206,8 @@ export async function GET(request: NextRequest) {
                 isOnline: !!u.isOnline,
                 birthDate: u.birthDate ?? null,
                 city: u.city ?? '',
-                state: u.state ?? ''
+                state: u.state ?? '',
+                clientLevel: getClientLevel(clientRechargesMap.get(u.clerkId) || 0)
             };
         });
 

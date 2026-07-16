@@ -203,6 +203,17 @@ export default function SearchPage() {
                         {user.isProfessional && user.identityStatus === 'approved' && (
                             <ShieldCheck className="w-3.5 h-3.5 text-purple-400 shrink-0 animate-in zoom-in duration-300" />
                         )}
+                        {!user.isProfessional && userData?.isProfessional && user.clientLevel && (
+                            <span className={`text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded-md leading-none tracking-wider shrink-0 flex items-center justify-center ${
+                                user.clientLevel === 'VIP' ? 'bg-purple-600 text-white animate-pulse' :
+                                user.clientLevel === 'Ouro' ? 'bg-yellow-500 text-yellow-950' :
+                                user.clientLevel === 'Prata' ? 'bg-slate-300 text-slate-800' :
+                                user.clientLevel === 'Bronze' ? 'bg-amber-600 text-white' :
+                                'bg-slate-500 text-white opacity-75'
+                            }`}>
+                                {user.clientLevel}
+                            </span>
+                        )}
                     </div>
                     <span className="text-[10px] text-slate-300 font-medium tracking-tight">
                         {locationStr}

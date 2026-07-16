@@ -364,7 +364,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                     const getLevel = (): ClientLevel => {
                         if (totalRechargeInReais <= 0) return {
                             label: 'Novo',
-                            sublabel: 'Ainda não fez recargas',
+                            sublabel: 'Ainda não fez recargas nos últimos 30 dias',
                             gradient: 'from-slate-100 to-slate-50',
                             iconBg: 'bg-slate-200/80',
                             textColor: 'text-slate-700',
@@ -379,7 +379,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                         };
                         if (totalRechargeInReais <= 100) return {
                             label: 'Bronze',
-                            sublabel: 'Até R$ 100 em recargas',
+                            sublabel: 'Até R$ 100 recarregados nos últimos 30 dias',
                             gradient: 'from-amber-100 via-orange-50 to-amber-50',
                             iconBg: 'bg-amber-200/70',
                             textColor: 'text-amber-900',
@@ -394,7 +394,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                         };
                         if (totalRechargeInReais <= 500) return {
                             label: 'Prata',
-                            sublabel: 'R$ 100 a R$ 500 em recargas',
+                            sublabel: 'R$ 100 a R$ 500 recarregados nos últimos 30 dias',
                             gradient: 'from-slate-200 via-slate-100 to-slate-50',
                             iconBg: 'bg-slate-300/60',
                             textColor: 'text-slate-800',
@@ -409,7 +409,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                         };
                         if (totalRechargeInReais <= 1000) return {
                             label: 'Ouro',
-                            sublabel: 'R$ 500 a R$ 1.000 em recargas',
+                            sublabel: 'R$ 500 a R$ 1.000 recarregados nos últimos 30 dias',
                             gradient: 'from-yellow-200 via-amber-100 to-yellow-50',
                             iconBg: 'bg-yellow-300/70',
                             textColor: 'text-yellow-900',
@@ -420,7 +420,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                         };
                         return {
                             label: 'VIP',
-                            sublabel: 'Acima de R$ 1.000 em recargas',
+                            sublabel: 'Mais de R$ 1.000 recarregados nos últimos 30 dias',
                             gradient: 'from-purple-200 via-violet-100 to-purple-50',
                             iconBg: 'bg-purple-300/60',
                             textColor: 'text-purple-900',
@@ -556,44 +556,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                     </p>
                 )}
 
-                {/* Painel Elegante de Estatísticas (Stats) para Credibilidade */}
-                {user.isProfessional && (
-                    <div className="w-full max-w-sm mt-5 grid grid-cols-3 gap-2 border-y border-slate-200/50 py-3.5 px-4 mb-4 z-10 bg-white/40 backdrop-blur-sm rounded-xl animate-in fade-in duration-300">
-                        <div className="flex flex-col items-center text-center border-r border-slate-200/50">
-                            <span className="text-sm font-bold text-slate-800 tabular-nums">
-                                {(user as any).conversationsLastWeekCount || 0}
-                            </span>
-                            <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
-                                Conversas
-                            </span>
-                            <span className="text-[7px] font-bold text-slate-400/80 uppercase tracking-wide mt-0.5">
-                                Na semana
-                            </span>
-                        </div>
-                        <div className="flex flex-col items-center text-center border-r border-slate-200/50">
-                            <span className="text-sm font-bold text-slate-800 tabular-nums">
-                                {user.subscribers?.length || 0}
-                            </span>
-                            <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
-                                Assinantes
-                            </span>
-                            <span className="text-[7px] font-bold text-slate-400/80 uppercase tracking-wide mt-0.5">
-                                Ativos
-                            </span>
-                        </div>
-                        <div className="flex flex-col items-center text-center">
-                            <span className="text-sm font-bold text-slate-800 tabular-nums">
-                                {((user as any).messagesLastWeekCount || 0).toLocaleString('pt-BR')}
-                            </span>
-                            <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
-                                Mensagens
-                            </span>
-                            <span className="text-[7px] font-bold text-slate-400/80 uppercase tracking-wide mt-0.5">
-                                Na semana
-                            </span>
-                        </div>
-                    </div>
-                )}
+
 
 
             </div>
