@@ -87,35 +87,46 @@ export async function GET(request: NextRequest) {
         const oneWeekAgo = new Date();
         oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-        // Agregação de conversas ativas
-        const activeRoomsGroup = await Room.aggregate([
-            {
-                $match: {
-                    participants: { $in: clerkIds },
-                    $or: [
-                        { lastMessageTime: { $gte: activeLimit } },
-                        { lastMessageTime: { $exists: false }, createdAt: { $gte: activeLimit } }
-                    ]
-                }
-            },
-            {
-                $unwind: "$participants"
-            },
-            {
-                $match: {
-                    participants: { $in: clerkIds }
-                }
-            },
-            {
-                $group: {
-                    _id: "$participants",
-                    count: { $sum: 1 }
-                }
-            }
-        ]);
+        // Agregação de conversas ativas (com bidirecionalidade obrigatória)
+        const activeRoomsDocs = await Room.find({
+            participants: { $in: clerkIds },
+            lastMessageTime: { $gte: activeLimit }
+        }).select('participants').lean() as any[];
 
         const activeRoomsMap = new Map<string, number>();
-        activeRoomsGroup.forEach((g: any) => activeRoomsMap.set(g._id, g.count));
+
+        if (activeRoomsDocs.length > 0) {
+            // Montar virtualRoomIds (formato usado pelas mensagens: p1_p2 ordenado)
+            const roomVirtualMap = new Map<string, string[]>(); // virtualRoomId → participants
+            for (const room of activeRoomsDocs) {
+                const vId = (room.participants as string[]).slice().sort().join('_');
+                roomVirtualMap.set(vId, room.participants as string[]);
+            }
+            const virtualRoomIds = Array.from(roomVirtualMap.keys());
+
+            // Quais roomIds têm mensagens de pelo menos 2 remetentes distintos?
+            const biSendersAgg = await Message.aggregate([
+                {
+                    $match: {
+                        roomId: { $in: virtualRoomIds },
+                        isSystem: { $ne: true }
+                    }
+                },
+                { $group: { _id: { roomId: '$roomId', senderId: '$senderId' } } },
+                { $group: { _id: '$_id.roomId', senderCount: { $sum: 1 } } },
+                { $match: { senderCount: { $gte: 2 } } }
+            ]) as any[];
+
+            // Montar mapa userId → count de salas bilaterais ativas
+            for (const { _id: vId } of biSendersAgg) {
+                const participants = roomVirtualMap.get(vId) ?? [];
+                for (const p of participants) {
+                    if (clerkIds.includes(p)) {
+                        activeRoomsMap.set(p, (activeRoomsMap.get(p) ?? 0) + 1);
+                    }
+                }
+            }
+        }
 
         // Agregação de mensagens na última semana
         const messagesGroup = await Message.aggregate([
