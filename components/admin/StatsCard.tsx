@@ -6,8 +6,8 @@ import { LucideIcon, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 interface StatsCardProps {
     title: string;
     value: string | number;
-    change: string;
-    isPositive: boolean;
+    change?: string;
+    isPositive?: boolean;
     icon: LucideIcon;
     color: 'purple' | 'green' | 'blue' | 'amber';
 }
@@ -42,18 +42,17 @@ export function StatsCard({ title, value, change, isPositive, icon: Icon, color 
                     <span className="text-3xl font-extrabold text-slate-800 tracking-tight block">
                         {value}
                     </span>
-                    <span className={`inline-flex items-center gap-0.5 text-xs font-bold px-2 py-0.5 rounded-full ${
-                        isPositive 
-                            ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
-                            : 'bg-rose-50 text-rose-600 border border-rose-100'
-                    }`}>
-                        {isPositive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-                        {change}
-                    </span>
+                    {change && (
+                        <span className={`inline-flex items-center gap-0.5 text-xs font-bold px-2 py-0.5 rounded-full ${
+                            isPositive 
+                                ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
+                                : 'bg-rose-50 text-rose-600 border border-rose-100'
+                        }`}>
+                            {isPositive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                            {change}
+                        </span>
+                    )}
                 </div>
-                <p className="text-[10px] text-slate-400 font-medium">
-                    Comparado ao mesmo período anterior
-                </p>
             </div>
 
             <div className={`p-3 rounded-xl border flex items-center justify-center transition-transform duration-300 group-hover:scale-110 ${colorMap[color].bg}`}>

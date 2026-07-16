@@ -57,12 +57,12 @@ export default function AdminPage() {
 
     const [activeTab, setActiveTab] = useState('dashboard');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [selectedPeriod, setSelectedPeriod] = useState<'none' | 'week' | 'month'>('none');
+
     const [dashboardData, setDashboardData] = useState<any>(null);
     const [loadingDashboard, setLoadingDashboard] = useState(true);
 
     const settings = useSettings(isLoaded, isSignedIn, userId);
-    const { isAuthorized, loadingSettings, comparisonPeriod } = settings;
+    const { isAuthorized, loadingSettings } = settings;
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -72,10 +72,10 @@ export default function AdminPage() {
         }
     }, []);
 
-    const fetchDashboard = async (period: string) => {
+    const fetchDashboard = async () => {
         setLoadingDashboard(true);
         try {
-            const res = await fetch(`/api/admin/dashboard?period=${period}`);
+            const res = await fetch('/api/admin/dashboard');
             if (res.ok) setDashboardData(await res.json());
             else toast.error('Erro ao carregar métricas do dashboard.');
         } catch {
@@ -93,7 +93,7 @@ export default function AdminPage() {
                 toast.success('Transação excluída com sucesso!', {
                     style: { borderRadius: '12px', background: '#1E293B', color: '#FFF', fontWeight: 600 }
                 });
-                fetchDashboard(selectedPeriod);
+                fetchDashboard();
             } else {
                 const data = await res.json();
                 toast.error(data.error || 'Erro ao excluir transação.');
@@ -105,16 +105,10 @@ export default function AdminPage() {
 
     useEffect(() => {
         if (!isAuthorized) return;
-        if (activeTab === 'dashboard' || activeTab === 'financial') {
-            fetchDashboard(selectedPeriod);
+        if (activeTab === 'dashboard') {
+            fetchDashboard();
         }
-    }, [activeTab, selectedPeriod, isAuthorized]);
-
-    useEffect(() => {
-        if (isAuthorized && comparisonPeriod) {
-            setSelectedPeriod(comparisonPeriod);
-        }
-    }, [isAuthorized, comparisonPeriod]);
+    }, [activeTab, isAuthorized]);
 
     if (!isLoaded || loadingSettings) {
         return (
@@ -173,16 +167,7 @@ export default function AdminPage() {
 
             <div className="flex-1 flex flex-col min-w-0">
                 <DashboardHeader title={TAB_TITLES[activeTab] ?? 'MimoAdmin'} onMenuToggle={() => setIsSidebarOpen(true)}>
-                    {(activeTab === 'dashboard' || activeTab === 'financial') && (
-                        <div className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 px-3 py-1.5 rounded-xl transition-all h-fit shrink-0 ml-2 md:ml-4 select-none">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Período:</span>
-                            <select value={selectedPeriod} onChange={(e) => setSelectedPeriod(e.target.value as any)} className="text-xs font-bold bg-transparent focus:outline-none text-slate-700 cursor-pointer pr-1">
-                                <option value="none">Sem Comparação</option>
-                                <option value="week">Última Semana</option>
-                                <option value="month">Último Mês</option>
-                            </select>
-                        </div>
-                    )}
+
                 </DashboardHeader>
 
                 <main className={`flex-1 overflow-y-auto max-w-7xl w-full mx-auto ${isSettingsTab ? 'p-4 md:p-8' : 'p-4 md:p-8 space-y-4 md:space-y-8'}`}>
@@ -190,10 +175,10 @@ export default function AdminPage() {
                     {activeTab === 'dashboard' && (
                         <>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                                <StatsCard title="Clientes Ativos" value={loadingDashboard ? '...' : dashboardData?.metrics?.activeClients?.value || '0'} change={loadingDashboard ? undefined : dashboardData?.metrics?.activeClients?.change || undefined} isPositive={loadingDashboard ? true : dashboardData?.metrics?.activeClients?.isPositive} icon={Users} color="purple" />
-                                <StatsCard title="Profissionais Ativas" value={loadingDashboard ? '...' : dashboardData?.metrics?.activeProfessionals?.value || '0'} change={loadingDashboard ? undefined : dashboardData?.metrics?.activeProfessionals?.change || undefined} isPositive={loadingDashboard ? true : dashboardData?.metrics?.activeProfessionals?.isPositive} icon={UserCheck} color="amber" />
-                                <StatsCard title="Conversas Ativas" value={loadingDashboard ? '...' : dashboardData?.metrics?.activeChats?.value || '0'} change={loadingDashboard ? undefined : dashboardData?.metrics?.activeChats?.change || undefined} isPositive={loadingDashboard ? true : dashboardData?.metrics?.activeChats?.isPositive} icon={MessageSquare} color="blue" />
-                                <StatsCard title="Mensagens Enviadas" value={loadingDashboard ? '...' : dashboardData?.metrics?.messages?.value || '0'} change={loadingDashboard ? undefined : dashboardData?.metrics?.messages?.change || undefined} isPositive={loadingDashboard ? true : dashboardData?.metrics?.messages?.isPositive} icon={MessageCircle} color="green" />
+                                <StatsCard title="Clientes Ativos" value={loadingDashboard ? '...' : dashboardData?.metrics?.activeClients?.value || '0'} icon={Users} color="purple" />
+                                <StatsCard title="Profissionais Ativas" value={loadingDashboard ? '...' : dashboardData?.metrics?.activeProfessionals?.value || '0'} icon={UserCheck} color="amber" />
+                                <StatsCard title="Conversas Ativas" value={loadingDashboard ? '...' : dashboardData?.metrics?.activeChats?.value || '0'} icon={MessageSquare} color="blue" />
+                                <StatsCard title="Mensagens Enviadas" value={loadingDashboard ? '...' : dashboardData?.metrics?.messages?.value || '0'} icon={MessageCircle} color="green" />
                             </div>
 
                             {/* Principais Usuários e Últimos Depósitos — 3 colunas no desktop */}
