@@ -161,22 +161,22 @@ export default function SearchPage() {
                 {/* Overlay gradiente escuro (apenas na parte inferior para leitura do texto) */}
                 <div className="absolute bottom-0 inset-x-0 h-1/3 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
 
-                {/* Badge Novo (top left) */}
-                {user.isNew && (
+                {/* Badge Novo (top left) - Apenas para profissionais */}
+                {user.isNew && user.isProfessional && (
                     <div className="absolute top-2.5 left-2.5 bg-purple-600 text-white text-[8px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-full shadow-md z-10">
                         Novo
                     </div>
                 )}
 
-                {/* Medalha de Nível (top left) */}
-                {!user.isProfessional && userData?.isProfessional && user.clientLevel && typeof user.clientLevel === 'object' && user.clientLevel.name !== 'Novo' && (() => {
+                {/* Medalha de Nível (top left) - Para clientes */}
+                {!user.isProfessional && userData?.isProfessional && user.clientLevel && typeof user.clientLevel === 'object' && (() => {
                     const IconComponent = 
                         user.clientLevel.icon === 'Crown' ? Crown :
                         user.clientLevel.icon === 'Star' ? Star :
                         user.clientLevel.icon === 'Medal' ? Medal : Award;
                     return (
                         <div 
-                            className={`absolute top-2.5 ${user.isNew ? 'left-[55px]' : 'left-2.5'} w-6 h-6 rounded-xl flex items-center justify-center shadow-md backdrop-blur-md border z-10 transition-all duration-300`}
+                            className="absolute top-2.5 left-2.5 w-6 h-6 rounded-xl flex items-center justify-center shadow-md backdrop-blur-md border z-10 transition-all duration-300"
                             style={{ 
                                 backgroundColor: `${user.clientLevel.color}d0`, 
                                 borderColor: `${user.clientLevel.color}45`,
