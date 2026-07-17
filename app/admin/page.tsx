@@ -23,10 +23,11 @@ import { SettingsPaymentsPage } from '@/components/admin/settings/SettingsPaymen
 import { SettingsAppPage } from '@/components/admin/settings/SettingsAppPage';
 import { SettingsAdminsPage } from '@/components/admin/settings/SettingsAdminsPage';
 import { SettingsExplorePage } from '@/components/admin/settings/SettingsExplorePage';
+import { SettingsLevelsPage } from '@/components/admin/settings/SettingsLevelsPage';
 import { useSettings } from '@/hooks/admin/useSettings';
 import {
     Users, UserCheck, MessageSquare, MessageCircle, Coins, TrendingUp,
-    Lock, ArrowLeft, CheckCircle2, Clock, AlertCircle, Sliders, Trash2, Award
+    Lock, ArrowLeft, CheckCircle2, Clock, AlertCircle, Sliders, Trash2, Award, Medal, Crown, Star
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -47,6 +48,7 @@ const TAB_TITLES: Record<string, string> = {
     'settings-payments': 'Configurações — Meios de Pagamento',
     'settings-app': 'Configurações — App & Experiência',
     'settings-admins': 'Configurações — Administradores',
+    'settings-levels': 'Configurações — Faixas & Medalhas',
 };
 
 const VALID_TABS = Object.keys(TAB_TITLES);
@@ -210,21 +212,23 @@ export default function AdminPage() {
                                                     )}
                                                     <div className="flex flex-col min-w-0 flex-1">
                                                         <Link href={`/admin/users/${client.clerkId}`} className="text-xs font-bold text-purple-600 hover:text-purple-800 hover:underline transition-colors text-left truncate flex items-center gap-1">
-                                                            {client.name}
-                                                            {client.clientLevel && client.clientLevel !== 'Novo' && (
-                                                                <span title={`Nível ${client.clientLevel}`} className="inline-flex shrink-0">
-                                                                    <Award 
-                                                                        size={12} 
-                                                                        className={`shrink-0 ${
-                                                                            client.clientLevel === 'VIP' ? 'text-purple-650' :
-                                                                            client.clientLevel === 'Ouro' ? 'text-yellow-600' :
-                                                                            client.clientLevel === 'Prata' ? 'text-slate-500' :
-                                                                            'text-amber-700'
-                                                                        }`} 
-                                                                    />
-                                                                </span>
-                                                            )}
-                                                        </Link>
+                                                             {client.name}
+                                                             {client.clientLevel && typeof client.clientLevel === 'object' && client.clientLevel.name !== 'Novo' && (() => {
+                                                                 const IconComponent = 
+                                                                     client.clientLevel.icon === 'Crown' ? Crown :
+                                                                     client.clientLevel.icon === 'Star' ? Star :
+                                                                     client.clientLevel.icon === 'Medal' ? Medal : Award;
+                                                                 return (
+                                                                     <span title={`Nível ${client.clientLevel.name}`} className="inline-flex shrink-0">
+                                                                         <IconComponent 
+                                                                             size={12} 
+                                                                             className="shrink-0"
+                                                                             style={{ color: client.clientLevel.color }}
+                                                                         />
+                                                                     </span>
+                                                                 );
+                                                             })()}
+                                                         </Link>
                                                         <span className="text-[10px] text-slate-400 font-semibold truncate">
                                                             {client.activeRoomsCount} {client.activeRoomsCount === 1 ? 'conversa' : 'conversas'} · {client.totalMessages} msgs
                                                         </span>
@@ -428,6 +432,15 @@ export default function AdminPage() {
                             isDirtyAdmins={settings.isDirtyAdmins}
                             saving={settings.saving} saveSettings={settings.saveSettings}
                             userId={userId}
+                        />
+                    )}
+                    {activeTab === 'settings-levels' && (
+                        <SettingsLevelsPage
+                            clientLevels={settings.clientLevels}
+                            setClientLevels={settings.setClientLevels}
+                            isDirtyLevels={settings.isDirtyLevels}
+                            saving={settings.saving}
+                            saveSettings={settings.saveSettings}
                         />
                     )}
 

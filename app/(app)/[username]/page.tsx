@@ -7,7 +7,7 @@ import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { SubscribeModal } from '@/components/SubscribeModal';
 import { useUserByUsername, usePublicGallery, useSubscribe, useMyProfile } from '@/hooks/useQueries';
-import { UserX, Camera, Lock, Eye, EyeOff, X, ChevronLeft, ChevronRight, ShieldCheck, Crown, Gift } from 'lucide-react';
+import { UserX, Camera, Lock, Eye, EyeOff, X, ChevronLeft, ChevronRight, ShieldCheck, Crown, Gift, Award, Medal, Star } from 'lucide-react';
 
 interface UserProfilePageProps {
     params?: Promise<{ username: string }>;
@@ -348,100 +348,51 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                     const openCount = relationshipStats.messageOpenRate90 ?? 0;
                     const totalSent = relationshipStats.last10MessagesSentCount ?? 0;
                     const isVeryAttentive = totalSent >= 5 && openCount >= Math.ceil(totalSent * 0.9);
+                    const levelInfo = relationshipStats.clientLevelInfo || { name: 'Novo', color: '#64748B', icon: 'Medal' };
 
-                    type ClientLevel = {
-                        label: string;
-                        sublabel: string;
-                        gradient: string;
-                        iconBg: string;
-                        textColor: string;
-                        subtextColor: string;
-                        icon: React.ReactNode;
-                        pillBg: string;
-                        pillText: string;
-                    };
+                    const getLevel = (): any => {
+                        const IconComponent = 
+                            levelInfo.icon === 'Crown' ? Crown :
+                            levelInfo.icon === 'Star' ? Star :
+                            levelInfo.icon === 'Medal' ? Medal : Award;
+                        
+                        const isVip = levelInfo.name.toUpperCase() === 'VIP' || levelInfo.color === '#000000';
 
-                    const getLevel = (): ClientLevel => {
-                        if (totalRechargeInReais <= 0) return {
-                            label: 'Novo',
-                            sublabel: 'Ainda não fez recargas nos últimos 30 dias',
-                            gradient: 'from-slate-100 to-slate-50',
-                            iconBg: 'bg-slate-200/80',
-                            textColor: 'text-slate-700',
-                            subtextColor: 'text-slate-400',
-                            pillBg: 'bg-slate-200',
-                            pillText: 'text-slate-600',
-                            icon: (
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500">
-                                    <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
-                                </svg>
-                            )
-                        };
-                        if (totalRechargeInReais <= 100) return {
-                            label: 'Bronze',
-                            sublabel: 'Até R$ 100 recarregados nos últimos 30 dias',
-                            gradient: 'from-amber-100 via-orange-50 to-amber-50',
-                            iconBg: 'bg-amber-200/70',
-                            textColor: 'text-amber-900',
-                            subtextColor: 'text-amber-600/80',
-                            pillBg: 'bg-amber-200',
-                            pillText: 'text-amber-800',
-                            icon: (
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="text-amber-600">
-                                    <path d="M12 2L9.1 9.1H2L7.5 13.5L5.5 20.5L12 16.5L18.5 20.5L16.5 13.5L22 9.1H14.9L12 2Z"/>
-                                </svg>
-                            )
-                        };
-                        if (totalRechargeInReais <= 500) return {
-                            label: 'Prata',
-                            sublabel: 'R$ 100 a R$ 500 recarregados nos últimos 30 dias',
-                            gradient: 'from-slate-200 via-slate-100 to-slate-50',
-                            iconBg: 'bg-slate-300/60',
-                            textColor: 'text-slate-800',
-                            subtextColor: 'text-slate-500',
-                            pillBg: 'bg-slate-300',
-                            pillText: 'text-slate-700',
-                            icon: (
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="text-slate-500">
-                                    <path d="M12 2L9.1 9.1H2L7.5 13.5L5.5 20.5L12 16.5L18.5 20.5L16.5 13.5L22 9.1H14.9L12 2Z"/>
-                                </svg>
-                            )
-                        };
-                        if (totalRechargeInReais <= 1000) return {
-                            label: 'Ouro',
-                            sublabel: 'R$ 500 a R$ 1.000 recarregados nos últimos 30 dias',
-                            gradient: 'from-yellow-200 via-amber-100 to-yellow-50',
-                            iconBg: 'bg-yellow-300/70',
-                            textColor: 'text-yellow-900',
-                            subtextColor: 'text-yellow-700/80',
-                            pillBg: 'bg-yellow-300',
-                            pillText: 'text-yellow-900',
-                            icon: <Crown className="w-[22px] h-[22px] text-yellow-600" />
-                        };
                         return {
-                            label: 'VIP',
-                            sublabel: 'Mais de R$ 1.000 recarregados nos últimos 30 dias',
-                            gradient: 'from-purple-200 via-violet-100 to-purple-50',
-                            iconBg: 'bg-purple-300/60',
-                            textColor: 'text-purple-900',
-                            subtextColor: 'text-purple-600/80',
-                            pillBg: 'bg-purple-300',
-                            pillText: 'text-purple-900',
-                            icon: <Crown className="w-[22px] h-[22px] text-purple-600" />
+                            label: levelInfo.name,
+                            sublabel: isVip 
+                                ? 'Membro VIP — Acesso completo e prioridade premium'
+                                : `Total de R$ ${totalRechargeInReais.toFixed(2)} recarregados nos últimos 30 dias`,
+                            gradient: isVip
+                                ? 'from-slate-950 via-slate-900 to-black border border-slate-800'
+                                : 'from-slate-100 to-slate-50 border border-slate-200/60',
+                            iconBg: isVip ? 'bg-slate-800/80' : 'bg-white shadow-sm',
+                            textColor: isVip ? 'text-white' : 'text-slate-800',
+                            subtextColor: isVip ? 'text-slate-400' : 'text-slate-500',
+                            pillBg: isVip ? 'bg-slate-850 border border-slate-700' : 'bg-slate-100 border border-slate-200',
+                            pillText: isVip ? 'text-slate-100' : 'text-slate-600',
+                            style: isVip ? {} : { 
+                                backgroundColor: `${levelInfo.color}06`,
+                                borderColor: `${levelInfo.color}15`
+                            },
+                            icon: <IconComponent className="w-[22px] h-[22px]" style={{ color: levelInfo.color }} />
                         };
                     };
 
                     const level = getLevel();
+                    const isVip = levelInfo.name.toUpperCase() === 'VIP' || levelInfo.color === '#000000';
 
                     return (
                         <div className="w-full max-w-md mt-5 z-10 animate-in fade-in slide-in-from-bottom-3 duration-500 space-y-3">
-
                             {/* Card de Nível — visual rico com gradiente */}
-                            <div className={`w-full rounded-3xl bg-gradient-to-br ${level.gradient} overflow-hidden shadow-md`}>
+                            <div 
+                                className={`w-full rounded-3xl bg-gradient-to-br ${level.gradient} overflow-hidden shadow-sm`}
+                                style={level.style}
+                            >
                                 <div className="px-5 pt-5 pb-4">
                                     {/* Topo: label e pill */}
                                     <div className="flex items-center justify-between mb-4">
-                                        <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Nível do Cliente</span>
+                                        <span className={`text-[10px] font-black uppercase tracking-[0.18em] ${isVip ? 'text-slate-400' : 'text-slate-400'}`}>Nível do Cliente</span>
                                         <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full ${level.pillBg} ${level.pillText}`}>
                                             {level.label}
                                         </span>
@@ -449,19 +400,19 @@ export default function UserProfilePage({ params, username: propUsername, onBack
 
                                     {/* Centro: ícone + nome do nível */}
                                     <div className="flex items-center gap-4">
-                                        <div className={`w-14 h-14 rounded-2xl ${level.iconBg} flex items-center justify-center shadow-sm flex-shrink-0`}>
+                                        <div className={`w-14 h-14 rounded-2xl ${level.iconBg} flex items-center justify-center shadow-sm shrink-0`}>
                                             {level.icon}
                                         </div>
                                         <div>
-                                            <p className={`text-2xl font-black tracking-tight leading-none ${level.textColor}`}>{level.label}</p>
-                                            <p className={`text-xs font-medium mt-1 leading-tight ${level.subtextColor}`}>{level.sublabel}</p>
+                                            <p className={`text-2.5xl font-black tracking-tight leading-none ${level.textColor}`}>{level.label}</p>
+                                            <p className={`text-xs font-medium mt-1.5 leading-tight ${level.subtextColor}`}>{level.sublabel}</p>
                                         </div>
                                     </div>
 
                                     {/* Rodapé: divisor + gasto comigo */}
-                                    <div className="mt-4 pt-4 border-t border-black/5 flex items-center justify-between">
+                                    <div className={`mt-4 pt-4 border-t ${isVip ? 'border-white/5' : 'border-black/5'} flex items-center justify-between`}>
                                         <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Gastou com você</span>
-                                        <span className="text-base font-black text-purple-700">
+                                        <span className={`text-base font-black ${isVip ? 'text-purple-400' : 'text-purple-750'}`}>
                                             {totalSpentWithMe.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                         </span>
                                     </div>

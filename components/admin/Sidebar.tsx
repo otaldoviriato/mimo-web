@@ -24,6 +24,7 @@ import {
     ShieldCheck,
     ChevronDown,
     Compass,
+    Award
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -43,6 +44,7 @@ const SETTINGS_TABS = [
     { id: 'settings-payments', label: 'Meios de Pagamento', icon: CreditCard },
     { id: 'settings-app', label: 'App & Experiência', icon: Smartphone },
     { id: 'settings-admins', label: 'Administradores', icon: ShieldCheck },
+    { id: 'settings-levels', label: 'Faixas & Medalhas', icon: Award },
 ];
 
 export function Sidebar({ activeTab, setActiveTab, isOpen = false, onClose }: SidebarProps) {

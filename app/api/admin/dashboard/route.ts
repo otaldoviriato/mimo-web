@@ -272,12 +272,26 @@ export async function GET(request: NextRequest) {
             ]);
             const recharges30DaysMap = new Map<string, number>(recharges30DaysAgg.map(r => [r._id, r.total]));
 
-            const getClientLevel = (amount: number): string => {
-                if (amount <= 0) return 'Novo';
-                if (amount <= 100) return 'Bronze';
-                if (amount <= 500) return 'Prata';
-                if (amount <= 1000) return 'Ouro';
-                return 'VIP';
+            const globalSettings = await AppSettings.findOne({ key: 'global' }).select('clientLevels').lean() as any;
+
+            const getClientLevel = (amount: number): any => {
+                if (!globalSettings?.clientLevels || globalSettings.clientLevels.length === 0) {
+                    let levelName = 'Novo';
+                    let color = '#64748B';
+                    let icon = 'Medal';
+                    if (amount > 0 && amount <= 100) { levelName = 'Bronze'; color = '#D97706'; }
+                    else if (amount <= 500) { levelName = 'Prata'; color = '#64748B'; }
+                    else if (amount <= 1000) { levelName = 'Ouro'; color = '#EAB308'; icon = 'Crown'; }
+                    else if (amount > 1000) { levelName = 'VIP'; color = '#000000'; icon = 'Crown'; }
+                    return { name: levelName, color, icon };
+                }
+                const sortedLevels = [...globalSettings.clientLevels].sort((a: any, b: any) => b.minAmount - a.minAmount);
+                for (const lvl of sortedLevels) {
+                    if (amount >= lvl.minAmount) {
+                        return { name: lvl.name, color: lvl.color, icon: lvl.icon };
+                    }
+                }
+                return { name: 'Novo', color: '#64748B', icon: 'Medal' };
             };
 
             // 3. Faturamento obtido por profissionais (em reais)

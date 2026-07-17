@@ -29,6 +29,7 @@ interface SettingsSnapshot {
     newProfileDaysThreshold: number;
     exploreSortingCriteria: string[];
     adminClerkIds: string[];
+    clientLevels: any[];
 }
 
 export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, userId: string | null | undefined) {
@@ -64,6 +65,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     const [identityVerificationPromptIntervalDays, setIdentityVerificationPromptIntervalDays] = useState(7);
     const [newProfileDaysThreshold, setNewProfileDaysThreshold] = useState(15);
     const [exploreSortingCriteria, setExploreSortingCriteria] = useState<string[]>(['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness']);
+    const [clientLevels, setClientLevels] = useState<any[]>([]);
 
     // Gerenciamento de administradores
     const [adminListRich, setAdminListRich] = useState<RichAdmin[]>([]);
@@ -99,6 +101,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         newProfileDaysThreshold: s.newProfileDaysThreshold ?? 15,
         exploreSortingCriteria: s.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'],
         adminClerkIds: richAdmins.map(a => a.clerkId),
+        clientLevels: s.clientLevels || [],
     });
 
     useEffect(() => {
@@ -144,6 +147,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     setIdentityVerificationPromptIntervalDays(s.identityVerificationPromptIntervalDays ?? 7);
                     setNewProfileDaysThreshold(s.newProfileDaysThreshold ?? 15);
                     setExploreSortingCriteria(s.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness']);
+                    setClientLevels(s.clientLevels || []);
                     setSavedSnapshot(buildSnapshot(s, richAdmins));
                     setIsAuthorized(true);
                 } else if (response.status === 403) {
@@ -232,6 +236,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     identityVerificationPromptIntervalDays,
                     newProfileDaysThreshold,
                     exploreSortingCriteria,
+                    clientLevels,
                 }),
             });
             if (response.ok) {
@@ -262,6 +267,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                 setIdentityVerificationPromptIntervalDays(s.identityVerificationPromptIntervalDays ?? 7);
                 setNewProfileDaysThreshold(s.newProfileDaysThreshold ?? 15);
                 setExploreSortingCriteria(s.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness']);
+                setClientLevels(s.clientLevels || []);
             } else {
                 const errData = await response.json();
                 toast.error(errData.error || 'Erro ao salvar configurações.');
@@ -338,6 +344,18 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         exploreSortingCriteria.length !== savedSnapshot.exploreSortingCriteria.length ||
         exploreSortingCriteria.some((c, idx) => c !== savedSnapshot.exploreSortingCriteria[idx])
     );
+    const isDirtyLevels = savedSnapshot !== null && (
+        clientLevels.length !== (savedSnapshot as any).clientLevels?.length ||
+        clientLevels.some((lvl, idx) => {
+            const snapLvl = (savedSnapshot as any).clientLevels?.[idx];
+            if (!snapLvl) return true;
+            return lvl.id !== snapLvl.id ||
+                   lvl.name !== snapLvl.name ||
+                   lvl.minAmount !== snapLvl.minAmount ||
+                   lvl.color !== snapLvl.color ||
+                   lvl.icon !== snapLvl.icon;
+        })
+    );
 
     return {
         settings, loadingSettings, isAuthorized, saving, savedSnapshot,
@@ -368,6 +386,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         identityVerificationPromptIntervalDays, setIdentityVerificationPromptIntervalDays,
         newProfileDaysThreshold, setNewProfileDaysThreshold,
         exploreSortingCriteria, setExploreSortingCriteria,
+        clientLevels, setClientLevels,
+        isDirtyLevels,
         adminListRich,
         adminSearch, setAdminSearch,
         adminSearchResults,

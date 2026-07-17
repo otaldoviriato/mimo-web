@@ -7,7 +7,7 @@ import { Button } from '@/components/Button';
 import { Avatar } from '@/components/Avatar';
 import { userApi } from '@/services/api';
 import { useMyProfile } from '@/hooks/useQueries';
-import { ShieldAlert, ShieldCheck, Search, X, MapPin, Award } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, Search, X, MapPin, Award, Medal, Crown, Star } from 'lucide-react';
 
 const calculateAge = (birthDateString?: string | Date) => {
     if (!birthDateString) return null;
@@ -185,20 +185,25 @@ export default function SearchPage() {
                 )}
 
                 {/* Medalha de Nível (top left) */}
-                {!user.isProfessional && userData?.isProfessional && user.clientLevel && user.clientLevel !== 'Novo' && (
-                    <div 
-                        className={`absolute top-2.5 ${user.isNew ? 'left-[55px]' : 'left-2.5'} w-6 h-6 rounded-xl flex items-center justify-center shadow-md backdrop-blur-md border z-10 transition-all duration-300 ${
-                            user.clientLevel === 'VIP' ? 'bg-purple-600/90 border-purple-400 text-purple-100' :
-                            user.clientLevel === 'Ouro' ? 'bg-yellow-500/90 border-yellow-300 text-yellow-50' :
-                            user.clientLevel === 'Prata' ? 'bg-slate-300/95 border-slate-200 text-slate-700' :
-                            user.clientLevel === 'Bronze' ? 'bg-amber-600/90 border-amber-400 text-amber-100' :
-                            'bg-slate-500/90 border-slate-400 text-white'
-                        }`}
-                        title={`Nível ${user.clientLevel}`}
-                    >
-                        <Award className="w-3.5 h-3.5" />
-                    </div>
-                )}
+                {!user.isProfessional && userData?.isProfessional && user.clientLevel && typeof user.clientLevel === 'object' && user.clientLevel.name !== 'Novo' && (() => {
+                    const IconComponent = 
+                        user.clientLevel.icon === 'Crown' ? Crown :
+                        user.clientLevel.icon === 'Star' ? Star :
+                        user.clientLevel.icon === 'Medal' ? Medal : Award;
+                    return (
+                        <div 
+                            className={`absolute top-2.5 ${user.isNew ? 'left-[55px]' : 'left-2.5'} w-6 h-6 rounded-xl flex items-center justify-center shadow-md backdrop-blur-md border z-10 transition-all duration-300`}
+                            style={{ 
+                                backgroundColor: `${user.clientLevel.color}d0`, 
+                                borderColor: `${user.clientLevel.color}45`,
+                                color: '#ffffff'
+                            }}
+                            title={`Nível ${user.clientLevel.name}`}
+                        >
+                            <IconComponent className="w-3.5 h-3.5" />
+                        </div>
+                    );
+                })()}
 
                 {/* Badge Online (top right) */}
                 {!!user.isOnline && (

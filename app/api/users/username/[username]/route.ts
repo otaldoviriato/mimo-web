@@ -76,6 +76,7 @@ export async function GET(
                 const viewer = await User.findOne({ clerkId: viewerClerkId }).select('isProfessional');
                 if (viewer?.isProfessional && !user.isProfessional) {
                     shouldShowBalance = true;
+                    const globalSettings = await AppSettings.findOne({ key: 'global' }).select('clientLevels').lean() as any;
 
                     // 1. Calcular total gasto (débitos do cliente com este profissional)
                     const totalSpentAgg = await MicroTransaction.aggregate([
@@ -206,6 +207,27 @@ export async function GET(
                     ]);
                     const totalHistoricalRecharge = totalHistoricalRechargeAgg[0]?.total ?? 0;
 
+                    const getClientLevelInfo = (amount: number, levels: any[]): any => {
+                        if (!levels || levels.length === 0) {
+                            let levelName = 'Novo';
+                            let color = '#64748B';
+                            let icon = 'Medal';
+                            if (amount > 0 && amount <= 100) { levelName = 'Bronze'; color = '#D97706'; }
+                            else if (amount <= 500) { levelName = 'Prata'; color = '#64748B'; }
+                            else if (amount <= 1000) { levelName = 'Ouro'; color = '#EAB308'; icon = 'Crown'; }
+                            else if (amount > 1000) { levelName = 'VIP'; color = '#000000'; icon = 'Crown'; }
+                            return { name: levelName, color, icon };
+                        }
+                        const sortedLevels = [...levels].sort((a: any, b: any) => b.minAmount - a.minAmount);
+                        for (const lvl of sortedLevels) {
+                            if (amount >= lvl.minAmount) {
+                                return { name: lvl.name, color: lvl.color, icon: lvl.icon };
+                            }
+                        }
+                        return { name: 'Novo', color: '#64748B', icon: 'Medal' };
+                    };
+                    const clientLevelInfo = getClientLevelInfo(totalHistoricalRecharge, globalSettings?.clientLevels);
+
                     // 5. Verificar se o cliente já enviou algum presente (badge "Primeiro Mimo")
                     const giftCount = await Message.countDocuments({
                         senderId: user.clerkId,
@@ -245,6 +267,7 @@ export async function GET(
                         hasEverSentGift,
                         messageOpenRate90,
                         last10MessagesSentCount,
+                        clientLevelInfo,
                         characterStats: {
                             totalClientTextChars,
                             freeCharsLimit,

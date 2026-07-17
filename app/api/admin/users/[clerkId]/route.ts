@@ -88,11 +88,20 @@ export async function GET(
             const total30Days = rechargesAgg[0]?.total ?? 0;
 
             const getClientLevel = (amount: number): string => {
-                if (amount <= 0) return 'Novo';
-                if (amount <= 100) return 'Bronze';
-                if (amount <= 500) return 'Prata';
-                if (amount <= 1000) return 'Ouro';
-                return 'VIP';
+                if (!settings?.clientLevels || settings.clientLevels.length === 0) {
+                    if (amount <= 0) return 'Novo';
+                    if (amount <= 100) return 'Bronze';
+                    if (amount <= 500) return 'Prata';
+                    if (amount <= 1000) return 'Ouro';
+                    return 'VIP';
+                }
+                const sortedLevels = [...settings.clientLevels].sort((a: any, b: any) => b.minAmount - a.minAmount);
+                for (const lvl of sortedLevels) {
+                    if (amount >= lvl.minAmount) {
+                        return lvl.name;
+                    }
+                }
+                return 'Novo';
             };
             clientLevel = getClientLevel(total30Days);
         }

@@ -63,6 +63,16 @@ async function getOrCreateSettings() {
             settings.exploreSortingCriteria = ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'];
             updated = true;
         }
+        if (settings.clientLevels === undefined || settings.clientLevels.length === 0) {
+            settings.clientLevels = [
+                { id: 'novo', name: 'Novo', minAmount: 0, color: '#64748B', icon: 'Medal' },
+                { id: 'bronze', name: 'Bronze', minAmount: 0.01, color: '#D97706', icon: 'Medal' },
+                { id: 'prata', name: 'Prata', minAmount: 100.01, color: '#64748B', icon: 'Medal' },
+                { id: 'ouro', name: 'Ouro', minAmount: 500.01, color: '#EAB308', icon: 'Crown' },
+                { id: 'vip', name: 'VIP', minAmount: 1000.01, color: '#000000', icon: 'Crown' }
+            ];
+            updated = true;
+        }
         if (updated) {
             await settings.save();
         }
@@ -171,6 +181,7 @@ export async function PUT(request: NextRequest) {
             chatInactivityHours,
             activeUserThresholdDays,
             exploreSortingCriteria,
+            clientLevels,
         } = body;
 
         // Validações básicas
@@ -396,6 +407,24 @@ export async function PUT(request: NextRequest) {
             }
 
             settings.adminClerkIds = sanitizedIds;
+        }
+
+        if (clientLevels !== undefined) {
+            if (!Array.isArray(clientLevels)) {
+                return NextResponse.json({ error: 'Níveis de clientes devem ser uma lista' }, { status: 400 });
+            }
+            for (const level of clientLevels) {
+                if (!level.id || !level.name || level.minAmount === undefined || !level.color || !level.icon) {
+                    return NextResponse.json({ error: 'Cada nível de cliente deve ter id, nome, valor mínimo, cor e ícone' }, { status: 400 });
+                }
+                if (isNaN(Number(level.minAmount)) || Number(level.minAmount) < 0) {
+                    return NextResponse.json({ error: 'O valor mínimo de recarga de cada faixa deve ser maior ou igual a zero' }, { status: 400 });
+                }
+                if (!['Award', 'Medal', 'Crown', 'Star'].includes(level.icon)) {
+                    return NextResponse.json({ error: 'O ícone selecionado é inválido. Escolha Award, Medal, Crown ou Star' }, { status: 400 });
+                }
+            }
+            settings.clientLevels = clientLevels;
         }
 
         await settings.save();

@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
             return acc;
         }, {});
 
-        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers newProfileDaysThreshold').lean();
+        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers newProfileDaysThreshold clientLevels').lean() as any;
         const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
         const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
         const thresholdDays = settings?.newProfileDaysThreshold ?? 15;
@@ -115,13 +115,24 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        const getClientLevel = (amountCents: number): string => {
-            const amount = amountCents;
-            if (amount <= 0) return 'Novo';
-            if (amount <= 100) return 'Bronze';
-            if (amount <= 500) return 'Prata';
-            if (amount <= 1000) return 'Ouro';
-            return 'VIP';
+        const getClientLevel = (amount: number): any => {
+            if (!settings?.clientLevels || settings.clientLevels.length === 0) {
+                let levelName = 'Novo';
+                let color = '#64748B';
+                let icon = 'Medal';
+                if (amount > 0 && amount <= 100) { levelName = 'Bronze'; color = '#D97706'; }
+                else if (amount <= 500) { levelName = 'Prata'; color = '#64748B'; }
+                else if (amount <= 1000) { levelName = 'Ouro'; color = '#EAB308'; icon = 'Crown'; }
+                else if (amount > 1000) { levelName = 'VIP'; color = '#000000'; icon = 'Crown'; }
+                return { name: levelName, color, icon };
+            }
+            const sortedLevels = [...settings.clientLevels].sort((a: any, b: any) => b.minAmount - a.minAmount);
+            for (const lvl of sortedLevels) {
+                if (amount >= lvl.minAmount) {
+                    return { name: lvl.name, color: lvl.color, icon: lvl.icon };
+                }
+            }
+            return { name: 'Novo', color: '#64748B', icon: 'Medal' };
         };
 
         // Mapear usuários e calcular scores

@@ -1,5 +1,13 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+export interface IClientLevel {
+    id: string;
+    name: string;
+    minAmount: number;
+    color: string;
+    icon: 'Award' | 'Medal' | 'Crown' | 'Star';
+}
+
 export interface IAppSettings extends Document {
     key: string;
     platformFeePercentage: number;
@@ -32,6 +40,7 @@ export interface IAppSettings extends Document {
     chatInactivityHours: number;
     activeUserThresholdDays: number;
     exploreSortingCriteria: string[];
+    clientLevels: IClientLevel[];
     createdAt: Date;
     updatedAt: Date;
 }
@@ -218,6 +227,23 @@ const AppSettingsSchema = new Schema<IAppSettings>({
         required: true,
         default: ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'],
     },
+    clientLevels: {
+        type: [{
+            id: { type: String, required: true },
+            name: { type: String, required: true },
+            minAmount: { type: Number, required: true },
+            color: { type: String, required: true },
+            icon: { type: String, required: true, enum: ['Award', 'Medal', 'Crown', 'Star'] }
+        }],
+        required: true,
+        default: [
+            { id: 'novo', name: 'Novo', minAmount: 0, color: '#64748B', icon: 'Medal' },
+            { id: 'bronze', name: 'Bronze', minAmount: 0.01, color: '#D97706', icon: 'Medal' },
+            { id: 'prata', name: 'Prata', minAmount: 100.01, color: '#64748B', icon: 'Medal' },
+            { id: 'ouro', name: 'Ouro', minAmount: 500.01, color: '#EAB308', icon: 'Crown' },
+            { id: 'vip', name: 'VIP', minAmount: 1000.01, color: '#000000', icon: 'Crown' }
+        ]
+    }
 }, {
     timestamps: true,
 });

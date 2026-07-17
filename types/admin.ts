@@ -29,6 +29,7 @@ export interface SettingsData {
     chatInactivityHours?: number;
     activeUserThresholdDays?: number;
     exploreSortingCriteria?: string[];
+    clientLevels?: any[];
 }
 
 export interface ChatMessage {
