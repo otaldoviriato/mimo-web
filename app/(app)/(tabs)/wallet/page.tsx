@@ -440,64 +440,6 @@ export default function WalletPage() {
                     </div>
                 )}
 
-                {/* ── PAINEL DE VELOCIDADE DE RESPOSTA ── */}
-                {userData?.isProfessional && userData?.professionalStatus === 'approved' && (
-                    <div className="bg-white border border-purple-100 rounded-2xl p-5 shadow-[0_4px_20px_rgb(0,0,0,0.012)] flex flex-col gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                        <div>
-                            <div className="flex items-center justify-between">
-                                <h3 className="font-bold text-gray-900 text-sm">Tempo de Resposta no Chat</h3>
-                                {(() => {
-                                    const minutes = userData?.avgResponseTimeMinutes;
-                                    if (minutes == null) {
-                                        return <span className="text-xs font-black text-slate-500 bg-slate-50 border border-slate-200/50 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Aguardando dados</span>;
-                                    }
-                                    if (minutes <= 10) {
-                                        return <span className="text-xs font-black text-emerald-650 bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Excelente</span>;
-                                    }
-                                    if (minutes <= 30) {
-                                        return <span className="text-xs font-black text-teal-600 bg-teal-50 border border-teal-100 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Bom</span>;
-                                    }
-                                    if (minutes <= 60) {
-                                        return <span className="text-xs font-black text-amber-650 bg-amber-50 border border-amber-100 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Regular</span>;
-                                    }
-                                    return <span className="text-xs font-black text-rose-650 bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Pode melhorar</span>;
-                                })()}
-                            </div>
-                            <p className="text-[11px] text-gray-400 leading-snug mt-1">
-                                O algoritmo do Explorar prioriza criadores que respondem rápido. Mantenha seu tempo baixo para receber mais destaque!
-                            </p>
-                        </div>
-
-                        {/* Detalhe do Tempo de Resposta */}
-                        <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-xl bg-purple-100 flex items-center justify-center text-purple-600 shrink-0">
-                                    <Clock3 className="w-4 h-4" />
-                                </div>
-                                <div className="flex flex-col text-left">
-                                    <span className="text-xs font-bold text-slate-700">Seu tempo médio</span>
-                                    <span className="text-[10px] text-slate-400 font-medium">Calculado em tempo real</span>
-                                </div>
-                            </div>
-                            <span className="text-sm font-black text-slate-800 tabular-nums">
-                                {(() => {
-                                    const minutes = userData?.avgResponseTimeMinutes;
-                                    if (minutes == null) return 'Calculando...';
-                                    if (minutes < 1) return 'Menos de 1 min';
-                                    if (minutes < 60) {
-                                        const sec = Math.round((minutes % 1) * 60);
-                                        const minStr = Math.floor(minutes);
-                                        return `${minStr} min ${sec > 0 ? `${sec}s` : ''}`;
-                                    }
-                                    const hours = Math.floor(minutes / 60);
-                                    const mins = Math.round(minutes % 60);
-                                    return `${hours}h ${mins > 0 ? `${mins}min` : ''}`;
-                                })()}
-                            </span>
-                        </div>
-                    </div>
-                )}
-
                 {/* ── BENTO BLOCK 2: HISTÓRICO DE SAQUES (Substitui Desempenho no Chat) ── */}
                 {(withdrawFeedback || hasActiveWithdrawal) && (
                     <div className={`rounded-2xl border p-4 flex items-start gap-3 shadow-[0_4px_20px_rgb(0,0,0,0.012)] ${

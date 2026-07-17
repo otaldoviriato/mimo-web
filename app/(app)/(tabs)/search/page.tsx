@@ -38,25 +38,9 @@ export default function SearchPage() {
     const [lightbox, setLightbox] = useState<{ photos: string[]; index: number } | null>(null);
 
     const [isSearchOpen, setIsSearchOpen] = useState(false);
-    const [activeFilter, setActiveFilter] = useState<'todos' | 'novos' | 'proximos'>('todos');
-
     const getFilteredUsers = () => {
-        return featuredUsers.filter(user => {
-            if (activeFilter === 'novos') {
-                return !!user.isNew;
-            }
-            if (activeFilter === 'proximos') {
-                return userData?.state ? user.state === userData.state : true;
-            }
-            return true;
-        });
+        return featuredUsers;
     };
-
-    const allCount = featuredUsers.length;
-    const newCount = featuredUsers.filter(u => u.isNew).length;
-    const nearbyCount = featuredUsers.filter(u => {
-        return userData?.state ? u.state === userData.state : true;
-    }).length;
 
     const openLightbox = (e: React.MouseEvent, photos: string[], index: number) => {
         e.stopPropagation();
@@ -399,40 +383,6 @@ export default function SearchPage() {
                 {/* Seção Explorar */}
                 {!username.trim() && (
                     <div className="flex flex-col gap-4 animate-in fade-in duration-500 pt-1">
-                        {/* Filtros em Pílulas */}
-                        <div className="flex gap-2 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar -mx-4 px-4">
-                            <button
-                                onClick={() => setActiveFilter('todos')}
-                                className={`shrink-0 text-xs font-bold px-4 py-2 rounded-full transition-all border ${
-                                    activeFilter === 'todos'
-                                        ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
-                                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95'
-                                }`}
-                            >
-                                Todos {allCount}
-                            </button>
-                            <button
-                                onClick={() => setActiveFilter('novos')}
-                                className={`shrink-0 text-xs font-bold px-4 py-2 rounded-full transition-all border ${
-                                    activeFilter === 'novos'
-                                        ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
-                                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95'
-                                }`}
-                            >
-                                Novos {newCount}
-                            </button>
-                            <button
-                                onClick={() => setActiveFilter('proximos')}
-                                className={`shrink-0 text-xs font-bold px-4 py-2 rounded-full transition-all border ${
-                                    activeFilter === 'proximos'
-                                        ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
-                                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95'
-                                }`}
-                            >
-                                Próximos {nearbyCount}
-                            </button>
-                        </div>
-
                         {loadingFeatured ? (
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 animate-pulse">
                                 {[1, 2, 3, 4, 5, 6].map((n) => (
@@ -447,7 +397,7 @@ export default function SearchPage() {
                                 
                                 {getFilteredUsers().length === 0 && (
                                     <div className="text-center py-12 text-gray-400 text-xs">
-                                        Nenhum perfil sugerido encontrado para este filtro.
+                                        Nenhum perfil sugerido encontrado.
                                     </div>
                                 )}
                             </>
