@@ -213,8 +213,8 @@ export async function GET(
                             let color = '#64748B';
                             let icon = 'Medal';
                             if (amount > 0 && amount <= 100) { levelName = 'Bronze'; color = '#D97706'; }
-                            else if (amount <= 500) { levelName = 'Prata'; color = '#64748B'; }
-                            else if (amount <= 1000) { levelName = 'Ouro'; color = '#EAB308'; icon = 'Crown'; }
+                            else if (amount > 100 && amount <= 500) { levelName = 'Prata'; color = '#64748B'; }
+                            else if (amount > 500 && amount <= 1000) { levelName = 'Ouro'; color = '#EAB308'; icon = 'Crown'; }
                             else if (amount > 1000) { levelName = 'VIP'; color = '#000000'; icon = 'Crown'; }
                             return { name: levelName, color, icon };
                         }
