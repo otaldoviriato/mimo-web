@@ -39,7 +39,6 @@ export async function GET(request: NextRequest) {
             exploreSortingCriteria = settings?.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'];
         }
 
-        const chatInactivityHours = settings?.chatInactivityHours ?? 48;
         const thresholdDays = settings?.newProfileDaysThreshold ?? 15;
 
         // Buscar todos os profissionais reais ativos e aprovados
@@ -78,8 +77,8 @@ export async function GET(request: NextRequest) {
             return acc;
         }, {});
 
-        // Agregação de conversas ativas (com bidirecionalidade obrigatória)
-        const activeLimit = new Date(Date.now() - chatInactivityHours * 60 * 60 * 1000);
+        // Agregação de conversas ativas (com bidirecionalidade obrigatória nas últimas 48h)
+        const activeLimit = new Date(Date.now() - 48 * 60 * 60 * 1000);
         const activeRoomsDocs = await Room.find({
             participants: { $in: clerkIds },
             lastMessageTime: { $gte: activeLimit }

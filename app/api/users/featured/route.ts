@@ -76,14 +76,13 @@ export async function GET(request: NextRequest) {
             return acc;
         }, {});
 
-        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers newProfileDaysThreshold exploreSortingCriteria chatInactivityHours clientLevels').lean() as any;
+        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers newProfileDaysThreshold exploreSortingCriteria clientLevels').lean() as any;
         const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
         const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
         const thresholdDays = settings?.newProfileDaysThreshold ?? 15;
         const exploreSortingCriteria = settings?.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'];
-        const chatInactivityHours = settings?.chatInactivityHours ?? 48;
 
-        const activeLimit = new Date(Date.now() - chatInactivityHours * 60 * 60 * 1000);
+        const activeLimit = new Date(Date.now() - 48 * 60 * 60 * 1000);
         const oneWeekAgo = new Date();
         oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 

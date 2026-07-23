@@ -19,7 +19,6 @@ interface SettingsSnapshot {
     couponsEnabled: boolean;
     chatSessionTimeoutMinutes: number;
     onlineDelayMinutes: number;
-    chatInactivityHours: number;
     activeUserThresholdDays: number;
     defaultPricePerCharSubscribers: number;
     defaultPricePerCharNonSubscribers: number;
@@ -56,7 +55,6 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     const [couponsEnabled, setCouponsEnabled] = useState(true);
     const [chatSessionTimeoutMinutes, setChatSessionTimeoutMinutes] = useState(30);
     const [onlineDelayMinutes, setOnlineDelayMinutes] = useState(2);
-    const [chatInactivityHours, setChatInactivityHours] = useState(48);
     const [activeUserThresholdDays, setActiveUserThresholdDays] = useState(7);
     const [defaultPricePerCharSubscribers, setDefaultPricePerCharSubscribers] = useState(0.002);
     const [defaultPricePerCharNonSubscribers, setDefaultPricePerCharNonSubscribers] = useState(0.005);
@@ -91,7 +89,6 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         couponsEnabled: s.couponsEnabled ?? true,
         chatSessionTimeoutMinutes: s.chatSessionTimeoutMinutes ?? 30,
         onlineDelayMinutes: s.onlineDelayMinutes ?? 2,
-        chatInactivityHours: s.chatInactivityHours ?? 48,
         activeUserThresholdDays: s.activeUserThresholdDays ?? 7,
         defaultPricePerCharSubscribers: s.defaultPricePerCharSubscribers ?? 0.002,
         defaultPricePerCharNonSubscribers: s.defaultPricePerCharNonSubscribers ?? 0.005,
@@ -138,7 +135,6 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     setCouponsEnabled(s.couponsEnabled ?? true);
                     setChatSessionTimeoutMinutes(s.chatSessionTimeoutMinutes ?? 30);
                     setOnlineDelayMinutes(s.onlineDelayMinutes ?? 2);
-                    setChatInactivityHours(s.chatInactivityHours ?? 48);
                     setActiveUserThresholdDays(s.activeUserThresholdDays ?? 7);
                     setDefaultPricePerCharSubscribers(s.defaultPricePerCharSubscribers ?? 0.002);
                     setDefaultPricePerCharNonSubscribers(s.defaultPricePerCharNonSubscribers ?? 0.005);
@@ -227,7 +223,6 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     couponsEnabled,
                     chatSessionTimeoutMinutes,
                     onlineDelayMinutes,
-                    chatInactivityHours,
                     activeUserThresholdDays,
                     defaultPricePerCharSubscribers,
                     defaultPricePerCharNonSubscribers,
@@ -258,7 +253,6 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                 setMinExclusivePhotos(s.minExclusivePhotos);
                 setMaxExclusivePhotos(s.maxExclusivePhotos);
                 setOnlineDelayMinutes(s.onlineDelayMinutes ?? 2);
-                setChatInactivityHours(s.chatInactivityHours ?? 48);
                 setActiveUserThresholdDays(s.activeUserThresholdDays ?? 7);
                 setDefaultPricePerCharSubscribers(s.defaultPricePerCharSubscribers ?? 0.002);
                 setDefaultPricePerCharNonSubscribers(s.defaultPricePerCharNonSubscribers ?? 0.005);
@@ -308,7 +302,6 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     const isDirtyChat = savedSnapshot !== null && (
         chatSessionTimeoutMinutes !== savedSnapshot.chatSessionTimeoutMinutes ||
         onlineDelayMinutes !== savedSnapshot.onlineDelayMinutes ||
-        chatInactivityHours !== savedSnapshot.chatInactivityHours ||
         activeUserThresholdDays !== savedSnapshot.activeUserThresholdDays
     );
     const isDirtyPricing = savedSnapshot !== null && (
@@ -377,7 +370,6 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         couponsEnabled, setCouponsEnabled,
         chatSessionTimeoutMinutes, setChatSessionTimeoutMinutes,
         onlineDelayMinutes, setOnlineDelayMinutes,
-        chatInactivityHours, setChatInactivityHours,
         activeUserThresholdDays, setActiveUserThresholdDays,
         defaultPricePerCharSubscribers, setDefaultPricePerCharSubscribers,
         defaultPricePerCharNonSubscribers, setDefaultPricePerCharNonSubscribers,

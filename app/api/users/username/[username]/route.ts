@@ -282,10 +282,9 @@ export async function GET(
             }
         }
 
-        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers chatInactivityHours').lean();
+        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers').lean();
         const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
         const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
-        const chatInactivityHours = settings?.chatInactivityHours ?? 48;
         let effectiveSubscribers = user.subscribers || [];
 
         let activeConversationsCount = 0;
@@ -303,7 +302,7 @@ export async function GET(
             effectiveSubscribers = activeSubscriptions.map((sub) => sub.subscriberId);
 
             // Calcular conversas ativas com bidirecionalidade obrigatória
-            const activeLimit = new Date(Date.now() - chatInactivityHours * 60 * 60 * 1000);
+            const activeLimit = new Date(Date.now() - 48 * 60 * 60 * 1000);
 
             // 1. Buscar salas ativas na janela de tempo
             const activeRooms = await Room.find({

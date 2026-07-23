@@ -33,7 +33,6 @@ async function getOrCreateSettings() {
             identityVerificationPromptIntervalDays: 7,
             newProfileDaysThreshold: 15,
             onlineDelayMinutes: 2,
-            chatInactivityHours: 48,
             activeUserThresholdDays: 7,
             exploreSortingCriteria: ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'],
         });
@@ -57,7 +56,6 @@ async function getOrCreateSettings() {
         if (settings.identityVerificationPromptIntervalDays === undefined) { settings.identityVerificationPromptIntervalDays = 7; updated = true; }
         if (settings.newProfileDaysThreshold === undefined) { settings.newProfileDaysThreshold = 15; updated = true; }
         if (settings.onlineDelayMinutes === undefined) { settings.onlineDelayMinutes = 2; updated = true; }
-        if (settings.chatInactivityHours === undefined) { settings.chatInactivityHours = 48; updated = true; }
         if (settings.activeUserThresholdDays === undefined) { settings.activeUserThresholdDays = 7; updated = true; }
         if (settings.exploreSortingCriteria === undefined || settings.exploreSortingCriteria.length === 0) {
             settings.exploreSortingCriteria = ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'];
@@ -178,7 +176,6 @@ export async function PUT(request: NextRequest) {
             identityVerificationPromptIntervalDays,
             newProfileDaysThreshold,
             onlineDelayMinutes,
-            chatInactivityHours,
             activeUserThresholdDays,
             exploreSortingCriteria,
             clientLevels,
@@ -304,13 +301,6 @@ export async function PUT(request: NextRequest) {
             settings.onlineDelayMinutes = delay;
         }
 
-        if (chatInactivityHours !== undefined) {
-            const val = Number(chatInactivityHours);
-            if (isNaN(val) || val < 1) {
-                return NextResponse.json({ error: 'Tempo de inatividade de conversa deve ser de pelo menos 1 hora' }, { status: 400 });
-            }
-            settings.chatInactivityHours = val;
-        }
 
         if (activeUserThresholdDays !== undefined) {
             const val = Number(activeUserThresholdDays);

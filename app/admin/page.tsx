@@ -366,7 +366,6 @@ export default function AdminPage() {
                         <SettingsChatPage
                             chatSessionTimeoutMinutes={settings.chatSessionTimeoutMinutes} setChatSessionTimeoutMinutes={settings.setChatSessionTimeoutMinutes}
                             onlineDelayMinutes={settings.onlineDelayMinutes} setOnlineDelayMinutes={settings.setOnlineDelayMinutes}
-                            chatInactivityHours={settings.chatInactivityHours} setChatInactivityHours={settings.setChatInactivityHours}
                             activeUserThresholdDays={settings.activeUserThresholdDays} setActiveUserThresholdDays={settings.setActiveUserThresholdDays}
                             isDirtyChat={settings.isDirtyChat}
                             saving={settings.saving} saveSettings={settings.saveSettings}

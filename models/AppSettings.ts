@@ -37,7 +37,6 @@ export interface IAppSettings extends Document {
     pwaShowAgainIntervalDays: number;
     identityVerificationPromptIntervalDays: number;
     newProfileDaysThreshold: number;
-    chatInactivityHours: number;
     activeUserThresholdDays: number;
     exploreSortingCriteria: string[];
     clientLevels: IClientLevel[];
@@ -209,12 +208,6 @@ const AppSettingsSchema = new Schema<IAppSettings>({
         required: true,
         default: 15,
         min: 0,
-    },
-    chatInactivityHours: {
-        type: Number,
-        required: true,
-        default: 48,
-        min: 1,
     },
     activeUserThresholdDays: {
         type: Number,

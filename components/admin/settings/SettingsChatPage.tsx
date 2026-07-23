@@ -8,7 +8,6 @@ import type { UseSettingsReturn } from '@/hooks/admin/useSettings';
 type Props = Pick<UseSettingsReturn,
     | 'chatSessionTimeoutMinutes' | 'setChatSessionTimeoutMinutes'
     | 'onlineDelayMinutes' | 'setOnlineDelayMinutes'
-    | 'chatInactivityHours' | 'setChatInactivityHours'
     | 'activeUserThresholdDays' | 'setActiveUserThresholdDays'
     | 'isDirtyChat' | 'saving' | 'saveSettings'
 >;
@@ -16,7 +15,6 @@ type Props = Pick<UseSettingsReturn,
 export function SettingsChatPage({
     chatSessionTimeoutMinutes, setChatSessionTimeoutMinutes,
     onlineDelayMinutes, setOnlineDelayMinutes,
-    chatInactivityHours, setChatInactivityHours,
     activeUserThresholdDays, setActiveUserThresholdDays,
     isDirtyChat, saving, saveSettings,
 }: Props) {
@@ -111,45 +109,7 @@ export function SettingsChatPage({
                     </div>
                 </div>
 
-                <div className="border-t border-slate-100 my-6" />
 
-                <div className="py-6">
-                    <div className="flex flex-col md:flex-row md:items-start gap-4 md:gap-8">
-                        <div className="md:w-1/2 space-y-1">
-                            <h4 className="text-sm font-bold text-slate-800">Tempo de Inatividade de Conversas (horas)</h4>
-                            <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                                Define o período de tempo limite, em horas, de ausência de troca mútua de mensagens para que a conversa seja considerada inativa.
-                            </p>
-                            <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2">
-                                <strong className="text-slate-600">Para a Profissional:</strong> conversas inativas terão sua opacidade reduzida e serão exibidas em preto e branco na lista de chats.
-                            </p>
-                            <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2">
-                                <strong className="text-slate-600">Prevenção Unilateral:</strong> para evitar abusos, mensagens adicionais enviadas de forma unilateral não reativam a conversa se ela já estiver inativa. Apenas uma resposta mútua restabelece o status de ativa.
-                            </p>
-                            <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2">
-                                O valor padrão recomendado é de <strong className="text-slate-600">48 horas</strong>.
-                            </p>
-                        </div>
-                        <div className="md:w-1/2 space-y-4">
-                            <div className="flex items-center gap-3">
-                                <input
-                                    type="number"
-                                    value={chatInactivityHours}
-                                    onChange={(e) => setChatInactivityHours(Number(e.target.value))}
-                                    min={1}
-                                    max={8760}
-                                    className={inputCls}
-                                />
-                                <span className="text-sm font-bold text-slate-505">horas</span>
-                            </div>
-                            <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
-                                <p className="text-[11px] text-blue-700 font-semibold">
-                                    Configuração atual: conversas sem interações bilaterais há mais de <strong>{chatInactivityHours} horas</strong> serão exibidas como inativas.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
                 <div className="border-t border-slate-100 my-6" />
 

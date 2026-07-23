@@ -78,7 +78,6 @@ export async function GET(request: NextRequest) {
             ]
         };
 
-        const chatInactivityHours = settings?.chatInactivityHours || 48;
         const activeUserThresholdDays = settings?.activeUserThresholdDays || 7;
         const activeThresholdDate = new Date(now.getTime() - activeUserThresholdDays * 24 * 60 * 60 * 1000);
 
@@ -211,8 +210,8 @@ export async function GET(request: NextRequest) {
         let activeProfessionalsData: any[] = [];
 
         if (activeClerkIds.length > 0) {
-            // 1. Quantidade de salas ativas por usuário (com bidirecionalidade obrigatória)
-            const activeRoomsLimit = new Date(Date.now() - chatInactivityHours * 60 * 60 * 1000);
+            // 1. Quantidade de salas ativas por usuário (com bidirecionalidade obrigatória nas últimas 48h)
+            const activeRoomsLimit = new Date(Date.now() - 48 * 60 * 60 * 1000);
 
             // Buscar salas ativas na janela de tempo
             const activeRoomsDocs = await Room.find({

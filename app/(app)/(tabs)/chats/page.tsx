@@ -21,8 +21,7 @@ interface Room {
     // roomId como string composta de clerkIds (ex: "user_abc_user_xyz")
     // usado para matching com eventos WebSocket
     roomId?: string;
-    isInactive?: boolean;
-    lastExchangeTime?: string;
+
     otherUser?: {
         clerkId: string;
         username: string;
@@ -809,10 +808,6 @@ export default function ChatsPage() {
                                 }
                             };
 
-                            const isUserProfessional = myProfile?.isProfessional === true;
-                            const isInactive = room.isInactive === true;
-                            const shouldStyleInactive = isUserProfessional && isInactive;
-
                             return (
                                 <li key={room._id}>
                                     <TouchableRipple
@@ -841,7 +836,7 @@ export default function ChatsPage() {
                                         }}
                                         onTouchEnd={endPress}
                                         onContextMenu={(e) => handleContextMenu(e, room._id)}
-                                        className={`w-full flex items-center px-4 py-3.5 bg-white border-b border-gray-100 hover:bg-gray-50 transition-colors text-left select-none ${shouldStyleInactive ? 'opacity-75 grayscale-[35%]' : ''}`}
+                                        className="w-full flex items-center px-4 py-3.5 bg-white border-b border-gray-100 hover:bg-gray-50 transition-colors text-left select-none"
                                     >
                                         <div className="relative shrink-0">
                                             <Avatar size={52} uri={room.otherUser?.photoUrl} isOnline={room.otherUser?.isOnline} />
@@ -858,11 +853,6 @@ export default function ChatsPage() {
                                                     {myProfile?.isProfessional && room.otherUser?.isHighSpender && (
                                                         <span title="VIP" className="shrink-0 flex items-center justify-center">
                                                             <Crown className="w-4 h-4 text-amber-500" />
-                                                        </span>
-                                                    )}
-                                                    {shouldStyleInactive && (
-                                                        <span className="bg-slate-100 border border-slate-200 text-slate-500 text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider shrink-0 h-fit select-none">
-                                                            Inativo
                                                         </span>
                                                     )}
                                                 </div>
