@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useClerk } from '@clerk/nextjs';
 import {
     User, Crown, Check, CheckCircle2, ShieldCheck, CreditCard, Calendar,
-    Camera, ChevronLeft, UserCheck, Loader2, X, Plus, AlertCircle
+    Camera, ChevronLeft, UserCheck, Loader2, X, Plus, AlertCircle, LogOut
 } from 'lucide-react';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useMyProfile } from '@/hooks/useQueries';
@@ -15,8 +16,8 @@ import { ImageCropper } from '@/components/ImageCropper';
 type Step = 'welcome' | 'identity' | 'profile' | 'done';
 type Dir  = 'forward' | 'backward';
 
-// Steps do fluxo profissional (excluindo o welcome que é compartilhado)
-const PRO_STEPS: Step[] = ['identity', 'profile', 'done'];
+// Steps do fluxo de onboarding
+const ONBOARDING_STEPS: Step[] = ['welcome', 'identity', 'profile'];
 
 // Mapa de step → step anterior para interceptação do gesto de voltar
 const PREV_ONBOARD: Partial<Record<Step, Step>> = {
@@ -75,7 +76,24 @@ const STEP_KEY = 'mimo_onboarding_step';
 
 export default function OnboardingPage() {
     const router = useTransitionRouter();
+    const { signOut } = useClerk();
     const { data: userData, refetch } = useMyProfile();
+
+    // Modal de confirmação de logout na tela inicial de Cadastro
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+    const handleConfirmLogout = async () => {
+        setIsLoggingOut(true);
+        try {
+            localStorage.removeItem(STEP_KEY);
+            await signOut(() => router.replace('/login'));
+        } catch (err) {
+            console.error('Erro ao encerrar sessão:', err);
+            setIsLoggingOut(false);
+            setShowLogoutModal(false);
+        }
+    };
 
     // Controla se a lógica de inicialização já rodou. Evita que atualizações
     // do userData durante o fluxo (ex: após validar CPF) causem redirect para /chats.
@@ -462,7 +480,7 @@ export default function OnboardingPage() {
     };
 
     const renderHeader = (forStep: Step, onBack?: () => void) => {
-        const idx = PRO_STEPS.indexOf(forStep);
+        const idx = ONBOARDING_STEPS.indexOf(forStep);
         return (
             <div className="shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between z-10 sticky top-0 shadow-md">
                 <div className="flex items-center gap-3">
@@ -470,7 +488,7 @@ export default function OnboardingPage() {
                         <button
                             type="button"
                             onClick={onBack}
-                            className="w-9 h-9 flex items-center justify-center rounded-full text-white hover:bg-white/15 active:bg-white/25 transition-colors -ml-1"
+                            className="w-9 h-9 flex items-center justify-center rounded-full text-white hover:bg-white/15 active:bg-white/25 transition-colors -ml-1 cursor-pointer"
                         >
                             <ChevronLeft className="w-5 h-5" />
                         </button>
@@ -486,10 +504,10 @@ export default function OnboardingPage() {
                     </span>
                 </div>
 
-                {/* Indicador de progresso nos steps do profissional */}
+                {/* Indicador de progresso nos steps do onboarding */}
                 {idx >= 0 && (
                     <div className="flex items-center gap-1.5">
-                        {PRO_STEPS.map((_, i) => (
+                        {ONBOARDING_STEPS.map((_, i) => (
                             <div
                                 key={i}
                                 className={`h-[5px] rounded-full bg-white transition-all duration-300 ${
@@ -534,7 +552,7 @@ export default function OnboardingPage() {
     // ── Welcome ──────────────────────────────────────────────────────────────
     const renderWelcome = () => (
         <div className="flex flex-col h-full bg-white">
-            {renderHeader('welcome')}
+            {renderHeader('welcome', () => setShowLogoutModal(true))}
 
             {/* Conteúdo rolável */}
             <div className="flex-1 overflow-y-auto no-scrollbar px-5 pt-8 pb-2">
@@ -1034,6 +1052,47 @@ export default function OnboardingPage() {
             >
                 {renderStep(step)}
             </div>
+
+            {/* Modal de Confirmação de Logout no Onboarding */}
+            {showLogoutModal && (
+                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-5 animate-in fade-in duration-200">
+                    <div
+                        className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"
+                        onClick={() => !isLoggingOut && setShowLogoutModal(false)}
+                    />
+                    <div className="relative w-full max-w-[360px] bg-white rounded-[28px] border border-purple-100 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 p-6 text-center">
+                        <div className="w-12 h-12 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-red-100 ring-4 ring-red-50/50">
+                            <LogOut className="w-6 h-6" />
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-1.5 leading-tight">Sair do MimoChat?</h3>
+                        <p className="text-xs text-gray-500 leading-relaxed mb-6">
+                            Sua sessão atual será encerrada. Você precisará fazer login novamente para continuar.
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                type="button"
+                                disabled={isLoggingOut}
+                                onClick={() => setShowLogoutModal(false)}
+                                className="flex-1 py-3.5 px-4 rounded-2xl bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 text-xs font-bold transition-all active:scale-[0.99] cursor-pointer"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isLoggingOut}
+                                onClick={handleConfirmLogout}
+                                className="flex-1 py-3.5 px-4 rounded-2xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md shadow-red-600/10 active:scale-[0.99] cursor-pointer flex items-center justify-center gap-1.5"
+                            >
+                                {isLoggingOut ? (
+                                    <><Loader2 className="w-4 h-4 animate-spin" /> Saindo...</>
+                                ) : (
+                                    'Sair da Conta'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
