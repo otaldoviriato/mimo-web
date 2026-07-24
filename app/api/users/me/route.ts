@@ -437,7 +437,8 @@ export async function GET(request: NextRequest) {
                 maxExclusivePhotos: settings?.maxExclusivePhotos ?? 4,
                 pwaShowAgainIntervalDays: settings?.pwaShowAgainIntervalDays ?? 7,
                 identityVerificationPromptIntervalDays: settings?.identityVerificationPromptIntervalDays ?? 7,
-                emailNotificationsEnabled: user.emailNotificationsEnabled ?? false,
+                emailNotificationsEnabled: user.emailNotificationsEnabled ?? true,
+                newUserNotificationsEnabled: user.newUserNotificationsEnabled ?? false,
                 hasPushToken: Boolean(user.fcmToken || (user.fcmTokens && user.fcmTokens.length > 0)),
                 hideFromExplore: user.hideFromExplore ?? false,
                 publicPhotosCount,
@@ -467,7 +468,7 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, subscriptionPrice, isSubscriptionEnabled, chargePerCharSubscribers, chargePerCharNonSubscribers, bio, emailNotificationsEnabled, hideFromExplore, subscriberDiscountPercentage, birthDate, city, state } = body;
+        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, subscriptionPrice, isSubscriptionEnabled, chargePerCharSubscribers, chargePerCharNonSubscribers, bio, emailNotificationsEnabled, newUserNotificationsEnabled, hideFromExplore, subscriberDiscountPercentage, birthDate, city, state } = body;
 
         await connectToDatabase();
 
@@ -607,6 +608,10 @@ export async function PATCH(request: NextRequest) {
 
         if (emailNotificationsEnabled !== undefined) {
             updateData.emailNotificationsEnabled = Boolean(emailNotificationsEnabled);
+        }
+
+        if (newUserNotificationsEnabled !== undefined) {
+            updateData.newUserNotificationsEnabled = Boolean(newUserNotificationsEnabled);
         }
 
         if (hideFromExplore !== undefined) {
@@ -779,7 +784,8 @@ export async function PATCH(request: NextRequest) {
                 minExclusivePhotos: settings?.minExclusivePhotos ?? 2,
                 maxExclusivePhotos: settings?.maxExclusivePhotos ?? 4,
                 pwaShowAgainIntervalDays: settings?.pwaShowAgainIntervalDays ?? 7,
-                emailNotificationsEnabled: user.emailNotificationsEnabled ?? false,
+                emailNotificationsEnabled: user.emailNotificationsEnabled ?? true,
+                newUserNotificationsEnabled: user.newUserNotificationsEnabled ?? false,
                 hasPushToken: Boolean(user.fcmToken || (user.fcmTokens && user.fcmTokens.length > 0)),
                 hideFromExplore: user.hideFromExplore ?? false,
                 avgResponseTimeMinutes: user.avgResponseTimeMinutes,

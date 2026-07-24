@@ -196,6 +196,7 @@ export function useUpdateProfile() {
             taxId?: string;
             phone?: string;
             emailNotificationsEnabled?: boolean;
+            newUserNotificationsEnabled?: boolean;
             birthDate?: string | Date | null;
             city?: string;
             state?: string;

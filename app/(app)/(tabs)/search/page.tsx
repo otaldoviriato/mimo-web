@@ -37,6 +37,25 @@ export default function SearchPage() {
     const [activeFilter, setActiveFilter] = useState<'online' | 'novos' | 'todos'>('online');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
 
+    const getEmptyStateMessage = () => {
+        if (userData?.isProfessional) {
+            if (activeFilter === 'online') {
+                return 'não existem perfis online no momento';
+            }
+            if (activeFilter === 'novos') {
+                return 'não existem perfis novos no momento';
+            }
+            return 'não existem perfis disponíveis no momento';
+        }
+        if (activeFilter === 'online') {
+            return 'não existem perfis online no momento';
+        }
+        if (activeFilter === 'novos') {
+            return 'não existem perfis novos no momento';
+        }
+        return 'Nenhum perfil encontrado no momento.';
+    };
+
     const getFilteredUsers = () => {
         let sourceList = username.trim() ? foundUsers : featuredUsers;
 
@@ -417,7 +436,7 @@ export default function SearchPage() {
                     />
                     <h1 className="text-2xl font-black text-white tracking-tighter">Mimo</h1>
                     <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">
-                        Buscar
+                        Explorar
                     </span>
                 </div>
                 
@@ -536,7 +555,7 @@ export default function SearchPage() {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-4 pb-16 md:pb-4">
+            <div className="flex-1 overflow-y-auto p-4 pb-16 md:pb-4 flex flex-col">
                 {error && username.length > 2 && (
                     <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 animate-in fade-in zoom-in">
                         <p className="text-sm font-semibold text-red-600 flex items-center gap-2">
@@ -550,7 +569,7 @@ export default function SearchPage() {
 
                 {/* Seção Explorar */}
                 {!username.trim() && (
-                    <div className="flex flex-col gap-4 animate-in fade-in duration-500 pt-1">
+                    <div className="flex-1 flex flex-col gap-4 animate-in fade-in duration-500 pt-1">
                         {loadingFeatured ? (
                             userData?.isProfessional ? (
                                 <div className="flex flex-col gap-3 max-w-2xl mx-auto w-full animate-pulse">
@@ -567,13 +586,13 @@ export default function SearchPage() {
                             )
                         ) : (
                             <>
-                                <div className={userData?.isProfessional ? "flex flex-col gap-2.5 max-w-2xl mx-auto w-full" : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"}>
-                                    {getFilteredUsers().map((user) => renderUserItem(user))}
-                                </div>
-                                
-                                {getFilteredUsers().length === 0 && (
-                                    <div className="text-center py-12 text-gray-400 text-xs">
-                                        Nenhum perfil sugerido encontrado.
+                                {getFilteredUsers().length > 0 ? (
+                                    <div className={userData?.isProfessional ? "flex flex-col gap-2.5 max-w-2xl mx-auto w-full" : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"}>
+                                        {getFilteredUsers().map((user) => renderUserItem(user))}
+                                    </div>
+                                ) : (
+                                    <div className="flex-1 min-h-[50vh] flex items-center justify-center text-center text-slate-400 text-xs sm:text-sm font-medium py-12 px-4 animate-in fade-in duration-300">
+                                        <p>{getEmptyStateMessage()}</p>
                                     </div>
                                 )}
                             </>

@@ -361,8 +361,8 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                         return {
                             label: levelInfo.name,
                             sublabel: isVip 
-                                ? 'Membro VIP — Acesso completo e prioridade premium'
-                                : `Total de R$ ${totalRechargeInReais.toFixed(2)} recarregados nos últimos 30 dias`,
+                                ? 'Membro VIP — Benefícios e prioridade premium'
+                                : `Nível ${levelInfo.name} ativo na plataforma`,
                             gradient: isVip
                                 ? 'from-slate-950 via-slate-900 to-black border border-slate-800'
                                 : 'from-slate-100 to-slate-50 border border-slate-200/60',
@@ -381,6 +381,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
 
                     const level = getLevel();
                     const isVip = levelInfo.name.toUpperCase() === 'VIP' || levelInfo.color === '#000000';
+                    const hasAnyAchievement = hasGift || isVeryAttentive;
 
                     return (
                         <div className="w-full max-w-md mt-5 z-10 animate-in fade-in slide-in-from-bottom-3 duration-500 space-y-3">
@@ -419,79 +420,54 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                                 </div>
                             </div>
 
-                            {/* Seção de Conquistas */}
-                            <div className="w-full bg-white/90 backdrop-blur-md border border-slate-100/80 rounded-3xl overflow-hidden shadow-sm">
-                                <div className="px-5 pt-4 pb-1">
-                                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Conquistas</span>
-                                </div>
-
-                                {/* Badge: Primeiro Mimo */}
-                                <div className={`mx-3 mb-3 mt-2 rounded-2xl border p-4 flex items-center gap-4 transition-all ${
-                                    hasGift
-                                        ? 'bg-gradient-to-r from-pink-50 to-rose-50 border-pink-200'
-                                        : 'bg-slate-50/80 border-slate-100'
-                                }`}>
-                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${
-                                        hasGift
-                                            ? 'bg-gradient-to-br from-pink-400 to-rose-500 shadow-md shadow-pink-300/40'
-                                            : 'bg-slate-200/70'
-                                    }`}>
-                                        {hasGift ? (
-                                            <Gift className="w-5 h-5 text-white" />
-                                        ) : (
-                                            <Lock className="w-4 h-4 text-slate-300" />
-                                        )}
+                            {/* Seção de Conquistas (Apenas as conquistadas são exibidas) */}
+                            {hasAnyAchievement && (
+                                <div className="w-full bg-white/90 backdrop-blur-md border border-slate-100/80 rounded-3xl overflow-hidden shadow-sm">
+                                    <div className="px-5 pt-4 pb-1">
+                                        <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Conquistas</span>
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <p className={`text-sm font-black leading-tight ${hasGift ? 'text-rose-700' : 'text-slate-400'}`}>
-                                                Primeiro Mimo
-                                            </p>
-                                            {hasGift && (
-                                                <span className="text-[9px] font-black uppercase tracking-wider bg-pink-100 text-pink-600 px-1.5 py-0.5 rounded-full">Conquistado</span>
-                                            )}
+
+                                    {/* Badge: Primeiro Mimo */}
+                                    {hasGift && (
+                                        <div className="mx-3 mb-3 mt-2 rounded-2xl border p-4 flex items-center gap-4 transition-all bg-gradient-to-r from-pink-50 to-rose-50 border-pink-200">
+                                            <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-pink-400 to-rose-500 shadow-md shadow-pink-300/40">
+                                                <Gift className="w-5 h-5 text-white" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-sm font-black leading-tight text-rose-700">
+                                                        Primeiro Mimo
+                                                    </p>
+                                                    <span className="text-[9px] font-black uppercase tracking-wider bg-pink-100 text-pink-600 px-1.5 py-0.5 rounded-full">Conquistado</span>
+                                                </div>
+                                                <p className="text-[11px] font-medium mt-0.5 leading-tight text-rose-500/80">
+                                                    Enviou pelo menos um presente
+                                                </p>
+                                            </div>
                                         </div>
-                                        <p className={`text-[11px] font-medium mt-0.5 leading-tight ${hasGift ? 'text-rose-500/80' : 'text-slate-400'}`}>
-                                            {hasGift ? 'Enviou pelo menos um presente' : 'Ainda não enviou nenhum presente'}
-                                        </p>
-                                    </div>
-                                </div>
+                                    )}
 
-                                {/* Badge: Muito Atento */}
-                                <div className={`mx-3 mb-3 rounded-2xl border p-4 flex items-center gap-4 transition-all ${
-                                    isVeryAttentive
-                                        ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200'
-                                        : 'bg-slate-50/80 border-slate-100'
-                                }`}>
-                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${
-                                        isVeryAttentive
-                                            ? 'bg-gradient-to-br from-emerald-400 to-teal-500 shadow-md shadow-emerald-300/40'
-                                            : 'bg-slate-200/70'
-                                    }`}>
-                                        {isVeryAttentive ? (
-                                            <Eye className="w-5 h-5 text-white" />
-                                        ) : (
-                                            <Lock className="w-4 h-4 text-slate-300" />
-                                        )}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <p className={`text-sm font-black leading-tight ${isVeryAttentive ? 'text-emerald-700' : 'text-slate-400'}`}>
-                                                Muito Atento
-                                            </p>
-                                            {isVeryAttentive && (
-                                                <span className="text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full">Conquistado</span>
-                                            )}
+                                    {/* Badge: Muito Atento */}
+                                    {isVeryAttentive && (
+                                        <div className="mx-3 mb-3 rounded-2xl border p-4 flex items-center gap-4 transition-all bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200">
+                                            <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-emerald-400 to-teal-500 shadow-md shadow-emerald-300/40">
+                                                <Eye className="w-5 h-5 text-white" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-sm font-black leading-tight text-emerald-700">
+                                                        Muito Atento
+                                                    </p>
+                                                    <span className="text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full">Conquistado</span>
+                                                </div>
+                                                <p className="text-[11px] font-medium mt-0.5 leading-tight text-emerald-600/80">
+                                                    Abriu {openCount} das últimas {totalSent} mensagens suas
+                                                </p>
+                                            </div>
                                         </div>
-                                        <p className={`text-[11px] font-medium mt-0.5 leading-tight ${isVeryAttentive ? 'text-emerald-600/80' : 'text-slate-400'}`}>
-                                            {isVeryAttentive
-                                                ? `Abriu ${openCount} das últimas ${totalSent} mensagens suas`
-                                                : 'Abre menos de 90% das suas mensagens'}
-                                        </p>
-                                    </div>
+                                    )}
                                 </div>
-
-                            </div>
+                            )}
 
                         </div>
                     );
