@@ -2,12 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Input } from '@/components/Input';
-import { Button } from '@/components/Button';
-import { Avatar } from '@/components/Avatar';
 import { userApi } from '@/services/api';
 import { useMyProfile } from '@/hooks/useQueries';
-import { ShieldAlert, ShieldCheck, Search, X, MapPin, Award, Medal, Crown, Star } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, Search, X, MapPin, MessageCircle, MessageSquare, CheckCheck } from 'lucide-react';
 
 const calculateAge = (birthDateString?: string | Date) => {
     if (!birthDateString) return null;
@@ -37,9 +34,42 @@ export default function SearchPage() {
     const [error, setError] = useState('');
     const [lightbox, setLightbox] = useState<{ photos: string[]; index: number } | null>(null);
 
+    const [activeFilter, setActiveFilter] = useState<'online' | 'novos' | 'todos'>('online');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
+
     const getFilteredUsers = () => {
-        return featuredUsers;
+        let sourceList = username.trim() ? foundUsers : featuredUsers;
+
+        if (userData?.isProfessional) {
+            if (activeFilter === 'online') {
+                sourceList = sourceList.filter((u) => !!u.isOnline);
+            } else if (activeFilter === 'novos') {
+                sourceList = sourceList.filter((u) => !!u.isNew && !u.isInactive);
+            } else if (activeFilter === 'todos') {
+                // Exibir todos os perfis (ativos e inativos), ordenados por prioridade (Tier 1 -> Tier 2 -> Tier 3)
+            }
+        } else {
+            if (activeFilter === 'online') {
+                sourceList = sourceList.filter((u) => !!u.isOnline);
+            } else if (activeFilter === 'novos') {
+                sourceList = sourceList.filter((u) => !!u.isNew);
+            }
+        }
+
+        // Priorizar por Tier (1: Com recarga ativa -> 2: Novos/Ativos sem recarga -> 3: Inativos), depois por histórico de conversa
+        return [...sourceList].sort((a, b) => {
+            const aTier = a.tier ?? (a.isInactive ? 3 : 1);
+            const bTier = b.tier ?? (b.isInactive ? 3 : 1);
+            if (aTier !== bTier) {
+                return aTier - bTier;
+            }
+            const aChat = !!a.hasChat;
+            const bChat = !!b.hasChat;
+            if (aChat !== bChat) {
+                return aChat ? 1 : -1;
+            }
+            return 0;
+        });
     };
 
     const openLightbox = (e: React.MouseEvent, photos: string[], index: number) => {
@@ -59,7 +89,6 @@ export default function SearchPage() {
         setLightbox(prev => prev ? { ...prev, index: (prev.index + 1) % prev.photos.length } : null);
     };
 
-
     // Resolve a transição de visualização imediatamente para não travar a animação de volta
     useEffect(() => {
         if (typeof window !== 'undefined' && (window as any).__resolveTransition) {
@@ -68,7 +97,7 @@ export default function SearchPage() {
         }
     }, []);
 
-    // Carregar usuários profissionais em destaque ao montar
+    // Carregar usuários em destaque ao montar
     useEffect(() => {
         const fetchFeatured = async () => {
             setLoadingFeatured(true);
@@ -76,7 +105,7 @@ export default function SearchPage() {
                 const data = await userApi.getFeaturedUsers();
                 setFeaturedUsers(data.users || []);
             } catch (err) {
-                console.error('Erro ao buscar criadores em destaque:', err);
+                console.error('Erro ao buscar destaques:', err);
             } finally {
                 setLoadingFeatured(false);
             }
@@ -131,7 +160,8 @@ export default function SearchPage() {
         return () => clearTimeout(timer);
     }, [username]);
 
-    const renderUserCard = (user: any) => {
+    // Renderiza Card de Criadora em Grid 3:4 (Exibido para Clientes / Homens)
+    const renderCreatorCard = (user: any) => {
         const age = calculateAge(user.birthDate);
         const displayName = age !== null 
             ? `${user.name || `@${user.username}`}, ${age}` 
@@ -142,13 +172,7 @@ export default function SearchPage() {
         return (
             <div
                 key={user.clerkId}
-                onClick={() => {
-                    if (userData?.isProfessional) {
-                        router.push(`/chat/${user.clerkId}`);
-                    } else {
-                        router.push(`/${user.username}`);
-                    }
-                }}
+                onClick={() => router.push(`/${user.username}`)}
                 className="relative aspect-[3/4] rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer active:scale-[0.98] border border-slate-100/50 bg-slate-100 animate-in fade-in zoom-in-95 duration-300 group"
             >
                 {/* Imagem de fundo */}
@@ -158,36 +182,20 @@ export default function SearchPage() {
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
 
-                {/* Overlay gradiente escuro (apenas na parte inferior para leitura do texto) */}
+                {/* Overlay gradiente escuro na parte inferior */}
                 <div className="absolute bottom-0 inset-x-0 h-1/3 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
 
-                {/* Badge Novo (top left) - Apenas para profissionais */}
-                {user.isNew && user.isProfessional && (
+                {/* Badge Já Conversou ou Badge Novo (top left) */}
+                {user.hasChat ? (
+                    <div className="absolute top-2.5 left-2.5 bg-slate-900/90 backdrop-blur-md text-slate-200 text-[8px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-md z-10 flex items-center gap-1 border border-slate-700/50">
+                        <CheckCheck className="w-3 h-3 text-emerald-400" />
+                        <span>Já conversou</span>
+                    </div>
+                ) : user.isNew ? (
                     <div className="absolute top-2.5 left-2.5 bg-purple-600 text-white text-[8px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-full shadow-md z-10">
                         Novo
                     </div>
-                )}
-
-                {/* Medalha de Nível (top left) - Para clientes */}
-                {!user.isProfessional && userData?.isProfessional && user.clientLevel && typeof user.clientLevel === 'object' && (() => {
-                    const IconComponent = 
-                        user.clientLevel.icon === 'Crown' ? Crown :
-                        user.clientLevel.icon === 'Star' ? Star :
-                        user.clientLevel.icon === 'Medal' ? Medal : Award;
-                    return (
-                        <div 
-                            className="absolute top-2.5 left-2.5 w-6 h-6 rounded-xl flex items-center justify-center shadow-md backdrop-blur-md border z-10 transition-all duration-300"
-                            style={{ 
-                                backgroundColor: `${user.clientLevel.color}d0`, 
-                                borderColor: `${user.clientLevel.color}45`,
-                                color: '#ffffff'
-                            }}
-                            title={`Nível ${user.clientLevel.name}`}
-                        >
-                            <IconComponent className="w-3.5 h-3.5" />
-                        </div>
-                    );
-                })()}
+                ) : null}
 
                 {/* Badge Online (top right) */}
                 {!!user.isOnline && (
@@ -206,7 +214,7 @@ export default function SearchPage() {
                         <h3 className="text-sm font-extrabold tracking-tight leading-none truncate max-w-[85%]">
                             {displayName}
                         </h3>
-                        {user.isProfessional && user.identityStatus === 'approved' && (
+                        {user.identityStatus === 'approved' && (
                             <ShieldCheck className="w-3.5 h-3.5 text-purple-400 shrink-0 animate-in zoom-in duration-300" />
                         )}
                     </div>
@@ -216,6 +224,122 @@ export default function SearchPage() {
                 </div>
             </div>
         );
+    };
+
+    // Renderiza Item de Cliente em Lista Limpa (Exibido para Criadoras / Profissionais)
+    const renderClientListItem = (user: any) => {
+        const age = calculateAge(user.birthDate);
+        const nameText = user.name || user.username || 'Cliente';
+        const displayName = age !== null ? `${nameText}, ${age}` : nameText;
+        const locationStr = user.city && user.state ? `${user.city}, ${user.state}` : (user.city || user.state || 'Brasil');
+        const photoUrl = user.photoUrl;
+        const initial = nameText.charAt(0).toUpperCase();
+        const isInactive = !!user.isInactive;
+
+        return (
+            <div
+                key={user.clerkId}
+                onClick={() => handleStartChat(user.clerkId)}
+                className={`w-full rounded-2xl border p-3.5 sm:p-4 shadow-xs hover:shadow-md transition-all duration-200 flex items-center justify-between gap-3 cursor-pointer group active:scale-[0.99] animate-in fade-in slide-in-from-bottom-2 duration-300 ${
+                    isInactive
+                        ? 'grayscale opacity-60 bg-slate-100/80 border-slate-200'
+                        : user.hasChat
+                        ? 'bg-slate-50/70 border-slate-200/80 hover:border-purple-300/60'
+                        : 'bg-white border-slate-200/80 hover:border-purple-300'
+                }`}
+            >
+                {/* Esquerda: Avatar com Badge Integrada + Informações em 3 Linhas */}
+                <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                    {/* Avatar Container com Micro-Badges no Topo/Base */}
+                    <div className="relative shrink-0">
+                        {photoUrl ? (
+                            <img
+                                src={photoUrl}
+                                alt={nameText}
+                                className="w-13 h-13 rounded-full object-cover border border-slate-100 shadow-sm group-hover:scale-105 transition-transform duration-300"
+                            />
+                        ) : (
+                            <div className="w-13 h-13 rounded-full bg-gradient-to-br from-slate-700 to-slate-900 text-white font-extrabold text-lg flex items-center justify-center border border-slate-200 shadow-sm group-hover:scale-105 transition-transform duration-300">
+                                {initial}
+                            </div>
+                        )}
+
+                        {/* Tag de Novo / Inativo no Canto Superior do Avatar */}
+                        {isInactive ? (
+                            <span className="absolute -top-1 -left-1 text-[9px] font-extrabold text-slate-600 bg-slate-200 border border-slate-300 px-1.5 py-0.5 rounded-full shadow-2xs shrink-0 z-10 leading-none">
+                                Inativo
+                            </span>
+                        ) : (
+                            user.isNew && !user.isOnline && (
+                                <span className="absolute -top-1 -left-1 text-[9px] font-extrabold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-full shadow-2xs shrink-0 z-10 leading-none">
+                                    Novo
+                                </span>
+                            )
+                        )}
+
+                        {/* Indicador de Status Online no Canto Inferior do Avatar */}
+                        {!!user.isOnline ? (
+                            <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full flex items-center justify-center z-10">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            </span>
+                        ) : (
+                            <span className="absolute bottom-0 right-0 w-3 h-3 bg-slate-300 border-2 border-white rounded-full z-10"></span>
+                        )}
+                    </div>
+
+                    {/* Bloco de Dados: 100% de Espaço Horizontal para o Nome na Linha 1 */}
+                    <div className="flex flex-col min-w-0 flex-1 justify-center space-y-0.5">
+                        {/* Linha 1: Nome Sem Pílulas ao Lado (Máximo Espaço Livre) */}
+                        <h3 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate leading-tight group-hover:text-purple-700 transition-colors w-full">
+                            {displayName}
+                        </h3>
+
+                        {/* Linha 2: Username Exclusivo */}
+                        <p className="text-xs text-slate-400 font-medium truncate leading-none">
+                            @{user.username}
+                        </p>
+
+                        {/* Linha 3: Localização (Ícone + Cidade/Estado) */}
+                        <div className="flex items-center gap-1 text-xs text-slate-500 font-medium truncate pt-0.5">
+                            <MapPin className="w-3 h-3 text-purple-500/80 shrink-0" />
+                            <span className="truncate">{locationStr}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Direita: Botão de Ação Enxuto e Proporcional */}
+                {user.hasChat ? (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartChat(user.clerkId);
+                        }}
+                        className="shrink-0 bg-slate-100 hover:bg-slate-200/80 active:scale-95 text-slate-700 font-bold text-xs px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl flex items-center gap-1 transition-all border border-slate-200/90 cursor-pointer shadow-2xs"
+                    >
+                        <MessageSquare className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                        <span className="whitespace-nowrap">Ver chat</span>
+                    </button>
+                ) : (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartChat(user.clerkId);
+                        }}
+                        className="shrink-0 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-bold text-xs px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl flex items-center gap-1 transition-all shadow-sm shadow-purple-200 cursor-pointer"
+                    >
+                        <MessageCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span className="whitespace-nowrap">Conversar</span>
+                    </button>
+                )}
+            </div>
+        );
+    };
+
+    const renderUserItem = (user: any) => {
+        if (userData?.isProfessional) {
+            return renderClientListItem(user);
+        }
+        return renderCreatorCard(user);
     };
 
     return (
@@ -284,7 +408,6 @@ export default function SearchPage() {
             )}
 
             {/* Header */}
-
             <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between z-10 sticky top-0 shadow-md">
                 <div className="flex items-center gap-3">
                     <img
@@ -367,6 +490,51 @@ export default function SearchPage() {
                 </div>
             )}
 
+            {/* Controle Segmentado de Filtros (Online, Novos, Todos) */}
+            <div className="bg-slate-50/90 backdrop-blur-md px-4 pt-3 pb-2 border-b border-slate-200/60 sticky top-[72px] z-10 shrink-0">
+                <div className="bg-slate-200/70 p-1 rounded-2xl flex items-center gap-1 max-w-md mx-auto shadow-inner">
+                    {/* 1º: Online (Padrão) */}
+                    <button
+                        onClick={() => setActiveFilter('online')}
+                        className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer ${
+                            activeFilter === 'online'
+                                ? 'bg-white text-purple-900 shadow-sm shadow-slate-300/40 border border-slate-200/50'
+                                : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                    >
+                        <span className="relative flex h-2 w-2">
+                            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${activeFilter === 'online' ? 'bg-emerald-400 opacity-75' : 'hidden'}`}></span>
+                            <span className={`relative inline-flex rounded-full h-2 w-2 ${activeFilter === 'online' ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+                        </span>
+                        <span>Online</span>
+                    </button>
+
+                    {/* 2º: Novos */}
+                    <button
+                        onClick={() => setActiveFilter('novos')}
+                        className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer ${
+                            activeFilter === 'novos'
+                                ? 'bg-white text-purple-900 shadow-sm shadow-slate-300/40 border border-slate-200/50'
+                                : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                    >
+                        <span>Novos</span>
+                    </button>
+
+                    {/* 3º: Todos */}
+                    <button
+                        onClick={() => setActiveFilter('todos')}
+                        className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer ${
+                            activeFilter === 'todos'
+                                ? 'bg-white text-purple-900 shadow-sm shadow-slate-300/40 border border-slate-200/50'
+                                : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                    >
+                        <span>Todos</span>
+                    </button>
+                </div>
+            </div>
+
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-4 pb-16 md:pb-4">
                 {error && username.length > 2 && (
@@ -384,15 +552,23 @@ export default function SearchPage() {
                 {!username.trim() && (
                     <div className="flex flex-col gap-4 animate-in fade-in duration-500 pt-1">
                         {loadingFeatured ? (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 animate-pulse">
-                                {[1, 2, 3, 4, 5, 6].map((n) => (
-                                    <div key={n} className="aspect-[3/4] bg-gray-200 rounded-3xl" />
-                                ))}
-                            </div>
+                            userData?.isProfessional ? (
+                                <div className="flex flex-col gap-3 max-w-2xl mx-auto w-full animate-pulse">
+                                    {[1, 2, 3, 4, 5].map((n) => (
+                                        <div key={n} className="h-20 bg-white border border-slate-200/60 rounded-2xl" />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 animate-pulse">
+                                    {[1, 2, 3, 4, 5, 6].map((n) => (
+                                        <div key={n} className="aspect-[3/4] bg-gray-200 rounded-xl" />
+                                    ))}
+                                </div>
+                            )
                         ) : (
                             <>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                                    {getFilteredUsers().map((user) => renderUserCard(user))}
+                                <div className={userData?.isProfessional ? "flex flex-col gap-2.5 max-w-2xl mx-auto w-full" : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"}>
+                                    {getFilteredUsers().map((user) => renderUserItem(user))}
                                 </div>
                                 
                                 {getFilteredUsers().length === 0 && (
@@ -408,8 +584,8 @@ export default function SearchPage() {
                 {/* Exibição de Resultados da Busca */}
                 {username.trim().length > 0 && (
                     <div className="flex flex-col gap-4 animate-in fade-in duration-300 pt-1">
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                            {foundUsers.map((user) => renderUserCard(user))}
+                        <div className={userData?.isProfessional ? "flex flex-col gap-2.5 max-w-2xl mx-auto w-full" : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"}>
+                            {foundUsers.map((user) => renderUserItem(user))}
                         </div>
                         {foundUsers.length === 0 && !loading && (
                             <div className="text-center py-12 text-gray-400 text-xs">
@@ -422,3 +598,4 @@ export default function SearchPage() {
         </div>
     );
 }
+

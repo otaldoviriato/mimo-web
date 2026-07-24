@@ -26,6 +26,9 @@ interface SettingsSnapshot {
     pwaShowAgainIntervalDays: number;
     identityVerificationPromptIntervalDays: number;
     newProfileDaysThreshold: number;
+    newClientHoursThreshold: number;
+    activeRechargedClientDaysThreshold: number;
+    activeUnrechargedClientHoursThreshold: number;
     exploreSortingCriteria: string[];
     adminClerkIds: string[];
     clientLevels: any[];
@@ -62,6 +65,9 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     const [pwaShowAgainIntervalDays, setPwaShowAgainIntervalDays] = useState(7);
     const [identityVerificationPromptIntervalDays, setIdentityVerificationPromptIntervalDays] = useState(7);
     const [newProfileDaysThreshold, setNewProfileDaysThreshold] = useState(15);
+    const [newClientHoursThreshold, setNewClientHoursThreshold] = useState(24);
+    const [activeRechargedClientDaysThreshold, setActiveRechargedClientDaysThreshold] = useState(30);
+    const [activeUnrechargedClientHoursThreshold, setActiveUnrechargedClientHoursThreshold] = useState(24);
     const [exploreSortingCriteria, setExploreSortingCriteria] = useState<string[]>(['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness']);
     const [clientLevels, setClientLevels] = useState<any[]>([]);
 
@@ -96,6 +102,9 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         pwaShowAgainIntervalDays: s.pwaShowAgainIntervalDays ?? 7,
         identityVerificationPromptIntervalDays: s.identityVerificationPromptIntervalDays ?? 7,
         newProfileDaysThreshold: s.newProfileDaysThreshold ?? 15,
+        newClientHoursThreshold: s.newClientHoursThreshold ?? 24,
+        activeRechargedClientDaysThreshold: s.activeRechargedClientDaysThreshold ?? 30,
+        activeUnrechargedClientHoursThreshold: s.activeUnrechargedClientHoursThreshold ?? 24,
         exploreSortingCriteria: s.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'],
         adminClerkIds: richAdmins.map(a => a.clerkId),
         clientLevels: s.clientLevels || [],
@@ -142,6 +151,9 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     setPwaShowAgainIntervalDays(s.pwaShowAgainIntervalDays ?? 7);
                     setIdentityVerificationPromptIntervalDays(s.identityVerificationPromptIntervalDays ?? 7);
                     setNewProfileDaysThreshold(s.newProfileDaysThreshold ?? 15);
+                    setNewClientHoursThreshold(s.newClientHoursThreshold ?? 24);
+                    setActiveRechargedClientDaysThreshold(s.activeRechargedClientDaysThreshold ?? 30);
+                    setActiveUnrechargedClientHoursThreshold(s.activeUnrechargedClientHoursThreshold ?? 24);
                     setExploreSortingCriteria(s.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness']);
                     setClientLevels(s.clientLevels || []);
                     setSavedSnapshot(buildSnapshot(s, richAdmins));
@@ -230,6 +242,9 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     pwaShowAgainIntervalDays,
                     identityVerificationPromptIntervalDays,
                     newProfileDaysThreshold,
+                    newClientHoursThreshold,
+                    activeRechargedClientDaysThreshold,
+                    activeUnrechargedClientHoursThreshold,
                     exploreSortingCriteria,
                     clientLevels,
                 }),
@@ -260,6 +275,9 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                 setPwaShowAgainIntervalDays(s.pwaShowAgainIntervalDays ?? 7);
                 setIdentityVerificationPromptIntervalDays(s.identityVerificationPromptIntervalDays ?? 7);
                 setNewProfileDaysThreshold(s.newProfileDaysThreshold ?? 15);
+                setNewClientHoursThreshold(s.newClientHoursThreshold ?? 24);
+                setActiveRechargedClientDaysThreshold(s.activeRechargedClientDaysThreshold ?? 30);
+                setActiveUnrechargedClientHoursThreshold(s.activeUnrechargedClientHoursThreshold ?? 24);
                 setExploreSortingCriteria(s.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness']);
                 setClientLevels(s.clientLevels || []);
             } else {
@@ -318,7 +336,10 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         maxPublicPhotos !== savedSnapshot.maxPublicPhotos ||
         minExclusivePhotos !== savedSnapshot.minExclusivePhotos ||
         maxExclusivePhotos !== savedSnapshot.maxExclusivePhotos ||
-        newProfileDaysThreshold !== savedSnapshot.newProfileDaysThreshold
+        newProfileDaysThreshold !== savedSnapshot.newProfileDaysThreshold ||
+        newClientHoursThreshold !== savedSnapshot.newClientHoursThreshold ||
+        activeRechargedClientDaysThreshold !== savedSnapshot.activeRechargedClientDaysThreshold ||
+        activeUnrechargedClientHoursThreshold !== savedSnapshot.activeUnrechargedClientHoursThreshold
     );
     const isDirtyPayments = savedSnapshot !== null && (
         pixEnabled !== savedSnapshot.pixEnabled ||
@@ -377,6 +398,9 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         pwaShowAgainIntervalDays, setPwaShowAgainIntervalDays,
         identityVerificationPromptIntervalDays, setIdentityVerificationPromptIntervalDays,
         newProfileDaysThreshold, setNewProfileDaysThreshold,
+        newClientHoursThreshold, setNewClientHoursThreshold,
+        activeRechargedClientDaysThreshold, setActiveRechargedClientDaysThreshold,
+        activeUnrechargedClientHoursThreshold, setActiveUnrechargedClientHoursThreshold,
         exploreSortingCriteria, setExploreSortingCriteria,
         clientLevels, setClientLevels,
         isDirtyLevels,

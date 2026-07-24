@@ -76,10 +76,13 @@ export async function GET(request: NextRequest) {
             return acc;
         }, {});
 
-        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers newProfileDaysThreshold exploreSortingCriteria clientLevels').lean() as any;
+        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers newProfileDaysThreshold newClientHoursThreshold activeRechargedClientDaysThreshold activeUnrechargedClientHoursThreshold exploreSortingCriteria clientLevels').lean() as any;
         const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
         const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
         const thresholdDays = settings?.newProfileDaysThreshold ?? 15;
+        const newClientHoursThreshold = settings?.newClientHoursThreshold ?? 24;
+        const activeRechargedClientDaysThreshold = settings?.activeRechargedClientDaysThreshold ?? 30;
+        const activeUnrechargedClientHoursThreshold = settings?.activeUnrechargedClientHoursThreshold ?? 24;
         const exploreSortingCriteria = settings?.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'];
 
         const activeLimit = new Date(Date.now() - 48 * 60 * 60 * 1000);
@@ -164,19 +167,16 @@ export async function GET(request: NextRequest) {
         const messagesLastWeekMap = new Map<string, number>();
         messagesGroup.forEach((g: any) => messagesLastWeekMap.set(g._id, g.count));
 
-        // 1. Agregação de recargas nos últimos 30 dias para os usuários listados (se for profissional)
+        // 1. Agregação de recargas históricas para os usuários listados (se for profissional)
         const clientRechargesMap = new Map<string, number>();
+        const clientHasRechargeMap = new Map<string, boolean>();
         if (currentUser?.isProfessional) {
-            const startOf30Days = new Date();
-            startOf30Days.setDate(startOf30Days.getDate() - 30);
-
             const rechargeAgg = await Transaction.aggregate([
                 {
                     $match: {
                         userId: { $in: clerkIds },
                         source: 'recharge',
-                        status: { $in: ['PAID', 'COMPLETED'] },
-                        timestamp: { $gte: startOf30Days }
+                        status: { $in: ['PAID', 'COMPLETED', 'paid', 'completed'] }
                     }
                 },
                 {
@@ -188,6 +188,9 @@ export async function GET(request: NextRequest) {
             ]);
             rechargeAgg.forEach((item: any) => {
                 clientRechargesMap.set(item._id, item.total);
+                if (item.total > 0) {
+                    clientHasRechargeMap.set(item._id, true);
+                }
             });
         }
 
@@ -210,6 +213,17 @@ export async function GET(request: NextRequest) {
             }
             return { name: 'Novo', color: '#64748B', icon: 'Medal' };
         };
+
+        // Buscar salas do usuário logado para identificar com quem ele já possui conversa
+        const userRooms = await Room.find({ participants: userId }).select('participants').lean() as any[];
+        const talkedUserIds = new Set<string>();
+        userRooms.forEach((r: any) => {
+            if (Array.isArray(r.participants)) {
+                r.participants.forEach((p: string) => {
+                    if (p !== userId) talkedUserIds.add(p);
+                });
+            }
+        });
 
         // Mapear usuários, calcular a completude do perfil e anexar até 4 fotos públicas
         const usersWithPhotos = featuredUsers.map(u => {
@@ -248,8 +262,39 @@ export async function GET(request: NextRequest) {
             const activeConversationsCount = activeRoomsMap.get(u.clerkId) || 0;
             const messagesLastWeekCount = messagesLastWeekMap.get(u.clerkId) || 0;
 
-            const cutoffDate = new Date();
-            cutoffDate.setDate(cutoffDate.getDate() - thresholdDays);
+            const cutoffDatePro = new Date();
+            cutoffDatePro.setDate(cutoffDatePro.getDate() - thresholdDays);
+
+            const cutoffDateClient = new Date(Date.now() - newClientHoursThreshold * 60 * 60 * 1000);
+            const rechargedClientActiveCutoff = new Date(Date.now() - activeRechargedClientDaysThreshold * 24 * 60 * 60 * 1000);
+            const unrechargedClientActiveCutoff = new Date(Date.now() - activeUnrechargedClientHoursThreshold * 60 * 60 * 1000);
+
+            const lastActiveDate = u.lastSeen ? new Date(u.lastSeen) : (u.createdAt ? new Date(u.createdAt) : new Date(0));
+            const isOnlineNow = !!u.isOnline;
+            const hasRecharge = clientHasRechargeMap.get(u.clerkId) ?? false;
+
+            let isInactive = false;
+            let tier = 1;
+
+            if (currentUser?.isProfessional) {
+                if (hasRecharge) {
+                    const isActive = isOnlineNow || lastActiveDate >= rechargedClientActiveCutoff;
+                    isInactive = !isActive;
+                    tier = isActive ? 1 : 3;
+                } else {
+                    const isActive = isOnlineNow || lastActiveDate >= unrechargedClientActiveCutoff;
+                    isInactive = !isActive;
+                    tier = isActive ? 2 : 3;
+                }
+            } else {
+                const isActive = isOnlineNow || lastActiveDate >= rechargedClientActiveCutoff;
+                isInactive = !isActive;
+                tier = isActive ? 1 : 3;
+            }
+
+            const isNew = u.isProfessional
+                ? (u.createdAt ? new Date(u.createdAt) >= cutoffDatePro : false)
+                : (u.createdAt ? new Date(u.createdAt) >= cutoffDateClient : false);
 
             return {
                 id: u._id,
@@ -265,26 +310,39 @@ export async function GET(request: NextRequest) {
                 chargePerCharSubscribers: u.chargePerCharSubscribers ?? defaultSub,
                 chargePerCharNonSubscribers: u.chargePerCharNonSubscribers ?? defaultNonSub,
                 bio: u.bio || '',
-                isNew: u.createdAt ? new Date(u.createdAt) >= cutoffDate : false,
+                isNew,
                 publicPhotos: publicPhotos.slice(0, 4),
                 avgResponseTimeMinutes: u.avgResponseTimeMinutes ?? null,
                 score: completeness, // mantido para compatibilidade com a tipagem do frontend
                 completeness,
                 lastActiveTime,
                 publicPhotosCount: photosCount,
-                isOnline: !!u.isOnline,
+                isOnline: isOnlineNow,
                 birthDate: u.birthDate ?? null,
                 city: u.city ?? '',
                 state: u.state ?? '',
                 activeConversationsCount,
                 messagesLastWeekCount,
-                clientLevel: getClientLevel(clientRechargesMap.get(u.clerkId) || 0)
+                clientLevel: getClientLevel(clientRechargesMap.get(u.clerkId) || 0),
+                hasChat: talkedUserIds.has(u.clerkId),
+                hasRecharge,
+                tier,
+                isInactive
             };
         });
 
         // Ordenar dinamicamente:
+        // 1. Por Tier (1: Com recarga ativa -> 2: Novos/Ativos sem recarga -> 3: Inativos)
+        // 2. Por Histórico de Conversa (Sem conversa primeiro)
+        // 3. Por critérios adicionais (Online, Acesso Recente, Completude)
         const sorted = usersWithPhotos
             .sort((a, b) => {
+                if (a.tier !== b.tier) {
+                    return a.tier - b.tier;
+                }
+                if (a.hasChat !== b.hasChat) {
+                    return a.hasChat ? 1 : -1;
+                }
                 for (const criterion of exploreSortingCriteria) {
                     if (criterion === 'activeConversations') {
                         const diff = (b.activeConversationsCount || 0) - (a.activeConversationsCount || 0);
@@ -311,7 +369,7 @@ export async function GET(request: NextRequest) {
                 }
                 return 0;
             })
-            .slice(0, 12);
+            .slice(0, currentUser?.isProfessional ? 60 : 30);
 
         return NextResponse.json({ users: sorted });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

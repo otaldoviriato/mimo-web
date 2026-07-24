@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
-import { User, GalleryItem, Transaction } from '@/models';
+import { User, GalleryItem, Transaction, Room } from '@/models';
 import { AppSettings } from '@/models/AppSettings';
 
 export const dynamic = 'force-dynamic';
@@ -77,30 +77,24 @@ export async function GET(request: NextRequest) {
             return acc;
         }, {});
 
-        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers newProfileDaysThreshold clientLevels').lean() as any;
+        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers newProfileDaysThreshold newClientHoursThreshold activeRechargedClientDaysThreshold activeUnrechargedClientHoursThreshold clientLevels').lean() as any;
         const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
         const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
         const thresholdDays = settings?.newProfileDaysThreshold ?? 15;
+        const newClientHoursThreshold = settings?.newClientHoursThreshold ?? 24;
+        const activeRechargedClientDaysThreshold = settings?.activeRechargedClientDaysThreshold ?? 30;
+        const activeUnrechargedClientHoursThreshold = settings?.activeUnrechargedClientHoursThreshold ?? 24;
 
-        const cutoffDate = new Date();
-        cutoffDate.setDate(cutoffDate.getDate() - thresholdDays);
-
-        const activeLimitDate = new Date();
-        activeLimitDate.setDate(activeLimitDate.getDate() - 30);
-
-        // 1. Agregação de recargas nos últimos 30 dias para os usuários listados (se for profissional)
+        // 1. Agregação de recargas históricas para os usuários listados (se for profissional)
         const clientRechargesMap = new Map<string, number>();
+        const clientHasRechargeMap = new Map<string, boolean>();
         if (currentUser?.isProfessional) {
-            const startOf30Days = new Date();
-            startOf30Days.setDate(startOf30Days.getDate() - 30);
-
             const rechargeAgg = await Transaction.aggregate([
                 {
                     $match: {
                         userId: { $in: clerkIds },
                         source: 'recharge',
-                        status: { $in: ['PAID', 'COMPLETED'] },
-                        timestamp: { $gte: startOf30Days }
+                        status: { $in: ['PAID', 'COMPLETED', 'paid', 'completed'] }
                     }
                 },
                 {
@@ -112,6 +106,7 @@ export async function GET(request: NextRequest) {
             ]);
             rechargeAgg.forEach((item: any) => {
                 clientRechargesMap.set(item._id, item.total);
+                if (item.total > 0) clientHasRechargeMap.set(item._id, true);
             });
         }
 
@@ -134,6 +129,17 @@ export async function GET(request: NextRequest) {
             }
             return { name: 'Novo', color: '#64748B', icon: 'Medal' };
         };
+
+        // Buscar salas do usuário logado para identificar com quem ele já possui conversa
+        const userRooms = await Room.find({ participants: userId }).select('participants').lean() as any[];
+        const talkedUserIds = new Set<string>();
+        userRooms.forEach((r: any) => {
+            if (Array.isArray(r.participants)) {
+                r.participants.forEach((p: string) => {
+                    if (p !== userId) talkedUserIds.add(p);
+                });
+            }
+        });
 
         // Mapear usuários e calcular scores
         const usersWithScores = foundUsers.map(u => {
@@ -182,18 +188,39 @@ export async function GET(request: NextRequest) {
                 score += 15;
             }
 
-            // Fator aleatório sutil (0 a 5 pts) para desempatar criadores semelhantes
-            const finalScore = score + Math.random() * 5;
+            const cutoffDatePro = new Date();
+            cutoffDatePro.setDate(cutoffDatePro.getDate() - thresholdDays);
 
-            // Critérios de qualificação booleana rígida
-            const isOnlineOrRecent = u.isOnline || (u.lastSeen && new Date(u.lastSeen) >= activeLimitDate) || (u.createdAt && new Date(u.createdAt) >= activeLimitDate);
-            const isQualified = currentUser?.isProfessional
-                ? (!!u.photoUrl && u.photoUrl.trim() !== '' && isOnlineOrRecent)
-                : (!!u.photoUrl && u.photoUrl.trim() !== '' &&
-                   !!u.coverUrl && u.coverUrl.trim() !== '' &&
-                   !!u.bio && u.bio.trim() !== '' &&
-                   photosCount >= 3 &&
-                   isOnlineOrRecent);
+            const cutoffDateClient = new Date(Date.now() - newClientHoursThreshold * 60 * 60 * 1000);
+            const rechargedClientActiveCutoff = new Date(Date.now() - activeRechargedClientDaysThreshold * 24 * 60 * 60 * 1000);
+            const unrechargedClientActiveCutoff = new Date(Date.now() - activeUnrechargedClientHoursThreshold * 60 * 60 * 1000);
+
+            const lastActiveDate = u.lastSeen ? new Date(u.lastSeen) : (u.createdAt ? new Date(u.createdAt) : new Date(0));
+            const isOnlineNow = !!u.isOnline;
+            const hasRecharge = clientHasRechargeMap.get(u.clerkId) ?? false;
+
+            let isInactive = false;
+            let tier = 1;
+
+            if (currentUser?.isProfessional) {
+                if (hasRecharge) {
+                    const isActive = isOnlineNow || lastActiveDate >= rechargedClientActiveCutoff;
+                    isInactive = !isActive;
+                    tier = isActive ? 1 : 3;
+                } else {
+                    const isActive = isOnlineNow || lastActiveDate >= unrechargedClientActiveCutoff;
+                    isInactive = !isActive;
+                    tier = isActive ? 2 : 3;
+                }
+            } else {
+                const isActive = isOnlineNow || lastActiveDate >= rechargedClientActiveCutoff;
+                isInactive = !isActive;
+                tier = isActive ? 1 : 3;
+            }
+
+            const isNew = u.isProfessional
+                ? (u.createdAt ? new Date(u.createdAt) >= cutoffDatePro : false)
+                : (u.createdAt ? new Date(u.createdAt) >= cutoffDateClient : false);
 
             return {
                 id: u._id,
@@ -209,24 +236,33 @@ export async function GET(request: NextRequest) {
                 chargePerCharSubscribers: u.chargePerCharSubscribers ?? defaultSub,
                 chargePerCharNonSubscribers: u.chargePerCharNonSubscribers ?? defaultNonSub,
                 bio: u.bio || '',
-                isNew: u.createdAt ? new Date(u.createdAt) >= cutoffDate : false,
+                isNew,
                 publicPhotos: publicPhotos.slice(0, 4),
                 avgResponseTimeMinutes: u.avgResponseTimeMinutes ?? null,
-                score: finalScore,
-                isQualified,
-                isOnline: !!u.isOnline,
+                score,
+                isOnline: isOnlineNow,
                 birthDate: u.birthDate ?? null,
                 city: u.city ?? '',
                 state: u.state ?? '',
-                clientLevel: getClientLevel(clientRechargesMap.get(u.clerkId) || 0)
+                clientLevel: getClientLevel(clientRechargesMap.get(u.clerkId) || 0),
+                hasChat: talkedUserIds.has(u.clerkId),
+                hasRecharge,
+                tier,
+                isInactive
             };
         });
 
         // Na busca, não filtramos por perfil qualificado/completo para permitir que qualquer usuário profissional aprovado correspondente seja encontrado.
         const filteredUsers = usersWithScores;
 
-        // Ordenação manual: Exact username matches primeiro, depois por score de relevância
+        // Ordenação manual: Por Tier (1 -> 2 -> 3), Perfis sem conversa aberta primeiro, exact username matches depois, depois por score
         const sortedUsers = filteredUsers.sort((a, b) => {
+            if (a.tier !== b.tier) {
+                return a.tier - b.tier;
+            }
+            if (a.hasChat !== b.hasChat) {
+                return a.hasChat ? 1 : -1;
+            }
             const aExact = a.username.toLowerCase() === cleanQuery.toLowerCase();
             const bExact = b.username.toLowerCase() === cleanQuery.toLowerCase();
             if (aExact && !bExact) return -1;

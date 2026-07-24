@@ -26,6 +26,9 @@ export interface SettingsData {
     pwaShowAgainIntervalDays: number;
     identityVerificationPromptIntervalDays: number;
     newProfileDaysThreshold: number;
+    newClientHoursThreshold?: number;
+    activeRechargedClientDaysThreshold?: number;
+    activeUnrechargedClientHoursThreshold?: number;
     activeUserThresholdDays?: number;
     exploreSortingCriteria?: string[];
     clientLevels?: any[];

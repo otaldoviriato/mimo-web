@@ -55,6 +55,9 @@ async function getOrCreateSettings() {
         if (settings.pwaShowAgainIntervalDays === undefined) { settings.pwaShowAgainIntervalDays = 7; updated = true; }
         if (settings.identityVerificationPromptIntervalDays === undefined) { settings.identityVerificationPromptIntervalDays = 7; updated = true; }
         if (settings.newProfileDaysThreshold === undefined) { settings.newProfileDaysThreshold = 15; updated = true; }
+        if (settings.newClientHoursThreshold === undefined) { settings.newClientHoursThreshold = 24; updated = true; }
+        if (settings.activeRechargedClientDaysThreshold === undefined) { settings.activeRechargedClientDaysThreshold = 30; updated = true; }
+        if (settings.activeUnrechargedClientHoursThreshold === undefined) { settings.activeUnrechargedClientHoursThreshold = 24; updated = true; }
         if (settings.onlineDelayMinutes === undefined) { settings.onlineDelayMinutes = 2; updated = true; }
         if (settings.activeUserThresholdDays === undefined) { settings.activeUserThresholdDays = 7; updated = true; }
         if (settings.exploreSortingCriteria === undefined || settings.exploreSortingCriteria.length === 0) {
@@ -175,6 +178,9 @@ export async function PUT(request: NextRequest) {
             pwaShowAgainIntervalDays,
             identityVerificationPromptIntervalDays,
             newProfileDaysThreshold,
+            newClientHoursThreshold,
+            activeRechargedClientDaysThreshold,
+            activeUnrechargedClientHoursThreshold,
             onlineDelayMinutes,
             activeUserThresholdDays,
             exploreSortingCriteria,
@@ -356,6 +362,30 @@ export async function PUT(request: NextRequest) {
                 return NextResponse.json({ error: 'Limite de dias para perfil novo inválido' }, { status: 400 });
             }
             settings.newProfileDaysThreshold = val;
+        }
+
+        if (newClientHoursThreshold !== undefined) {
+            const val = Number(newClientHoursThreshold);
+            if (isNaN(val) || val < 0) {
+                return NextResponse.json({ error: 'Limite de horas para novo cliente masculino inválido' }, { status: 400 });
+            }
+            settings.newClientHoursThreshold = val;
+        }
+
+        if (activeRechargedClientDaysThreshold !== undefined) {
+            const val = Number(activeRechargedClientDaysThreshold);
+            if (isNaN(val) || val < 0) {
+                return NextResponse.json({ error: 'Limite de dias de inatividade para cliente com recarga inválido' }, { status: 400 });
+            }
+            settings.activeRechargedClientDaysThreshold = val;
+        }
+
+        if (activeUnrechargedClientHoursThreshold !== undefined) {
+            const val = Number(activeUnrechargedClientHoursThreshold);
+            if (isNaN(val) || val < 0) {
+                return NextResponse.json({ error: 'Limite de horas de inatividade para cliente sem recarga inválido' }, { status: 400 });
+            }
+            settings.activeUnrechargedClientHoursThreshold = val;
         }
 
         if (exploreSortingCriteria !== undefined) {

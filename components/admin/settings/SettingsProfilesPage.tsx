@@ -11,6 +11,9 @@ type Props = Pick<UseSettingsReturn,
     | 'minExclusivePhotos' | 'setMinExclusivePhotos'
     | 'maxExclusivePhotos' | 'setMaxExclusivePhotos'
     | 'newProfileDaysThreshold' | 'setNewProfileDaysThreshold'
+    | 'newClientHoursThreshold' | 'setNewClientHoursThreshold'
+    | 'activeRechargedClientDaysThreshold' | 'setActiveRechargedClientDaysThreshold'
+    | 'activeUnrechargedClientHoursThreshold' | 'setActiveUnrechargedClientHoursThreshold'
     | 'isDirtyProfiles' | 'saving' | 'saveSettings'
 >;
 
@@ -35,6 +38,9 @@ export function SettingsProfilesPage({
     minExclusivePhotos, setMinExclusivePhotos,
     maxExclusivePhotos, setMaxExclusivePhotos,
     newProfileDaysThreshold, setNewProfileDaysThreshold,
+    newClientHoursThreshold, setNewClientHoursThreshold,
+    activeRechargedClientDaysThreshold, setActiveRechargedClientDaysThreshold,
+    activeUnrechargedClientHoursThreshold, setActiveUnrechargedClientHoursThreshold,
     isDirtyProfiles, saving, saveSettings,
 }: Props) {
     const inputCls = 'w-full max-w-xs px-3.5 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700 shadow-sm';
@@ -133,10 +139,10 @@ export function SettingsProfilesPage({
                 </div>
 
                 <SettingField
-                    title="Dias para Badge 'Novo' no Perfil"
+                    title="Dias para Badge 'Novo' no Perfil Criadora"
                     description={
                         <span>
-                            Define por quantos dias após o cadastro um perfil de profissional exibe a badge <strong className="text-slate-600">&quot;Novo&quot;</strong> nos cards de busca e exploração da plataforma. Esta badge destaca criadores recém-chegados, ajudando usuários a descobrirem novos perfis e incentivando a diversificação da base de criadores. Após este período, a badge desaparece automaticamente. Defina como <strong className="text-slate-600">0</strong> para desativar completamente a badge de novo perfil.
+                            Define por quantos dias após o cadastro um perfil de profissional exibe a badge <strong className="text-slate-600">&quot;Novo&quot;</strong> nos cards de busca e exploração da plataforma.
                         </span>
                     }
                     unit="dias"
@@ -154,6 +160,50 @@ export function SettingsProfilesPage({
                                 Badge desativada. Nenhum perfil exibirá o indicador &quot;Novo&quot;.
                             </p>
                         )}
+                    </div>
+                </SettingField>
+
+                <SettingField
+                    title="Horas para Badge 'Novo' e Atividade para Cliente sem Recarga"
+                    description={
+                        <span>
+                            Define por quantas horas após o cadastro um cliente masculino sem recargas exibe a badge <strong className="text-slate-600">&quot;Novo&quot;</strong> e é considerado ativo na busca. Padrão: 24 horas.
+                        </span>
+                    }
+                    unit="horas"
+                >
+                    <div className="space-y-2">
+                        <input
+                            type="number"
+                            value={activeUnrechargedClientHoursThreshold}
+                            onChange={(e) => {
+                                const val = Number(e.target.value);
+                                setNewClientHoursThreshold(val);
+                                setActiveUnrechargedClientHoursThreshold(val);
+                            }}
+                            min={0}
+                            className={inputCls}
+                        />
+                    </div>
+                </SettingField>
+
+                <SettingField
+                    title="Dias de Atividade para Cliente com Recarga"
+                    description={
+                        <span>
+                            Define por quantos dias após o último acesso um cliente masculino que já fez recarga permanece considerado ativo antes de ir para os inativos. Padrão: 30 dias.
+                        </span>
+                    }
+                    unit="dias"
+                >
+                    <div className="space-y-2">
+                        <input
+                            type="number"
+                            value={activeRechargedClientDaysThreshold}
+                            onChange={(e) => setActiveRechargedClientDaysThreshold(Number(e.target.value))}
+                            min={0}
+                            className={inputCls}
+                        />
                     </div>
                 </SettingField>
             </div>
