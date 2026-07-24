@@ -588,8 +588,8 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                             </div>
                         </div>
 
-                        {/* ── SEÇÃO: VERIFICAÇÃO DE IDENTIDADE ── */}
-                        {profileIsProfessional && (
+                        {/* ── SEÇÃO: VERIFICAÇÃO DE IDENTIDADE (Exibida apenas se NÃO for verificado) ── */}
+                        {profileIsProfessional && userData?.identityStatus !== 'approved' && (
                             <div>
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Verificação de Identidade (Selo de Verificado)</p>
                             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-4 space-y-3.5">

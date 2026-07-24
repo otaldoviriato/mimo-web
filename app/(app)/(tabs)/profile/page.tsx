@@ -408,7 +408,14 @@ export default function ProfilePage() {
                             disabled={uploadPhotoMutation.isPending}
                             className="relative group p-1 bg-white rounded-full shadow-2xl transition-transform duration-75 active:scale-90 border-2 border-purple-100 pointer-events-auto"
                         >
-                            <Avatar uri={localPhotoUrl} size={100} />
+                            <div className="relative">
+                                <Avatar uri={localPhotoUrl} size={100} />
+                                {/* Indicador de Online no próprio perfil */}
+                                <span 
+                                    className="w-5 h-5 rounded-full bg-emerald-500 border-2 border-white absolute bottom-1 right-1 shadow-xs z-20" 
+                                    title="Você está online" 
+                                />
+                            </div>
                             <div className="absolute inset-1 rounded-full bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
                                 <Plus className="w-6 h-6 text-white" />
                             </div>
@@ -430,6 +437,14 @@ export default function ProfilePage() {
                     <p className="text-purple-600 font-bold text-sm tracking-wide mt-0.5">
                         @{userData?.username}
                     </p>
+
+                    {/* Selo de Perfil Verificado (Para o próprio usuário) */}
+                    {userData?.isProfessional && userData?.identityStatus === 'approved' && (
+                        <span className="mt-2 inline-flex items-center gap-1 bg-purple-50 text-purple-700 border border-purple-200/80 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wider uppercase shadow-xs">
+                            <ShieldCheck className="w-3 h-3 text-purple-600" />
+                            Perfil Verificado
+                        </span>
+                    )}
 
                     {/* Biografia */}
                     {userData?.bio && (
@@ -895,7 +910,13 @@ export default function ProfilePage() {
                         disabled={uploadPhotoMutation.isPending}
                         className="relative shrink-0 block p-0.5 bg-purple-50 rounded-full border border-purple-100 shadow-sm transition-all duration-75 active:scale-90"
                     >
-                        <Avatar uri={localPhotoUrl} size={64} />
+                        <div className="relative">
+                            <Avatar uri={localPhotoUrl} size={64} />
+                            <span 
+                                className="w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white absolute bottom-0 right-0 shadow-xs z-20" 
+                                title="Você está online" 
+                            />
+                        </div>
                         {/* Ícone indicador de edição de foto */}
                         <div className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-purple-600 border border-white flex items-center justify-center shadow-md">
                             <Camera className="w-3 h-3 text-white" />

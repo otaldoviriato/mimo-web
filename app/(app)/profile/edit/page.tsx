@@ -5,7 +5,7 @@ import { useUser } from '@clerk/nextjs';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useMyProfile, useUpdateProfile } from '@/hooks/useQueries';
 import { formatCPF } from '@/components/RechargeModal';
-import { Lock, ArrowLeft, Check, AlertCircle, RefreshCw } from 'lucide-react';
+import { Lock, ArrowLeft, Check, AlertCircle, RefreshCw, ShieldCheck } from 'lucide-react';
 
 const formatDate = (dateString?: string | Date) => {
     if (!dateString) return '';
@@ -178,6 +178,19 @@ export default function EditProfilePage() {
             </div>
 
             <div className="p-4 flex flex-col gap-4 max-w-md w-full mx-auto">
+                {/* Banner de Identidade Verificada */}
+                {profileIsProfessional && userData?.identityStatus === 'approved' && (
+                    <div className="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200/80 rounded-2xl p-4 flex items-center gap-3.5 shadow-xs">
+                        <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                            <ShieldCheck className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h4 className="text-xs font-black text-purple-950 uppercase tracking-wider">Perfil Verificado</h4>
+                            <p className="text-[11px] text-purple-700 font-medium leading-snug mt-0.5">Sua identidade foi confirmada e você possui o selo oficial de verificação.</p>
+                        </div>
+                    </div>
+                )}
+
                 {/* ── SEÇÃO 1: INFORMAÇÕES PÚBLICAS DO PERFIL ── */}
                 <div>
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 px-1">Informações do Perfil</p>
