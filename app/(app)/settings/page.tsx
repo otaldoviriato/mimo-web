@@ -9,7 +9,7 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { formatCPF, formatPhone } from '@/components/RechargeModal';
 import { PricingGuideModal, PRICE_PER_CHAR_OPTIONS } from '@/components/PricingGuideModal';
 import Link from 'next/link';
-import { ShieldCheck, RefreshCw, AlertCircle } from 'lucide-react';
+import { ShieldCheck, RefreshCw, AlertCircle, Lock } from 'lucide-react';
 
 function SkeletonField() {
     return (
@@ -500,7 +500,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
         name !== initialName ||
         username !== initialUsername ||
         phone !== initialPhone ||
-        birthDate !== initialBirthDate ||
         city !== initialCity ||
         state !== initialState ||
         hideFromExplore !== (userData?.hideFromExplore === true) ||
@@ -612,36 +611,56 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                         <p className="text-[10px] font-semibold text-red-500 mt-1">Este nome de usuário já está em uso</p>
                                     )}
                                 </div>
-                                {/* E-mail */}
-                                <div className="px-4 py-3.5 border-b border-gray-50 bg-gray-50/50">
-                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">E-mail</label>
+                                {/* E-mail (Bloqueado) */}
+                                <div className="px-4 py-3.5 border-b border-gray-100 bg-slate-50/80">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <label className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">E-mail</label>
+                                        <span className="text-[9px] font-bold text-slate-400 bg-slate-200/70 px-2 py-0.5 rounded-full flex items-center gap-1 border border-slate-300/40 select-none">
+                                            <Lock className="w-2.5 h-2.5 text-slate-500" />
+                                            Bloqueado
+                                        </span>
+                                    </div>
                                     <input
-                                        className="w-full text-sm text-gray-500 font-medium bg-transparent focus:outline-none cursor-not-allowed"
+                                        className="w-full text-sm text-slate-600 font-semibold bg-transparent focus:outline-none cursor-not-allowed select-none"
                                         value={userData?.email || ''}
                                         readOnly
                                         disabled
                                     />
                                 </div>
-                                {/* CPF */}
-                                <div className="px-4 py-3.5 border-b border-gray-50 bg-gray-50/50">
-                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">CPF</label>
+
+                                {/* CPF (Bloqueado) */}
+                                <div className="px-4 py-3.5 border-b border-gray-100 bg-slate-50/80">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <label className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">CPF</label>
+                                        <span className="text-[9px] font-bold text-slate-400 bg-slate-200/70 px-2 py-0.5 rounded-full flex items-center gap-1 border border-slate-300/40 select-none">
+                                            <Lock className="w-2.5 h-2.5 text-slate-500" />
+                                            Bloqueado
+                                        </span>
+                                    </div>
                                     <input
                                         id="settings-cpf-input"
-                                        className="w-full text-sm text-gray-500 font-medium bg-transparent focus:outline-none cursor-not-allowed"
+                                        className="w-full text-sm text-slate-600 font-semibold bg-transparent focus:outline-none cursor-not-allowed select-none"
                                         placeholder="Não informado"
                                         value={taxId}
                                         readOnly
                                         disabled
                                     />
                                 </div>
-                                {/* Data de Nascimento */}
-                                <div className="px-4 py-3.5 border-b border-gray-50">
-                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Data de Nascimento</label>
+
+                                {/* Data de Nascimento (Bloqueado) */}
+                                <div className="px-4 py-3.5 border-b border-gray-100 bg-slate-50/80">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <label className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Data de Nascimento</label>
+                                        <span className="text-[9px] font-bold text-slate-400 bg-slate-200/70 px-2 py-0.5 rounded-full flex items-center gap-1 border border-slate-300/40 select-none">
+                                            <Lock className="w-2.5 h-2.5 text-slate-500" />
+                                            Bloqueado
+                                        </span>
+                                    </div>
                                     <input
-                                        type="date"
-                                        className="w-full text-sm text-gray-900 font-medium bg-transparent focus:outline-none"
-                                        value={birthDate}
-                                        onChange={(e) => setBirthDate(e.target.value)}
+                                        className="w-full text-sm text-slate-600 font-semibold bg-transparent focus:outline-none cursor-not-allowed select-none"
+                                        value={birthDate ? formatDate(birthDate) : 'Não informada'}
+                                        readOnly
+                                        disabled
                                     />
                                 </div>
                                 {/* Estado */}
