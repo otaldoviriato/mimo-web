@@ -9,7 +9,7 @@ import { useMyProfile, useUploadPhoto, useUploadCover, useMyGallery, useUploadTo
 import { ImageCropper } from '@/components/ImageCropper';
 import { usePayment } from '@/context/PaymentContext';
 import { PullToRefresh } from '@/components';
-import { Settings, Share2, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, ShieldAlert, Heart, Globe, Crown, Camera, Gift, CreditCard, QrCode, Star, Info, CheckCircle2, X, MoreVertical, ChevronLeft, ChevronRight, ExternalLink, CalendarClock, AlertCircle } from 'lucide-react';
+import { Settings, Share2, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, ShieldAlert, Heart, Globe, Crown, Camera, Gift, CreditCard, QrCode, Star, Info, CheckCircle2, X, MoreVertical, ChevronLeft, ChevronRight, ExternalLink, CalendarClock, AlertCircle, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function ProfilePage() {
@@ -440,10 +440,10 @@ export default function ProfilePage() {
 
                     {/* Botão de Edição de Perfil */}
                     <button
-                        onClick={() => router.push('/settings')}
-                        className="mt-5 w-full max-w-xs h-9 bg-purple-50 hover:bg-purple-100/80 border border-purple-100/80 font-bold text-xs text-purple-700 rounded-xl transition-all duration-75 active:scale-95 active:bg-purple-200/50 flex items-center justify-center gap-2"
+                        onClick={() => router.push('/profile/edit')}
+                        className="mt-5 w-full max-w-xs h-9 bg-purple-50 hover:bg-purple-100/80 border border-purple-100/80 font-bold text-xs text-purple-700 rounded-xl transition-all duration-75 active:scale-95 active:bg-purple-200/50 flex items-center justify-center gap-2 cursor-pointer"
                     >
-                        <Settings className="w-3.5 h-3.5 text-purple-400" />
+                        <Pencil className="w-3.5 h-3.5 text-purple-500" />
                         Editar Perfil
                     </button>
 

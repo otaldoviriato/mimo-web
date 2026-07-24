@@ -9,7 +9,7 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { formatCPF, formatPhone } from '@/components/RechargeModal';
 import { PricingGuideModal, PRICE_PER_CHAR_OPTIONS } from '@/components/PricingGuideModal';
 import Link from 'next/link';
-import { ShieldCheck, RefreshCw, AlertCircle, Lock } from 'lucide-react';
+import { ShieldCheck, RefreshCw, AlertCircle, Lock, Pencil, ChevronRight } from 'lucide-react';
 
 function SkeletonField() {
     return (
@@ -568,232 +568,23 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                     </div>
                 ) : (
                     <>
-
-
-                        {/* ── SEÇÃO: DADOS DO PERFIL ── */}
+                        {/* ── ATALHO: EDITAR PERFIL ── */}
                         <div>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Dados do Perfil</p>
-                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                                {/* Nome */}
-                                <div className="px-4 py-3.5 border-b border-gray-50">
-                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Nome de Exibição</label>
-                                    <input
-                                        className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
-                                        placeholder="Seu nome ou apelido"
-                                        value={name}
-                                        onChange={(e) => setName(e.target.value)}
-                                    />
-                                </div>
-                                {/* Username */}
-                                <div className="px-4 py-3.5 border-b border-gray-50">
-                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Username</label>
-                                    <div className="flex items-center gap-1">
-                                        <span className="text-sm text-gray-300 select-none">@</span>
-                                        <input
-                                            className="flex-1 text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
-                                            placeholder="username"
-                                            value={username}
-                                            onChange={(e) => handleUsernameChange(e.target.value)}
-                                            autoCapitalize="none"
-                                            autoCorrect="off"
-                                        />
-                                        {usernameStatus === 'checking' && (
-                                            <svg className="animate-spin h-3.5 w-3.5 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                                        )}
-                                        {usernameStatus === 'available' && (
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-emerald-500 shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
-                                        )}
-                                        {usernameStatus === 'taken' && (
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-red-500 shrink-0"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                        )}
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Perfil</p>
+                            <div 
+                                onClick={() => router.push('/profile/edit')}
+                                className="bg-white rounded-2xl border border-gray-100 shadow-xs p-4 flex items-center justify-between hover:border-purple-200 active:scale-[0.99] transition-all cursor-pointer group"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0 text-purple-600 group-hover:scale-105 transition-transform">
+                                        <Pencil className="w-5 h-5" />
                                     </div>
-                                    {usernameStatus === 'taken' && (
-                                        <p className="text-[10px] font-semibold text-red-500 mt-1">Este nome de usuário já está em uso</p>
-                                    )}
-                                </div>
-                                {/* E-mail (Bloqueado) */}
-                                <div className="px-4 py-3.5 border-b border-gray-100 bg-slate-50/80">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <label className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">E-mail</label>
-                                        <span className="text-[9px] font-bold text-slate-400 bg-slate-200/70 px-2 py-0.5 rounded-full flex items-center gap-1 border border-slate-300/40 select-none">
-                                            <Lock className="w-2.5 h-2.5 text-slate-500" />
-                                            Bloqueado
-                                        </span>
+                                    <div>
+                                        <h3 className="text-sm font-bold text-gray-900 group-hover:text-purple-700 transition-colors">Editar Perfil</h3>
+                                        <p className="text-xs text-gray-400">Nome de exibição, @username, biografia e localização</p>
                                     </div>
-                                    <input
-                                        className="w-full text-sm text-slate-600 font-semibold bg-transparent focus:outline-none cursor-not-allowed select-none"
-                                        value={userData?.email || ''}
-                                        readOnly
-                                        disabled
-                                    />
                                 </div>
-
-                                {/* CPF (Bloqueado) */}
-                                <div className="px-4 py-3.5 border-b border-gray-100 bg-slate-50/80">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <label className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">CPF</label>
-                                        <span className="text-[9px] font-bold text-slate-400 bg-slate-200/70 px-2 py-0.5 rounded-full flex items-center gap-1 border border-slate-300/40 select-none">
-                                            <Lock className="w-2.5 h-2.5 text-slate-500" />
-                                            Bloqueado
-                                        </span>
-                                    </div>
-                                    <input
-                                        id="settings-cpf-input"
-                                        className="w-full text-sm text-slate-600 font-semibold bg-transparent focus:outline-none cursor-not-allowed select-none"
-                                        placeholder="Não informado"
-                                        value={taxId}
-                                        readOnly
-                                        disabled
-                                    />
-                                </div>
-
-                                {/* Data de Nascimento (Bloqueado) */}
-                                <div className="px-4 py-3.5 border-b border-gray-100 bg-slate-50/80">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <label className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Data de Nascimento</label>
-                                        <span className="text-[9px] font-bold text-slate-400 bg-slate-200/70 px-2 py-0.5 rounded-full flex items-center gap-1 border border-slate-300/40 select-none">
-                                            <Lock className="w-2.5 h-2.5 text-slate-500" />
-                                            Bloqueado
-                                        </span>
-                                    </div>
-                                    <input
-                                        className="w-full text-sm text-slate-600 font-semibold bg-transparent focus:outline-none cursor-not-allowed select-none"
-                                        value={birthDate ? formatDate(birthDate) : 'Não informada'}
-                                        readOnly
-                                        disabled
-                                    />
-                                </div>
-                                {/* Estado */}
-                                <div className="px-4 py-3.5 border-b border-gray-50">
-                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Estado (Naturalidade)</label>
-                                    <select
-                                        value={state}
-                                        onChange={(e) => {
-                                            setState(e.target.value);
-                                            setCity('');
-                                            setCitySearchQuery('');
-                                        }}
-                                        className="w-full text-sm text-gray-900 font-medium bg-transparent focus:outline-none cursor-pointer"
-                                    >
-                                        <option value="">Selecione seu Estado</option>
-                                        {BRAZILIAN_STATES.map(s => (
-                                            <option key={s.uf} value={s.uf}>{s.name} ({s.uf})</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                {/* Cidade */}
-                                <div className="px-4 py-3.5 border-b border-gray-50 relative">
-                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Cidade / Município</label>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            disabled={!state}
-                                            placeholder={state ? (loadingCities ? "Carregando municípios..." : "Digite para buscar seu município") : "Selecione o estado primeiro"}
-                                            className={`w-full text-sm text-gray-900 font-medium bg-transparent focus:outline-none ${!state ? 'cursor-not-allowed text-gray-400' : ''}`}
-                                            value={citySearchQuery}
-                                            onChange={(e) => {
-                                                setCitySearchQuery(e.target.value);
-                                                setShowCityDropdown(true);
-                                            }}
-                                            onFocus={() => setShowCityDropdown(true)}
-                                            onBlur={() => {
-                                                setTimeout(() => setShowCityDropdown(false), 200);
-                                            }}
-                                        />
-                                        {loadingCities && (
-                                            <svg className="animate-spin h-3.5 w-3.5 text-purple-600 shrink-0" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                                        )}
-                                    </div>
-                                    
-                                    {showCityDropdown && state && citiesList.length > 0 && (
-                                        <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-150 rounded-xl shadow-lg z-50 no-scrollbar">
-                                            {citiesList
-                                                .filter(c => c.toLowerCase().includes(citySearchQuery.toLowerCase()))
-                                                .slice(0, 50)
-                                                .map((c, i) => (
-                                                    <button
-                                                        key={i}
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setCity(c);
-                                                            setCitySearchQuery(c);
-                                                            setShowCityDropdown(false);
-                                                        }}
-                                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 active:bg-purple-100 border-b border-gray-50/50 last:border-b-0 transition-all cursor-pointer"
-                                                    >
-                                                        {c}
-                                                    </button>
-                                                ))
-                                            }
-                                        </div>
-                                    )}
-                                </div>
-                                {/* Telefone */}
-                                <div className="px-4 py-3.5 border-b border-gray-50">
-                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Telefone / WhatsApp</label>
-                                    <input
-                                        id="settings-phone-input"
-                                        className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
-                                        placeholder="(00) 00000-0000"
-                                        value={phone}
-                                        onChange={(e) => setPhone(formatPhone(e.target.value))}
-                                        maxLength={15}
-                                        type="tel"
-                                    />
-                                </div>
-                                {/* Biografia (apenas profissionais) */}
-                                {profileIsProfessional && (
-                                    <div className="px-4 py-3.5">
-                                        <div className="flex justify-between items-center mb-1">
-                                            <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Biografia</label>
-                                            <span className={`text-[9px] font-medium ${bio.length > 300 ? 'text-red-500' : 'text-gray-400'}`}>
-                                                {bio.length}/300
-                                            </span>
-                                        </div>
-                                        <textarea
-                                            className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none resize-none h-20"
-                                            placeholder="Fale um pouco sobre você..."
-                                            value={bio}
-                                            onChange={(e) => {
-                                                if (e.target.value.length <= 300) {
-                                                    setBio(e.target.value);
-                                                }
-                                            }}
-                                            maxLength={300}
-                                        />
-                                    </div>
-                                )}
-
-                                {/* Botão Salvar (e alertas) */}
-                                {(hasPersonalChanges || loading || saveSuccess || saveError) && (
-                                    <div className="px-4 pb-5 pt-2 flex flex-col gap-2">
-                                        {saveError && (
-                                            <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-100 rounded-xl">
-                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                                                <p className="text-xs text-red-600 font-medium">{saveError}</p>
-                                            </div>
-                                        )}
-                                        {saveSuccess && (
-                                            <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-100 rounded-xl">
-                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-600 shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
-                                                <p className="text-xs text-green-700 font-medium">Perfil atualizado com sucesso</p>
-                                            </div>
-                                        )}
-                                        {(hasPersonalChanges || loading) && (
-                                            <button
-                                                onClick={handleSaveAll}
-                                                disabled={loading || !hasPersonalChanges || usernameStatus === 'checking' || usernameStatus === 'taken'}
-                                                className="w-full h-10 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors active:scale-[0.98] flex items-center justify-center gap-2"
-                                            >
-                                                {loading ? (
-                                                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                                                ) : (
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                                                )}
-                                                Salvar Alterações
-                                            </button>
-                                        )}
-                                    </div>
-                                )}
+                                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
                             </div>
                         </div>
 
