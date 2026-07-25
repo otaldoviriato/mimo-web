@@ -148,7 +148,8 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
 
             {/* Main content */}
             <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
-                {/* Header Superior Mobile Persistente (Evita flashes e recriações no DOM) */}
+                {/* Header Superior Mobile Persistente — oculto na aba Perfil */}
+                {pathname !== '/profile' && (
                 <div className="md:hidden shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between z-30 sticky top-0 shadow-md">
                     <div className="flex items-center gap-3">
                         <img
@@ -205,6 +206,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                         )}
                     </div>
                 </div>
+                )}
 
                 {children}
             </div>

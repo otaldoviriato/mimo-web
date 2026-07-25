@@ -278,76 +278,104 @@ export default function WalletPage() {
             {/* Bento Grid Container - Compacto, sem bordas pretas, sem rosa e ajustado para mobile */}
             <div className="p-4 flex flex-col gap-4 max-w-3xl w-full mx-auto relative z-0">
 
-                {/* ── SKELETON: Exibido enquanto carrega dados — sem flash de tela inteira ── */}
-                {loadingDashboard && (
-                    <div className="flex flex-col gap-4 animate-pulse">
-                        <div className="h-[150px] rounded-2xl bg-purple-50/80 border border-purple-100/60" />
-                        <div className="h-[90px] rounded-2xl bg-white border border-slate-200/60" />
-                        <div className="h-[120px] rounded-2xl bg-white border border-slate-200/60" />
-                    </div>
-                )}
-
-                {/* ── BENTO BLOCK 1: CARD DE SALDO PRINCIPAL (Tema Claro Lavanda / Azul Premium) ── */}
-                <div className={`bg-gradient-to-br from-purple-50/90 to-indigo-50/50 rounded-2xl p-5 flex flex-col justify-between min-h-[150px] relative overflow-hidden shadow-[0_8px_30px_rgb(124,58,237,0.02)] text-slate-800 border border-purple-100/80${loadingDashboard ? ' hidden' : ''}`}>
-                    <div className="flex justify-between items-start gap-4">
-                        <div className="flex flex-col">
-                            <div className="flex items-center gap-1.5">
-                                <span className="text-[11.5px] text-purple-650 font-extrabold uppercase tracking-widest">
-                                    Saldo Disponível
-                                </span>
-                                <button
-                                    onClick={toggleShowValues}
-                                    className="text-purple-400 hover:text-purple-600 active:scale-95 transition-all focus:outline-none p-0.5"
-                                    title={showValues ? "Ocultar valores" : "Mostrar valores"}
-                                >
-                                    {showValues ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                                </button>
+                {/* ── BENTO BLOCK 1: CARD DE SALDO PRINCIPAL ── */}
+                <div className="bg-gradient-to-br from-purple-50/90 to-indigo-50/50 rounded-2xl p-5 flex flex-col justify-between min-h-[150px] relative overflow-hidden shadow-[0_8px_30px_rgb(124,58,237,0.02)] text-slate-800 border border-purple-100/80">
+                    {loadingDashboard ? (
+                        /* Skeleton interno do card de saldo */
+                        <div className="animate-pulse flex flex-col gap-3">
+                            <div className="flex justify-between items-start">
+                                <div className="flex flex-col gap-2">
+                                    <div className="h-2.5 bg-purple-200/60 rounded-full w-28" />
+                                    <div className="h-8 bg-purple-200/60 rounded-xl w-36 mt-1" />
+                                </div>
+                                <div className="h-6 bg-purple-200/60 rounded-lg w-16" />
                             </div>
-                            <h2 className="text-3xl font-black text-slate-800 tracking-tight mt-1">
-                                {renderValue(data.balance)}
-                            </h2>
+                            <div className="mt-4 pt-4 border-t border-purple-100/50 flex justify-between items-center">
+                                <div className="h-2.5 bg-purple-200/60 rounded-full w-48" />
+                                <div className="h-9 bg-purple-200/60 rounded-xl w-32" />
+                            </div>
                         </div>
-                        <span className="text-[10.5px] bg-slate-200/60 border border-slate-300/40 text-slate-600 font-bold px-2 py-0.5 rounded-lg uppercase tracking-wider backdrop-blur-sm">
-                            Real (BRL)
-                        </span>
-                    </div>
+                    ) : (
+                        <>
+                        <div className="flex justify-between items-start gap-4">
+                            <div className="flex flex-col">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-[11.5px] text-purple-650 font-extrabold uppercase tracking-widest">
+                                        Saldo Disponível
+                                    </span>
+                                    <button
+                                        onClick={toggleShowValues}
+                                        className="text-purple-400 hover:text-purple-600 active:scale-95 transition-all focus:outline-none p-0.5"
+                                        title={showValues ? "Ocultar valores" : "Mostrar valores"}
+                                    >
+                                        {showValues ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                                    </button>
+                                </div>
+                                <h2 className="text-3xl font-black text-slate-800 tracking-tight mt-1">
+                                    {renderValue(data.balance)}
+                                </h2>
+                            </div>
+                            <span className="text-[10.5px] bg-slate-200/60 border border-slate-300/40 text-slate-600 font-bold px-2 py-0.5 rounded-lg uppercase tracking-wider backdrop-blur-sm">
+                                Real (BRL)
+                            </span>
+                        </div>
 
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4 pt-4 border-t border-purple-100/50">
-                        <p className="text-[11px] text-slate-450 max-w-xs flex items-center gap-1.5 leading-snug">
-                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                            Saques via Pix transferidos diretamente para o CPF cadastrado.
-                        </p>
-                        
-                        <button
-                            onClick={() => {
-                                if (!userData?.taxId) {
-                                    toast.error('Você precisa ter o CPF cadastrado e verificado para solicitar saques.');
-                                } else if (isBalanceInsufficientForFee) {
-                                    setWithdrawErrorModalOpen(true);
-                                } else {
-                                    setWithdrawConfirmModalOpen(true);
-                                }
-                            }}
-                            disabled={data.balance <= 0 || hasActiveWithdrawal || requestWithdrawMutation.isPending}
-                            className={`h-9 px-4 rounded-xl font-bold text-xs sm:text-sm tracking-wide uppercase transition-all active:scale-[0.97] flex items-center justify-center gap-1.5 shrink-0 shadow-sm ${
-                                data.balance <= 0 || hasActiveWithdrawal || requestWithdrawMutation.isPending
-                                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none border border-slate-200/40'
-                                    : 'bg-purple-600 hover:bg-purple-700 text-white shadow-purple-950/10'
-                            }`}
-                        >
-                            {requestWithdrawMutation.isPending ? (
-                                <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" />
-                            ) : (
-                                <ArrowDownRight className="w-3.5 h-3.5 shrink-0" />
-                            )}
-                            {hasActiveWithdrawal ? 'Saque em andamento' : requestWithdrawMutation.isPending ? 'Criando saque...' : 'Sacar Saldo (PIX)'}
-                        </button>
-                    </div>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4 pt-4 border-t border-purple-100/50">
+                            <p className="text-[11px] text-slate-450 max-w-xs flex items-center gap-1.5 leading-snug">
+                                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                                Saques via Pix transferidos diretamente para o CPF cadastrado.
+                            </p>
+                            
+                            <button
+                                onClick={() => {
+                                    if (!userData?.taxId) {
+                                        toast.error('Você precisa ter o CPF cadastrado e verificado para solicitar saques.');
+                                    } else if (isBalanceInsufficientForFee) {
+                                        setWithdrawErrorModalOpen(true);
+                                    } else {
+                                        setWithdrawConfirmModalOpen(true);
+                                    }
+                                }}
+                                disabled={data.balance <= 0 || hasActiveWithdrawal || requestWithdrawMutation.isPending}
+                                className={`h-9 px-4 rounded-xl font-bold text-xs sm:text-sm tracking-wide uppercase transition-all active:scale-[0.97] flex items-center justify-center gap-1.5 shrink-0 shadow-sm ${
+                                    data.balance <= 0 || hasActiveWithdrawal || requestWithdrawMutation.isPending
+                                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none border border-slate-200/40'
+                                        : 'bg-purple-600 hover:bg-purple-700 text-white shadow-purple-950/10'
+                                }`}
+                            >
+                                {requestWithdrawMutation.isPending ? (
+                                    <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" />
+                                ) : (
+                                    <ArrowDownRight className="w-3.5 h-3.5 shrink-0" />
+                                )}
+                                {hasActiveWithdrawal ? 'Saque em andamento' : requestWithdrawMutation.isPending ? 'Criando saque...' : 'Sacar Saldo (PIX)'}
+                            </button>
+                        </div>
+                        </>
+                    )}
                 </div>
 
                 {/* ── PAINEL DE ENGAJAMENTO / COMPLETUDE DO PERFIL ── */}
-                {showEngagementPanel && (
-                    <div className="bg-white border border-purple-100 rounded-2xl p-5 shadow-[0_4px_20px_rgb(0,0,0,0.012)] flex flex-col gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                {(loadingDashboard || showEngagementPanel) && (
+                    <div className="bg-white border border-purple-100 rounded-2xl p-5 shadow-[0_4px_20px_rgb(0,0,0,0.012)] flex flex-col gap-4">
+                        {loadingDashboard ? (
+                            /* Skeleton interno do card de qualidade do perfil */
+                            <div className="animate-pulse flex flex-col gap-3">
+                                <div className="flex justify-between items-center">
+                                    <div className="h-3.5 bg-slate-200 rounded-full w-32" />
+                                    <div className="h-5 bg-purple-100 rounded-full w-20" />
+                                </div>
+                                <div className="h-2 bg-slate-100 rounded-full w-full" />
+                                <div className="h-2 bg-slate-100 rounded-full w-3/4" />
+                                <div className="grid grid-cols-2 gap-2 mt-1">
+                                    <div className="h-5 bg-slate-100 rounded-lg w-full" />
+                                    <div className="h-5 bg-slate-100 rounded-lg w-full" />
+                                    <div className="h-5 bg-slate-100 rounded-lg w-full" />
+                                    <div className="h-5 bg-slate-100 rounded-lg w-full" />
+                                </div>
+                            </div>
+                        ) : showEngagementPanel ? (
+                        <>
                         <div>
                             <div className="flex items-center justify-between">
                                 <h3 className="font-bold text-gray-900 text-sm">Qualidade do Perfil</h3>
@@ -412,8 +440,12 @@ export default function WalletPage() {
                             Ajustar Perfil
                             <ArrowUpRight className="w-3.5 h-3.5" />
                         </button>
-                    </div>
+                        </>
+                        ) : null}
+                </div>
                 )}
+
+
 
                 {/* ── BENTO BLOCK 2: HISTÓRICO DE SAQUES (Substitui Desempenho no Chat) ── */}
                 {(withdrawFeedback || hasActiveWithdrawal) && (
