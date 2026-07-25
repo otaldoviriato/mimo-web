@@ -909,7 +909,7 @@ export default function ProfilePage() {
                 </div>
             </div>
 
-            <PullToRefresh onRefresh={onRefreshClient} className="px-4 pt-5 pb-24 max-w-md w-full mx-auto relative z-10 flex flex-col gap-4">
+            <PullToRefresh onRefresh={onRefreshClient} className="px-4 pt-5 pb-24 max-w-md w-full mx-auto relative z-10" contentClassName="flex flex-col gap-4">
                 {/* Informações Básicas / Perfil */}
                 <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 flex items-center justify-between gap-3 shadow-xs">
                     <div className="flex items-center gap-3.5 min-w-0 flex-1">

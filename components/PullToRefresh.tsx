@@ -7,9 +7,10 @@ interface PullToRefreshProps {
     onRefresh: () => Promise<any> | any;
     children: React.ReactNode;
     className?: string;
+    contentClassName?: string;
 }
 
-export function PullToRefresh({ onRefresh, children, className = '' }: PullToRefreshProps) {
+export function PullToRefresh({ onRefresh, children, className = '', contentClassName = '' }: PullToRefreshProps) {
     const [pullDistance, setPullDistance] = useState(0);
     const [refreshing, setRefreshing] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -125,7 +126,7 @@ export function PullToRefresh({ onRefresh, children, className = '' }: PullToRef
 
             {/* Conteúdo deslocado levemente ao puxar */}
             <div 
-                className="flex-1 flex flex-col transition-transform duration-150"
+                className={`flex-1 flex flex-col transition-transform duration-150 ${contentClassName}`}
                 style={{
                     transform: refreshing ? `translateY(${threshold}px)` : `translateY(${pullDistance}px)`,
                 }}
