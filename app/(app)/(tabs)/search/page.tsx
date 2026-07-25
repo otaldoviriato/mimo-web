@@ -63,28 +63,36 @@ export default function SearchPage() {
                 sourceList = sourceList.filter((u) => !!u.isOnline);
             } else if (activeFilter === 'novos') {
                 sourceList = sourceList.filter((u) => !!u.isNew && !u.isInactive);
-            } else if (activeFilter === 'todos') {
-                // Exibir todos os perfis (ativos e inativos), ordenados por prioridade (Tier 1 -> Tier 2 -> Tier 3)
             }
-        } else {
-            if (activeFilter === 'online') {
-                sourceList = sourceList.filter((u) => !!u.isOnline);
-            } else if (activeFilter === 'novos') {
-                sourceList = sourceList.filter((u) => !!u.isNew);
-            }
+
+            // Priorizar por Tier (1: Com recarga ativa -> 2: Novos/Ativos sem recarga -> 3: Inativos)
+            return [...sourceList].sort((a, b) => {
+                const aTier = a.tier ?? (a.isInactive ? 3 : 1);
+                const bTier = b.tier ?? (b.isInactive ? 3 : 1);
+                if (aTier !== bTier) {
+                    return aTier - bTier;
+                }
+                const aChat = !!a.hasChat;
+                const bChat = !!b.hasChat;
+                if (aChat !== bChat) {
+                    return aChat ? 1 : -1;
+                }
+                return 0;
+            });
         }
 
-        // Priorizar por Tier (1: Com recarga ativa -> 2: Novos/Ativos sem recarga -> 3: Inativos), depois por histórico de conversa
+        // Visão do cliente masculino buscando criadoras femininas:
+        // Exibe todas as criadoras sem filtro, priorizando online primeiro, depois com conversa ativa
         return [...sourceList].sort((a, b) => {
-            const aTier = a.tier ?? (a.isInactive ? 3 : 1);
-            const bTier = b.tier ?? (b.isInactive ? 3 : 1);
-            if (aTier !== bTier) {
-                return aTier - bTier;
+            const aOnline = !!a.isOnline;
+            const bOnline = !!b.isOnline;
+            if (aOnline !== bOnline) {
+                return aOnline ? -1 : 1;
             }
             const aChat = !!a.hasChat;
             const bChat = !!b.hasChat;
             if (aChat !== bChat) {
-                return aChat ? 1 : -1;
+                return aChat ? -1 : 1;
             }
             return 0;
         });
@@ -493,50 +501,52 @@ export default function SearchPage() {
                 </div>
             )}
 
-            {/* Controle Segmentado de Filtros (Online, Novos, Todos) */}
-            <div className="bg-slate-50/90 backdrop-blur-md px-4 pt-3 pb-2 border-b border-slate-200/60 sticky top-[72px] z-10 shrink-0">
-                <div className="bg-slate-200/70 p-1 rounded-2xl flex items-center gap-1 max-w-md mx-auto shadow-inner">
-                    {/* 1º: Online (Padrão) */}
-                    <button
-                        onClick={() => setActiveFilter('online')}
-                        className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer ${
-                            activeFilter === 'online'
-                                ? 'bg-white text-purple-900 shadow-sm shadow-slate-300/40 border border-slate-200/50'
-                                : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                    >
-                        <span className="relative flex h-2 w-2">
-                            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${activeFilter === 'online' ? 'bg-emerald-400 opacity-75' : 'hidden'}`}></span>
-                            <span className={`relative inline-flex rounded-full h-2 w-2 ${activeFilter === 'online' ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
-                        </span>
-                        <span>Online</span>
-                    </button>
+            {/* Controle Segmentado de Filtros (Apenas para Perfil Profissional buscando clientes) */}
+            {userData?.isProfessional && (
+                <div className="bg-slate-50/90 backdrop-blur-md px-4 pt-3 pb-2 border-b border-slate-200/60 sticky top-[72px] z-10 shrink-0">
+                    <div className="bg-slate-200/70 p-1 rounded-2xl flex items-center gap-1 max-w-md mx-auto shadow-inner">
+                        {/* 1º: Online (Padrão) */}
+                        <button
+                            onClick={() => setActiveFilter('online')}
+                            className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer ${
+                                activeFilter === 'online'
+                                    ? 'bg-white text-purple-900 shadow-sm shadow-slate-300/40 border border-slate-200/50'
+                                    : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                        >
+                            <span className="relative flex h-2 w-2">
+                                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${activeFilter === 'online' ? 'bg-emerald-400 opacity-75' : 'hidden'}`}></span>
+                                <span className={`relative inline-flex rounded-full h-2 w-2 ${activeFilter === 'online' ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+                            </span>
+                            <span>Online</span>
+                        </button>
 
-                    {/* 2º: Novos */}
-                    <button
-                        onClick={() => setActiveFilter('novos')}
-                        className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer ${
-                            activeFilter === 'novos'
-                                ? 'bg-white text-purple-900 shadow-sm shadow-slate-300/40 border border-slate-200/50'
-                                : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                    >
-                        <span>Novos</span>
-                    </button>
+                        {/* 2º: Novos */}
+                        <button
+                            onClick={() => setActiveFilter('novos')}
+                            className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer ${
+                                activeFilter === 'novos'
+                                    ? 'bg-white text-purple-900 shadow-sm shadow-slate-300/40 border border-slate-200/50'
+                                    : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                        >
+                            <span>Novos</span>
+                        </button>
 
-                    {/* 3º: Todos */}
-                    <button
-                        onClick={() => setActiveFilter('todos')}
-                        className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer ${
-                            activeFilter === 'todos'
-                                ? 'bg-white text-purple-900 shadow-sm shadow-slate-300/40 border border-slate-200/50'
-                                : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                    >
-                        <span>Todos</span>
-                    </button>
+                        {/* 3º: Todos */}
+                        <button
+                            onClick={() => setActiveFilter('todos')}
+                            className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer ${
+                                activeFilter === 'todos'
+                                    ? 'bg-white text-purple-900 shadow-sm shadow-slate-300/40 border border-slate-200/50'
+                                    : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                        >
+                            <span>Todos</span>
+                        </button>
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-4 pb-16 md:pb-4 flex flex-col">
