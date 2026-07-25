@@ -197,12 +197,7 @@ export default function SearchPage() {
                 <div className="absolute bottom-0 inset-x-0 h-1/3 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
 
                 {/* Badge Já Conversou ou Badge Novo (top left) */}
-                {user.hasChat ? (
-                    <div className="absolute top-2.5 left-2.5 bg-slate-900/90 backdrop-blur-md text-slate-200 text-[8px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-md z-10 flex items-center gap-1 border border-slate-700/50">
-                        <CheckCheck className="w-3 h-3 text-emerald-400" />
-                        <span>Já conversou</span>
-                    </div>
-                ) : user.isNew ? (
+                {user.isNew ? (
                     <div className="absolute top-2.5 left-2.5 bg-purple-600 text-white text-[8px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-full shadow-md z-10">
                         Novo
                     </div>
