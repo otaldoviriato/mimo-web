@@ -121,6 +121,10 @@ export default function SearchPage() {
             (window as any).__resolveTransition();
             (window as any).__resolveTransition = null;
         }
+
+        const handleToggle = () => setIsSearchOpen(prev => !prev);
+        window.addEventListener('mimo:toggle-search', handleToggle);
+        return () => window.removeEventListener('mimo:toggle-search', handleToggle);
     }, []);
 
 
@@ -412,44 +416,6 @@ export default function SearchPage() {
                     )}
                 </div>
             )}
-
-            {/* Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between z-10 sticky top-0 shadow-md">
-                <div className="flex items-center gap-3">
-                    <img
-                        src="/Logo.svg"
-                        alt="MimoChat"
-                        className="w-8 h-8 object-contain shrink-0"
-                    />
-                    <h1 className="text-2xl font-black text-white tracking-tighter">Mimo</h1>
-                    <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">
-                        Explorar
-                    </span>
-                </div>
-                
-                <div className="flex items-center gap-1.5">
-                    {/* Botão de Busca Discreto (Lupa) */}
-                    <button
-                        onClick={() => setIsSearchOpen(prev => !prev)}
-                        className={`p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center cursor-pointer ${
-                            isSearchOpen ? 'bg-white/15' : ''
-                        }`}
-                        title="Buscar usuário"
-                    >
-                        <Search className="w-5 h-5 text-white" />
-                    </button>
-
-                    {userData?.isAdmin && (
-                        <button
-                            onClick={() => router.push('/admin')}
-                            className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center cursor-pointer"
-                            title="Painel Admin"
-                        >
-                            <ShieldAlert className="w-5 h-5" />
-                        </button>
-                    )}
-                </div>
-            </div>
 
             {/* Modern Search Bar - Expandível */}
             {isSearchOpen && (

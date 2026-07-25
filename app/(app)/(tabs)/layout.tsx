@@ -2,23 +2,30 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useMyProfile } from '@/hooks/useQueries';
 import { BalanceDisplay } from '@/components/BalanceDisplay';
 import { Avatar } from '@/components/Avatar';
 import { useUser } from '@clerk/nextjs';
 import { PWAPromoModal } from '@/components/PWAPromoModal';
 import { NotifPromoModal } from '@/components/NotifPromoModal';
+import { Settings, ShieldAlert, Search, Pencil } from 'lucide-react';
 
 // As abas são geradas dinamicamente dentro do componente com base no tipo de perfil (profissional ou não)
 
 export default function TabsLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
+    const router = useRouter();
     const { data: userData } = useMyProfile();
     const { user } = useUser();
     const balance = userData?.balance ?? 0;
 
     const isProfessional = !!userData?.isProfessional;
+
+    const currentTabLabel = 
+        pathname === '/wallet' ? 'Carteira' :
+        pathname === '/search' ? 'Explorar' :
+        pathname === '/profile' ? 'Perfil' : 'Conversas';
 
     const resolvedTabs = [
         {
@@ -141,6 +148,64 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
 
             {/* Main content */}
             <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
+                {/* Header Superior Mobile Persistente (Evita flashes e recriações no DOM) */}
+                <div className="md:hidden shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between z-30 sticky top-0 shadow-md">
+                    <div className="flex items-center gap-3">
+                        <img
+                            src="/Logo.svg"
+                            alt="MimoChat"
+                            className="w-8 h-8 object-contain shrink-0"
+                        />
+                        <h1 className="text-2xl font-black text-white tracking-tighter">Mimo</h1>
+                        <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">
+                            {currentTabLabel}
+                        </span>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                        {pathname === '/search' && (
+                            <button
+                                onClick={() => {
+                                    if (typeof window !== 'undefined') {
+                                        window.dispatchEvent(new CustomEvent('mimo:toggle-search'));
+                                    }
+                                }}
+                                className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center cursor-pointer"
+                                title="Buscar usuário"
+                            >
+                                <Search className="w-5 h-5 text-white" />
+                            </button>
+                        )}
+                        {pathname === '/profile' && (
+                            <button
+                                onClick={() => router.push('/profile/edit')}
+                                className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center cursor-pointer"
+                                title="Editar Perfil"
+                            >
+                                <Pencil className="w-4.5 h-4.5" />
+                            </button>
+                        )}
+                        {userData?.isAdmin && (
+                            <button
+                                onClick={() => router.push('/admin')}
+                                className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center cursor-pointer"
+                                title="Painel Admin"
+                            >
+                                <ShieldAlert className="w-5 h-5" />
+                            </button>
+                        )}
+                        {(pathname === '/profile' || pathname === '/chats' || pathname === '/') && (
+                            <button
+                                onClick={() => router.push('/settings')}
+                                className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center cursor-pointer"
+                                title="Configurações"
+                            >
+                                <Settings className="w-5 h-5" />
+                            </button>
+                        )}
+                    </div>
+                </div>
+
                 {children}
             </div>
 

@@ -226,28 +226,7 @@ export default function WalletPage() {
         }
     }, [latestWithdrawal, lastSeenWithdrawalStatus, refetchDashboard, refetchPendingWithdrawal, refetchProfile]);
 
-    if (loadingDashboard) {
-        return (
-            <div className="flex flex-col h-full bg-slate-50 overflow-y-auto pb-24 animate-pulse">
-                {/* Header idêntico para evitar flashes brancos */}
-                <div className="shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between z-20 sticky top-0 shadow-md">
-                    <div className="flex items-center gap-3">
-                        <img
-                            src="/Logo.svg"
-                            alt="MimoChat"
-                            className="w-8 h-8 object-contain shrink-0"
-                        />
-                        <h1 className="text-2xl font-black text-white tracking-tighter">Mimo</h1>
-                        <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">Carteira</span>
-                    </div>
-                </div>
-                <div className="p-4 flex flex-col gap-4 max-w-3xl mx-auto w-full">
-                    <div className="h-36 bg-white rounded-2xl border border-gray-100 shadow-sm" />
-                    <div className="h-24 bg-white rounded-2xl border border-gray-100 shadow-sm" />
-                </div>
-            </div>
-        );
-    }
+
 
     // Cálculos para o gráfico de barras mensal
     const points = data.earningsEvolution || [];
@@ -296,34 +275,20 @@ export default function WalletPage() {
 
     return (
         <div className="flex flex-col h-full bg-slate-50 text-gray-850 overflow-y-auto pb-28 md:pb-6 relative no-scrollbar">
-            
-            {/* Header */}
-            <div className="shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between z-20 sticky top-0 shadow-md">
-                <div className="flex items-center gap-3">
-                    <img
-                        src="/Logo.svg"
-                        alt="MimoChat"
-                        className="w-8 h-8 object-contain shrink-0"
-                    />
-                    <h1 className="text-2xl font-black text-white tracking-tighter">Mimo</h1>
-                    <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">Carteira</span>
-                </div>
-                {userData?.isAdmin && (
-                    <button
-                        onClick={() => router.push('/admin')}
-                        className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center"
-                        title="Painel Admin"
-                    >
-                        <ShieldAlert className="w-5 h-5" />
-                    </button>
-                )}
-            </div>
-
             {/* Bento Grid Container - Compacto, sem bordas pretas, sem rosa e ajustado para mobile */}
             <div className="p-4 flex flex-col gap-4 max-w-3xl w-full mx-auto relative z-0">
-                
+
+                {/* ── SKELETON: Exibido enquanto carrega dados — sem flash de tela inteira ── */}
+                {loadingDashboard && (
+                    <div className="flex flex-col gap-4 animate-pulse">
+                        <div className="h-[150px] rounded-2xl bg-purple-50/80 border border-purple-100/60" />
+                        <div className="h-[90px] rounded-2xl bg-white border border-slate-200/60" />
+                        <div className="h-[120px] rounded-2xl bg-white border border-slate-200/60" />
+                    </div>
+                )}
+
                 {/* ── BENTO BLOCK 1: CARD DE SALDO PRINCIPAL (Tema Claro Lavanda / Azul Premium) ── */}
-                <div className="bg-gradient-to-br from-purple-50/90 to-indigo-50/50 rounded-2xl p-5 flex flex-col justify-between min-h-[150px] relative overflow-hidden shadow-[0_8px_30px_rgb(124,58,237,0.02)] text-slate-800 border border-purple-100/80">
+                <div className={`bg-gradient-to-br from-purple-50/90 to-indigo-50/50 rounded-2xl p-5 flex flex-col justify-between min-h-[150px] relative overflow-hidden shadow-[0_8px_30px_rgb(124,58,237,0.02)] text-slate-800 border border-purple-100/80${loadingDashboard ? ' hidden' : ''}`}>
                     <div className="flex justify-between items-start gap-4">
                         <div className="flex flex-col">
                             <div className="flex items-center gap-1.5">

@@ -871,43 +871,7 @@ export default function ProfilePage() {
                 }}
             />
 
-            {/* Header */}
-            <div className="shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between sticky top-0 z-20 shadow-md">
-                <div className="flex items-center gap-3">
-                    <img
-                        src="/Logo.svg"
-                        alt="MimoChat"
-                        className="w-8 h-8 object-contain shrink-0"
-                    />
-                    <h1 className="text-2xl font-black text-white tracking-tighter">Mimo</h1>
-                    <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">Perfil</span>
-                </div>
-                <div className="flex items-center gap-1">
-                    <button
-                        onClick={() => router.push('/profile/edit')}
-                        className="p-2 hover:bg-white/10 active:bg-white/20 active:scale-75 rounded-full transition-all duration-75 text-white flex items-center justify-center cursor-pointer"
-                        title="Editar Perfil"
-                    >
-                        <Pencil className="w-4.5 h-4.5" />
-                    </button>
-                    {userData?.isAdmin && (
-                        <button
-                            onClick={() => router.push('/admin')}
-                            className="p-2 hover:bg-white/10 active:bg-white/20 active:scale-75 rounded-full transition-all duration-75 text-white flex items-center justify-center cursor-pointer"
-                            title="Painel Admin"
-                        >
-                            <ShieldAlert className="w-5 h-5" />
-                        </button>
-                    )}
-                    <button
-                        onClick={() => router.push('/settings')}
-                        className="p-2 hover:bg-white/10 active:bg-white/20 active:scale-75 rounded-full transition-all duration-75 text-white flex items-center justify-center cursor-pointer"
-                        title="Configurações"
-                    >
-                        <Settings className="w-5 h-5" />
-                    </button>
-                </div>
-            </div>
+
 
             <PullToRefresh onRefresh={onRefreshClient} className="px-4 pt-5 pb-24 max-w-md w-full mx-auto relative z-10" contentClassName="flex flex-col gap-4">
                 {/* Informações Básicas / Perfil */}
