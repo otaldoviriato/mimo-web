@@ -45,7 +45,7 @@ export const metadata: Metadata = {
     appleWebApp: {
         capable: true,
         title: 'Mimo Chat',
-        statusBarStyle: 'default',
+        statusBarStyle: 'black-translucent',
     },
 };
 
