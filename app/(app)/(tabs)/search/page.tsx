@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { userApi } from '@/services/api';
-import { useMyProfile } from '@/hooks/useQueries';
+import { useMyProfile, useFeaturedUsers } from '@/hooks/useQueries';
 import { ShieldAlert, ShieldCheck, Search, X, MapPin, MessageCircle, MessageSquare, CheckCheck } from 'lucide-react';
 
 const calculateAge = (birthDateString?: string | Date) => {
@@ -29,8 +29,7 @@ export default function SearchPage() {
     const [username, setUsername] = useState('');
     const [loading, setLoading] = useState(false);
     const [foundUsers, setFoundUsers] = useState<any[]>([]);
-    const [featuredUsers, setFeaturedUsers] = useState<any[]>([]);
-    const [loadingFeatured, setLoadingFeatured] = useState(false);
+    const { data: featuredUsers = [], isLoading: loadingFeatured } = useFeaturedUsers();
     const [error, setError] = useState('');
     const [lightbox, setLightbox] = useState<{ photos: string[]; index: number } | null>(null);
 
@@ -116,22 +115,7 @@ export default function SearchPage() {
         }
     }, []);
 
-    // Carregar usuários em destaque ao montar
-    useEffect(() => {
-        const fetchFeatured = async () => {
-            setLoadingFeatured(true);
-            try {
-                const data = await userApi.getFeaturedUsers();
-                setFeaturedUsers(data.users || []);
-            } catch (err) {
-                console.error('Erro ao buscar destaques:', err);
-            } finally {
-                setLoadingFeatured(false);
-            }
-        };
 
-        fetchFeatured();
-    }, []);
 
     const handleSearch = async () => {
         if (!username.trim()) {

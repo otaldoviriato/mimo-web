@@ -70,7 +70,13 @@ export function useMyProfile() {
             }
             return undefined;
         },
-        initialDataUpdatedAt: 0,
+        initialDataUpdatedAt: () => {
+            if (typeof window !== 'undefined' && localStorage.getItem('mimo_profile')) {
+                return Date.now();
+            }
+            return 0;
+        },
+        staleTime: 5 * 60 * 1000,
         refetchInterval: (query: any) => {
             const user = query.state.data;
             if (
@@ -147,7 +153,13 @@ export function useChatRooms() {
             }
             return undefined;
         },
-        initialDataUpdatedAt: 0,
+        initialDataUpdatedAt: () => {
+            if (typeof window !== 'undefined' && user?.id && localStorage.getItem(`mimo_rooms_${user.id}`)) {
+                return Date.now();
+            }
+            return 0;
+        },
+        staleTime: 60 * 1000,
     });
 
     useEffect(() => {
@@ -369,6 +381,19 @@ export function useUserByUsername(username: string | undefined) {
     });
 
     return query;
+}
+
+// ─── Hook: usuários em destaque (Explorar) ──────────────────────────────────
+export function useFeaturedUsers() {
+    return useQuery({
+        queryKey: ['users', 'featured'],
+        queryFn: async () => {
+            const data = await userApi.getFeaturedUsers();
+            return (data.users || []) as any[];
+        },
+        staleTime: 3 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
+    });
 }
 
 // ─── Galeria ─────────────────────────────────────────────────────────────
