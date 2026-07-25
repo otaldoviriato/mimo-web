@@ -909,17 +909,17 @@ export default function ProfilePage() {
                 </div>
             </div>
 
-            <PullToRefresh onRefresh={onRefreshClient} className="px-4 pt-4 pb-24 max-w-md w-full mx-auto relative z-10 space-y-3.5">
-                {/* Card Principal do Usuário (Hero Identity Card) */}
-                <div className="bg-white rounded-3xl border border-slate-200/70 p-5 shadow-xs shadow-purple-100/40 relative overflow-hidden flex flex-col gap-4">
-                    <div className="flex items-start gap-4">
+            <PullToRefresh onRefresh={onRefreshClient} className="px-4 pt-5 pb-24 max-w-md w-full mx-auto relative z-10 flex flex-col gap-4">
+                {/* Informações Básicas / Perfil */}
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 flex items-center justify-between gap-3 shadow-xs">
+                    <div className="flex items-center gap-3.5 min-w-0 flex-1">
                         {/* Avatar com Indicadores de Câmera e Online Posicionados sem Sobreposição */}
                         <div className="relative shrink-0">
                             <div 
                                 onClick={() => fileInputRef.current?.click()}
                                 className="cursor-pointer group relative rounded-full"
                             >
-                                <Avatar uri={localPhotoUrl} size={68} />
+                                <Avatar uri={localPhotoUrl} size={60} />
                                 {/* Botão Câmera (Top Right) */}
                                 <button
                                     onClick={(e) => {
@@ -927,91 +927,115 @@ export default function ProfilePage() {
                                         fileInputRef.current?.click();
                                     }}
                                     disabled={uploadPhotoMutation.isPending}
-                                    className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-purple-600 hover:bg-purple-700 active:scale-90 border-2 border-white flex items-center justify-center shadow-md transition-all cursor-pointer z-20"
+                                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-purple-600 hover:bg-purple-700 active:scale-90 border-2 border-white flex items-center justify-center shadow-xs transition-all cursor-pointer z-20"
                                     title="Alterar foto de perfil"
                                 >
-                                    <Camera className="w-3 h-3 text-white" />
+                                    <Camera className="w-2.5 h-2.5 text-white" />
                                 </button>
                             </div>
                             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
                             
                             {/* Ponto Verde Online (Bottom Right) sem sobreposição */}
                             <span 
-                                className="w-4 h-4 rounded-full bg-emerald-500 border-2 border-white absolute bottom-0.5 right-0.5 shadow-2xs z-10 flex items-center justify-center" 
+                                className="w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white absolute bottom-0 right-0 shadow-2xs z-10 flex items-center justify-center" 
                                 title="Você está online"
                             >
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                             </span>
                         </div>
                         
-                        {/* Informações de Perfil */}
-                        <div className="flex-1 min-w-0 pt-0.5">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                                <h2 className="text-base sm:text-lg font-black text-slate-900 truncate tracking-tight">
-                                    {userData?.name || userData?.username || user?.username || ''}
-                                </h2>
-                            </div>
-                            
-                            <p className="text-xs text-purple-600 font-bold truncate">
+                        {/* Informações do Usuário */}
+                        <div className="min-w-0 flex-1">
+                            <h2 className="text-base font-bold text-slate-900 truncate leading-tight">
+                                {userData?.name || userData?.username || user?.username || ''}
+                            </h2>
+                            <p className="text-xs text-purple-600 font-medium truncate mt-0.5">
                                 @{userData?.username || ''}
                             </p>
-
-                            {/* Badge de Nível / Membro */}
-                            <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                                <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-800 border border-purple-200/70 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full shadow-2xs">
-                                    <ShieldCheck className="w-3 h-3 text-purple-600" />
-                                    <span>Conta Verificada</span>
-                                </span>
-                            </div>
+                            <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                                Conta Ativa
+                            </p>
                         </div>
                     </div>
 
-                    {/* Botão de Atalho para Editar Perfil */}
-                    <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
-                        <button
-                            onClick={() => router.push('/profile/edit')}
-                            className="flex-1 h-9 rounded-xl bg-slate-100 hover:bg-slate-200/80 active:scale-[0.98] text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-200/60"
-                        >
-                            <Pencil className="w-3.5 h-3.5 text-purple-600" />
-                            <span>Editar perfil</span>
-                        </button>
-                        <button
-                            onClick={() => router.push('/settings')}
-                            className="h-9 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 active:scale-[0.98] text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-200/60"
-                            title="Configurações"
-                        >
-                            <Settings className="w-3.5 h-3.5 text-slate-600" />
-                        </button>
-                    </div>
+                    {/* Botão Editar Perfil */}
+                    <button
+                        onClick={() => router.push('/profile/edit')}
+                        className="shrink-0 bg-slate-100 hover:bg-slate-200/80 active:scale-95 text-slate-700 font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all border border-slate-200/80 cursor-pointer shadow-2xs"
+                    >
+                        <Pencil className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                        <span>Editar</span>
+                    </button>
                 </div>
 
                 {/* Card de Saldo */}
-                <div className="bg-gradient-to-br from-purple-700 via-purple-800 to-indigo-900 rounded-3xl p-5 text-white shadow-md shadow-purple-900/20 relative overflow-hidden flex flex-col gap-4">
-                    <div className="flex justify-between items-start z-10 relative">
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs flex flex-col gap-3">
+                    <div className="flex justify-between items-start gap-2">
                         <div>
-                            <span className="text-[10px] font-bold text-purple-200/90 uppercase tracking-widest block">Meu Saldo Mimo</span>
-                            <span className="text-3xl font-black tracking-tight text-white mt-1 block">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Meu Saldo</span>
+                            <span className="text-2xl font-black text-slate-900 tracking-tight mt-0.5 block">
                                 {((userData?.balance ?? 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </span>
                             {userData?.promotionalBalance > 0 && (
-                                <span className="text-[10px] text-purple-200 bg-white/10 border border-white/20 font-bold px-2 py-0.5 rounded-md mt-2 inline-block">
+                                <span className="text-[10px] text-purple-600 font-semibold mt-1 block">
                                     Sendo {((userData.promotionalBalance) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} de {userData.promotionalBalanceLabel || 'Crédito de boas-vindas'}
                                 </span>
                             )}
                         </div>
 
-                        <div className="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white shrink-0">
-                            <QrCode className="w-5 h-5 text-purple-200" />
-                        </div>
+                        <button
+                            onClick={openRechargeModal}
+                            className="h-9 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-bold text-xs transition-all shadow-sm shadow-purple-200 flex items-center gap-1.5 cursor-pointer shrink-0"
+                        >
+                            <Plus className="w-3.5 h-3.5" />
+                            Recarregar
+                        </button>
                     </div>
+                </div>
 
-                    <button
-                        onClick={openRechargeModal}
-                        className="w-full h-11 rounded-2xl bg-white hover:bg-slate-100 active:scale-[0.98] text-purple-900 font-black text-sm flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer z-10"
-                    >
-                        <Plus className="w-4 h-4 text-purple-700 stroke-[3]" />
-                        <span>Recarregar Saldo via Pix</span>
-                    </button>
+                {/* Histórico de Recargas */}
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs flex flex-col gap-3">
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5">Histórico de Recargas</h3>
+                    
+                    {loadingHistory ? (
+                        <div className="flex flex-col gap-3">
+                            {[...Array(3)].map((_, i) => (
+                                <div key={i} className="flex items-center justify-between text-xs animate-pulse">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-7 h-7 rounded-xl bg-slate-100/70" />
+                                        <div className="flex flex-col gap-1.5">
+                                            <div className="h-3 bg-slate-100 rounded w-20" />
+                                            <div className="h-2 bg-slate-100 rounded w-28" />
+                                        </div>
+                                    </div>
+                                    <div className="h-3 bg-slate-100 rounded w-10" />
+                                </div>
+                            ))}
+                        </div>
+                    ) : depositHistoryItems.length > 0 ? (
+                        <div className="flex flex-col gap-3">
+                            {depositHistoryItems.slice(0, 5).map((tx) => (
+                                <div key={tx.id} className="flex items-center justify-between text-xs py-1 border-b border-slate-50 last:border-0">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
+                                            {tx.type === 'gift' && <Gift className="w-3.5 h-3.5" />}
+                                            {tx.type === 'card' && <CreditCard className="w-3.5 h-3.5" />}
+                                            {tx.type === 'pix' && <QrCode className="w-3.5 h-3.5" />}
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-slate-700">{tx.label}</p>
+                                            <p className="text-[10px] text-slate-400 font-medium">
+                                                {new Date(tx.createdAt).toLocaleDateString('pt-BR')} às {new Date(tx.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <span className="font-bold text-emerald-600">+{tx.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-xs text-slate-400 font-medium text-center py-4">Nenhuma recarga efetuada ainda.</p>
+                    )}
                 </div>
 
                 {/* Card de Assinaturas Ativas */}
@@ -1019,11 +1043,8 @@ export default function ProfilePage() {
                     const mySubscriptions = subscriptionsData?.subscriptions ?? [];
                     if (mySubscriptions.length === 0) return null;
                     return (
-                        <div className="bg-white rounded-3xl border border-slate-200/70 p-5 shadow-xs shadow-purple-100/40 flex flex-col gap-3">
-                            <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
-                                <Crown className="w-4 h-4 text-purple-600" />
-                                <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Minhas Assinaturas</h3>
-                            </div>
+                        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs flex flex-col gap-3">
+                            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5">Minhas Assinaturas</h3>
                             <div className="flex flex-col gap-2">
                                 {mySubscriptions.map((sub) => {
                                     const prof = sub.professional;
@@ -1084,54 +1105,6 @@ export default function ProfilePage() {
                         </div>
                     );
                 })()}
-
-                {/* Histórico de Depósitos */}
-                <div className="bg-white rounded-3xl border border-slate-200/70 p-5 shadow-xs shadow-purple-100/40 flex flex-col gap-3">
-                    <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
-                        <CreditCard className="w-4 h-4 text-purple-600" />
-                        <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Histórico de Recargas</h3>
-                    </div>
-                    
-                    {loadingHistory ? (
-                        <div className="flex flex-col gap-3">
-                            {[...Array(3)].map((_, i) => (
-                                <div key={i} className="flex items-center justify-between text-xs animate-pulse">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-7 h-7 rounded-xl bg-slate-100/70" />
-                                        <div className="flex flex-col gap-1.5">
-                                            <div className="h-3 bg-slate-100 rounded w-20" />
-                                            <div className="h-2 bg-slate-100 rounded w-28" />
-                                        </div>
-                                    </div>
-                                    <div className="h-3 bg-slate-100 rounded w-10" />
-                                </div>
-                            ))}
-                        </div>
-                    ) : depositHistoryItems.length > 0 ? (
-                        <div className="flex flex-col gap-3">
-                            {depositHistoryItems.slice(0, 5).map((tx) => (
-                                <div key={tx.id} className="flex items-center justify-between text-xs py-1 border-b border-slate-50 last:border-0">
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="w-8 h-8 rounded-xl bg-purple-50 flex items-center justify-center text-purple-700 shrink-0">
-                                            {tx.type === 'gift' && <Gift className="w-4 h-4" />}
-                                            {tx.type === 'card' && <CreditCard className="w-4 h-4" />}
-                                            {tx.type === 'pix' && <QrCode className="w-4 h-4" />}
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-slate-800">{tx.label}</p>
-                                            <p className="text-[10px] text-slate-400 font-medium">
-                                                {new Date(tx.createdAt).toLocaleDateString('pt-BR')} às {new Date(tx.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <span className="font-extrabold text-emerald-600">+{tx.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-xs text-slate-400 font-medium text-center py-4">Nenhuma recarga efetuada ainda.</p>
-                    )}
-                </div>
 
             </PullToRefresh>
 
