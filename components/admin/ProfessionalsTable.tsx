@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { SortableColumnHeader } from './SortableColumnHeader';
 
-type SortKey = 'balance' | 'earned' | 'access' | 'rooms' | 'messages';
+type SortKey = 'balance' | 'earned' | 'access' | 'rooms' | 'messages' | 'subscription';
 
 export function ProfessionalsTable() {
     const router = useRouter();
@@ -33,6 +33,7 @@ export function ProfessionalsTable() {
         access: (u) => u.accessCount || 0,
         rooms: (u) => u.roomsCount || 0,
         messages: (u) => u.messagesCount || 0,
+        subscription: (u) => u.subscriptionPrice || 0,
     };
 
     // Ordena os perfis conforme a coluna clicada (mantém a ordem de cadastro mais recente vinda da API por padrão)
@@ -48,7 +49,7 @@ export function ProfessionalsTable() {
     const fetchUsers = async (query: string = '') => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/admin/users?q=${encodeURIComponent(query)}&onboardingStatus=all`);
+            const res = await fetch(`/api/admin/users?q=${encodeURIComponent(query)}&onboardingStatus=all&role=professional&limit=500`);
             if (res.ok) {
                 const data = await res.json();
                 // Filtra apenas profissionais (isProfessional)
@@ -205,7 +206,9 @@ export function ProfessionalsTable() {
                                         <SortableColumnHeader label="Mensagens" active={sortKey === 'messages'} direction={sortDir} onClick={() => handleSort('messages')} />
                                     </div>
                                 </th>
-                                <th className="py-4 px-6">Valor Assinatura</th>
+                                <th className="py-4 px-6">
+                                    <SortableColumnHeader label="Valor Assinatura" active={sortKey === 'subscription'} direction={sortDir} onClick={() => handleSort('subscription')} />
+                                </th>
                                 <th className="py-4 px-6 text-center">Ações</th>
                             </tr>
                         </thead>

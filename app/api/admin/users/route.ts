@@ -34,9 +34,19 @@ export async function GET(request: NextRequest) {
         const searchParams = request.nextUrl.searchParams;
         const query = searchParams.get('q') || '';
         const onboardingStatus = searchParams.get('onboardingStatus') || 'all';
+        const role = searchParams.get('role');
+        const isProfessionalParam = searchParams.get('isProfessional');
+        const limitParam = searchParams.get('limit');
         
         let filter: any = {};
         
+        // Filtro de perfil profissional / cliente
+        if (role === 'professional' || isProfessionalParam === 'true') {
+            filter.isProfessional = true;
+        } else if (role === 'client' || isProfessionalParam === 'false') {
+            filter.isProfessional = { $ne: true };
+        }
+
         // Filtro de onboardingStatus
         if (onboardingStatus === 'completed') {
             filter.$or = [
@@ -64,23 +74,40 @@ export async function GET(request: NextRequest) {
             };
             
             if (filter.$or) {
+                const existingOr = filter.$or;
+                delete filter.$or;
                 filter = {
+                    ...filter,
                     $and: [
-                        { $or: filter.$or },
+                        { $or: existingOr },
                         searchFilter
                     ]
                 };
             } else {
-                filter = searchFilter;
+                filter = {
+                    ...filter,
+                    ...searchFilter
+                };
             }
         }
         
-        // Garante que adicionamos onboardingStep no select para controle do admin
-        const usersList = await User.find(filter)
+        let limitVal = 500;
+        if (limitParam !== null) {
+            const parsed = parseInt(limitParam, 10);
+            if (!isNaN(parsed) && parsed >= 0) {
+                limitVal = parsed;
+            }
+        }
+
+        let queryChain = User.find(filter)
             .select('clerkId username name email photoUrl balance isProfessional onboardingStep createdAt taxId phone pixKey subscriptionPrice lastSeen isOnline accessCount lastAccessAt')
-            .sort({ createdAt: -1 })
-            .limit(100)
-            .lean() as any[];
+            .sort({ createdAt: -1 });
+
+        if (limitVal > 0) {
+            queryChain = queryChain.limit(limitVal);
+        }
+
+        const usersList = await queryChain.lean() as any[];
 
         const clerkIds = usersList.map(u => u.clerkId);
 

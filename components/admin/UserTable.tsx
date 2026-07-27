@@ -26,7 +26,7 @@ export function UserTable() {
     const fetchUsers = async (query: string = '') => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/admin/users?q=${encodeURIComponent(query)}`);
+            const res = await fetch(`/api/admin/users?q=${encodeURIComponent(query)}&limit=500`);
             if (res.ok) {
                 const data = await res.json();
                 setUsers(data.users || []);

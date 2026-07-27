@@ -48,7 +48,7 @@ export function ClientsTable() {
     const fetchUsers = async (query: string = '') => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/admin/users?q=${encodeURIComponent(query)}&onboardingStatus=all`);
+            const res = await fetch(`/api/admin/users?q=${encodeURIComponent(query)}&onboardingStatus=all&role=client&limit=500`);
             if (res.ok) {
                 const data = await res.json();
                 // Filtra apenas clientes (!isProfessional)
