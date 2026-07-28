@@ -982,49 +982,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                     </button>
                                 </div>
 
-                                {/* Toggle 2: Novo usuário cadastrado */}
-                                <div className="px-4 py-3.5 flex items-center justify-between">
-                                    <div className="flex items-center gap-3 min-w-0">
-                                        <div className="w-8 h-8 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-500">
-                                                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/>
-                                            </svg>
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-medium text-gray-800">Novo usuário cadastrado</p>
-                                            <p className="text-[10px] text-gray-400 leading-snug">
-                                                Receba alertas toda vez que um novo usuário se cadastrar no aplicativo
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        id="new-user-notifications-toggle"
-                                        type="button"
-                                        onClick={async () => {
-                                            const newValue = !newUserNotificationsEnabled;
-                                            setNewUserNotificationsEnabled(newValue);
-                                            setSavingNewUserPref(true);
-                                            try {
-                                                await updateProfileMutation.mutateAsync({ newUserNotificationsEnabled: newValue });
-                                            } catch {
-                                                setNewUserNotificationsEnabled(!newValue);
-                                            } finally {
-                                                setSavingNewUserPref(false);
-                                            }
-                                        }}
-                                        disabled={savingNewUserPref}
-                                        className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-60 ${
-                                            newUserNotificationsEnabled ? 'bg-purple-600' : 'bg-gray-200'
-                                        }`}
-                                        aria-label="Ativar notificação de novo usuário cadastrado"
-                                        role="switch"
-                                        aria-checked={newUserNotificationsEnabled}
-                                    >
-                                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${
-                                            newUserNotificationsEnabled ? 'translate-x-5' : 'translate-x-0'
-                                        }`} />
-                                    </button>
-                                </div>
                             </div>
                         </div>
 
