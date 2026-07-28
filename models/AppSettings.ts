@@ -43,6 +43,11 @@ export interface IAppSettings extends Document {
     activeUserThresholdDays: number;
     exploreSortingCriteria: string[];
     clientLevels: IClientLevel[];
+    creatorEngagementEmailsEnabled: boolean;
+    creatorEngagementStep1Enabled: boolean;
+    creatorEngagementStep1Hours: number;
+    creatorEngagementStep2Enabled: boolean;
+    creatorEngagementStep2Hours: number;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -234,6 +239,33 @@ const AppSettingsSchema = new Schema<IAppSettings>({
         type: Number,
         required: true,
         default: 7,
+        min: 1,
+    },
+    creatorEngagementEmailsEnabled: {
+        type: Boolean,
+        required: true,
+        default: true,
+    },
+    creatorEngagementStep1Enabled: {
+        type: Boolean,
+        required: true,
+        default: true,
+    },
+    creatorEngagementStep1Hours: {
+        type: Number,
+        required: true,
+        default: 24,
+        min: 1,
+    },
+    creatorEngagementStep2Enabled: {
+        type: Boolean,
+        required: true,
+        default: true,
+    },
+    creatorEngagementStep2Hours: {
+        type: Number,
+        required: true,
+        default: 72,
         min: 1,
     },
     exploreSortingCriteria: {

@@ -5,7 +5,8 @@ import { createPortal } from 'react-dom';
 import { useClerk } from '@clerk/nextjs';
 import {
     User, Crown, Check, CheckCircle2, ShieldCheck, CreditCard, Calendar,
-    Camera, ChevronLeft, UserCheck, Loader2, X, Plus, AlertCircle, LogOut
+    Camera, ChevronLeft, UserCheck, Loader2, X, Plus, AlertCircle, LogOut,
+    Copy, Link2, Share2
 } from 'lucide-react';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useMyProfile } from '@/hooks/useQueries';
@@ -79,9 +80,17 @@ export default function OnboardingPage() {
     const { signOut } = useClerk();
     const { data: userData, refetch } = useMyProfile();
 
-    // Modal de confirmação de logout na tela inicial de Cadastro
     const [showLogoutModal, setShowLogoutModal] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const [copiedLink, setCopiedLink] = useState(false);
+
+    const handleCopyLink = (url: string) => {
+        if (typeof window !== 'undefined') {
+            navigator.clipboard.writeText(url);
+            setCopiedLink(true);
+            setTimeout(() => setCopiedLink(false), 2500);
+        }
+    };
 
     const handleConfirmLogout = async () => {
         setIsLoggingOut(true);
@@ -983,40 +992,133 @@ export default function OnboardingPage() {
     );
 
     // ── Done ──────────────────────────────────────────────────────────────────
-    const renderDone = () => (
-        <div className="flex flex-col h-full bg-white">
-            <div className="flex-1 flex flex-col items-center justify-center px-6 text-center gap-5">
-                {/* Ícone de sucesso — verde, consistente com cores semânticas do app */}
-                <div className="w-20 h-20 bg-emerald-500 rounded-[26px] flex items-center justify-center shadow-lg shadow-emerald-100">
-                    <UserCheck className="w-9 h-9 text-white" />
+    const renderDone = () => {
+        const isProf = userData?.isProfessional || role === 'professional';
+        const userSlug = username || userData?.username || '';
+        const fullLink = typeof window !== 'undefined'
+            ? `${window.location.origin}/${userSlug}`
+            : `mimo.chat/${userSlug}`;
+
+        if (!isProf) {
+            return (
+                <div className="flex flex-col h-full bg-white">
+                    <div className="flex-1 flex flex-col items-center justify-center px-6 text-center gap-5">
+                        <div className="w-20 h-20 bg-emerald-500 rounded-[26px] flex items-center justify-center shadow-lg shadow-emerald-100">
+                            <UserCheck className="w-9 h-9 text-white" />
+                        </div>
+                        <div className="space-y-2">
+                            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Tudo certo!</h2>
+                            <p className="text-sm text-gray-500 max-w-[250px] mx-auto leading-relaxed">
+                                Seu CPF foi validado e sua conta está pronta para você começar a conversar.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="px-5 pt-2 pb-8 shrink-0">
+                        <PrimaryButton onClick={navigateToApp}>
+                            Começar a usar o MimoChat
+                        </PrimaryButton>
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div className="flex flex-col h-full bg-slate-50 overflow-y-auto">
+                <div className="flex-1 px-5 py-8 max-w-md mx-auto w-full flex flex-col justify-center gap-6">
+                    <div className="text-center space-y-2">
+                        <div className="w-16 h-16 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-2 border border-purple-200">
+                            <Crown className="w-8 h-8 text-purple-600" />
+                        </div>
+                        <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+                            Perfil Criado! Como Faturar no Mimo
+                        </h2>
+                        <p className="text-xs text-gray-600 leading-relaxed max-w-sm mx-auto">
+                            O MimoChat é a sua plataforma para monetizar sua atenção. Para começar a receber mensagens e ter ganhos reais, siga estes 3 passos:
+                        </p>
+                    </div>
+
+                    {/* Box com o Link Exclusivo da Criadora */}
+                    <div className="bg-white border border-purple-200 rounded-2xl p-4 shadow-sm space-y-2.5">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-extrabold uppercase tracking-widest text-purple-600 flex items-center gap-1">
+                                <Link2 className="w-3.5 h-3.5" /> Seu Link Exclusivo
+                            </span>
+                            {copiedLink && (
+                                <span className="text-[10px] font-bold text-emerald-600 animate-in fade-in">
+                                    Copiado para a área de transferência!
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2 bg-slate-50 border border-gray-200 rounded-xl p-2.5">
+                            <span className="text-xs font-bold text-slate-800 flex-1 truncate">
+                                {fullLink}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => handleCopyLink(fullLink)}
+                                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-lg transition-colors flex items-center gap-1 shrink-0 cursor-pointer"
+                            >
+                                {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                                {copiedLink ? 'Copiado' : 'Copiar'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Os 3 Passos de Sucesso */}
+                    <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm space-y-3.5">
+                        <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-700 border-b border-gray-100 pb-2">
+                            3 Passos para seu Primeiro Faturamento:
+                        </h3>
+
+                        <div className="flex items-start gap-3">
+                            <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
+                                1
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-xs font-bold text-slate-900">Copie e compartilhe seu link</p>
+                                <p className="text-[11px] text-slate-500 leading-snug">
+                                    Coloque na bio do seu Instagram, TikTok ou envie diretamente para seus contatos no WhatsApp.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                            <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
+                                2
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-xs font-bold text-slate-900">Homens recarregam créditos</p>
+                                <p className="text-[11px] text-slate-500 leading-snug">
+                                    Ao clicar no seu link, eles acessam seu perfil e recarregam saldo para poder falar com você.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                            <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
+                                3
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-xs font-bold text-slate-900">Responda e saca via Pix</p>
+                                <p className="text-[11px] text-slate-500 leading-snug">
+                                    Cada mensagem ou mídia trocada adiciona dinheiro ao seu saldo. Faça saques rápidos no Pix.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div className="space-y-2">
-                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">Tudo certo!</h2>
-                    <p className="text-sm text-gray-500 max-w-[250px] mx-auto leading-relaxed">
-                        {userData?.isProfessional
-                            ? "Seu CPF foi validado e seu perfil profissional está pronto para começar."
-                            : "Seu CPF foi validado e sua conta está pronta para você começar a conversar."
-                        }
-                    </p>
-                </div>
-
-                {/* Dots com as cores primárias do app (sem fuchsia) */}
-                <div className="flex gap-2 items-center mt-1">
-                    <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '110ms' }} />
-                    <span className="w-2 h-2 bg-purple-300 rounded-full animate-bounce" style={{ animationDelay: '220ms' }} />
+                {/* CTA */}
+                <div className="px-5 pt-2 pb-8 shrink-0 bg-slate-50 border-t border-gray-100">
+                    <div className="max-w-md mx-auto space-y-2">
+                        <PrimaryButton onClick={navigateToApp}>
+                            Ir para Minhas Conversas
+                        </PrimaryButton>
+                    </div>
                 </div>
             </div>
-
-            {/* CTA */}
-            <div className="px-5 pt-2 pb-8 shrink-0">
-                <PrimaryButton onClick={navigateToApp}>
-                    Começar a usar o MimoChat
-                </PrimaryButton>
-            </div>
-        </div>
-    );
+        );
+    };
 
     // ── Render step por nome (usado pelo motor de animação) ───────────────────
     const renderStep = (s: Step) => {

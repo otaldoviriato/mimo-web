@@ -60,6 +60,7 @@ export interface IUser extends Document {
     hideFromExplore?: boolean;
     subscriberDiscountPercentage?: number;
     financialLastViewedAt?: Date;
+    engagementEmailsSent?: string[];
     createdAt: Date;
     updatedAt: Date;
 }
@@ -256,6 +257,10 @@ const UserSchema = new Schema<IUser>({
     },
     financialLastViewedAt: {
         type: Date,
+    },
+    engagementEmailsSent: {
+        type: [String],
+        default: [],
     },
 }, {
     timestamps: true,

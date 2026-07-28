@@ -60,6 +60,11 @@ async function getOrCreateSettings() {
         if (settings.activeUnrechargedClientHoursThreshold === undefined) { settings.activeUnrechargedClientHoursThreshold = 24; updated = true; }
         if (settings.onlineDelayMinutes === undefined) { settings.onlineDelayMinutes = 2; updated = true; }
         if (settings.activeUserThresholdDays === undefined) { settings.activeUserThresholdDays = 7; updated = true; }
+        if (settings.creatorEngagementEmailsEnabled === undefined) { settings.creatorEngagementEmailsEnabled = true; updated = true; }
+        if (settings.creatorEngagementStep1Enabled === undefined) { settings.creatorEngagementStep1Enabled = true; updated = true; }
+        if (settings.creatorEngagementStep1Hours === undefined) { settings.creatorEngagementStep1Hours = 24; updated = true; }
+        if (settings.creatorEngagementStep2Enabled === undefined) { settings.creatorEngagementStep2Enabled = true; updated = true; }
+        if (settings.creatorEngagementStep2Hours === undefined) { settings.creatorEngagementStep2Hours = 72; updated = true; }
         if (settings.exploreSortingCriteria === undefined || settings.exploreSortingCriteria.length === 0) {
             settings.exploreSortingCriteria = ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'];
             updated = true;
@@ -185,7 +190,32 @@ export async function PUT(request: NextRequest) {
             activeUserThresholdDays,
             exploreSortingCriteria,
             clientLevels,
+            creatorEngagementEmailsEnabled,
+            creatorEngagementStep1Enabled,
+            creatorEngagementStep1Hours,
+            creatorEngagementStep2Enabled,
+            creatorEngagementStep2Hours,
         } = body;
+
+        if (creatorEngagementEmailsEnabled !== undefined) {
+            settings.creatorEngagementEmailsEnabled = Boolean(creatorEngagementEmailsEnabled);
+        }
+        if (creatorEngagementStep1Enabled !== undefined) {
+            settings.creatorEngagementStep1Enabled = Boolean(creatorEngagementStep1Enabled);
+        }
+        if (creatorEngagementStep1Hours !== undefined) {
+            const val = Number(creatorEngagementStep1Hours);
+            if (isNaN(val) || val < 1) return NextResponse.json({ error: 'Prazo da régua 1 deve ser de pelo menos 1 hora' }, { status: 400 });
+            settings.creatorEngagementStep1Hours = val;
+        }
+        if (creatorEngagementStep2Enabled !== undefined) {
+            settings.creatorEngagementStep2Enabled = Boolean(creatorEngagementStep2Enabled);
+        }
+        if (creatorEngagementStep2Hours !== undefined) {
+            const val = Number(creatorEngagementStep2Hours);
+            if (isNaN(val) || val < 1) return NextResponse.json({ error: 'Prazo da régua 2 deve ser de pelo menos 1 hora' }, { status: 400 });
+            settings.creatorEngagementStep2Hours = val;
+        }
 
         // Validações básicas
         if (platformFeePercentage !== undefined) {

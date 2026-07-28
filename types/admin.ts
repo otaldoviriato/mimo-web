@@ -32,6 +32,11 @@ export interface SettingsData {
     activeUserThresholdDays?: number;
     exploreSortingCriteria?: string[];
     clientLevels?: any[];
+    creatorEngagementEmailsEnabled?: boolean;
+    creatorEngagementStep1Enabled?: boolean;
+    creatorEngagementStep1Hours?: number;
+    creatorEngagementStep2Enabled?: boolean;
+    creatorEngagementStep2Hours?: number;
 }
 
 export interface ChatMessage {

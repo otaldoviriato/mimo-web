@@ -32,6 +32,11 @@ interface SettingsSnapshot {
     exploreSortingCriteria: string[];
     adminClerkIds: string[];
     clientLevels: any[];
+    creatorEngagementEmailsEnabled: boolean;
+    creatorEngagementStep1Enabled: boolean;
+    creatorEngagementStep1Hours: number;
+    creatorEngagementStep2Enabled: boolean;
+    creatorEngagementStep2Hours: number;
 }
 
 export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, userId: string | null | undefined) {
@@ -71,6 +76,13 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     const [exploreSortingCriteria, setExploreSortingCriteria] = useState<string[]>(['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness']);
     const [clientLevels, setClientLevels] = useState<any[]>([]);
 
+    // Parametrização de e-mails de engajamento de criadoras
+    const [creatorEngagementEmailsEnabled, setCreatorEngagementEmailsEnabled] = useState(true);
+    const [creatorEngagementStep1Enabled, setCreatorEngagementStep1Enabled] = useState(true);
+    const [creatorEngagementStep1Hours, setCreatorEngagementStep1Hours] = useState(24);
+    const [creatorEngagementStep2Enabled, setCreatorEngagementStep2Enabled] = useState(true);
+    const [creatorEngagementStep2Hours, setCreatorEngagementStep2Hours] = useState(72);
+
     // Gerenciamento de administradores
     const [adminListRich, setAdminListRich] = useState<RichAdmin[]>([]);
     const [adminSearch, setAdminSearch] = useState('');
@@ -108,6 +120,11 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         exploreSortingCriteria: s.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'],
         adminClerkIds: richAdmins.map(a => a.clerkId),
         clientLevels: s.clientLevels || [],
+        creatorEngagementEmailsEnabled: s.creatorEngagementEmailsEnabled ?? true,
+        creatorEngagementStep1Enabled: s.creatorEngagementStep1Enabled ?? true,
+        creatorEngagementStep1Hours: s.creatorEngagementStep1Hours ?? 24,
+        creatorEngagementStep2Enabled: s.creatorEngagementStep2Enabled ?? true,
+        creatorEngagementStep2Hours: s.creatorEngagementStep2Hours ?? 72,
     });
 
     useEffect(() => {
@@ -156,6 +173,11 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     setActiveUnrechargedClientHoursThreshold(s.activeUnrechargedClientHoursThreshold ?? 24);
                     setExploreSortingCriteria(s.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness']);
                     setClientLevels(s.clientLevels || []);
+                    setCreatorEngagementEmailsEnabled(s.creatorEngagementEmailsEnabled ?? true);
+                    setCreatorEngagementStep1Enabled(s.creatorEngagementStep1Enabled ?? true);
+                    setCreatorEngagementStep1Hours(s.creatorEngagementStep1Hours ?? 24);
+                    setCreatorEngagementStep2Enabled(s.creatorEngagementStep2Enabled ?? true);
+                    setCreatorEngagementStep2Hours(s.creatorEngagementStep2Hours ?? 72);
                     setSavedSnapshot(buildSnapshot(s, richAdmins));
                     setIsAuthorized(true);
                 } else if (response.status === 403) {
@@ -247,6 +269,11 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     activeUnrechargedClientHoursThreshold,
                     exploreSortingCriteria,
                     clientLevels,
+                    creatorEngagementEmailsEnabled,
+                    creatorEngagementStep1Enabled,
+                    creatorEngagementStep1Hours,
+                    creatorEngagementStep2Enabled,
+                    creatorEngagementStep2Hours,
                 }),
             });
             if (response.ok) {
@@ -280,6 +307,11 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                 setActiveUnrechargedClientHoursThreshold(s.activeUnrechargedClientHoursThreshold ?? 24);
                 setExploreSortingCriteria(s.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness']);
                 setClientLevels(s.clientLevels || []);
+                setCreatorEngagementEmailsEnabled(s.creatorEngagementEmailsEnabled ?? true);
+                setCreatorEngagementStep1Enabled(s.creatorEngagementStep1Enabled ?? true);
+                setCreatorEngagementStep1Hours(s.creatorEngagementStep1Hours ?? 24);
+                setCreatorEngagementStep2Enabled(s.creatorEngagementStep2Enabled ?? true);
+                setCreatorEngagementStep2Hours(s.creatorEngagementStep2Hours ?? 72);
             } else {
                 const errData = await response.json();
                 toast.error(errData.error || 'Erro ao salvar configurações.');
@@ -348,7 +380,12 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     );
     const isDirtyApp = savedSnapshot !== null && (
         pwaShowAgainIntervalDays !== savedSnapshot.pwaShowAgainIntervalDays ||
-        identityVerificationPromptIntervalDays !== savedSnapshot.identityVerificationPromptIntervalDays
+        identityVerificationPromptIntervalDays !== savedSnapshot.identityVerificationPromptIntervalDays ||
+        creatorEngagementEmailsEnabled !== savedSnapshot.creatorEngagementEmailsEnabled ||
+        creatorEngagementStep1Enabled !== savedSnapshot.creatorEngagementStep1Enabled ||
+        creatorEngagementStep1Hours !== savedSnapshot.creatorEngagementStep1Hours ||
+        creatorEngagementStep2Enabled !== savedSnapshot.creatorEngagementStep2Enabled ||
+        creatorEngagementStep2Hours !== savedSnapshot.creatorEngagementStep2Hours
     );
     const isDirtyAdmins = savedSnapshot !== null && (
         adminListRich.length !== savedSnapshot.adminClerkIds.length ||
@@ -403,6 +440,11 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         activeUnrechargedClientHoursThreshold, setActiveUnrechargedClientHoursThreshold,
         exploreSortingCriteria, setExploreSortingCriteria,
         clientLevels, setClientLevels,
+        creatorEngagementEmailsEnabled, setCreatorEngagementEmailsEnabled,
+        creatorEngagementStep1Enabled, setCreatorEngagementStep1Enabled,
+        creatorEngagementStep1Hours, setCreatorEngagementStep1Hours,
+        creatorEngagementStep2Enabled, setCreatorEngagementStep2Enabled,
+        creatorEngagementStep2Hours, setCreatorEngagementStep2Hours,
         isDirtyLevels,
         adminListRich,
         adminSearch, setAdminSearch,
