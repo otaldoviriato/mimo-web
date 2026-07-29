@@ -1024,39 +1024,44 @@ export default function OnboardingPage() {
 
         return (
             <div className="flex flex-col h-full bg-slate-50 overflow-y-auto">
-                <div className="flex-1 px-5 py-8 max-w-md mx-auto w-full flex flex-col justify-center gap-6">
-                    <div className="text-center space-y-2">
-                        <div className="w-16 h-16 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-2 border border-purple-200">
-                            <Crown className="w-8 h-8 text-purple-600" />
-                        </div>
-                        <h2 className="text-2xl font-black text-gray-900 tracking-tight">
-                            Perfil Criado! Como Faturar no Mimo
-                        </h2>
-                        <p className="text-xs text-gray-600 leading-relaxed max-w-sm mx-auto">
-                            O MimoChat é a sua plataforma para monetizar sua atenção. Para começar a receber mensagens e ter ganhos reais, siga estes 3 passos:
-                        </p>
+                {/* Header Superior Roxo com a Logo Oficial Mimo */}
+                <div className="bg-gradient-to-r from-purple-700 via-purple-600 to-purple-800 text-white px-6 pt-9 pb-7 text-center shadow-md relative shrink-0">
+                    <div className="w-14 h-14 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center mx-auto mb-3 border border-white/20 shadow-inner">
+                        <img src="/Logo.svg" alt="MimoChat" className="w-8 h-8 object-contain brightness-0 invert" />
                     </div>
+                    <span className="inline-block px-3 py-1 bg-white/15 text-purple-100 rounded-full text-[10px] font-extrabold uppercase tracking-widest mb-2 border border-white/10">
+                        Perfil Criado com Sucesso!
+                    </span>
+                    <h2 className="text-xl md:text-2xl font-black text-white tracking-tight leading-tight max-w-xs mx-auto">
+                        Como começar a ganhar dinheiro com mensagens
+                    </h2>
+                </div>
 
-                    {/* Box com o Link Exclusivo da Criadora */}
-                    <div className="bg-white border border-purple-200 rounded-2xl p-4 shadow-sm space-y-2.5">
+                <div className="flex-1 px-5 py-6 max-w-md mx-auto w-full flex flex-col justify-start gap-5">
+                    <p className="text-xs text-slate-600 text-center leading-relaxed max-w-sm mx-auto font-medium">
+                        O MimoChat é a sua ferramenta oficial para ganhar dinheiro trocando mensagens. Siga estes 3 passos simples para receber seus primeiros mimos:
+                    </p>
+
+                    {/* Box do Link Exclusivo da Criadora */}
+                    <div className="bg-white border-2 border-purple-200 rounded-2xl p-4 shadow-sm space-y-2.5">
                         <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-extrabold uppercase tracking-widest text-purple-600 flex items-center gap-1">
-                                <Link2 className="w-3.5 h-3.5" /> Seu Link Exclusivo
+                            <span className="text-[10px] font-extrabold uppercase tracking-widest text-purple-700 flex items-center gap-1.5">
+                                <Link2 className="w-3.5 h-3.5 text-purple-600" /> Seu Link Exclusivo
                             </span>
                             {copiedLink && (
                                 <span className="text-[10px] font-bold text-emerald-600 animate-in fade-in">
-                                    Copiado para a área de transferência!
+                                    Copiado!
                                 </span>
                             )}
                         </div>
-                        <div className="flex items-center gap-2 bg-slate-50 border border-gray-200 rounded-xl p-2.5">
-                            <span className="text-xs font-bold text-slate-800 flex-1 truncate">
+                        <div className="flex items-center gap-2 bg-purple-50/70 border border-purple-100 rounded-xl p-2.5">
+                            <span className="text-xs font-bold text-purple-950 flex-1 truncate">
                                 {fullLink}
                             </span>
                             <button
                                 type="button"
                                 onClick={() => handleCopyLink(fullLink)}
-                                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-lg transition-colors flex items-center gap-1 shrink-0 cursor-pointer"
+                                className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-extrabold text-xs rounded-xl transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-md shadow-purple-600/20"
                             >
                                 {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                                 {copiedLink ? 'Copiado' : 'Copiar'}
@@ -1065,52 +1070,53 @@ export default function OnboardingPage() {
                     </div>
 
                     {/* Os 3 Passos de Sucesso */}
-                    <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm space-y-3.5">
-                        <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-700 border-b border-gray-100 pb-2">
-                            3 Passos para seu Primeiro Faturamento:
+                    <div className="bg-white border border-purple-100 rounded-2xl p-4 shadow-sm space-y-4">
+                        <h3 className="text-xs font-extrabold uppercase tracking-wider text-purple-900 border-b border-slate-100 pb-2.5 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-purple-600 inline-block" />
+                            Passo a passo para começar:
                         </h3>
 
                         <div className="flex items-start gap-3">
-                            <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
+                            <div className="w-7 h-7 rounded-xl bg-purple-600 text-white flex items-center justify-center text-xs font-extrabold shrink-0 mt-0.5 shadow-sm shadow-purple-600/30">
                                 1
                             </div>
                             <div className="min-w-0 flex-1">
                                 <p className="text-xs font-bold text-slate-900">Copie e compartilhe seu link</p>
-                                <p className="text-[11px] text-slate-500 leading-snug">
-                                    Coloque na bio do seu Instagram, TikTok ou envie diretamente para seus contatos no WhatsApp.
+                                <p className="text-[11px] text-slate-600 leading-snug mt-0.5 font-medium">
+                                    Coloque na bio do seu Instagram, TikTok ou envie nos seus grupos e conversas do WhatsApp.
                                 </p>
                             </div>
                         </div>
 
                         <div className="flex items-start gap-3">
-                            <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
+                            <div className="w-7 h-7 rounded-xl bg-purple-600 text-white flex items-center justify-center text-xs font-black shrink-0 mt-0.5 shadow-sm shadow-purple-600/30">
                                 2
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="text-xs font-bold text-slate-900">Homens recarregam créditos</p>
-                                <p className="text-[11px] text-slate-500 leading-snug">
-                                    Ao clicar no seu link, eles acessam seu perfil e recarregam saldo para poder falar com você.
+                                <p className="text-xs font-bold text-slate-900">Homens entram e recarregam créditos</p>
+                                <p className="text-[11px] text-slate-600 leading-snug mt-0.5 font-medium">
+                                    Ao clicar no seu link, eles acessam seu perfil e adicionam saldo para mandar mensagens para você.
                                 </p>
                             </div>
                         </div>
 
                         <div className="flex items-start gap-3">
-                            <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
+                            <div className="w-7 h-7 rounded-xl bg-purple-600 text-white flex items-center justify-center text-xs font-black shrink-0 mt-0.5 shadow-sm shadow-purple-600/30">
                                 3
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="text-xs font-bold text-slate-900">Responda e saca via Pix</p>
-                                <p className="text-[11px] text-slate-500 leading-snug">
-                                    Cada mensagem ou mídia trocada adiciona dinheiro ao seu saldo. Faça saques rápidos no Pix.
+                                <p className="text-xs font-bold text-slate-900">Responda mensagens e receba via Pix</p>
+                                <p className="text-[11px] text-slate-600 leading-snug mt-0.5 font-medium">
+                                    Cada mensagem ou foto trocada gera dinheiro no seu saldo. Você pode realizar saques rápidos via Pix a qualquer momento.
                                 </p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* CTA */}
-                <div className="px-5 pt-2 pb-8 shrink-0 bg-slate-50 border-t border-gray-100">
-                    <div className="max-w-md mx-auto space-y-2">
+                {/* CTA Botão */}
+                <div className="px-5 pt-3 pb-8 shrink-0 bg-white border-t border-slate-100 shadow-lg">
+                    <div className="max-w-md mx-auto">
                         <PrimaryButton onClick={navigateToApp}>
                             Ir para Minhas Conversas
                         </PrimaryButton>

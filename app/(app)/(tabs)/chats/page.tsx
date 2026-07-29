@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Avatar, TouchableRipple, PullToRefresh } from '@/components';
 import { useChatRooms, useMyProfile, QueryKeys } from '@/hooks/useQueries';
 import { useSocket } from '@/hooks/useSocket';
-import { CheckCircle2, X, WalletCards, Crown, ShieldAlert, Clock, AlertCircle, ChevronRight, MessageCircle, Trash2, ShieldCheck, Copy, Link, Check, Share2 } from 'lucide-react';
+import { CheckCircle2, X, WalletCards, Crown, ShieldAlert, Clock, AlertCircle, ChevronRight, MessageCircle, Trash2, ShieldCheck, Copy, Link, Check, Share2, Star } from 'lucide-react';
 import { Drawer } from 'vaul';
 
 interface Room {
@@ -342,6 +342,48 @@ export default function ChatsPage() {
         );
     };
 
+    const [hideShareBanner, setHideShareBanner] = useState(false);
+
+    const renderShareLinkBanner = () => {
+        if (!myProfile || !myProfile.isProfessional || hideShareBanner || !myProfile.username) return null;
+
+        const fullLink = typeof window !== 'undefined'
+            ? `${window.location.origin}/${myProfile.username}`
+            : `mimo.chat/${myProfile.username}`;
+
+        return (
+            <div className="mx-4 mt-4 bg-gradient-to-r from-purple-50 via-indigo-50/60 to-purple-50 border border-purple-200/80 rounded-2xl p-3 shadow-xs animate-in fade-in slide-in-from-top-2 duration-300 relative">
+                <button
+                    onClick={() => setHideShareBanner(true)}
+                    className="absolute top-2.5 right-2.5 p-1 rounded-full text-purple-400 hover:text-purple-600 transition-colors cursor-pointer"
+                    title="Dispensar"
+                >
+                    <X size={14} />
+                </button>
+                <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 shrink-0 flex items-center justify-center rounded-xl bg-white p-1.5 border border-purple-200 shadow-xs">
+                        <img src="/Logo.svg" alt="Mimo" className="w-full h-full object-contain" />
+                    </div>
+                    <div className="min-w-0 flex-1 pr-5">
+                        <h3 className="font-extrabold text-purple-950 text-xs truncate">
+                            Seu link de perfil: <span className="text-purple-700 underline">{fullLink}</span>
+                        </h3>
+                        <p className="text-[11px] text-purple-700 leading-tight mt-0.5 font-medium">
+                            Divulgue no Instagram/TikTok para receber mensagens!
+                        </p>
+                    </div>
+                    <button
+                        onClick={handleCopyProfileLink}
+                        className="shrink-0 inline-flex items-center gap-1 bg-purple-600 hover:bg-purple-700 active:scale-95 transition-all text-white text-[11px] font-extrabold px-3 py-1.5 rounded-xl shadow-md shadow-purple-600/10 cursor-pointer"
+                    >
+                        {copiedProfileLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        {copiedProfileLink ? 'Copiado' : 'Copiar'}
+                    </button>
+                </div>
+            </div>
+        );
+    };
+
     // ─── Listeners de WebSocket em tempo real ───────────────────────────────
     useEffect(() => {
         if (!socket || !user?.id) return;
@@ -588,11 +630,13 @@ export default function ChatsPage() {
     return (
         <div className="flex flex-col h-full">
 
-            {/* Banner de Verificação de Identidade ou Completude do Perfil (exibido apenas um de cada vez) */}
+            {/* Banner de Verificação de Identidade, Completude do Perfil ou Link Exclusivo (exibido um de cada vez) */}
             {(() => {
                 const verificationBanner = renderVerificationBanner();
                 if (verificationBanner) return verificationBanner;
-                return renderProfileProgressBanner();
+                const profileBanner = renderProfileProgressBanner();
+                if (profileBanner) return profileBanner;
+                return renderShareLinkBanner();
             })()}
 
             {/* Modal de crédito promocional */}
@@ -766,98 +810,17 @@ export default function ChatsPage() {
                 {isLoading ? (
                     <ChatListSkeleton />
                 ) : rooms.length === 0 ? (
-                    myProfile?.isProfessional ? (
-                        <div className="flex-1 flex flex-col px-4 py-6 max-w-md mx-auto w-full animate-in fade-in duration-500 space-y-4">
-                            {/* Card de Início Rápido / Ativação */}
-                            <div className="bg-gradient-to-br from-purple-50 via-indigo-50/40 to-purple-50/20 border border-purple-100 rounded-3xl p-5 shadow-sm space-y-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-purple-600 rounded-2xl flex items-center justify-center text-white shadow-md shadow-purple-600/20 shrink-0">
-                                        <Crown className="w-5 h-5 text-amber-300" />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <h2 className="text-sm font-extrabold text-purple-950 leading-tight">
-                                            Ative seu perfil e receba suas primeiras conversas!
-                                        </h2>
-                                        <p className="text-[11px] text-purple-700 mt-0.5 font-medium leading-snug">
-                                            Os homens entram no app através do seu link de perfil exclusivo.
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {/* Box do Link Exclusivo */}
-                                <div className="bg-white border border-purple-100 rounded-2xl p-3 shadow-xs space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-extrabold uppercase tracking-widest text-purple-600 flex items-center gap-1">
-                                            <Link className="w-3 h-3" /> Seu Link Exclusivo
-                                        </span>
-                                        {copiedProfileLink && (
-                                            <span className="text-[10px] font-bold text-emerald-600">
-                                                Copiado!
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-2 bg-slate-50 border border-gray-100 rounded-xl p-2">
-                                        <span className="text-xs font-bold text-slate-800 flex-1 truncate">
-                                            {typeof window !== 'undefined' ? `${window.location.origin}/${myProfile.username}` : `mimo.chat/${myProfile.username}`}
-                                        </span>
-                                        <button
-                                            type="button"
-                                            onClick={handleCopyProfileLink}
-                                            className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-bold text-xs rounded-lg transition-all flex items-center gap-1 shrink-0 cursor-pointer shadow-xs"
-                                        >
-                                            {copiedProfileLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                                            {copiedProfileLink ? 'Copiado' : 'Copiar'}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Checklist de Ações */}
-                                <div className="space-y-2.5 pt-1">
-                                    <h3 className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">
-                                        Checklist de Início Rápido:
-                                    </h3>
-                                    
-                                    <div className="flex items-start gap-2.5 bg-white/70 border border-purple-100/60 rounded-xl p-2.5">
-                                        <div className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[10px] font-extrabold shrink-0 mt-0.5">
-                                            1
-                                        </div>
-                                        <div className="text-xs leading-snug text-slate-700">
-                                            <strong className="text-slate-900 block font-bold">Coloque seu link na bio</strong>
-                                            Adicione seu link no Instagram, TikTok ou envie nos seus grupos.
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-start gap-2.5 bg-white/70 border border-purple-100/60 rounded-xl p-2.5">
-                                        <div className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[10px] font-extrabold shrink-0 mt-0.5">
-                                            2
-                                        </div>
-                                        <div className="text-xs leading-snug text-slate-700">
-                                            <strong className="text-slate-900 block font-bold">Complete fotos da galeria</strong>
-                                            Perfis com fotos atrativas convertem muito mais visitantes.
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Dica de Ouro */}
-                                <div className="bg-amber-500/10 border border-amber-200/80 rounded-2xl p-3 flex items-start gap-2.5">
-                                    <div className="text-base shrink-0">💡</div>
-                                    <p className="text-[11px] text-amber-900 font-semibold leading-relaxed">
-                                        <strong>Dica de Ouro:</strong> Criadoras que colocam seu link na bio do Instagram e divulgam nos Stories recebem mensagens pagas no mesmo dia!
-                                    </p>
-                                </div>
-                            </div>
+                    <div className="flex-1 flex flex-col items-center justify-center px-8 py-20 text-center animate-in fade-in duration-500">
+                        <div className="w-16 h-16 bg-purple-50/80 rounded-2xl flex items-center justify-center mb-4 text-purple-600 border border-purple-100 shadow-inner">
+                            <MessageCircle className="w-7 h-7 text-purple-600" />
                         </div>
-                    ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center px-8 py-16 text-center animate-in fade-in duration-500">
-                            <div className="w-14 h-14 bg-purple-50/60 rounded-2xl flex items-center justify-center mb-4 text-purple-500 shadow-inner">
-                                <MessageCircle className="w-6 h-6 text-purple-400" />
-                            </div>
-                            <h2 className="text-base font-bold text-slate-800 mb-1">Sem conversas ainda</h2>
-                            <p className="text-slate-500 text-xs max-w-[240px] leading-relaxed">
-                                Suas novas mensagens aparecerão aqui. Encontre criadoras incríveis na aba Explorar!
-                            </p>
-                        </div>
-                    )
+                        <h2 className="text-base font-bold text-slate-900 mb-1">Sem conversas ainda</h2>
+                        <p className="text-slate-500 text-xs max-w-[260px] leading-relaxed">
+                            {myProfile?.isProfessional
+                                ? "Suas conversas aparecerão aqui assim que seus clientes entrarem pelo seu link."
+                                : "Suas mensagens de conversa com perfis do MimoChat aparecerão aqui."}
+                        </p>
+                    </div>
                 ) : (
                     <ul>
                         {[...rooms]
@@ -924,7 +887,7 @@ export default function ChatsPage() {
                                                     )}
                                                     {myProfile?.isProfessional && room.otherUser?.isHighSpender && (
                                                         <span title="VIP" className="shrink-0 flex items-center justify-center">
-                                                            <Crown className="w-4 h-4 text-amber-500" />
+                                                            <Star className="w-4 h-4 text-amber-500 fill-amber-400" />
                                                         </span>
                                                     )}
                                                 </div>
