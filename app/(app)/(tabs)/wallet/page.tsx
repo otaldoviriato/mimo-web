@@ -418,22 +418,22 @@ export default function WalletPage() {
                 {userData?.isProfessional && (
                     <div className="bg-white border-2 border-purple-100 rounded-2xl p-5 shadow-sm space-y-4">
                         {/* Header com Progresso */}
-                        <div className="flex items-start justify-between gap-3 border-b border-purple-50 pb-3.5">
+                        <div className="flex items-center justify-between gap-3 border-b border-purple-50 pb-3.5">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center p-2 text-white shadow-md shadow-purple-600/20 shrink-0">
                                     <img src="/Logo.svg" alt="Mimo" className="w-full h-full object-contain brightness-0 invert" />
                                 </div>
                                 <div>
                                     <span className="text-[10px] font-extrabold uppercase tracking-widest text-purple-700 block">
-                                        Minhas Metas de Sucesso
+                                        Metas
                                     </span>
                                     <h3 className="font-extrabold text-slate-900 text-sm leading-tight">
                                         {currentPhase === 1 ? 'Fase 1: Ativação Inicial' : currentPhase === 2 ? 'Fase 2: Tração & Engajamento' : 'Fase 3: Criadora Elite 🚀'}
                                     </h3>
                                 </div>
                             </div>
-                            <span className="text-xs font-black text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-100/80">
-                                {currentPhase === 1 ? Math.round((phase1CompletedCount / 3) * 100) : currentPhase === 2 ? Math.round((phase2CompletedCount / 3) * 100) : Math.round((phase3CompletedCount / 3) * 100)}% Concluído
+                            <span className="text-[11px] font-black text-purple-700 bg-purple-50 px-3 py-1 rounded-full border border-purple-100/80 shrink-0 whitespace-nowrap">
+                                {currentPhase === 1 ? Math.round((phase1CompletedCount / 3) * 100) : currentPhase === 2 ? Math.round((phase2CompletedCount / 3) * 100) : Math.round((phase3CompletedCount / 3) * 100)}% concluído
                             </span>
                         </div>
 
@@ -456,7 +456,7 @@ export default function WalletPage() {
                                         </div>
                                         <div className="min-w-0">
                                             <p className="text-xs font-bold text-slate-900 truncate">Divulgar seu link exclusivo</p>
-                                            <p className="text-[10px] text-slate-500 truncate">{typeof window !== 'undefined' && userData?.username ? `${window.location.origin}/${userData.username}` : `mimo.chat/${userData?.username || ''}`}</p>
+                                            <p className="text-[10px] font-medium text-purple-700 truncate">mimo.chat/{userData?.username || ''}</p>
                                         </div>
                                     </div>
                                     <button
@@ -486,8 +486,8 @@ export default function WalletPage() {
                                             </p>
                                         </div>
                                     </div>
-                                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
-                                        g2_firstRoom ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                                    <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-lg shrink-0 whitespace-nowrap ${
+                                        g2_firstRoom ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200/80 text-slate-600'
                                     }`}>
                                         {totalRooms}/1 conversa
                                     </span>
@@ -510,8 +510,8 @@ export default function WalletPage() {
                                             </p>
                                         </div>
                                     </div>
-                                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
-                                        g3_firstEarning ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                                    <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-lg shrink-0 whitespace-nowrap ${
+                                        g3_firstEarning ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200/80 text-slate-600'
                                     }`}>
                                         {g3_firstEarning ? 'Recebido' : 'Pendente'}
                                     </span>
@@ -536,7 +536,7 @@ export default function WalletPage() {
                                             <p className="text-[10px] text-slate-500">Mantenha múltiplos contatos interessados</p>
                                         </div>
                                     </div>
-                                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
+                                    <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-lg shrink-0 whitespace-nowrap ${
                                         g4_threeRooms ? 'bg-emerald-100 text-emerald-800' : 'bg-purple-100 text-purple-800'
                                     }`}>
                                         {totalRooms}/3 conversas
@@ -557,8 +557,8 @@ export default function WalletPage() {
                                             <p className="text-[10px] text-slate-500">Fidelize clientes respondendo diariamente</p>
                                         </div>
                                     </div>
-                                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
-                                        g5_sevenDaysRoom ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                                    <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-lg shrink-0 whitespace-nowrap ${
+                                        g5_sevenDaysRoom ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200/80 text-slate-600'
                                     }`}>
                                         {maxActiveDays}/7 dias
                                     </span>
@@ -578,8 +578,8 @@ export default function WalletPage() {
                                             <p className="text-[10px] text-slate-500">Transfira seus ganhos para o Pix</p>
                                         </div>
                                     </div>
-                                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
-                                        g6_firstWithdrawal ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                                    <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-lg shrink-0 whitespace-nowrap ${
+                                        g6_firstWithdrawal ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200/80 text-slate-600'
                                     }`}>
                                         {g6_firstWithdrawal ? 'Sacado' : 'Pendente'}
                                     </span>
@@ -604,7 +604,7 @@ export default function WalletPage() {
                                             <p className="text-[10px] text-slate-500">Construa uma rede forte de apoiadores</p>
                                         </div>
                                     </div>
-                                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
+                                    <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-lg shrink-0 whitespace-nowrap ${
                                         g7_tenRooms ? 'bg-emerald-100 text-emerald-800' : 'bg-purple-100 text-purple-800'
                                     }`}>
                                         {totalRooms}/10 conversas
@@ -625,8 +625,8 @@ export default function WalletPage() {
                                             <p className="text-[10px] text-slate-500">Super fidelização de clientes VIPs</p>
                                         </div>
                                     </div>
-                                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
-                                        g8_thirtyDaysRoom ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                                    <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-lg shrink-0 whitespace-nowrap ${
+                                        g8_thirtyDaysRoom ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200/80 text-slate-600'
                                     }`}>
                                         {maxActiveDays}/30 dias
                                     </span>
@@ -646,7 +646,7 @@ export default function WalletPage() {
                                             <p className="text-[10px] text-slate-500">Soma dos seus ganhos totais</p>
                                         </div>
                                     </div>
-                                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
+                                    <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-lg shrink-0 whitespace-nowrap ${
                                         g9_fiveHundredReais ? 'bg-emerald-100 text-emerald-800' : 'bg-purple-100 text-purple-800'
                                     }`}>
                                         {formatCurrency(totalEarningsVal)} / R$ 500
