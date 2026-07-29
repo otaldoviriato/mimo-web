@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { useMyProfile, useRequestWithdraw, usePendingWithdrawal, useUpdateProfile, useWithdrawalHistory } from '@/hooks/useQueries';
+import { useMyProfile, useRequestWithdraw, usePendingWithdrawal, useUpdateProfile, useWithdrawalHistory, useChatRooms } from '@/hooks/useQueries';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Input } from '@/components/Input';
 import { Avatar } from '@/components/Avatar';
@@ -24,7 +24,11 @@ import {
     Loader2,
     CheckCircle2,
     Clock3,
-    XCircle
+    XCircle,
+    Copy,
+    Check,
+    Link2,
+    Star
 } from 'lucide-react';
 
 const formatCPF = (cpf?: string) => {
@@ -258,30 +262,59 @@ export default function WalletPage() {
         };
     });
 
-    // Cálculo da completude do perfil para criadores
-    const hasPhoto = !!userData?.photoUrl && userData.photoUrl.trim() !== '';
-    const hasCover = !!userData?.coverUrl && userData.coverUrl.trim() !== '';
-    const hasBio = !!userData?.bio && userData.bio.trim().length >= 10;
-    const hasPhotos = (userData?.publicPhotosCount ?? 0) >= 3;
+    // ── LÓGICA DO SISTEMA DE METAS DA CRIADORA ("JORNADA DE SUCESSO") ────────
+    const { data: rooms = [] } = useChatRooms();
+    const [copiedGoalLink, setCopiedGoalLink] = useState(false);
 
-    let completedSteps = 0;
-    if (hasPhoto) completedSteps++;
-    if (hasCover) completedSteps++;
-    if (hasBio) completedSteps++;
-    if (hasPhotos) completedSteps++;
+    const handleCopyGoalLink = () => {
+        if (typeof window !== 'undefined' && userData?.username) {
+            const url = `${window.location.origin}/${userData.username}`;
+            navigator.clipboard.writeText(url);
+            setCopiedGoalLink(true);
+            setTimeout(() => setCopiedGoalLink(false), 2500);
+        }
+    };
 
-    const completenessPercentage = completedSteps * 25;
-    const showEngagementPanel = userData?.isProfessional && userData?.professionalStatus === 'approved' && completenessPercentage < 100;
+    // Métricas calculadas em tempo real
+    const totalRooms = rooms.length;
+    const totalMessagesSentOrReceived = data.totalMessagesCount || 0;
+    const totalEarningsVal = (data.balance || 0) + (data.totalWithdrawn || 0);
+    const hasWithdrawals = (withdrawalsData?.withdrawals || []).some((w: any) => w.status === 'concluido');
+
+    const maxActiveDays = rooms.reduce((maxDays: number, r: any) => {
+        const start = new Date(r.createdAt || r.updatedAt || Date.now()).getTime();
+        const days = Math.floor((Date.now() - start) / (1000 * 60 * 60 * 24));
+        return Math.max(maxDays, days);
+    }, 0);
+
+    // Definição das Metas por Fase
+    const g1_link = true;
+    const g2_firstRoom = totalRooms >= 1;
+    const g3_firstEarning = (data.totalMessageEarnings || 0) > 0 || (data.totalImageUnlockEarnings || 0) > 0 || totalMessagesSentOrReceived > 0;
+    const phase1CompletedCount = (g2_firstRoom ? 1 : 0) + (g3_firstEarning ? 1 : 0) + 1;
+    const isPhase1Done = g2_firstRoom && g3_firstEarning;
+
+    const g4_threeRooms = totalRooms >= 3;
+    const g5_sevenDaysRoom = maxActiveDays >= 7;
+    const g6_firstWithdrawal = hasWithdrawals;
+    const phase2CompletedCount = (g4_threeRooms ? 1 : 0) + (g5_sevenDaysRoom ? 1 : 0) + (g6_firstWithdrawal ? 1 : 0);
+    const isPhase2Done = isPhase1Done && g4_threeRooms && g5_sevenDaysRoom && g6_firstWithdrawal;
+
+    const g7_tenRooms = totalRooms >= 10;
+    const g8_thirtyDaysRoom = maxActiveDays >= 30;
+    const g9_fiveHundredReais = totalEarningsVal >= 50000;
+    const phase3CompletedCount = (g7_tenRooms ? 1 : 0) + (g8_thirtyDaysRoom ? 1 : 0) + (g9_fiveHundredReais ? 1 : 0);
+
+    const currentPhase = !isPhase1Done ? 1 : !isPhase2Done ? 2 : 3;
 
     return (
         <div className="flex flex-col h-full bg-slate-50 text-gray-850 overflow-y-auto pb-28 md:pb-6 relative no-scrollbar">
-            {/* Bento Grid Container - Compacto, sem bordas pretas, sem rosa e ajustado para mobile */}
+            {/* Bento Grid Container */}
             <div className="p-4 flex flex-col gap-4 max-w-3xl w-full mx-auto relative z-0">
 
                 {/* ── BENTO BLOCK 1: CARD DE SALDO PRINCIPAL ── */}
                 <div className="bg-gradient-to-br from-purple-50/90 to-indigo-50/50 rounded-2xl p-5 flex flex-col justify-between min-h-[150px] relative overflow-hidden shadow-[0_8px_30px_rgb(124,58,237,0.02)] text-slate-800 border border-purple-100/80">
                     {loadingDashboard ? (
-                        /* Skeleton interno do card de saldo */
                         <div className="animate-pulse flex flex-col gap-3">
                             <div className="flex justify-between items-start">
                                 <div className="flex flex-col gap-2">
@@ -355,94 +388,247 @@ export default function WalletPage() {
                     )}
                 </div>
 
-                {/* ── PAINEL DE ENGAJAMENTO / COMPLETUDE DO PERFIL ── */}
-                {(loadingDashboard || showEngagementPanel) && (
-                    <div className="bg-white border border-purple-100 rounded-2xl p-5 shadow-[0_4px_20px_rgb(0,0,0,0.012)] flex flex-col gap-4">
-                        {loadingDashboard ? (
-                            /* Skeleton interno do card de qualidade do perfil */
-                            <div className="animate-pulse flex flex-col gap-3">
-                                <div className="flex justify-between items-center">
-                                    <div className="h-3.5 bg-slate-200 rounded-full w-32" />
-                                    <div className="h-5 bg-purple-100 rounded-full w-20" />
+                {/* ── CARD: JORNADA DE SUCESSO DA CRIADORA (SISTEMA DE METAS) ── */}
+                {userData?.isProfessional && (
+                    <div className="bg-white border-2 border-purple-100 rounded-2xl p-5 shadow-sm space-y-4">
+                        {/* Header com Progresso */}
+                        <div className="flex items-start justify-between gap-3 border-b border-purple-50 pb-3.5">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center p-2 text-white shadow-md shadow-purple-600/20 shrink-0">
+                                    <img src="/Logo.svg" alt="Mimo" className="w-full h-full object-contain brightness-0 invert" />
                                 </div>
-                                <div className="h-2 bg-slate-100 rounded-full w-full" />
-                                <div className="h-2 bg-slate-100 rounded-full w-3/4" />
-                                <div className="grid grid-cols-2 gap-2 mt-1">
-                                    <div className="h-5 bg-slate-100 rounded-lg w-full" />
-                                    <div className="h-5 bg-slate-100 rounded-lg w-full" />
-                                    <div className="h-5 bg-slate-100 rounded-lg w-full" />
-                                    <div className="h-5 bg-slate-100 rounded-lg w-full" />
+                                <div>
+                                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-purple-700 block">
+                                        Minhas Metas de Sucesso
+                                    </span>
+                                    <h3 className="font-extrabold text-slate-900 text-sm leading-tight">
+                                        {currentPhase === 1 ? 'Fase 1: Ativação Inicial' : currentPhase === 2 ? 'Fase 2: Tração & Engajamento' : 'Fase 3: Criadora Elite 🚀'}
+                                    </h3>
                                 </div>
                             </div>
-                        ) : showEngagementPanel ? (
-                        <>
-                        <div>
-                            <div className="flex items-center justify-between">
-                                <h3 className="font-bold text-gray-900 text-sm">Qualidade do Perfil</h3>
-                                <span className="text-xs font-black text-purple-650 bg-purple-50 px-2 py-0.5 rounded-full uppercase tracking-wider">{completenessPercentage}% Completo</span>
-                            </div>
-                            <p className="text-[11px] text-gray-400 leading-snug mt-1">
-                                Um perfil qualificado atrai muito mais mimos e conversas pagas. Complete todos os requisitos para ser recomendado!
-                            </p>
+                            <span className="text-xs font-black text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-100/80">
+                                {currentPhase === 1 ? Math.round((phase1CompletedCount / 3) * 100) : currentPhase === 2 ? Math.round((phase2CompletedCount / 3) * 100) : Math.round((phase3CompletedCount / 3) * 100)}% Concluído
+                            </span>
                         </div>
 
                         {/* Barra de Progresso */}
                         <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                             <div 
                                 className="bg-gradient-to-r from-purple-600 to-indigo-600 h-full rounded-full transition-all duration-500"
-                                style={{ width: `${completenessPercentage}%` }}
+                                style={{ width: `${currentPhase === 1 ? (phase1CompletedCount / 3) * 100 : currentPhase === 2 ? (phase2CompletedCount / 3) * 100 : (phase3CompletedCount / 3) * 100}%` }}
                             />
                         </div>
 
-                        {/* Checklist de Requisitos */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
-                            <div className="flex items-center gap-2.5 text-xs text-gray-700">
-                                <div className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 border ${
-                                    hasPhoto ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-500 border-rose-100'
-                                }`}>
-                                    {hasPhoto ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                        {/* FASE 1: Ativação Inicial */}
+                        {currentPhase === 1 && (
+                            <div className="space-y-3 pt-1">
+                                {/* Meta 1: Compartilhar Link */}
+                                <div className="flex items-center justify-between p-3 rounded-xl bg-purple-50/60 border border-purple-100/70 gap-3">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
+                                            <CheckCircle2 className="w-4 h-4" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-bold text-slate-900 truncate">Divulgar seu link exclusivo</p>
+                                            <p className="text-[10px] text-slate-500 truncate">{typeof window !== 'undefined' && userData?.username ? `${window.location.origin}/${userData.username}` : `mimo.chat/${userData?.username || ''}`}</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleCopyGoalLink}
+                                        className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-bold text-xs rounded-lg transition-all flex items-center gap-1 shrink-0 cursor-pointer shadow-xs"
+                                    >
+                                        {copiedGoalLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                                        {copiedGoalLink ? 'Copiado' : 'Copiar'}
+                                    </button>
                                 </div>
-                                <span className={hasPhoto ? 'font-medium' : 'text-gray-400'}>Foto de perfil</span>
-                            </div>
 
-                            <div className="flex items-center gap-2.5 text-xs text-gray-700">
-                                <div className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 border ${
-                                    hasCover ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-500 border-rose-100'
+                                {/* Meta 2: 1ª Conversa */}
+                                <div className={`flex items-center justify-between p-3 rounded-xl border gap-3 ${
+                                    g2_firstRoom ? 'bg-emerald-50/60 border-emerald-100' : 'bg-slate-50 border-slate-100'
                                 }`}>
-                                    {hasCover ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                                            g2_firstRoom ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'
+                                        }`}>
+                                            {g2_firstRoom ? <CheckCircle2 className="w-4 h-4" /> : <Clock3 className="w-4 h-4" />}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-bold text-slate-900">Conseguir sua 1ª conversa</p>
+                                            <p className="text-[10px] text-slate-500">
+                                                {g2_firstRoom ? 'Concluída com sucesso!' : 'Clientes entram pelo seu link'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
+                                        g2_firstRoom ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                                    }`}>
+                                        {totalRooms}/1 conversa
+                                    </span>
                                 </div>
-                                <span className={hasCover ? 'font-medium' : 'text-gray-400'}>Foto de capa</span>
-                            </div>
 
-                            <div className="flex items-center gap-2.5 text-xs text-gray-700">
-                                <div className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 border ${
-                                    hasBio ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-500 border-rose-100'
+                                {/* Meta 3: 1ª Mensagem Paga */}
+                                <div className={`flex items-center justify-between p-3 rounded-xl border gap-3 ${
+                                    g3_firstEarning ? 'bg-emerald-50/60 border-emerald-100' : 'bg-slate-50 border-slate-100'
                                 }`}>
-                                    {hasBio ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                                            g3_firstEarning ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'
+                                        }`}>
+                                            {g3_firstEarning ? <CheckCircle2 className="w-4 h-4" /> : <Clock3 className="w-4 h-4" />}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-bold text-slate-900">Receber a 1ª mensagem paga</p>
+                                            <p className="text-[10px] text-slate-500">
+                                                {g3_firstEarning ? 'Concluída!' : 'Responda para somar saldo'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
+                                        g3_firstEarning ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                                    }`}>
+                                        {g3_firstEarning ? 'Recebido' : 'Pendente'}
+                                    </span>
                                 </div>
-                                <span className={hasBio ? 'font-medium' : 'text-gray-400'}>Biografia (mín. 10 chars)</span>
                             </div>
+                        )}
 
-                            <div className="flex items-center gap-2.5 text-xs text-gray-700">
-                                <div className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 border ${
-                                    hasPhotos ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-500 border-rose-100'
+                        {/* FASE 2: Tração & Engajamento */}
+                        {currentPhase === 2 && (
+                            <div className="space-y-3 pt-1">
+                                <div className={`flex items-center justify-between p-3 rounded-xl border gap-3 ${
+                                    g4_threeRooms ? 'bg-emerald-50/60 border-emerald-100' : 'bg-slate-50 border-slate-100'
                                 }`}>
-                                    {hasPhotos ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                                            g4_threeRooms ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'
+                                        }`}>
+                                            {g4_threeRooms ? <CheckCircle2 className="w-4 h-4" /> : <Clock3 className="w-4 h-4" />}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-bold text-slate-900">Alcançar 3 conversas ativas</p>
+                                            <p className="text-[10px] text-slate-500">Mantenha múltiplos contatos interessados</p>
+                                        </div>
+                                    </div>
+                                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
+                                        g4_threeRooms ? 'bg-emerald-100 text-emerald-800' : 'bg-purple-100 text-purple-800'
+                                    }`}>
+                                        {totalRooms}/3 conversas
+                                    </span>
                                 </div>
-                                <span className={hasPhotos ? 'font-medium' : 'text-gray-400'}>Galeria (mín. 3 fotos)</span>
-                            </div>
-                        </div>
 
-                        <button
-                            onClick={() => router.replace('/profile')}
-                            className="w-full h-10 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-100 text-xs font-bold transition-all active:scale-[0.98] mt-1 flex items-center justify-center gap-1.5 cursor-pointer"
-                        >
-                            Ajustar Perfil
-                            <ArrowUpRight className="w-3.5 h-3.5" />
-                        </button>
-                        </>
-                        ) : null}
-                </div>
+                                <div className={`flex items-center justify-between p-3 rounded-xl border gap-3 ${
+                                    g5_sevenDaysRoom ? 'bg-emerald-50/60 border-emerald-100' : 'bg-slate-50 border-slate-100'
+                                }`}>
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                                            g5_sevenDaysRoom ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'
+                                        }`}>
+                                            {g5_sevenDaysRoom ? <CheckCircle2 className="w-4 h-4" /> : <Clock3 className="w-4 h-4" />}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-bold text-slate-900">Manter conversa por 7 dias</p>
+                                            <p className="text-[10px] text-slate-500">Fidelize clientes respondendo diariamente</p>
+                                        </div>
+                                    </div>
+                                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
+                                        g5_sevenDaysRoom ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                                    }`}>
+                                        {maxActiveDays}/7 dias
+                                    </span>
+                                </div>
+
+                                <div className={`flex items-center justify-between p-3 rounded-xl border gap-3 ${
+                                    g6_firstWithdrawal ? 'bg-emerald-50/60 border-emerald-100' : 'bg-slate-50 border-slate-100'
+                                }`}>
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                                            g6_firstWithdrawal ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'
+                                        }`}>
+                                            {g6_firstWithdrawal ? <CheckCircle2 className="w-4 h-4" /> : <Clock3 className="w-4 h-4" />}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-bold text-slate-900">Realizar seu 1º Saque Pix</p>
+                                            <p className="text-[10px] text-slate-500">Transfira seus ganhos para o Pix</p>
+                                        </div>
+                                    </div>
+                                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
+                                        g6_firstWithdrawal ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                                    }`}>
+                                        {g6_firstWithdrawal ? 'Sacado' : 'Pendente'}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* FASE 3: Criadora Elite */}
+                        {currentPhase === 3 && (
+                            <div className="space-y-3 pt-1">
+                                <div className={`flex items-center justify-between p-3 rounded-xl border gap-3 ${
+                                    g7_tenRooms ? 'bg-emerald-50/60 border-emerald-100' : 'bg-slate-50 border-slate-100'
+                                }`}>
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                                            g7_tenRooms ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'
+                                        }`}>
+                                            {g7_tenRooms ? <CheckCircle2 className="w-4 h-4" /> : <Clock3 className="w-4 h-4" />}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-bold text-slate-900">10 Conversas Ativas</p>
+                                            <p className="text-[10px] text-slate-500">Construa uma rede forte de apoiadores</p>
+                                        </div>
+                                    </div>
+                                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
+                                        g7_tenRooms ? 'bg-emerald-100 text-emerald-800' : 'bg-purple-100 text-purple-800'
+                                    }`}>
+                                        {totalRooms}/10 conversas
+                                    </span>
+                                </div>
+
+                                <div className={`flex items-center justify-between p-3 rounded-xl border gap-3 ${
+                                    g8_thirtyDaysRoom ? 'bg-emerald-50/60 border-emerald-100' : 'bg-slate-50 border-slate-100'
+                                }`}>
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                                            g8_thirtyDaysRoom ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'
+                                        }`}>
+                                            {g8_thirtyDaysRoom ? <CheckCircle2 className="w-4 h-4" /> : <Clock3 className="w-4 h-4" />}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-bold text-slate-900">Manter conversa por 30 dias</p>
+                                            <p className="text-[10px] text-slate-500">Super fidelização de clientes VIPs</p>
+                                        </div>
+                                    </div>
+                                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
+                                        g8_thirtyDaysRoom ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                                    }`}>
+                                        {maxActiveDays}/30 dias
+                                    </span>
+                                </div>
+
+                                <div className={`flex items-center justify-between p-3 rounded-xl border gap-3 ${
+                                    g9_fiveHundredReais ? 'bg-emerald-50/60 border-emerald-100' : 'bg-slate-50 border-slate-100'
+                                }`}>
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                                            g9_fiveHundredReais ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'
+                                        }`}>
+                                            {g9_fiveHundredReais ? <CheckCircle2 className="w-4 h-4" /> : <Clock3 className="w-4 h-4" />}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-bold text-slate-900">Atingir R$ 500 faturados</p>
+                                            <p className="text-[10px] text-slate-500">Soma dos seus ganhos totais</p>
+                                        </div>
+                                    </div>
+                                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
+                                        g9_fiveHundredReais ? 'bg-emerald-100 text-emerald-800' : 'bg-purple-100 text-purple-800'
+                                    }`}>
+                                        {formatCurrency(totalEarningsVal)} / R$ 500
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 )}
 
 
