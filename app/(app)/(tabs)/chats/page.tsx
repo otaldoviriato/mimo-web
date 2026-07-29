@@ -183,6 +183,8 @@ export default function ChatsPage() {
     const renderVerificationBanner = () => {
         if (!myProfile) return null;
         if (!myProfile.isProfessional) return null;
+        // O card de verificação de identidade só deve aparecer para criadoras que JÁ tenham ao menos 1 conversa iniciada
+        if ((rooms?.length ?? 0) === 0) return null;
 
         // Se estiver pendente
         if (myProfile.identityStatus === 'pending') {
@@ -274,110 +276,43 @@ export default function ChatsPage() {
         return null;
     };
 
-    const renderProfileProgressBanner = () => {
-        if (!myProfile || !myProfile.isProfessional || myProfile.professionalStatus !== 'approved' || hideProfileProgress) return null;
-
-        const hasPhoto = !!myProfile.photoUrl && myProfile.photoUrl.trim() !== '';
-        const hasCover = !!myProfile.coverUrl && myProfile.coverUrl.trim() !== '';
-        const hasBio = !!myProfile.bio && myProfile.bio.trim().length >= 10;
-        const hasPhotos = (myProfile.publicPhotosCount ?? 0) >= 3;
-
-        let completedSteps = 0;
-        if (hasPhoto) completedSteps++;
-        if (hasCover) completedSteps++;
-        if (hasBio) completedSteps++;
-        if (hasPhotos) completedSteps++;
-
-        const completenessPercentage = completedSteps * 25;
-
-        if (completenessPercentage === 100) return null;
-
-        return (
-            <div className="mx-4 mt-4 mb-4 bg-gradient-to-r from-purple-50 via-indigo-50/50 to-purple-50/30 border border-purple-100 rounded-2xl p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300 relative">
-                <button 
-                    onClick={() => {
-                        setHideProfileProgress(true);
-                        sessionStorage.setItem('mimo_hide_profile_progress_banner', 'true');
-                    }}
-                    className="absolute top-2.5 right-2.5 p-1 rounded-full text-purple-400 hover:text-purple-600 transition-colors"
-                    title="Dispensar"
-                >
-                    <X size={14} />
-                </button>
-                <div className="flex items-start gap-3">
-                    <div className="min-w-0 flex-1 pr-4">
-                        <h3 className="font-bold text-purple-900 text-xs md:text-sm">Melhore o seu perfil! 🚀</h3>
-                        <p className="text-[10px] md:text-xs text-purple-700 mt-0.5 leading-snug">
-                            Seu perfil está <span className="font-extrabold">{completenessPercentage}% completo</span>. Perfis completos ganham destaque e atraem muito mais clientes!
-                        </p>
-                        
-                        {/* Barra de Progresso */}
-                        <div className="w-full bg-purple-200/50 h-2 rounded-full mt-3 overflow-hidden">
-                            <div 
-                                className="bg-gradient-to-r from-purple-600 to-indigo-600 h-full rounded-full transition-all duration-500"
-                                style={{ width: `${completenessPercentage}%` }}
-                            />
-                        </div>
-                        
-                        {/* Requisitos Pendentes */}
-                        <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[9px] font-bold uppercase tracking-wider text-purple-500/80">
-                            {!hasPhoto && <span>• Falta Foto Perfil</span>}
-                            {!hasCover && <span>• Falta Capa</span>}
-                            {!hasBio && <span>• Falta Bio (min 10)</span>}
-                            {!hasPhotos && <span>• Falta Galeria (min 3)</span>}
-                        </div>
-
-                        <div className="mt-3.5 flex justify-end">
-                            <button
-                                onClick={() => router.replace('/profile')}
-                                className="inline-flex items-center justify-center gap-1.5 bg-purple-600 hover:bg-purple-700 active:scale-[0.98] transition-all text-white text-[10px] font-extrabold px-3 py-1.5 rounded-xl shadow-md shadow-purple-600/10 cursor-pointer"
-                            >
-                                Completar Agora
-                                <ChevronRight className="w-3 h-3" />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
     const [hideShareBanner, setHideShareBanner] = useState(false);
 
     const renderShareLinkBanner = () => {
         if (!myProfile || !myProfile.isProfessional || hideShareBanner || !myProfile.username) return null;
 
-        const fullLink = typeof window !== 'undefined'
-            ? `${window.location.origin}/${myProfile.username}`
-            : `mimo.chat/${myProfile.username}`;
+        const displayLink = `mimo.chat/${myProfile.username}`;
 
         return (
-            <div className="mx-4 mt-4 bg-gradient-to-r from-purple-50 via-indigo-50/60 to-purple-50 border border-purple-200/80 rounded-2xl p-3 shadow-xs animate-in fade-in slide-in-from-top-2 duration-300 relative">
+            <div className="mx-4 mt-4 bg-gradient-to-r from-purple-50 via-indigo-50/60 to-purple-50 border border-purple-200/80 rounded-2xl p-3.5 shadow-xs animate-in fade-in slide-in-from-top-2 duration-300 relative">
                 <button
                     onClick={() => setHideShareBanner(true)}
-                    className="absolute top-2.5 right-2.5 p-1 rounded-full text-purple-400 hover:text-purple-600 transition-colors cursor-pointer"
+                    className="absolute top-2.5 right-2.5 p-1 rounded-full text-purple-400 hover:text-purple-600 active:scale-90 transition-colors cursor-pointer z-10"
                     title="Dispensar"
                 >
-                    <X size={14} />
+                    <X size={15} />
                 </button>
-                <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 shrink-0 flex items-center justify-center rounded-xl bg-white p-1.5 border border-purple-200 shadow-xs">
-                        <img src="/Logo.svg" alt="Mimo" className="w-full h-full object-contain" />
+                <div className="flex items-center gap-3 pr-6">
+                    <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center p-2 text-white shadow-md shadow-purple-600/20 shrink-0">
+                        <img src="/Logo.svg" alt="Mimo" className="w-full h-full object-contain brightness-0 invert" />
                     </div>
-                    <div className="min-w-0 flex-1 pr-5">
-                        <h3 className="font-extrabold text-purple-950 text-xs truncate">
-                            Seu link de perfil: <span className="text-purple-700 underline">{fullLink}</span>
+                    <div className="min-w-0 flex-1">
+                        <h3 className="font-extrabold text-slate-900 text-xs tracking-tight flex items-center gap-1.5 flex-wrap">
+                            Seu link de perfil:
+                            <span className="font-bold text-purple-700 bg-purple-100/80 px-1.5 py-0.5 rounded text-[11px] truncate max-w-[170px] sm:max-w-none">
+                                {displayLink}
+                            </span>
                         </h3>
-                        <p className="text-[11px] text-purple-700 leading-tight mt-0.5 font-medium">
+                        <p className="text-[11px] text-purple-700 font-medium leading-tight mt-0.5">
                             Divulgue no Instagram/TikTok para receber mensagens!
                         </p>
                     </div>
                     <button
                         onClick={handleCopyProfileLink}
-                        className="shrink-0 inline-flex items-center gap-1 bg-purple-600 hover:bg-purple-700 active:scale-95 transition-all text-white text-[11px] font-extrabold px-3 py-1.5 rounded-xl shadow-md shadow-purple-600/10 cursor-pointer"
+                        className="shrink-0 inline-flex items-center justify-center gap-1.5 bg-purple-600 hover:bg-purple-700 active:scale-95 transition-all text-white text-[11px] font-extrabold px-3 py-2 rounded-xl shadow-md shadow-purple-600/15 cursor-pointer ml-1"
                     >
                         {copiedProfileLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                        {copiedProfileLink ? 'Copiado' : 'Copiar'}
+                        {copiedProfileLink ? 'Copiado!' : 'Copiar'}
                     </button>
                 </div>
             </div>
@@ -630,12 +565,10 @@ export default function ChatsPage() {
     return (
         <div className="flex flex-col h-full">
 
-            {/* Banner de Verificação de Identidade, Completude do Perfil ou Link Exclusivo (exibido um de cada vez) */}
+            {/* Banner de Verificação de Identidade ou Link Exclusivo (exibido um de cada vez) */}
             {(() => {
                 const verificationBanner = renderVerificationBanner();
                 if (verificationBanner) return verificationBanner;
-                const profileBanner = renderProfileProgressBanner();
-                if (profileBanner) return profileBanner;
                 return renderShareLinkBanner();
             })()}
 
