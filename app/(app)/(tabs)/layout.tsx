@@ -131,14 +131,27 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                             </p>
                         </div>
                     </div>
+                    {userData?.isAdmin && (
+                        <button
+                            onClick={() => router.push('/admin')}
+                            className="flex items-center justify-between w-full px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl transition-all font-semibold text-xs border border-purple-200/60 cursor-pointer"
+                            title="Acessar Back-office"
+                        >
+                            <div className="flex items-center gap-2 min-w-0">
+                                <ShieldAlert className="w-4 h-4 text-purple-600 shrink-0" />
+                                <span className="truncate">{userData?.email || user?.primaryEmailAddress?.emailAddress || 'Back-office'}</span>
+                            </div>
+                            <span className="text-[10px] bg-purple-600 text-white font-bold px-1.5 py-0.5 rounded uppercase shrink-0">Admin</span>
+                        </button>
+                    )}
                 </div>
             </aside>
 
             {/* Main content */}
             <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
-                {/* Header Superior Mobile Persistente — oculto na aba Perfil apenas para o perfil feminino (profissional) */}
+                {/* Header Superior Persistente — oculto na aba Perfil apenas para o perfil feminino (profissional) */}
                 {!(pathname === '/profile' && isProfessional) && (
-                <div className="md:hidden shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between z-30 sticky top-0 shadow-md">
+                <div className="shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between z-30 sticky top-0 shadow-md">
                     <div className="flex items-center gap-3">
                         <img
                             src="/Logo.svg"
@@ -151,7 +164,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                         </span>
                     </div>
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1.5">
                         {pathname === '/search' && (
                             <button
                                 onClick={() => {
@@ -177,10 +190,13 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                         {userData?.isAdmin && (
                             <button
                                 onClick={() => router.push('/admin')}
-                                className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center cursor-pointer"
-                                title="Painel Admin"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-white/15 hover:bg-white/25 active:bg-white/30 border border-white/25 rounded-full transition-all text-white cursor-pointer shadow-sm"
+                                title="Acessar Back-office"
                             >
-                                <ShieldAlert className="w-5 h-5" />
+                                <ShieldAlert className="w-4.5 h-4.5 text-purple-200 shrink-0" />
+                                <span className="text-xs font-semibold max-w-[140px] sm:max-w-[240px] truncate">
+                                    {userData?.email || user?.primaryEmailAddress?.emailAddress || 'Back-office'}
+                                </span>
                             </button>
                         )}
                         {pathname === '/profile' && (
