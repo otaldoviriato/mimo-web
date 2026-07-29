@@ -113,26 +113,47 @@ function LockedMediaTypeBadge({ isVideo, duration }: { isVideo?: boolean; durati
     );
 }
 
-function formatLastSeen(isOnline?: boolean, lastSeenDateStr?: string | Date) {
+function formatLastSeen(
+    isOnline?: boolean,
+    lastSeenDateStr?: string | Date,
+    latestMessageTimestamp?: string | Date
+) {
     if (isOnline) return 'online';
-    if (!lastSeenDateStr) return '';
-    
+
+    let date: Date | null = null;
+
+    if (lastSeenDateStr) {
+        const parsed = new Date(lastSeenDateStr);
+        if (!isNaN(parsed.getTime())) {
+            date = parsed;
+        }
+    }
+
+    if (latestMessageTimestamp) {
+        const msgDate = new Date(latestMessageTimestamp);
+        if (!isNaN(msgDate.getTime())) {
+            if (!date || msgDate.getTime() > date.getTime()) {
+                date = msgDate;
+            }
+        }
+    }
+
+    if (!date) return '';
+
     try {
-        const date = new Date(lastSeenDateStr);
         const now = new Date();
-        
         const isToday = date.getDate() === now.getDate() &&
             date.getMonth() === now.getMonth() &&
             date.getFullYear() === now.getFullYear();
-            
+
         const yesterday = new Date(now);
         yesterday.setDate(now.getDate() - 1);
         const isYesterday = date.getDate() === yesterday.getDate() &&
             date.getMonth() === yesterday.getMonth() &&
             date.getFullYear() === yesterday.getFullYear();
-            
+
         const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-        
+
         if (isToday) {
             return `visto por último hoje às ${timeStr}`;
         } else if (isYesterday) {
@@ -599,6 +620,10 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         ? queryClient.getQueryData<CachedRoom[]>(QueryKeys.rooms(user.id))?.find((room) => room.participants.includes(otherUserId))
         : undefined;
     const receiverBalance = receiver?.balance ?? cachedRoom?.otherUser?.balance ?? 0;
+
+    const latestPartnerMessage = React.useMemo(() => {
+        return messages.filter(m => m.senderId === otherUserId).slice(-1)[0];
+    }, [messages, otherUserId]);
 
     // Lista derivada das mídias históricas carregadas combinadas com as mídias das mensagens locais
     const mediaItems = React.useMemo(() => {
@@ -2361,7 +2386,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                         </span>
                                     ) : (
                                         <span className="text-[10px] text-white/65 font-medium truncate tracking-tight normal-case">
-                                            {receiver ? formatLastSeen(receiver.isOnline, receiver.lastSeen) : (receiver?.username ? `@${receiver.username}` : 'Ver perfil')}
+                                            {receiver ? formatLastSeen(receiver.isOnline, receiver.lastSeen, latestPartnerMessage?.timestamp) : (receiver?.username ? `@${receiver.username}` : 'Ver perfil')}
                                         </span>
                                     )}
                                 </div>
