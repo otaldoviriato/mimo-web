@@ -183,7 +183,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                                 <ShieldAlert className="w-5 h-5" />
                             </button>
                         )}
-                        {(pathname === '/profile' || pathname === '/chats' || pathname === '/') && (
+                        {pathname === '/profile' && (
                             <button
                                 onClick={() => router.push('/settings')}
                                 className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center cursor-pointer"
