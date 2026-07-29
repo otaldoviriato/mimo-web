@@ -190,11 +190,11 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                         {userData?.isAdmin && (
                             <button
                                 onClick={() => router.push('/admin')}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-white/15 hover:bg-white/25 active:bg-white/30 border border-white/25 rounded-full transition-all text-white cursor-pointer shadow-sm"
+                                className="p-2 md:px-3 md:py-1.5 hover:bg-white/10 active:bg-white/20 md:bg-white/15 md:hover:bg-white/25 md:border md:border-white/25 rounded-full transition-all text-white flex items-center justify-center gap-2 cursor-pointer"
                                 title="Acessar Back-office"
                             >
-                                <ShieldAlert className="w-4.5 h-4.5 text-purple-200 shrink-0" />
-                                <span className="text-xs font-semibold max-w-[140px] sm:max-w-[240px] truncate">
+                                <ShieldAlert className="w-5 h-5 md:w-4.5 md:h-4.5 text-white md:text-purple-200 shrink-0" />
+                                <span className="hidden md:inline text-xs font-semibold max-w-[240px] truncate">
                                     {userData?.email || user?.primaryEmailAddress?.emailAddress || 'Back-office'}
                                 </span>
                             </button>
