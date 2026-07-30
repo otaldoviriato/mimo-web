@@ -7,6 +7,8 @@ import { useSignIn, useSignUp } from '@clerk/nextjs/legacy';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import Link from 'next/link';
+import { useQueryClient } from '@tanstack/react-query';
+import { clearMimoClientSession } from '@/lib/clientSession';
 
 function GiftCapture() {
     const searchParams = useSearchParams();
@@ -22,6 +24,7 @@ function GiftCapture() {
 
 export default function LoginPage() {
     const router = useRouter();
+    const queryClient = useQueryClient();
     const { isSignedIn } = useAuth();
     const { isLoaded: signInLoaded, signIn, setActive: setSignInActive } = useSignIn();
     const { isLoaded: signUpLoaded, signUp, setActive: setSignUpActive } = useSignUp();
@@ -218,6 +221,11 @@ export default function LoginPage() {
 
         try {
             // Fluxo de autenticação agnóstico e padrão
+            const pendingGift = typeof window !== 'undefined' ? localStorage.getItem('mimo_pending_gift') : null;
+            clearMimoClientSession(queryClient);
+            if (pendingGift && typeof window !== 'undefined') {
+                localStorage.setItem('mimo_pending_gift', pendingGift);
+            }
             await signIn.authenticateWithRedirect({
                 strategy: 'oauth_google',
                 redirectUrl: '/sso-callback',

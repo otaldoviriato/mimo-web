@@ -10,6 +10,8 @@ import { formatCPF, formatPhone } from '@/components/RechargeModal';
 import { PricingGuideModal, PRICE_PER_CHAR_OPTIONS } from '@/components/PricingGuideModal';
 import Link from 'next/link';
 import { ShieldCheck, RefreshCw, AlertCircle, Lock, Pencil, ChevronRight } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { clearMimoClientSession } from '@/lib/clientSession';
 
 function SkeletonField() {
     return (
@@ -92,6 +94,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const { user } = useUser();
     const { signOut } = useClerk();
     const router = useTransitionRouter();
+    const queryClient = useQueryClient();
     const { isInstallable, promptInstall, mounted, isStandalone } = usePWA();
     const { permission: notificationPermission, handleRequestPermission } = usePushNotifications();
 
@@ -413,6 +416,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
 
     const handleLogout = async () => {
         if (confirm('Tem certeza que deseja sair da sua conta?')) {
+            clearMimoClientSession(queryClient);
             await signOut(() => router.replace('/login'));
         }
     };
@@ -439,10 +443,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                 throw new Error(data.error || 'Não foi possível concluir a ação.');
             }
 
-            if (typeof window !== 'undefined') {
-                localStorage.removeItem('mimo_profile');
-            }
-
+            clearMimoClientSession(queryClient);
             await signOut(() => router.replace('/login'));
         } catch (error: any) {
             setAccountActionError(error.message || 'Não foi possível concluir a ação.');

@@ -11,6 +11,8 @@ import {
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useMyProfile } from '@/hooks/useQueries';
 import { ImageCropper } from '@/components/ImageCropper';
+import { useQueryClient } from '@tanstack/react-query';
+import { clearMimoClientSession } from '@/lib/clientSession';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -78,6 +80,7 @@ const STEP_KEY = 'mimo_onboarding_step';
 export default function OnboardingPage() {
     const router = useTransitionRouter();
     const { signOut } = useClerk();
+    const queryClient = useQueryClient();
     const { data: userData, refetch } = useMyProfile();
 
     const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -95,7 +98,7 @@ export default function OnboardingPage() {
     const handleConfirmLogout = async () => {
         setIsLoggingOut(true);
         try {
-            localStorage.removeItem(STEP_KEY);
+            clearMimoClientSession(queryClient);
             await signOut(() => router.replace('/login'));
         } catch (err) {
             console.error('Erro ao encerrar sessão:', err);

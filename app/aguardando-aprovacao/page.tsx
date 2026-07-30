@@ -5,6 +5,7 @@ import { useAuth } from '@clerk/nextjs';
 import { useClerk } from '@clerk/nextjs';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, LogOut, CheckCircle2, AlertTriangle, ShieldAlert, MessageCircle } from 'lucide-react';
+import { clearMimoClientSession } from '@/lib/clientSession';
 
 export default function AguardandoAprovacaoPage() {
     const { isLoaded, isSignedIn } = useAuth();
@@ -133,11 +134,7 @@ export default function AguardandoAprovacaoPage() {
     }, [isLoaded, isSignedIn, router]);
 
     const handleLogout = async () => {
-        if (typeof window !== 'undefined') {
-            localStorage.removeItem('mimo_professional_released');
-            localStorage.removeItem('mimo_signup_flow');
-            localStorage.removeItem('mimo_profile');
-        }
+        clearMimoClientSession(queryClient);
         await signOut();
         router.replace('/login');
     };

@@ -40,6 +40,7 @@ export const QueryKeys = {
 
 export function useMyProfile() {
     const { user: clerkUser } = useUser();
+    const queryClient = useQueryClient();
 
     const query = useQuery({
         queryKey: QueryKeys.me,
@@ -76,6 +77,8 @@ export function useMyProfile() {
             }
             return 0;
         },
+        enabled: !!clerkUser?.id,
+        refetchOnMount: 'always',
         staleTime: 5 * 60 * 1000,
         refetchInterval: (query: any) => {
             const user = query.state.data;
@@ -91,13 +94,31 @@ export function useMyProfile() {
         },
     });
 
+    const isDifferentClerkUser = !!(
+        clerkUser?.id &&
+        query.data?.clerkId &&
+        query.data.clerkId !== clerkUser.id
+    );
+
     useEffect(() => {
-        if (typeof window !== 'undefined' && query.data) {
+        if (!isDifferentClerkUser) return;
+
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem('mimo_profile');
+        }
+        queryClient.invalidateQueries({ queryKey: QueryKeys.me });
+    }, [isDifferentClerkUser, queryClient]);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && query.data && !isDifferentClerkUser) {
             localStorage.setItem('mimo_profile', JSON.stringify(query.data));
         }
-    }, [query.data]);
+    }, [query.data, isDifferentClerkUser]);
 
-    return query;
+    return {
+        ...query,
+        data: isDifferentClerkUser ? undefined : query.data,
+    };
 }
 
 // ─── Hook: salas de chat ────────────────────────────────────────────────────
