@@ -13,7 +13,7 @@ import { Drawer } from 'vaul';
 import { AudioRecorder } from '@/components/AudioRecorder';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { MediaComposerSheet } from '@/components/MediaComposerSheet';
-import { ShieldCheck, MessageSquare } from 'lucide-react';
+import { ShieldCheck, MessageSquare, Wallet } from 'lucide-react';
 
 interface Message {
     _id: string;
@@ -2357,7 +2357,10 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                             </svg>
                         </button>
                         <button 
-                            onClick={() => receiver?.username && router.push(`/${receiver.username}`)}
+                            onClick={() => {
+                                const target = receiver?.username || receiver?.id || otherUserId;
+                                router.push(`/chat/${target}/info`);
+                            }}
                             className="flex-1 flex items-center gap-3.5 min-w-0 text-left py-0.5"
                         >
                             <div className={`relative shrink-0 ${!receiver ? 'animate-pulse' : ''}`}>
@@ -2386,7 +2389,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                         </span>
                                     ) : (
                                         <span className="text-[10px] text-white/65 font-medium truncate tracking-tight normal-case">
-                                            {receiver ? formatLastSeen(receiver.isOnline, receiver.lastSeen, latestPartnerMessage?.timestamp) : (receiver?.username ? `@${receiver.username}` : 'Ver perfil')}
+                                            {receiver ? formatLastSeen(receiver.isOnline, receiver.lastSeen, latestPartnerMessage?.timestamp) : (receiver?.username ? `@${receiver.username}` : 'Ver informações')}
                                         </span>
                                     )}
                                 </div>
@@ -2399,22 +2402,6 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                 </svg>
-                            )}
-                            {!userData?.isProfessional && receiver?.isProfessional && (
-                                <button
-                                    id="gallery-btn"
-                                    onClick={() => setGalleryVisible(true)}
-                                    className="text-white/80 hover:text-white p-2 hover:bg-white/10 rounded-full active:scale-95 transition-all"
-                                    title="Ver mídias compartilhadas"
-                                >
-                                    {/* Ícone grade 2x2 */}
-                                    <svg width="20" height="20" viewBox="0 0 18 18" fill="none">
-                                        <rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor"/>
-                                        <rect x="11" y="1" width="6" height="6" rx="1.5" fill="currentColor"/>
-                                        <rect x="1" y="11" width="6" height="6" rx="1.5" fill="currentColor"/>
-                                        <rect x="11" y="11" width="6" height="6" rx="1.5" fill="currentColor"/>
-                                    </svg>
-                                </button>
                             )}
 
                             <div className="relative">
@@ -2432,7 +2419,23 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                 {menuVisible && (
                                     <>
                                         <div className="fixed inset-0 z-10" onClick={() => setMenuVisible(false)} />
-                                        <div className="absolute right-0 top-8 bg-white rounded-xl shadow-lg border border-gray-100 w-44 z-20 overflow-hidden">
+                                        <div className="absolute right-0 top-8 bg-white rounded-xl shadow-lg border border-gray-100 w-56 z-20 overflow-hidden select-none">
+                                            {!userData?.isProfessional && (
+                                                <>
+                                                    <button
+                                                        onClick={() => {
+                                                            setMenuVisible(false);
+                                                            openRechargeModal();
+                                                        }}
+                                                        className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                                    >
+                                                        <Wallet className="w-4 h-4 text-purple-600 shrink-0" />
+                                                        <span className="flex-1 text-left font-medium">Carteira</span>
+                                                        <span className="text-xs text-gray-400 font-normal">R$ {(balance / 100).toFixed(2).replace('.', ',')}</span>
+                                                    </button>
+                                                    <div className="border-t border-gray-100" />
+                                                </>
+                                            )}
                                             <button
                                                 onClick={() => setMenuVisible(false)}
                                                 className="flex items-center gap-3 w-full px-4 py-3 text-sm text-red-500 hover:bg-red-50 transition-colors"
@@ -2441,7 +2444,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                     <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
                                                     <path d="M4.93 4.93l14.14 14.14" stroke="currentColor" strokeWidth="2" />
                                                 </svg>
-                                                Bloquear
+                                                <span className="font-medium">Bloquear</span>
                                             </button>
                                             <div className="border-t border-gray-100" />
                                             <button
@@ -2451,7 +2454,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                                                     <path d="M3 3l18 18M11.05 4.05C5.5 4.56 1 9.4 1 15.22V17h2c0-4.43 3.06-8.14 7.18-9.14M17.77 6.23a10.1 10.1 0 0 1 4.23 8v1.74h-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                                                 </svg>
-                                                Denunciar
+                                                <span className="font-medium">Denunciar</span>
                                             </button>
                                             {userData?.isAdmin && (
                                                 <>
@@ -2461,7 +2464,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                             setMenuVisible(false);
                                                             socket?.emit('toggle_monetization', { roomId, disabled: !monetizationDisabled });
                                                         }}
-                                                        className="flex items-center gap-3 w-full px-4 py-3 text-sm text-purple-700 hover:bg-purple-50 transition-colors font-semibold"
+                                                        className="flex items-center gap-3 w-full px-4 py-3 text-sm text-purple-700 hover:bg-purple-50 transition-colors font-semibold whitespace-nowrap"
                                                     >
                                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                                             {monetizationDisabled ? (
@@ -3163,6 +3166,8 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     </div>
                 )}
 
+
+
                 {/* Sheet de Preview e Configuração da Mídia */}
                 {selectedFile && userData?.isProfessional && (
                     <MediaComposerSheet
@@ -3200,7 +3205,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                         className="fixed inset-0 z-20" 
                                         onClick={() => setAttachMenuVisible(false)} 
                                     />
-                                    <div className="absolute bottom-14 left-0 bg-white rounded-2xl shadow-xl border border-gray-100 w-48 overflow-hidden z-30 animate-in slide-in-from-bottom-2 duration-200">
+                                    <div className="absolute bottom-14 left-0 bg-white rounded-2xl shadow-xl border border-gray-100 w-52 overflow-hidden z-30 animate-in slide-in-from-bottom-2 duration-200">
                                         <button
                                             onClick={() => {
                                                 setAttachMenuVisible(false);
@@ -3273,7 +3278,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     )}
 
                     {audioRecordingStatus === 'idle' && (
-                        <div className="flex-1 flex items-end bg-gray-100 rounded-2xl px-4 py-2 min-h-[44px] max-h-[120px]">
+                        <div className="flex-1 min-w-0 flex flex-col justify-center bg-gray-100 rounded-2xl px-3.5 py-2 min-h-[44px] max-h-[140px] transition-all">
                             <textarea
                                 ref={inputRef}
                                 value={selectedFile ? "Mídia selecionada para envio..." : messageText}
@@ -3285,7 +3290,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                 placeholder="Digite sua mensagem..."
                                 rows={1}
                                 maxLength={500}
-                                className="flex-1 bg-transparent text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none leading-5 py-1 disabled:text-gray-400"
+                                className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none leading-5 py-0.5 disabled:text-gray-400"
                                 style={{ maxHeight: '96px' }}
                                 onInput={(e) => {
                                     const el = e.currentTarget;
@@ -3293,6 +3298,24 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                     el.style.height = Math.min(el.scrollHeight, 96) + 'px';
                                 }}
                             />
+                            {charCount > 0 && !userData?.isProfessional && receiver?.isProfessional && !monetizationDisabled && currentRate > 0 && (
+                                <div className="flex justify-end w-full pt-0.5 select-none animate-in fade-in duration-150">
+                                    <span
+                                        onClick={() => {
+                                            if ((balance / 100) < estimatedCostInReais) {
+                                                openRechargeModal('Seu saldo é insuficiente para enviar esta mensagem. Por favor, recarregue para continuar.');
+                                            }
+                                        }}
+                                        className={`text-[10px] font-normal select-none tracking-tight ${
+                                            (balance / 100) < estimatedCostInReais
+                                                ? 'text-amber-600 font-medium cursor-pointer hover:underline'
+                                                : 'text-gray-400'
+                                        }`}
+                                    >
+                                        R$ {estimatedCostInReais.toFixed(2).replace('.', ',')}
+                                    </span>
+                                </div>
+                            )}
                         </div>
                     )}
                     
@@ -3301,16 +3324,15 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
                                 if (selectedFile) {
-                                    // Fallback: só é alcançável durante a janela em que userData ainda
-                                    // está carregando (o MediaComposerSheet ainda não decidiu se o
-                                    // usuário é profissional), então envia com os padrões grátis/permanente.
                                     sendSelectedMedia(0, false, 60);
+                                } else if (charCount > 0 && !userData?.isProfessional && receiver?.isProfessional && !monetizationDisabled && currentRate > 0 && (balance / 100) < estimatedCostInReais) {
+                                    openRechargeModal('Seu saldo é insuficiente para enviar esta mensagem. Por favor, recarregue para continuar.');
                                 } else {
                                     handleSend();
                                 }
                             }}
                             disabled={(!messageText.trim() && !selectedFile) || !connected}
-                            className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shrink-0 ${
+                            className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shrink-0 select-none ${
                                 (messageText.trim() || selectedFile) && connected
                                     ? 'bg-purple-600 hover:bg-purple-700 shadow-sm text-white'
                                     : 'bg-gray-200 text-gray-400'
@@ -3322,7 +3344,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                 </svg>
                             ) : (
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="currentColor">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="currentColor shrink-0">
                                     <path d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                 </svg>
                             )}
@@ -3343,6 +3365,8 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                         />
                     )}
                 </div>
+
+
             </div>
 
             {giftModalVisible && (
