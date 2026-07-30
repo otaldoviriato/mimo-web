@@ -597,7 +597,7 @@ export function RechargeModal({
                                     {shouldShowInsufficientContext && (
                                         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3.5">
                                             <p className="text-xs font-semibold uppercase tracking-widest text-amber-800">Saldo insuficiente</p>
-                                            <p className="mt-1.5 text-sm leading-relaxed text-amber-900">
+                                            <p className="mt-1.5 text-xs leading-relaxed text-amber-800">
                                                 Para enviar esta mensagem, você precisa ter pelo menos{' '}
                                                 <strong className="font-bold">{formatCents(requiredAmountInCents ?? 0)}</strong>{' '}
                                                 na carteira. Seu saldo atual é{' '}
