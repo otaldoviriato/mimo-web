@@ -2529,18 +2529,17 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 <button
                     type="button"
                     onClick={() => openRechargeModal({ currentBalanceInCents: balance })}
-                    className="shrink-0 z-10 flex w-full items-center gap-3 border-b border-amber-200 bg-amber-50 px-5 py-3 text-left text-amber-950 transition-colors hover:bg-amber-100 active:bg-amber-100"
+                    className="shrink-0 z-10 flex w-full items-center gap-2.5 border-b border-amber-100 bg-amber-50/80 px-4 py-2 text-left text-amber-950 transition-colors hover:bg-amber-50 active:bg-amber-100"
                 >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700 ring-1 ring-amber-200">
-                        <AlertTriangle size={17} strokeWidth={2.3} />
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-100/80 text-amber-700 ring-1 ring-amber-200/70">
+                        <AlertTriangle size={13} strokeWidth={2.2} />
                     </span>
                     <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-bold leading-tight">Saldo baixo</span>
-                        <span className="block truncate text-xs font-medium leading-tight text-amber-800">
+                        <span className="block text-xs font-semibold leading-4">Saldo baixo</span>
+                        <span className="block whitespace-normal text-[11px] font-medium leading-3.5 text-amber-800">
                             Saldo atual: {formattedBalance}. Toque para recarregar.
                         </span>
                     </span>
-                    <span className="shrink-0 text-sm font-bold text-amber-900">{formattedBalance}</span>
                 </button>
             )}
 
