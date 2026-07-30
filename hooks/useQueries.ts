@@ -36,7 +36,26 @@ export const QueryKeys = {
     rooms: (userId: string) => ['rooms', userId] as const,
     balance: (userId: string) => ['balance', userId] as const,
     userById: (userId: string) => ['user', userId] as const,
+    chatPricing: ['settings', 'chat-pricing'] as const,
 } as const;
+
+export function useChatPricing() {
+    return useQuery({
+        queryKey: QueryKeys.chatPricing,
+        queryFn: async () => {
+            const response = await fetch('/api/settings/chat-pricing', { cache: 'no-store' });
+            if (!response.ok) throw new Error('Falha ao buscar precificacao do chat');
+            return response.json() as Promise<{
+                defaultPricePerCharSubscribers: number;
+                defaultPricePerCharNonSubscribers: number;
+                audioPriceMultiplier: number;
+            }>;
+        },
+        staleTime: 5 * 1000,
+        refetchInterval: 15 * 1000,
+        refetchOnWindowFocus: true,
+    });
+}
 
 export function useMyProfile() {
     const { user: clerkUser } = useUser();

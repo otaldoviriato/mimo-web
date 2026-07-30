@@ -7,7 +7,7 @@ import { useUser } from '@clerk/nextjs';
 import { useQueryClient } from '@tanstack/react-query';
 import { Avatar } from '@/components/Avatar';
 import { useSocket } from '@/hooks/useSocket';
-import { useUserById, useMyProfile, QueryKeys } from '@/hooks/useQueries';
+import { useChatPricing, useUserById, useMyProfile, QueryKeys } from '@/hooks/useQueries';
 import { usePayment } from '@/context/PaymentContext';
 import { Drawer } from 'vaul';
 import { AudioRecorder } from '@/components/AudioRecorder';
@@ -620,6 +620,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
     const { data: userData } = useMyProfile();
     const { data: receiver } = useUserById(otherUserId);
+    const { data: chatPricing } = useChatPricing();
     const balance = userData?.balance ?? 0;
     const formattedBalance = (balance / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     const cachedRoom = user?.id
@@ -2250,21 +2251,17 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const charCount = messageText.trim().length;
     const isSubscriber = receiver?.subscribers?.includes(user?.id ?? '');
     const currentRate = (receiver?.isProfessional && !monetizationDisabled)
-        ? (isSubscriber 
-            ? (receiver.chargePerCharSubscribers ?? 0.002) 
-            : (receiver.chargePerCharNonSubscribers ?? 0.005))
+        ? (isSubscriber
+            ? (chatPricing?.defaultPricePerCharSubscribers ?? 0)
+            : (chatPricing?.defaultPricePerCharNonSubscribers ?? 0))
         : 0;
     let estimatedCostInCents = 0;
-    let estimatedCostInReais = 0;
     if (charCount > 0 && receiver?.isProfessional && !monetizationDisabled) {
-        const costPerCharInCents = currentRate * 100;
-        const rawCostInCents = charCount * costPerCharInCents;
-        estimatedCostInCents = Math.max(1, Math.ceil(rawCostInCents));
-        estimatedCostInReais = estimatedCostInCents / 100;
+        estimatedCostInCents = Math.max(1, Math.ceil(charCount * currentRate * 100));
     }
 
     // Preço do áudio: preço por caractere x multiplicador configurável, por segundo.
-    const audioPriceMultiplier = receiver?.audioPriceMultiplier ?? 5;
+    const audioPriceMultiplier = chatPricing?.audioPriceMultiplier ?? 5;
     const audioCostPerSecondInCents = currentRate > 0 ? (currentRate * 100 * audioPriceMultiplier) : 0;
     // Quantos segundos de áudio o saldo atual do cliente consegue pagar (undefined = sem limite, mensagem gratuita).
     const maxAudioDurationSeconds = audioCostPerSecondInCents > 0
@@ -3308,7 +3305,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                 <div className="flex justify-end w-full pt-0.5 select-none animate-in fade-in duration-150">
                                     <span
                                         onClick={() => {
-                                            if ((balance / 100) < estimatedCostInReais) {
+                                            if (balance < estimatedCostInCents) {
                                                 openRechargeModal({
                                                     currentBalanceInCents: balance,
                                                     requiredAmountInCents: estimatedCostInCents,
@@ -3317,7 +3314,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                         }}
                                         className="text-[10px] font-normal select-none tracking-tight text-gray-400"
                                     >
-                                        R$ {estimatedCostInReais.toFixed(2).replace('.', ',')}
+                                        R$ {(estimatedCostInCents / 100).toFixed(2).replace('.', ',')}
                                     </span>
                                 </div>
                             )}
@@ -3330,7 +3327,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                             onClick={() => {
                                 if (selectedFile) {
                                     sendSelectedMedia(0, false, 60);
-                                } else if (charCount > 0 && !userData?.isProfessional && receiver?.isProfessional && !monetizationDisabled && currentRate > 0 && (balance / 100) < estimatedCostInReais) {
+                                } else if (charCount > 0 && !userData?.isProfessional && receiver?.isProfessional && !monetizationDisabled && currentRate > 0 && balance < estimatedCostInCents) {
                                     openRechargeModal({
                                         currentBalanceInCents: balance,
                                         requiredAmountInCents: estimatedCostInCents,
