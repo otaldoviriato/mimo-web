@@ -14,6 +14,7 @@ export const CLERK_PUBLIC_ROUTES = [
 
 export const RESERVED_BASE_ROUTES = [
     ...CLERK_PUBLIC_ROUTES,
+    '/chat',
     '/chats',
     '/search',
     '/profile',
