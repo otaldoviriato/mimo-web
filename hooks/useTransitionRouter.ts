@@ -19,7 +19,15 @@ export function useTransitionRouter() {
 
     const push = (href: string) => {
         if (stackNav) {
-            // 1. Verifica se é rota de chat (/chat/userId)
+            // 1. Verifica se é rota de informações do chat (/chat/userId/info)
+            const chatInfoMatch = href.match(/^\/chat\/([^\/]+)\/info$/);
+            if (chatInfoMatch) {
+                const userId = chatInfoMatch[1];
+                stackNav.pushVirtual('chatInfo', { userId });
+                return;
+            }
+
+            // 2. Verifica se é rota de chat (/chat/userId)
             const chatMatch = href.match(/^\/chat\/([^\/]+)$/);
             if (chatMatch) {
                 const userId = chatMatch[1];

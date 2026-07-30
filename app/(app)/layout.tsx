@@ -13,6 +13,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useSocket } from '@/hooks/useSocket';
 import { usePageTitleNotifications } from '@/hooks/usePageTitleNotifications';
 import ChatPage from './chat/[userId]/page';
+import ChatInfoPage from './chat/[userId]/info/page';
 import UserProfilePage from './[username]/page';
 import SettingsPage from './settings/page';
 
@@ -646,6 +647,11 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                                 isSubPage={true}
                                 isClosing={isClosing}
                                 onBack={popVirtual}
+                            />
+                        )}
+                        {screen.type === 'chatInfo' && (
+                            <ChatInfoPage
+                                params={Promise.resolve({ userId: screen.params.userId })}
                             />
                         )}
                         {screen.type === 'profile' && (

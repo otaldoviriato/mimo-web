@@ -43,19 +43,29 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [historicalMedia, setHistoricalMedia] = useState<any[]>([]);
 
+    const targetClerkId = receiver?.clerkId || receiver?._id || receiver?.id || otherUserId;
+
     // Carrega mensagens e mídias da conversa
     useEffect(() => {
-        if (typeof window !== 'undefined' && user?.id && otherUserId) {
-            const currentRoomId = [user.id, otherUserId].sort().join('_');
-            const cached = localStorage.getItem(`mimo_messages_${currentRoomId}`);
-            if (cached) {
-                try {
-                    const parsed = JSON.parse(cached);
-                    if (Array.isArray(parsed)) {
-                        setMessages(parsed);
+        if (typeof window !== 'undefined' && user?.id && targetClerkId) {
+            const currentRoomId = [user.id, targetClerkId].sort().join('_');
+            const keysToTry = [
+                `mimo_messages_${currentRoomId}`,
+                `mimo_messages_${[user.id, otherUserId].sort().join('_')}`
+            ];
+
+            for (const key of keysToTry) {
+                const cached = localStorage.getItem(key);
+                if (cached) {
+                    try {
+                        const parsed = JSON.parse(cached);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            setMessages(parsed);
+                            break;
+                        }
+                    } catch (e) {
+                        console.error('Erro ao ler mensagens do cache:', e);
                     }
-                } catch (e) {
-                    console.error('Erro ao ler mensagens do cache:', e);
                 }
             }
 
@@ -65,9 +75,11 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
                         setHistoricalMedia(res.data);
                     }
                 })
-                .catch(err => console.error('Erro ao buscar mídias:', err));
+                .catch(() => {
+                    // Ignora 401 silenciosamente, as mídias locais das mensagens do cache serão exibidas normalmente
+                });
         }
-    }, [user?.id, otherUserId]);
+    }, [user?.id, otherUserId, targetClerkId]);
 
     // Estado para exibição em modal da mídia selecionada
     const [selectedMedia, setSelectedMedia] = useState<{ url: string; isVideo?: boolean } | null>(null);

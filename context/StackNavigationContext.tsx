@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 
 export interface StackScreen {
-    type: 'chat' | 'profile' | 'settings';
+    type: 'chat' | 'profile' | 'settings' | 'chatInfo';
     key: string;
     params: any;
     isClosing?: boolean;
@@ -11,7 +11,7 @@ export interface StackScreen {
 
 interface StackNavigationContextType {
     screens: StackScreen[];
-    pushVirtual: (type: 'chat' | 'profile' | 'settings', params: any) => void;
+    pushVirtual: (type: 'chat' | 'profile' | 'settings' | 'chatInfo', params: any) => void;
     popVirtual: () => void;
     isVirtualActive: boolean;
 }
@@ -21,7 +21,7 @@ const StackNavigationContext = createContext<StackNavigationContextType | undefi
 function isSameVirtualScreen(screen: StackScreen | undefined, type: StackScreen['type'], params: any) {
     if (!screen || screen.type !== type) return false;
 
-    if (type === 'chat') {
+    if (type === 'chat' || type === 'chatInfo') {
         return screen.params?.userId === params?.userId;
     }
 
@@ -43,7 +43,7 @@ export function StackNavigationProvider({ children }: { children: React.ReactNod
 
     const isManualPopRef = useRef(false);
 
-    const pushVirtual = useCallback((type: 'chat' | 'profile' | 'settings', params: any) => {
+    const pushVirtual = useCallback((type: 'chat' | 'profile' | 'settings' | 'chatInfo', params: any) => {
         const currentScreens = screensRef.current;
         const topScreen = currentScreens[currentScreens.length - 1];
 
@@ -58,6 +58,8 @@ export function StackNavigationProvider({ children }: { children: React.ReactNod
         let url = '';
         if (type === 'chat') {
             url = `/chat/${params.userId}`;
+        } else if (type === 'chatInfo') {
+            url = `/chat/${params.userId}/info`;
         } else if (type === 'profile') {
             url = `/${params.username}`;
         } else if (type === 'settings') {
