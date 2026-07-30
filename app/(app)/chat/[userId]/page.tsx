@@ -2275,6 +2275,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         receiver?.isProfessional &&
         !monetizationDisabled &&
         lowBalanceThresholdInCents > 0 &&
+        balance > 0 &&
         balance <= lowBalanceThresholdInCents;
 
     useEffect(() => {
