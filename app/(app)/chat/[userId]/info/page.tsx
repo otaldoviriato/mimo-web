@@ -31,23 +31,36 @@ interface Message {
     isExpired?: boolean;
 }
 
-interface ChatInfoPageProps {
-    params: Promise<{ userId: string }>;
+interface MediaItem {
+    id?: string;
+    url: string;
+    thumbnailUrl?: string;
+    isVideo?: boolean;
+    messageId?: string;
+    isTemporary?: boolean;
+    expiresAt?: string | Date;
 }
 
-export default function ChatInfoPage({ params }: ChatInfoPageProps) {
-    const resolvedParams = use(params);
-    const otherUserId = resolvedParams.userId;
+interface ChatInfoPageProps {
+    params?: Promise<{ userId: string }>;
+    userId?: string;
+}
+
+export default function ChatInfoPage({ params, userId: propUserId }: ChatInfoPageProps) {
+    const resolvedParams = params ? use(params) : null;
+    const otherUserId = propUserId || resolvedParams?.userId || '';
+    const isRouteClerkId = isClerkUserId(otherUserId);
     const router = useTransitionRouter();
     const { user } = useUser();
-    const { data: receiverById } = useUserById(otherUserId);
-    const { data: receiverByUsername } = useUserByUsername(otherUserId);
-    const receiver = receiverByUsername || receiverById;
+    const { data: receiverById, isLoading: loadingReceiverById } = useUserById(isRouteClerkId ? otherUserId : undefined);
+    const { data: receiverByUsername, isLoading: loadingReceiverByUsername } = useUserByUsername(isRouteClerkId ? undefined : otherUserId);
+    const receiver = receiverById || receiverByUsername;
 
     const [messages, setMessages] = useState<Message[]>([]);
-    const [historicalMedia, setHistoricalMedia] = useState<any[]>([]);
+    const [historicalMedia, setHistoricalMedia] = useState<MediaItem[]>([]);
 
     const targetClerkId = receiver?.clerkId || (isClerkUserId(otherUserId) ? otherUserId : null);
+    const isResolvingReceiver = isRouteClerkId ? loadingReceiverById : loadingReceiverByUsername;
 
     // Carrega mensagens e mídias da conversa
     useEffect(() => {
@@ -147,6 +160,53 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
 
     const giftsExchanged = messages.filter(m => m.isGift);
     const totalGiftsCount = giftsExchanged.length;
+
+    if (!receiver && isResolvingReceiver) {
+        return (
+            <div className="min-h-screen bg-slate-50 text-slate-900">
+                <div className="sticky top-0 z-30 bg-purple-600 text-white px-4 py-3.5 flex items-center gap-3 shadow-md">
+                    <button
+                        onClick={() => router.back()}
+                        className="p-1.5 hover:bg-white/10 rounded-full transition-colors active:scale-95"
+                        aria-label="Voltar"
+                    >
+                        <ArrowLeft className="w-6 h-6" />
+                    </button>
+                    <h1 className="text-lg font-bold tracking-tight">Informações da Conversa</h1>
+                </div>
+                <div className="max-w-xl mx-auto px-4 pt-6">
+                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col items-center">
+                        <div className="w-24 h-24 rounded-full bg-slate-100 animate-pulse mb-4" />
+                        <div className="h-5 w-40 rounded-lg bg-slate-100 animate-pulse mb-2" />
+                        <div className="h-4 w-24 rounded-lg bg-slate-100 animate-pulse" />
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!receiver && !isResolvingReceiver) {
+        return (
+            <div className="min-h-screen bg-slate-50 text-slate-900">
+                <div className="sticky top-0 z-30 bg-purple-600 text-white px-4 py-3.5 flex items-center gap-3 shadow-md">
+                    <button
+                        onClick={() => router.back()}
+                        className="p-1.5 hover:bg-white/10 rounded-full transition-colors active:scale-95"
+                        aria-label="Voltar"
+                    >
+                        <ArrowLeft className="w-6 h-6" />
+                    </button>
+                    <h1 className="text-lg font-bold tracking-tight">Informações da Conversa</h1>
+                </div>
+                <div className="max-w-xl mx-auto px-4 pt-6">
+                    <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 text-center">
+                        <p className="text-sm font-bold text-slate-700 mb-1">Perfil não encontrado</p>
+                        <p className="text-xs text-slate-400">Não foi possível carregar as informações dessa conversa.</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 pb-12">

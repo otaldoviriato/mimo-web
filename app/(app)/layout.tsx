@@ -651,7 +651,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                         )}
                         {screen.type === 'chatInfo' && (
                             <ChatInfoPage
-                                params={Promise.resolve({ userId: screen.params.userId })}
+                                userId={screen.params.userId}
                             />
                         )}
                         {screen.type === 'profile' && (
