@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useMyProfile } from '@/hooks/useQueries';
+import { useChatRooms, useMyProfile } from '@/hooks/useQueries';
 import { BalanceDisplay } from '@/components/BalanceDisplay';
 import { Avatar } from '@/components/Avatar';
 import { useUser } from '@clerk/nextjs';
@@ -17,10 +17,12 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
     const pathname = usePathname();
     const router = useRouter();
     const { data: userData } = useMyProfile();
+    const { data: rooms = [] } = useChatRooms();
     const { user } = useUser();
     const balance = userData?.balance ?? 0;
 
     const isProfessional = !!userData?.isProfessional;
+    const shouldShowProfileStartIndicator = isProfessional && rooms.length === 0;
 
     const currentTabLabel = 
         pathname === '/wallet' ? 'Carteira' :
@@ -108,8 +110,11 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                                         : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                                     }`}
                             >
-                                <span className={isActive ? 'text-purple-600' : 'text-gray-400'}>
+                                <span className={`relative ${isActive ? 'text-purple-600' : 'text-gray-400'}`}>
                                     {tab.icon(isActive)}
+                                    {tab.href === '/profile' && shouldShowProfileStartIndicator && (
+                                        <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-purple-600 ring-2 ring-white" />
+                                    )}
                                 </span>
                                 {tab.label}
                             </Link>
@@ -232,7 +237,12 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                             className={`flex-1 h-full flex flex-col items-center justify-center gap-1 px-2 text-[11px] font-semibold transition-colors pt-2 pb-[calc(6px+env(safe-area-inset-bottom))]
                                 ${isActive ? 'text-purple-600' : 'text-gray-400'}`}
                         >
-                            {tab.icon(isActive)}
+                            <span className="relative">
+                                {tab.icon(isActive)}
+                                {tab.href === '/profile' && shouldShowProfileStartIndicator && (
+                                    <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-purple-600 ring-2 ring-white" />
+                                )}
+                            </span>
                             {tab.label}
                         </Link>
                     );

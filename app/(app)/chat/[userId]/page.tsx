@@ -620,7 +620,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
     const { data: userData } = useMyProfile();
     const { data: receiver } = useUserById(otherUserId);
-    const { data: chatPricing } = useChatPricing();
+    const { data: chatPricing } = useChatPricing(receiver?.isProfessional ? receiver.clerkId : undefined);
     const balance = userData?.balance ?? 0;
     const formattedBalance = (balance / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     const cachedRoom = user?.id
@@ -2249,7 +2249,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     };
 
     const charCount = messageText.trim().length;
-    const isSubscriber = receiver?.subscribers?.includes(user?.id ?? '');
+    const isSubscriber = chatPricing?.isSubscriber ?? false;
     const currentRate = (receiver?.isProfessional && !monetizationDisabled)
         ? (isSubscriber
             ? (chatPricing?.defaultPricePerCharSubscribers ?? 0)
