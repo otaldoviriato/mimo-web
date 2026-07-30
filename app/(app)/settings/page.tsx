@@ -7,7 +7,6 @@ import { useMyProfile, useUpdateProfile } from '@/hooks/useQueries';
 import { usePWA } from '@/context/PWAContext';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { formatCPF, formatPhone } from '@/components/RechargeModal';
-import { PricingGuideModal, PRICE_PER_CHAR_OPTIONS } from '@/components/PricingGuideModal';
 import Link from 'next/link';
 import { ShieldCheck, RefreshCw, AlertCircle, Lock, Pencil, ChevronRight } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -110,8 +109,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const [subscriptionPrice, setSubscriptionPrice] = useState('');
     const [isSubscriptionEnabled, setIsSubscriptionEnabled] = useState(false);
     const [bio, setBio] = useState('');
-    const [chargePerCharSubscribers, setChargePerCharSubscribers] = useState('');
-    const [chargePerCharNonSubscribers, setChargePerCharNonSubscribers] = useState('');
     const [hideFromExplore, setHideFromExplore] = useState(false);
     const [subscriberDiscountPercentage, setSubscriberDiscountPercentage] = useState('20');
     
@@ -121,9 +118,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const [loadingSubscription, setLoadingSubscription] = useState(false);
     const [saveSubscriptionError, setSaveSubscriptionError] = useState('');
     const [saveSubscriptionSuccess, setSaveSubscriptionSuccess] = useState(false);
-    const [loadingPricing, setLoadingPricing] = useState(false);
-    const [savePricingError, setSavePricingError] = useState('');
-    const [savePricingSuccess, setSavePricingSuccess] = useState(false);
     const [isAboutExpanded, setIsAboutExpanded] = useState(false);
     const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(true);
     const [savingEmailPref, setSavingEmailPref] = useState(false);
@@ -133,7 +127,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const [accountAction, setAccountAction] = useState<'suspend' | 'delete' | null>(null);
     const [accountActionLoading, setAccountActionLoading] = useState(false);
     const [accountActionError, setAccountActionError] = useState('');
-    const [showPricingGuideModal, setShowPricingGuideModal] = useState(false);
 
     const [birthDate, setBirthDate] = useState('');
     const [state, setState] = useState('');
@@ -164,8 +157,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             setBio(userData.bio || '');
             setEmailNotificationsEnabled(userData.emailNotificationsEnabled ?? true);
             setNewUserNotificationsEnabled(userData.newUserNotificationsEnabled ?? false);
-            setChargePerCharSubscribers(userData.chargePerCharSubscribers?.toString() ?? '0.002');
-            setChargePerCharNonSubscribers(userData.chargePerCharNonSubscribers?.toString() ?? '0.005');
             setSubscriberDiscountPercentage((userData.subscriberDiscountPercentage ?? 20).toString());
             setHideFromExplore(userData.hideFromExplore === true);
             setBirthDate(userData.birthDate ? new Date(userData.birthDate).toISOString().split('T')[0] : '');
@@ -211,13 +202,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
 
         fetchCities();
     }, [state]);
-
-    useEffect(() => {
-        const discount = Number(subscriberDiscountPercentage) || 20;
-        const nonSubPrice = Number(chargePerCharNonSubscribers) || 0;
-        const subPrice = parseFloat((nonSubPrice * (1 - discount / 100)).toFixed(4));
-        setChargePerCharSubscribers(subPrice.toString());
-    }, [subscriberDiscountPercentage, chargePerCharNonSubscribers]);
 
     const handleSaveAll = async () => {
         if (usernameStatus === 'checking') {
@@ -295,20 +279,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                     setLoading(false);
                     return;
                 }
-                const limitMaxPrice = userData?.maxPricePerChar ?? 0.2;
-                const charPrice = Number(chargePerCharNonSubscribers) || 0;
-                if (charPrice > limitMaxPrice) {
-                    setSaveError(`O preço máximo por caractere é R$ ${limitMaxPrice.toFixed(2)}`);
-                    setLoading(false);
-                    return;
-                }
-
-                updateData.isSubscriptionEnabled = isSubscriptionEnabled;
-                updateData.subscriptionPrice = price;
-                updateData.subscriberDiscountPercentage = discount;
                 updateData.bio = bio;
-                updateData.chargePerCharNonSubscribers = charPrice;
-                updateData.chargePerCharSubscribers = Number(chargePerCharSubscribers) || 0;
             } else {
                 updateData.bio = '';
             }
@@ -365,8 +336,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             const updateData: any = {
                 isSubscriptionEnabled,
                 subscriptionPrice: price,
-                subscriberDiscountPercentage: discount,
-                chargePerCharSubscribers: Number(chargePerCharSubscribers) || 0
+                subscriberDiscountPercentage: discount
             };
 
             await updateProfileMutation.mutateAsync(updateData);
@@ -378,42 +348,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             setLoadingSubscription(false);
         }
     };
-
-    const handleSavePricing = async () => {
-        setLoadingPricing(true);
-        setSavePricingError('');
-        setSavePricingSuccess(false);
-
-        try {
-            const limitMaxPrice = userData?.maxPricePerChar ?? 0.2;
-            const charPrice = Number(chargePerCharNonSubscribers) || 0;
-
-            if (charPrice < 0) {
-                setSavePricingError('O preço por caractere não pode ser negativo');
-                setLoadingPricing(false);
-                return;
-            }
-            if (charPrice > limitMaxPrice) {
-                setSavePricingError(`O preço máximo por caractere é R$ ${limitMaxPrice.toFixed(2)}`);
-                setLoadingPricing(false);
-                return;
-            }
-
-            const updateData: any = {
-                chargePerCharNonSubscribers: charPrice,
-                chargePerCharSubscribers: Number(chargePerCharSubscribers) || 0
-            };
-
-            await updateProfileMutation.mutateAsync(updateData);
-            setSavePricingSuccess(true);
-            setTimeout(() => setSavePricingSuccess(false), 3000);
-        } catch (error: any) {
-            setSavePricingError('Erro ao salvar preço por caractere');
-        } finally {
-            setLoadingPricing(false);
-        }
-    };
-
     const handleLogout = async () => {
         if (confirm('Tem certeza que deseja sair da sua conta?')) {
             clearMimoClientSession(queryClient);
@@ -450,13 +384,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
         } finally {
             setAccountActionLoading(false);
         }
-    };
-
-
-    const handleSelectPricePerChar = (option: number) => {
-        const discountFactor = 1 - (Number(subscriberDiscountPercentage) || 20) / 100;
-        setChargePerCharNonSubscribers(option.toString());
-        setChargePerCharSubscribers(parseFloat((option * discountFactor).toFixed(4)).toString());
     };
 
     const initialUsername = userData?.username || '';
@@ -508,7 +435,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
 
     const initialSubscriptionPrice = userData?.subscriptionPrice ?? 0;
     const initialIsSubscriptionEnabled = userData?.isSubscriptionEnabled ?? false;
-    const initialChargePerCharNonSubscribers = userData?.chargePerCharNonSubscribers?.toString() ?? '0.005';
     const initialDiscount = userData?.subscriberDiscountPercentage ?? 20;
 
     const currentSubscriptionPriceClean = Number(subscriptionPrice.replace(/\D/g, '')) / 100;
@@ -519,12 +445,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             currentSubscriptionPriceClean !== initialSubscriptionPrice ||
             isSubscriptionEnabled !== initialIsSubscriptionEnabled ||
             currentDiscount !== initialDiscount
-        );
-
-    
-    const hasPricingChanges =
-        profileIsProfessional && (
-            chargePerCharNonSubscribers !== initialChargePerCharNonSubscribers
         );
 
     const layoutClass = isSubPage
@@ -788,154 +708,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                 </div>
                             </div>
                         )}
-
-                        {/* ── CARD 2: PRECIFICAÇÃO POR CARACTERE ── */}
-                        {profileIsProfessional && (
-                            <div>
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Precificação por Caractere</p>
-                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-50">
-                                    
-                                    {/* Preço por Caractere */}
-                                    <div className="px-4 py-3.5 bg-slate-50/20 border-t border-gray-50 flex flex-col gap-3">
-                                        <div>
-                                            <div className="flex items-center justify-between gap-2">
-                                                <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block">Preço por Caractere (Mensagens)</label>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowPricingGuideModal(true)}
-                                                    className="shrink-0 text-[10px] font-bold text-purple-600 hover:text-purple-700 transition-colors underline underline-offset-2 decoration-purple-200"
-                                                >
-                                                    Como saber quanto cobrar?
-                                                </button>
-                                            </div>
-                                            <p className="text-[9px] text-gray-400 leading-snug mt-0.5">
-                                                Escolha o preço base por caractere digitado no chat.
-                                                {isSubscriptionEnabled ? ` Assinantes têm ${Number(subscriberDiscountPercentage) || 20}% de desconto automaticamente.` : ' Habilite a assinatura para oferecer desconto aos assinantes.'}
-                                            </p>
-                                        </div>
-
-                                        <div className="grid grid-cols-4 gap-2 mt-1">
-                                            {PRICE_PER_CHAR_OPTIONS.map((option) => {
-                                                const limitMaxPrice = userData?.maxPricePerChar ?? 0.2;
-                                                const disabled = option > limitMaxPrice;
-                                                const active = Number(chargePerCharNonSubscribers) === option;
-                                                return (
-                                                    <button
-                                                        key={option}
-                                                        type="button"
-                                                        disabled={disabled}
-                                                        onClick={() => handleSelectPricePerChar(option)}
-                                                        className={`h-10 rounded-xl text-xs font-bold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
-                                                            active
-                                                                ? 'bg-purple-600 text-white shadow-sm ring-2 ring-purple-200'
-                                                                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                                                        }`}
-                                                    >
-                                                        R$ {option.toFixed(2).replace('.', ',')}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-
-                                        {/* Detalhes de cálculo dinâmico */}
-                                        <div className="grid grid-cols-2 gap-2 bg-purple-50/40 rounded-xl p-2.5 border border-purple-50 text-[10px] mt-0.5">
-                                            <div className="flex flex-col gap-0.5">
-                                                <span className="font-semibold text-gray-400 uppercase tracking-wider text-[8px]">Não Assinantes</span>
-                                                <span className="font-bold text-gray-800">
-                                                    {Number(chargePerCharNonSubscribers).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4 })}
-                                                </span>
-                                                <span className="text-[8.5px] text-gray-500 font-medium">
-                                                    100 chars = {((Number(chargePerCharNonSubscribers) || 0) * 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })}
-                                                </span>
-                                            </div>
-                                            
-                                            <div className={`flex flex-col gap-0.5 border-l border-purple-100/50 pl-2.5 ${!isSubscriptionEnabled ? 'opacity-40' : ''}`}>
-                                                <span className="font-semibold text-purple-600 uppercase tracking-wider text-[8px] flex items-center gap-0.5">
-                                                    Assinantes
-                                                    <span className="bg-purple-100 text-purple-700 text-[7px] font-extrabold px-1 rounded">-{Number(subscriberDiscountPercentage) || 20}%</span>
-                                                </span>
-                                                <span className="font-bold text-purple-700">
-                                                    {(Number(chargePerCharNonSubscribers) * (1 - (Number(subscriberDiscountPercentage) || 20) / 100)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4 })}
-                                                </span>
-                                                <span className="text-[8.5px] text-purple-500 font-medium">
-                                                    100 chars = {((Number(chargePerCharNonSubscribers) || 0) * (1 - (Number(subscriberDiscountPercentage) || 20) / 100) * 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })}
-                                                </span>
-                                                {!isSubscriptionEnabled && (
-                                                    <span className="text-[7.5px] text-gray-400 font-medium mt-0.5 italic block">
-                                                        Inativo (Sem assinatura ativa)
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* Preço do Áudio (derivado do preço por caractere) */}
-                                        <div className="bg-purple-50/40 rounded-xl p-2.5 border border-purple-50 text-[10px]">
-                                            <span className="font-semibold text-gray-400 uppercase tracking-wider text-[8px] block mb-1">
-                                                Preço do Áudio (por segundo)
-                                            </span>
-                                            <p className="text-[9px] text-gray-400 leading-snug mb-1.5">
-                                                Calculado automaticamente como o preço por caractere × {userData?.audioPriceMultiplier ?? 5}.
-                                            </p>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <div className="flex flex-col gap-0.5">
-                                                    <span className="font-semibold text-gray-400 uppercase tracking-wider text-[8px]">Não Assinantes</span>
-                                                    <span className="font-bold text-gray-800">
-                                                        {((Number(chargePerCharNonSubscribers) || 0) * (userData?.audioPriceMultiplier ?? 5)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4 })} / seg
-                                                    </span>
-                                                </div>
-                                                <div className={`flex flex-col gap-0.5 border-l border-purple-100/50 pl-2.5 ${!isSubscriptionEnabled ? 'opacity-40' : ''}`}>
-                                                    <span className="font-semibold text-purple-600 uppercase tracking-wider text-[8px]">Assinantes</span>
-                                                    <span className="font-bold text-purple-700">
-                                                        {((Number(chargePerCharNonSubscribers) || 0) * (1 - (Number(subscriberDiscountPercentage) || 20) / 100) * (userData?.audioPriceMultiplier ?? 5)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4 })} / seg
-                                                    </span>
-                                                    {!isSubscriptionEnabled && (
-                                                        <span className="text-[7.5px] text-gray-400 font-medium mt-0.5 italic block">
-                                                            Inativo
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        
-                                    </div>
-
-                                    {/* Botão Salvar Preço por Caractere */}
-                                    {(hasPricingChanges || loadingPricing || savePricingSuccess || savePricingError) && (
-                                        <div className="px-4 pb-5 pt-3.5 flex flex-col gap-2 bg-white">
-                                            {savePricingError && (
-                                                <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-100 rounded-xl">
-                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                                                    <p className="text-xs text-red-600 font-medium">{savePricingError}</p>
-                                                </div>
-                                            )}
-                                            {savePricingSuccess && (
-                                                <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-100 rounded-xl">
-                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-600 shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
-                                                    <p className="text-xs text-green-700 font-medium">Preço por caractere atualizado com sucesso</p>
-                                                </div>
-                                            )}
-                                            {(hasPricingChanges || loadingPricing) && (
-                                                <button
-                                                    onClick={handleSavePricing}
-                                                    disabled={loadingPricing || !hasPricingChanges}
-                                                    className="w-full h-10 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors active:scale-[0.98] flex items-center justify-center gap-2"
-                                                >
-                                                    {loadingPricing ? (
-                                                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                                                    ) : (
-                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                                                    )}
-                                                    Salvar Preço por Caractere
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* ── SEÇÃO: NOTIFICAÇÕES ── */}
+                        {/* SEÇÃO: NOTIFICAÇÕES ── */}
                         <div>
                             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Notificações</p>
                             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col divide-y divide-gray-50">
@@ -1336,13 +1109,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                     </div>
                 </div>
             )}
-            <PricingGuideModal
-                visible={showPricingGuideModal}
-                onClose={() => setShowPricingGuideModal(false)}
-                selectedRate={Number(chargePerCharNonSubscribers) || PRICE_PER_CHAR_OPTIONS[0]}
-                maxPricePerChar={userData?.maxPricePerChar ?? 0.2}
-                onApply={handleSelectPricePerChar}
-            />
         </div>
     );
 }

@@ -115,15 +115,11 @@ export function SettingsTab({
                     <SettingsSectionCard title="Precificação & Assinaturas" icon={<Coins size={16} />} storageKey="pricing">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                             <div className="space-y-2">
-                                <label className={labelCls}>Preço Máximo por Caractere (R$)</label>
-                                <input type="number" step="0.001" value={maxPricePerChar} onChange={(e) => setMaxPricePerChar(Number(e.target.value))} min={0} className={inputCls} />
-                            </div>
-                            <div className="space-y-2">
-                                <label className={labelCls}>Preço Padrão por Char (Não-Assinantes) (R$)</label>
+                                <label className={labelCls}>Preco da Plataforma por Char (Nao-Assinantes) (R$)</label>
                                 <input type="number" step="0.0001" value={defaultPricePerCharNonSubscribers} onChange={(e) => setDefaultPricePerCharNonSubscribers(Number(e.target.value))} min={0} className={inputCls} />
                             </div>
                             <div className="space-y-2">
-                                <label className={labelCls}>Preço Padrão por Char (Assinantes) (R$)</label>
+                                <label className={labelCls}>Preco da Plataforma por Char (Assinantes) (R$)</label>
                                 <input type="number" step="0.0001" value={defaultPricePerCharSubscribers} onChange={(e) => setDefaultPricePerCharSubscribers(Number(e.target.value))} min={0} className={inputCls} />
                             </div>
                             <div className="space-y-2">

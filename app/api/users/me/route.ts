@@ -412,8 +412,8 @@ export async function GET(request: NextRequest) {
                 identityStatus: user.identityStatus || null,
                 subscriptionPrice: user.subscriptionPrice || 0,
                 isSubscriptionEnabled: user.isSubscriptionEnabled ?? false,
-                chargePerCharSubscribers: user.chargePerCharSubscribers ?? (settings?.defaultPricePerCharSubscribers ?? 0.002),
-                chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? (settings?.defaultPricePerCharNonSubscribers ?? 0.005),
+                chargePerCharSubscribers: settings?.defaultPricePerCharSubscribers ?? 0.002,
+                chargePerCharNonSubscribers: settings?.defaultPricePerCharNonSubscribers ?? 0.005,
                 subscribers: activeSubscriberIds,
                 pixKey: user.taxId || user.pixKey,
                 savedCards: (user.savedCards || []).map((card: ICard) => ({
@@ -468,7 +468,7 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, subscriptionPrice, isSubscriptionEnabled, chargePerCharSubscribers, chargePerCharNonSubscribers, bio, emailNotificationsEnabled, newUserNotificationsEnabled, hideFromExplore, subscriberDiscountPercentage, birthDate, city, state } = body;
+        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, subscriptionPrice, isSubscriptionEnabled, bio, emailNotificationsEnabled, newUserNotificationsEnabled, hideFromExplore, subscriberDiscountPercentage, birthDate, city, state } = body;
 
         await connectToDatabase();
 
@@ -479,8 +479,6 @@ export async function PATCH(request: NextRequest) {
         const globalSubscriberDiscountPercentage = settings?.subscriberDiscountPercentage ?? 20;
 
         const currentUser = await User.findOne({ clerkId: userId });
-        const oldPriceNonSub = currentUser?.chargePerCharNonSubscribers ?? (settings?.defaultPricePerCharNonSubscribers ?? 0.005);
-        const oldPriceSub = currentUser?.chargePerCharSubscribers ?? (settings?.defaultPricePerCharSubscribers ?? 0.002);
 
         // Valida mudança de isProfessional (mesma lógica que era do chargeMode)
         if (isProfessional !== undefined && currentUser && isProfessional !== currentUser.isProfessional) {
@@ -566,30 +564,6 @@ export async function PATCH(request: NextRequest) {
             }
             updateData.subscriberDiscountPercentage = discountNum;
         }
-
-        if (chargePerCharNonSubscribers !== undefined) {
-            if (chargePerCharNonSubscribers < 0) return NextResponse.json({ error: 'Charge per char cannot be negative' }, { status: 400 });
-            if (chargePerCharNonSubscribers > maxPricePerChar) {
-                return NextResponse.json({ error: `O preço por caractere não pode ser maior que R$ ${maxPricePerChar}` }, { status: 400 });
-            }
-            updateData.chargePerCharNonSubscribers = chargePerCharNonSubscribers;
-        }
-
-        if (chargePerCharNonSubscribers !== undefined || subscriberDiscountPercentage !== undefined) {
-            const currentDiscount = subscriberDiscountPercentage !== undefined 
-                ? Number(subscriberDiscountPercentage) 
-                : (currentUser?.subscriberDiscountPercentage ?? globalSubscriberDiscountPercentage);
-                
-            const currentNonSubPrice = chargePerCharNonSubscribers !== undefined 
-                ? Number(chargePerCharNonSubscribers) 
-                : (currentUser?.chargePerCharNonSubscribers ?? 0.005);
-                
-            updateData.chargePerCharSubscribers = Number((currentNonSubPrice * (1 - currentDiscount / 100)).toFixed(4));
-        } else if (chargePerCharSubscribers !== undefined) {
-            if (chargePerCharSubscribers < 0) return NextResponse.json({ error: 'Charge per char cannot be negative' }, { status: 400 });
-            updateData.chargePerCharSubscribers = chargePerCharSubscribers;
-        }
-
         const isProf = isProfessional !== undefined ? isProfessional : (currentUser?.isProfessional ?? false);
 
         if (bio !== undefined) {
@@ -667,42 +641,6 @@ export async function PATCH(request: NextRequest) {
             { returnDocument: 'after', runValidators: true, upsert: true }
         );
 
-        // Verificar se os preços por caractere foram alterados para notificar o servidor de chat
-        const newPriceNonSub = user.chargePerCharNonSubscribers;
-        const newPriceSub = user.chargePerCharSubscribers;
-
-        const priceChanged = 
-            (chargePerCharNonSubscribers !== undefined && Number(chargePerCharNonSubscribers) !== oldPriceNonSub) ||
-            (user.chargePerCharSubscribers !== oldPriceSub);
-
-        if (priceChanged) {
-            try {
-                const chatServerUrl = process.env.NEXT_PUBLIC_CHAT_SERVER_URL || 'http://localhost:3001';
-                fetch(`${chatServerUrl}/api/internal/notify-price-change`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        professionalId: userId,
-                        oldPriceNonSub,
-                        newPriceNonSub,
-                        oldPriceSub,
-                        newPriceSub,
-                    }),
-                }).then(async (notifyResponse) => {
-                    if (!notifyResponse.ok) {
-                        const errText = await notifyResponse.text();
-                        console.error('[notify-price-change] Failed to notify chat server about price change:', errText);
-                    } else {
-                        console.log('[notify-price-change] Successfully notified chat server of price change.');
-                    }
-                }).catch(err => {
-                    console.error('[notify-price-change] Error calling chat server:', err);
-                });
-            } catch (err) {
-                console.error('[notify-price-change] Synchronous error preparing chat server call:', err);
-            }
-        }
-
         // Se isProfessional mudou, deleta todas as conversas do usuário e atualiza metadados
         if (isProfessionalChanging) {
             const rooms = await Room.find({ participants: userId }).select('_id').lean();
@@ -761,8 +699,8 @@ export async function PATCH(request: NextRequest) {
                 professionalStatus: user.professionalStatus,
                 subscriptionPrice: user.subscriptionPrice || 0,
                 isSubscriptionEnabled: user.isSubscriptionEnabled ?? false,
-                chargePerCharSubscribers: user.chargePerCharSubscribers ?? (settings?.defaultPricePerCharSubscribers ?? 0.002),
-                chargePerCharNonSubscribers: user.chargePerCharNonSubscribers ?? (settings?.defaultPricePerCharNonSubscribers ?? 0.005),
+                chargePerCharSubscribers: settings?.defaultPricePerCharSubscribers ?? 0.002,
+                chargePerCharNonSubscribers: settings?.defaultPricePerCharNonSubscribers ?? 0.005,
                 subscribers: updatedActiveSubscriberIds,
                 pixKey: user.taxId || user.pixKey,
                 savedCards: (user.savedCards || []).map((card: ICard) => ({

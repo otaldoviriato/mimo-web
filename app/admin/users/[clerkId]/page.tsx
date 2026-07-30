@@ -131,8 +131,6 @@ export default function UserDetailPage() {
     
     // Inputs adicionais de profissional
     const [subscriptionPrice, setSubscriptionPrice] = useState<number>(0);
-    const [chargeSub, setChargeSub] = useState<number>(0.002);
-    const [chargeNonSub, setChargeNonSub] = useState<number>(0.005);
     const [photoUrl, setPhotoUrl] = useState('');
     const [coverUrl, setCoverUrl] = useState('');
 
@@ -297,8 +295,6 @@ export default function UserDetailPage() {
                     setPhone(data.user.phone || '');
                     setPixKey(data.user.pixKey || '');
                     setSubscriptionPrice(data.user.subscriptionPrice || 0);
-                    setChargeSub(data.user.chargePerCharSubscribers !== undefined ? data.user.chargePerCharSubscribers : 0.002);
-                    setChargeNonSub(data.user.chargePerCharNonSubscribers !== undefined ? data.user.chargePerCharNonSubscribers : 0.005);
                     setPhotoUrl(data.user.photoUrl || '');
                     setCoverUrl(data.user.coverUrl || '');
 
@@ -341,8 +337,6 @@ export default function UserDetailPage() {
                     phone,
                     pixKey,
                     subscriptionPrice,
-                    chargePerCharSubscribers: chargeSub,
-                    chargePerCharNonSubscribers: chargeNonSub,
                     photoUrl,
                     coverUrl
                 })
@@ -690,30 +684,6 @@ export default function UserDetailPage() {
                                             />
                                         </div>
 
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Custo por Caractere (Assinantes)</label>
-                                            <input 
-                                                type="number" 
-                                                step="0.0001"
-                                                value={chargeSub}
-                                                onChange={(e) => setChargeSub(Number(e.target.value))}
-                                                className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700"
-                                            />
-                                        </div>
-
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Custo por Caractere (Não Assinantes)</label>
-                                            <input 
-                                                type="number" 
-                                                step="0.0001"
-                                                value={chargeNonSub}
-                                                onChange={(e) => setChargeNonSub(Number(e.target.value))}
-                                                className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700"
-                                            />
-                                        </div>
-
-                                        
-
                                         <div className="space-y-1 sm:col-span-2">
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">URL do Avatar (Foto do Perfil)</label>
                                             <input 
@@ -767,7 +737,7 @@ export default function UserDetailPage() {
                                         />
                                         <div>
                                             <span className="text-xs font-bold text-slate-700 group-hover:text-purple-600 transition-colors block">Perfil Profissional</span>
-                                            <span className="text-[10px] text-slate-400 font-medium block leading-tight">Profissionais vendem assinatura e cobram por caractere de mensagens.</span>
+                                            <span className="text-[10px] text-slate-400 font-medium block leading-tight">Profissionais vendem assinaturas e recebem pelos atendimentos monetizados.</span>
                                         </div>
                                     </label>
                                 </div>

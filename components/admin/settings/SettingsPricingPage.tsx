@@ -32,9 +32,8 @@ function SettingField({ title, description, unit, children }: { title: string; d
 }
 
 export function SettingsPricingPage({
-    maxPricePerChar, setMaxPricePerChar,
     defaultPricePerCharNonSubscribers, setDefaultPricePerCharNonSubscribers,
-    defaultPricePerCharSubscribers, setDefaultPricePerCharSubscribers,
+    defaultPricePerCharSubscribers,
     minSubscriptionPrice, setMinSubscriptionPrice,
     maxSubscriptionPrice, setMaxSubscriptionPrice,
     subscriberDiscountPercentage, setSubscriberDiscountPercentage,
@@ -54,7 +53,7 @@ export function SettingsPricingPage({
                 <div>
                     <h2 className="text-xl font-bold text-slate-800 tracking-tight">Precificação & Assinaturas</h2>
                     <p className="text-sm text-slate-500 font-medium mt-0.5">
-                        Limites e valores padrão que controlam como profissionais precificam seus serviços e assinaturas.
+                        Valores globais que controlam o custo das mensagens, audios e assinaturas na plataforma.
                     </p>
                 </div>
             </div>
@@ -65,25 +64,10 @@ export function SettingsPricingPage({
                 </div>
 
                 <SettingField
-                    title="Preço Máximo por Caractere (R$)"
-                    description="Teto global que nenhum profissional pode ultrapassar ao definir seu preço por caractere digitado pelo cliente. O sistema bloqueia qualquer tentativa de cadastrar um valor acima deste limite. Protege os usuários de preços abusivos e mantém a acessibilidade da plataforma. Lembre-se que o preço é cobrado por caractere, então valores pequenos representam cobranças significativas em mensagens longas."
-                    unit="R$ / char"
-                >
-                    <input
-                        type="number"
-                        step="0.0001"
-                        value={maxPricePerChar}
-                        onChange={(e) => setMaxPricePerChar(Number(e.target.value))}
-                        min={0}
-                        className={inputCls}
-                    />
-                </SettingField>
-
-                <SettingField
-                    title="Preço Padrão por Caractere (Não-Assinantes) (R$)"
+                    title="Preco da Plataforma por Caractere (Nao-Assinantes) (R$)"
                     description={
                         <span>
-                            Valor pré-preenchido como padrão no campo de preço por caractere para usuários <strong className="text-slate-600">sem assinatura ativa</strong> do profissional. Cada profissional pode alterar esse valor individualmente no seu perfil — este é apenas o valor inicial sugerido no cadastro. Representa o preço cheio, sem desconto.
+                            Valor cobrado por caractere de usuarios sem assinatura ativa. Este preco e definido pela administracao e vale para todas as profissionais.
                         </span>
                     }
                     unit="R$ / char"
@@ -99,10 +83,10 @@ export function SettingsPricingPage({
                 </SettingField>
 
                 <SettingField
-                    title="Preço Padrão por Caractere (Assinantes) (R$)"
+                    title="Preco da Plataforma por Caractere (Assinantes) (R$)"
                     description={
                         <span>
-                            Valor pré-preenchido como padrão para usuários <strong className="text-slate-600">com assinatura ativa</strong> do profissional. Este valor é calculado automaticamente aplicando o Desconto Automático para Assinantes (%) sobre o preço padrão de não-assinantes.
+                            Valor cobrado de usuarios com assinatura ativa. Ele e calculado automaticamente a partir do preco de nao-assinantes e do desconto para assinantes.
                         </span>
                     }
                     unit="R$ / char"
@@ -120,7 +104,7 @@ export function SettingsPricingPage({
                     title="Multiplicador de Preço do Áudio"
                     description={
                         <span>
-                            Fator aplicado sobre o preço por caractere do profissional para calcular o valor cobrado por <strong className="text-slate-600">segundo de áudio</strong> enviado. O preço por segundo de áudio é sempre calculado como <strong className="text-slate-600">preço por caractere × este multiplicador</strong>, usando a mesma taxa (assinante ou não-assinante) já definida pelo profissional para mensagens de texto. Exemplo: se o preço por caractere é R$ 0,005 e o multiplicador é 5, cada segundo de áudio custa R$ 0,025.
+                            Fator aplicado sobre o preco por caractere da plataforma para calcular o valor cobrado por segundo de audio. Exemplo: se o preco por caractere e R$ 0,005 e o multiplicador e 5, cada segundo de audio custa R$ 0,025.
                         </span>
                     }
                     unit="x por segundo"

@@ -485,7 +485,7 @@ export function UserTable() {
                                     />
                                     <div>
                                                                         <span className="text-xs font-bold text-slate-700 group-hover:text-purple-600 transition-colors block">Perfil Monetizado</span>
-                                                                        <span className="text-[10px] text-slate-400 font-medium block">Pode definir preços por caractere e receber pagamentos.</span>
+                                                                        <span className="text-[10px] text-slate-400 font-medium block">Pode vender assinaturas e receber pagamentos.</span>
                                                                     </div>
                                 </label>
                             </div>

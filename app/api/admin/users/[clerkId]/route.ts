@@ -109,8 +109,8 @@ export async function GET(
         return NextResponse.json({
             user: {
                 ...userObj,
-                chargePerCharSubscribers: userObj.chargePerCharSubscribers ?? defaultSub,
-                chargePerCharNonSubscribers: userObj.chargePerCharNonSubscribers ?? defaultNonSub,
+                chargePerCharSubscribers: defaultSub,
+                chargePerCharNonSubscribers: defaultNonSub,
                 createdAt: userObj.createdAt ? new Date(userObj.createdAt).toLocaleDateString('pt-BR') : 'N/A',
                 clientLevel: clientLevel,
             },
@@ -175,8 +175,6 @@ export async function PATCH(
             taxId, 
             phone, 
             subscriptionPrice,
-            chargePerCharSubscribers,
-            chargePerCharNonSubscribers,
             photoUrl,
             coverUrl,
             bio
@@ -209,8 +207,6 @@ export async function PATCH(
             subscriptionPriceBRLToCents(price);
             updateFields.subscriptionPrice = Number(price.toFixed(2));
         }
-        if (chargePerCharSubscribers !== undefined) updateFields.chargePerCharSubscribers = Number(chargePerCharSubscribers);
-        if (chargePerCharNonSubscribers !== undefined) updateFields.chargePerCharNonSubscribers = Number(chargePerCharNonSubscribers);
         if (photoUrl !== undefined) updateFields.photoUrl = photoUrl;
         if (coverUrl !== undefined) updateFields.coverUrl = coverUrl;
 
