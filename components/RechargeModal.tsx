@@ -13,7 +13,6 @@ import {
     CheckCircle2,
     CreditCard,
     LockKeyhole,
-    MessageCircle,
     QrCode,
     ShieldCheck,
     Ticket,
@@ -596,24 +595,14 @@ export function RechargeModal({
                             <>
                                 <div className="flex-1 px-5 py-4">
                                     {shouldShowInsufficientContext && (
-                                        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3.5">
-                                            <div className="mb-3 flex items-center gap-2 text-amber-700">
-                                                <AlertCircle size={16} strokeWidth={2.2} />
-                                                <p className="text-xs font-semibold uppercase tracking-widest">Saldo insuficiente</p>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <div>
-                                                    <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-amber-700/75">
-                                                        <MessageCircle size={12} strokeWidth={2.1} />
-                                                        <span>Mensagem</span>
-                                                    </div>
-                                                    <p className="text-sm font-bold text-amber-950">{formatCents(requiredAmountInCents ?? 0)}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="mb-1 text-[11px] font-semibold text-amber-700/75">Faltam</p>
-                                                    <p className="text-sm font-bold text-amber-950">{formatCents(balanceDeficitInCents)}</p>
-                                                </div>
-                                            </div>
+                                        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3.5">
+                                            <p className="text-xs font-semibold uppercase tracking-widest text-amber-800">Saldo insuficiente</p>
+                                            <p className="mt-1.5 text-sm leading-relaxed text-amber-900">
+                                                Para enviar esta mensagem, você precisa ter pelo menos{' '}
+                                                <strong className="font-bold">{formatCents(requiredAmountInCents ?? 0)}</strong>{' '}
+                                                na carteira. Seu saldo atual é{' '}
+                                                <strong className="font-bold">{formatCents(displayedBalanceInCents)}</strong>.
+                                            </p>
                                         </div>
                                     )}
                                     {!shouldShowInsufficientContext && insufficientBalanceMessage && (
