@@ -2358,7 +2358,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                         </button>
                         <button 
                             onClick={() => {
-                                const target = receiver?.username || receiver?.id || otherUserId;
+                                const target = receiver?.clerkId || otherUserId;
                                 router.push(`/chat/${target}/info`);
                             }}
                             className="flex-1 flex items-center gap-3.5 min-w-0 text-left py-0.5"

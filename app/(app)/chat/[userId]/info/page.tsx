@@ -8,6 +8,10 @@ import { Avatar } from '@/components/Avatar';
 import { useUserById, useUserByUsername } from '@/hooks/useQueries';
 import { ShieldCheck, ArrowLeft, MessageSquare, Calendar, Gift, Image as ImageIcon, ExternalLink, Clock } from 'lucide-react';
 
+function isClerkUserId(value: string) {
+    return value.startsWith('user_');
+}
+
 interface Message {
     _id: string;
     senderId: string;
@@ -38,12 +42,12 @@ export default function ChatInfoPage({ params }: ChatInfoPageProps) {
     const { user } = useUser();
     const { data: receiverById } = useUserById(otherUserId);
     const { data: receiverByUsername } = useUserByUsername(otherUserId);
-    const receiver = receiverById || receiverByUsername;
+    const receiver = receiverByUsername || receiverById;
 
     const [messages, setMessages] = useState<Message[]>([]);
     const [historicalMedia, setHistoricalMedia] = useState<any[]>([]);
 
-    const targetClerkId = receiver?.clerkId || receiver?._id || receiver?.id || otherUserId;
+    const targetClerkId = receiver?.clerkId || (isClerkUserId(otherUserId) ? otherUserId : null);
 
     // Carrega mensagens e mídias da conversa
     useEffect(() => {
