@@ -28,6 +28,7 @@ export interface IAppSettings extends Document {
     creditCardEnabled: boolean;
     couponsEnabled: boolean;
     chatSessionTimeoutMinutes: number;
+    lowBalanceThresholdInCents: number;
     onlineDelayMinutes: number;
     institutionalEmails: string[];
     emailRedirections: { sourceEmail: string; targetEmail: string; displayName?: string }[];
@@ -174,6 +175,12 @@ const AppSettingsSchema = new Schema<IAppSettings>({
         required: true,
         default: 30,
         min: 1,
+    },
+    lowBalanceThresholdInCents: {
+        type: Number,
+        required: true,
+        default: 1000,
+        min: 0,
     },
     onlineDelayMinutes: {
         type: Number,

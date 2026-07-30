@@ -365,6 +365,7 @@ export default function AdminPage() {
                     {activeTab === 'settings-chat' && (
                         <SettingsChatPage
                             chatSessionTimeoutMinutes={settings.chatSessionTimeoutMinutes} setChatSessionTimeoutMinutes={settings.setChatSessionTimeoutMinutes}
+                            lowBalanceThresholdInCents={settings.lowBalanceThresholdInCents} setLowBalanceThresholdInCents={settings.setLowBalanceThresholdInCents}
                             onlineDelayMinutes={settings.onlineDelayMinutes} setOnlineDelayMinutes={settings.setOnlineDelayMinutes}
                             activeUserThresholdDays={settings.activeUserThresholdDays} setActiveUserThresholdDays={settings.setActiveUserThresholdDays}
                             isDirtyChat={settings.isDirtyChat}

@@ -7,6 +7,7 @@ import type { UseSettingsReturn } from '@/hooks/admin/useSettings';
 
 type Props = Pick<UseSettingsReturn,
     | 'chatSessionTimeoutMinutes' | 'setChatSessionTimeoutMinutes'
+    | 'lowBalanceThresholdInCents' | 'setLowBalanceThresholdInCents'
     | 'onlineDelayMinutes' | 'setOnlineDelayMinutes'
     | 'activeUserThresholdDays' | 'setActiveUserThresholdDays'
     | 'isDirtyChat' | 'saving' | 'saveSettings'
@@ -14,6 +15,7 @@ type Props = Pick<UseSettingsReturn,
 
 export function SettingsChatPage({
     chatSessionTimeoutMinutes, setChatSessionTimeoutMinutes,
+    lowBalanceThresholdInCents, setLowBalanceThresholdInCents,
     onlineDelayMinutes, setOnlineDelayMinutes,
     activeUserThresholdDays, setActiveUserThresholdDays,
     isDirtyChat, saving, saveSettings,
@@ -66,6 +68,40 @@ export function SettingsChatPage({
                             <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
                                 <p className="text-[11px] text-blue-700 font-semibold">
                                     Configuração atual: mensagens com intervalo ≥ <strong>{chatSessionTimeoutMinutes} minutos</strong> iniciam uma nova sessão e disparam notificação ao profissional.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="border-t border-slate-100 my-6" />
+
+                <div className="py-6">
+                    <div className="flex flex-col md:flex-row md:items-start gap-4 md:gap-8">
+                        <div className="md:w-1/2 space-y-1">
+                            <h4 className="text-sm font-bold text-slate-800">Alerta de Saldo Baixo (R$)</h4>
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                                Define o saldo mÃ­nimo para exibir uma faixa de alerta dentro da sala de chat do cliente. Ao tocar na faixa, o BottomSheet de recarga Ã© aberto.
+                            </p>
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2">
+                                O valor padrÃ£o recomendado Ã© de <strong className="text-slate-600">R$ 10,00</strong>. Use 0 para desativar o alerta.
+                            </p>
+                        </div>
+                        <div className="md:w-1/2 space-y-4">
+                            <div className="flex items-center gap-3">
+                                <span className="text-sm font-bold text-slate-505">R$</span>
+                                <input
+                                    type="number"
+                                    value={(lowBalanceThresholdInCents / 100).toString()}
+                                    onChange={(e) => setLowBalanceThresholdInCents(Math.round(Number(e.target.value || 0) * 100))}
+                                    min={0}
+                                    step={0.01}
+                                    className={inputCls}
+                                />
+                            </div>
+                            <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+                                <p className="text-[11px] text-blue-700 font-semibold">
+                                    ConfiguraÃ§Ã£o atual: clientes com saldo atÃ© <strong>{(lowBalanceThresholdInCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong> verÃ£o o alerta na sala.
                                 </p>
                             </div>
                         </div>

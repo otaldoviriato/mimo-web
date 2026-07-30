@@ -13,7 +13,7 @@ import { Drawer } from 'vaul';
 import { AudioRecorder } from '@/components/AudioRecorder';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { MediaComposerSheet } from '@/components/MediaComposerSheet';
-import { ShieldCheck, MessageSquare, Wallet } from 'lucide-react';
+import { AlertTriangle, ShieldCheck, MessageSquare, Wallet } from 'lucide-react';
 
 interface Message {
     _id: string;
@@ -71,6 +71,11 @@ interface CachedRoom {
         balance?: number;
     };
     monetizationDisabled?: boolean;
+}
+
+interface CachedCurrentUser {
+    balance?: number;
+    [key: string]: unknown;
 }
 
 function formatMediaDuration(durationInSeconds?: number) {
@@ -507,6 +512,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const [isLeaving, setIsLeaving] = useState(false);
     const [useNativeTransition, setUseNativeTransition] = useState(false);
     const [viewportStyle, setViewportStyle] = useState<React.CSSProperties>({});
+    const [lowBalanceThresholdInCents, setLowBalanceThresholdInCents] = useState(1000);
     const chatRootRef = useRef<HTMLDivElement>(null);
 
     const isViewerOpen = fullscreenIndex !== null || fullscreenLockedMessage !== null;
@@ -616,10 +622,29 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const { data: userData } = useMyProfile();
     const { data: receiver } = useUserById(otherUserId);
     const balance = userData?.balance ?? 0;
+    const formattedBalance = (balance / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     const cachedRoom = user?.id
         ? queryClient.getQueryData<CachedRoom[]>(QueryKeys.rooms(user.id))?.find((room) => room.participants.includes(otherUserId))
         : undefined;
     const receiverBalance = receiver?.balance ?? cachedRoom?.otherUser?.balance ?? 0;
+
+    const decrementLocalBalance = (amountInCents: number) => {
+        if (amountInCents <= 0) return;
+        queryClient.setQueryData(QueryKeys.me, (old: CachedCurrentUser | null | undefined) =>
+            old ? { ...old, balance: Math.max(0, (old.balance ?? 0) - amountInCents) } : old
+        );
+    };
+
+    useEffect(() => {
+        fetch('/api/settings/payments')
+            .then((r) => r.json())
+            .then((data) => {
+                if (typeof data?.lowBalanceThresholdInCents === 'number') {
+                    setLowBalanceThresholdInCents(data.lowBalanceThresholdInCents);
+                }
+            })
+            .catch(() => undefined);
+    }, []);
 
     const latestPartnerMessage = React.useMemo(() => {
         return messages.filter(m => m.senderId === otherUserId).slice(-1)[0];
@@ -1121,6 +1146,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         socket.on('message_error', (data: { error: string }) => {
             alert(data.error);
             setSending(false);
+            queryClient.invalidateQueries({ queryKey: QueryKeys.me });
         });
 
         socket.on('user_typing', (data: { isTyping: boolean }) => {
@@ -1908,6 +1934,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             replyingTo ? (replyingTo.isGift ? '🎁 Presente' : (replyingTo.isLockedImage ? '📸 Imagem bloqueada' : (replyingTo.originalImageUrl ? '📸 Imagem' : (replyingTo.isVideo ? '🎥 Vídeo' : replyingTo.content)))) : undefined,
             replyingTo?.senderId
         );
+        decrementLocalBalance(costInCents);
         setReplyingTo(null);
         socket.emit('mark_as_read', { roomId });
 
@@ -2244,6 +2271,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const maxAudioDurationSeconds = audioCostPerSecondInCents > 0
         ? Math.floor(balance / audioCostPerSecondInCents)
         : undefined;
+    const shouldShowLowBalanceAlert = !userData?.isProfessional &&
+        receiver?.isProfessional &&
+        !monetizationDisabled &&
+        lowBalanceThresholdInCents > 0 &&
+        balance <= lowBalanceThresholdInCents;
 
     useEffect(() => {
         if (!receiver || !user?.id) return;
@@ -2492,6 +2524,25 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     </>
                 )}
             </div>
+
+            {shouldShowLowBalanceAlert && (
+                <button
+                    type="button"
+                    onClick={() => openRechargeModal({ currentBalanceInCents: balance })}
+                    className="shrink-0 z-10 flex w-full items-center gap-3 border-b border-amber-200 bg-amber-50 px-5 py-3 text-left text-amber-950 transition-colors hover:bg-amber-100 active:bg-amber-100"
+                >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+                        <AlertTriangle size={17} strokeWidth={2.3} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-bold leading-tight">Saldo baixo</span>
+                        <span className="block truncate text-xs font-medium leading-tight text-amber-800">
+                            Saldo atual: {formattedBalance}. Toque para recarregar.
+                        </span>
+                    </span>
+                    <span className="shrink-0 text-sm font-bold text-amber-900">{formattedBalance}</span>
+                </button>
+            )}
 
             {/* Messages Container Wrapper */}
             <div className="flex-1 relative overflow-hidden flex flex-col">

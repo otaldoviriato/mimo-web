@@ -26,6 +26,7 @@ async function getOrCreateSettings() {
             maxPublicPhotos: 12,
             minExclusivePhotos: 2,
             maxExclusivePhotos: 4,
+            lowBalanceThresholdInCents: 1000,
             defaultPricePerCharSubscribers: 0.002,
             defaultPricePerCharNonSubscribers: 0.005,
             audioPriceMultiplier: 5,
@@ -47,6 +48,7 @@ async function getOrCreateSettings() {
         if (settings.creditCardEnabled === undefined) { settings.creditCardEnabled = true; updated = true; }
         if (settings.couponsEnabled === undefined) { settings.couponsEnabled = true; updated = true; }
         if (settings.chatSessionTimeoutMinutes === undefined) { settings.chatSessionTimeoutMinutes = 30; updated = true; }
+        if (settings.lowBalanceThresholdInCents === undefined) { settings.lowBalanceThresholdInCents = 1000; updated = true; }
         if (settings.minSubscriptionPrice === undefined) { settings.minSubscriptionPrice = 10; updated = true; }
         if (settings.institutionalEmails === undefined) { settings.institutionalEmails = ['viriatoceo@mimochat.com.br']; updated = true; }
         if (settings.defaultPricePerCharSubscribers === undefined) { settings.defaultPricePerCharSubscribers = 0.002; updated = true; }
@@ -177,6 +179,7 @@ export async function PUT(request: NextRequest) {
             creditCardEnabled,
             couponsEnabled,
             chatSessionTimeoutMinutes,
+            lowBalanceThresholdInCents,
             defaultPricePerCharSubscribers,
             defaultPricePerCharNonSubscribers,
             audioPriceMultiplier,
@@ -327,6 +330,14 @@ export async function PUT(request: NextRequest) {
                 return NextResponse.json({ error: 'Tempo de sessão deve ser de pelo menos 1 minuto' }, { status: 400 });
             }
             settings.chatSessionTimeoutMinutes = timeout;
+        }
+
+        if (lowBalanceThresholdInCents !== undefined) {
+            const threshold = Number(lowBalanceThresholdInCents);
+            if (isNaN(threshold) || threshold < 0) {
+                return NextResponse.json({ error: 'Limite de saldo baixo inválido' }, { status: 400 });
+            }
+            settings.lowBalanceThresholdInCents = Math.round(threshold);
         }
 
         if (onlineDelayMinutes !== undefined) {

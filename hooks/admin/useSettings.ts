@@ -18,6 +18,7 @@ interface SettingsSnapshot {
     creditCardEnabled: boolean;
     couponsEnabled: boolean;
     chatSessionTimeoutMinutes: number;
+    lowBalanceThresholdInCents: number;
     onlineDelayMinutes: number;
     activeUserThresholdDays: number;
     defaultPricePerCharSubscribers: number;
@@ -62,6 +63,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     const [creditCardEnabled, setCreditCardEnabled] = useState(true);
     const [couponsEnabled, setCouponsEnabled] = useState(true);
     const [chatSessionTimeoutMinutes, setChatSessionTimeoutMinutes] = useState(30);
+    const [lowBalanceThresholdInCents, setLowBalanceThresholdInCents] = useState(1000);
     const [onlineDelayMinutes, setOnlineDelayMinutes] = useState(2);
     const [activeUserThresholdDays, setActiveUserThresholdDays] = useState(7);
     const [defaultPricePerCharSubscribers, setDefaultPricePerCharSubscribers] = useState(0.002);
@@ -106,6 +108,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         creditCardEnabled: s.creditCardEnabled ?? true,
         couponsEnabled: s.couponsEnabled ?? true,
         chatSessionTimeoutMinutes: s.chatSessionTimeoutMinutes ?? 30,
+        lowBalanceThresholdInCents: s.lowBalanceThresholdInCents ?? 1000,
         onlineDelayMinutes: s.onlineDelayMinutes ?? 2,
         activeUserThresholdDays: s.activeUserThresholdDays ?? 7,
         defaultPricePerCharSubscribers: s.defaultPricePerCharSubscribers ?? 0.002,
@@ -160,6 +163,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     setCreditCardEnabled(s.creditCardEnabled ?? true);
                     setCouponsEnabled(s.couponsEnabled ?? true);
                     setChatSessionTimeoutMinutes(s.chatSessionTimeoutMinutes ?? 30);
+                    setLowBalanceThresholdInCents(s.lowBalanceThresholdInCents ?? 1000);
                     setOnlineDelayMinutes(s.onlineDelayMinutes ?? 2);
                     setActiveUserThresholdDays(s.activeUserThresholdDays ?? 7);
                     setDefaultPricePerCharSubscribers(s.defaultPricePerCharSubscribers ?? 0.002);
@@ -256,6 +260,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     creditCardEnabled,
                     couponsEnabled,
                     chatSessionTimeoutMinutes,
+                    lowBalanceThresholdInCents,
                     onlineDelayMinutes,
                     activeUserThresholdDays,
                     defaultPricePerCharSubscribers,
@@ -286,6 +291,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                 setSavedSnapshot(buildSnapshot(data.settings, data.richAdmins || []));
                 // Sync state com valores retornados
                 const s = data.settings;
+                setLowBalanceThresholdInCents(s.lowBalanceThresholdInCents ?? 1000);
                 setMaxPricePerChar(s.maxPricePerChar);
                 setMaxSubscriptionPrice(s.maxSubscriptionPrice);
                 setMinSubscriptionPrice(s.minSubscriptionPrice ?? 10);
@@ -351,6 +357,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     );
     const isDirtyChat = savedSnapshot !== null && (
         chatSessionTimeoutMinutes !== savedSnapshot.chatSessionTimeoutMinutes ||
+        lowBalanceThresholdInCents !== savedSnapshot.lowBalanceThresholdInCents ||
         onlineDelayMinutes !== savedSnapshot.onlineDelayMinutes ||
         activeUserThresholdDays !== savedSnapshot.activeUserThresholdDays
     );
@@ -427,6 +434,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         creditCardEnabled, setCreditCardEnabled,
         couponsEnabled, setCouponsEnabled,
         chatSessionTimeoutMinutes, setChatSessionTimeoutMinutes,
+        lowBalanceThresholdInCents, setLowBalanceThresholdInCents,
         onlineDelayMinutes, setOnlineDelayMinutes,
         activeUserThresholdDays, setActiveUserThresholdDays,
         defaultPricePerCharSubscribers, setDefaultPricePerCharSubscribers,
