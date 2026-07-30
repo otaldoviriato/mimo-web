@@ -1865,11 +1865,10 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
         if (receiver?.isProfessional && balance < costInCents) {
             console.warn('[handleSend] Saldo insuficiente. Requerido:', costInCents, 'Disponível:', balance);
-            openRechargeModal(
-                userData?.hasWelcomeCreditEnded
-                    ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
-                    : 'Você não tem saldo suficiente para enviar esta mensagem. Por favor, recarregue sua carteira.'
-            );
+            openRechargeModal({
+                currentBalanceInCents: balance,
+                requiredAmountInCents: costInCents,
+            });
             return;
         }
 
@@ -2229,12 +2228,13 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             ? (receiver.chargePerCharSubscribers ?? 0.002) 
             : (receiver.chargePerCharNonSubscribers ?? 0.005))
         : 0;
+    let estimatedCostInCents = 0;
     let estimatedCostInReais = 0;
     if (charCount > 0 && receiver?.isProfessional && !monetizationDisabled) {
         const costPerCharInCents = currentRate * 100;
         const rawCostInCents = charCount * costPerCharInCents;
-        const totalCostInCents = Math.max(1, Math.ceil(rawCostInCents));
-        estimatedCostInReais = totalCostInCents / 100;
+        estimatedCostInCents = Math.max(1, Math.ceil(rawCostInCents));
+        estimatedCostInReais = estimatedCostInCents / 100;
     }
 
     // Preço do áudio: preço por caractere x multiplicador configurável, por segundo.
@@ -3303,14 +3303,13 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                     <span
                                         onClick={() => {
                                             if ((balance / 100) < estimatedCostInReais) {
-                                                openRechargeModal('Seu saldo é insuficiente para enviar esta mensagem. Por favor, recarregue para continuar.');
+                                                openRechargeModal({
+                                                    currentBalanceInCents: balance,
+                                                    requiredAmountInCents: estimatedCostInCents,
+                                                });
                                             }
                                         }}
-                                        className={`text-[10px] font-normal select-none tracking-tight ${
-                                            (balance / 100) < estimatedCostInReais
-                                                ? 'text-amber-600 font-medium cursor-pointer hover:underline'
-                                                : 'text-gray-400'
-                                        }`}
+                                        className="text-[10px] font-normal select-none tracking-tight text-gray-400"
                                     >
                                         R$ {estimatedCostInReais.toFixed(2).replace('.', ',')}
                                     </span>
@@ -3326,7 +3325,10 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                 if (selectedFile) {
                                     sendSelectedMedia(0, false, 60);
                                 } else if (charCount > 0 && !userData?.isProfessional && receiver?.isProfessional && !monetizationDisabled && currentRate > 0 && (balance / 100) < estimatedCostInReais) {
-                                    openRechargeModal('Seu saldo é insuficiente para enviar esta mensagem. Por favor, recarregue para continuar.');
+                                    openRechargeModal({
+                                        currentBalanceInCents: balance,
+                                        requiredAmountInCents: estimatedCostInCents,
+                                    });
                                 } else {
                                     handleSend();
                                 }

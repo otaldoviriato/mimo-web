@@ -13,6 +13,7 @@ import {
     CheckCircle2,
     CreditCard,
     LockKeyhole,
+    MessageCircle,
     QrCode,
     ShieldCheck,
     Ticket,
@@ -33,6 +34,10 @@ interface RechargeModalProps {
     onGeneratePix?: (amount: number) => Promise<PixPaymentData | null | void>;
     onGenerateCardPayment?: (data: CardPaymentRequest) => Promise<RechargeResponse | null | void>;
     insufficientBalanceMessage?: string | null;
+    rechargeContext?: {
+        currentBalanceInCents?: number;
+        requiredAmountInCents?: number;
+    } | null;
 }
 
 interface RechargeResponse {
@@ -75,8 +80,29 @@ interface UserProfileResponse {
     user?: {
         taxId?: string;
         phone?: string;
+        balance?: number;
         savedCards?: SavedCard[];
     };
+}
+
+interface CachedProfile {
+    balance?: number;
+    user?: {
+        balance?: number;
+        savedCards?: SavedCard[];
+    };
+}
+
+interface DepositTransaction {
+    source?: string;
+    type?: string;
+    metadata?: {
+        cardId?: string;
+    };
+}
+
+interface DepositHistoryCache {
+    transactions?: DepositTransaction[];
 }
 
 const FIXED_OPTIONS = [
@@ -84,11 +110,6 @@ const FIXED_OPTIONS = [
     { label: 'R$ 25', value: 25 },
     { label: 'R$ 50', value: 50 },
     { label: 'R$ 100', value: 100 },
-];
-
-const INITIAL_METHODS = [
-    { id: 'pix', type: 'pix', label: 'Pix', icon: 'qr-code' },
-    { id: 'card', type: 'card', label: 'Cartão de crédito', icon: 'card' },
 ];
 
 function detectCardBrand(number: string): string {
@@ -154,6 +175,7 @@ export function RechargeModal({
     onGeneratePix,
     onGenerateCardPayment,
     insufficientBalanceMessage,
+    rechargeContext,
 }: RechargeModalProps) {
     const queryClient = useQueryClient();
     const { user } = useUser();
@@ -181,6 +203,7 @@ export function RechargeModal({
     const [couponSuccess, setCouponSuccess] = useState('');
     const [giftModalOpen, setGiftModalOpen] = useState(false);
     const [giftAmount, setGiftAmount] = useState<number | null>(null);
+    const [currentBalanceInCents, setCurrentBalanceInCents] = useState<number | null>(null);
     const [paymentAvailability, setPaymentAvailability] = useState<PaymentAvailability>({
         pixEnabled: true,
         creditCardEnabled: true,
@@ -195,9 +218,13 @@ export function RechargeModal({
         if (!visible) return;
 
         // Tenta carregar do cache do React Query de forma síncrona imediata
-        const cachedProfile = queryClient.getQueryData<any>(QueryKeys.me);
+        const cachedProfile = queryClient.getQueryData<CachedProfile>(QueryKeys.me);
+        const cachedBalance = cachedProfile?.balance ?? cachedProfile?.user?.balance;
+        if (typeof cachedBalance === 'number') {
+            setCurrentBalanceInCents(cachedBalance);
+        }
         if (cachedProfile?.user?.savedCards) {
-            const cards = (cachedProfile.user.savedCards || []).filter((card: any) => card.canUseForPayments);
+            const cards = (cachedProfile.user.savedCards || []).filter((card) => card.canUseForPayments);
             setSavedCards(cards);
             setLoadingCards(false);
         } else {
@@ -208,6 +235,7 @@ export function RechargeModal({
             .then((res: UserProfileResponse) => {
                 if (res?.user?.taxId) setUserCpf(formatCPF(res.user.taxId));
                 if (res?.user?.phone) setUserPhone(formatPhone(res.user.phone));
+                if (typeof res?.user?.balance === 'number') setCurrentBalanceInCents(res.user.balance);
                 const cards = (res?.user?.savedCards || []).filter((card) => card.canUseForPayments);
                 setSavedCards(cards);
 
@@ -231,10 +259,10 @@ export function RechargeModal({
                         }
                     }
                 } else {
-                    const cachedData = queryClient.getQueryData<any>(['deposit', 'history']);
+                    const cachedData = queryClient.getQueryData<DepositHistoryCache>(['deposit', 'history']);
                     const txs = cachedData?.transactions || [];
 
-                    const applyLastTx = (transactions: any[]) => {
+                    const applyLastTx = (transactions: DepositTransaction[]) => {
                         if (transactions.length > 0) {
                             const lastTx = transactions[0];
                             const method = lastTx.source === 'gift' ? 'coupon' : lastTx.type === 'CC' ? 'card' : 'pix';
@@ -486,10 +514,6 @@ export function RechargeModal({
         }
     };
 
-    const allMethods = INITIAL_METHODS.filter((m) => {
-        if (m.id === 'coupon') return paymentAvailability.couponsEnabled;
-        return true;
-    });
     const finalAmount = getFinalAmount();
     const hasCpf = userCpf.replace(/\D/g, '').length === 11;
     const hasPhone = userPhone.replace(/\D/g, '').length >= 10;
@@ -515,6 +539,17 @@ export function RechargeModal({
     const isCardValid = isCardSelected ? hasValidCardData : true;
     const canConfirm = finalAmount > 0 && selectedMethod !== '' && isPixValid && isCardValid;
     const formattedFinalAmount = finalAmount > 0 ? finalAmount.toFixed(2).replace('.', ',') : '0,00';
+    const displayedBalanceInCents = rechargeContext?.currentBalanceInCents ?? currentBalanceInCents ?? 0;
+    const requiredAmountInCents = rechargeContext?.requiredAmountInCents;
+    const shouldShowRequiredAmount = typeof requiredAmountInCents === 'number' && requiredAmountInCents > 0;
+    const balanceDeficitInCents = shouldShowRequiredAmount
+        ? Math.max(0, requiredAmountInCents - displayedBalanceInCents)
+        : 0;
+    const formatCents = (valueInCents: number) =>
+        (valueInCents / 100).toLocaleString('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+        });
 
     return (
         <>
@@ -524,33 +559,60 @@ export function RechargeModal({
                 <Drawer.Content className="fixed inset-x-0 bottom-0 z-[101] mx-auto flex max-h-[84vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[24px] bg-white shadow-[0_-20px_60px_rgba(15,23,42,0.18)] outline-none">
                     <div className="border-b border-gray-100 px-5 pb-4 pt-3 shrink-0 bg-white">
                         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-gray-200" />
-                        <div className="flex items-start justify-between gap-4">
-                            <div>
-                                <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Carteira Mimo</p>
-                                <Drawer.Title className="mt-1 text-xl font-bold tracking-tight text-gray-900">Recarregar saldo</Drawer.Title>
-                                <p className="mt-0.5 text-sm text-gray-500">
-                                    Adicione créditos de forma rápida e segura.
-                                </p>
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-3">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600 ring-1 ring-purple-100">
+                                    <WalletCards size={19} strokeWidth={2.1} />
+                                </div>
+                                <div className="min-w-0">
+                                    <Drawer.Title className="truncate text-lg font-bold tracking-tight text-gray-900">Adicionar saldo</Drawer.Title>
+                                    {(insufficientBalanceMessage || balanceDeficitInCents > 0) && (
+                                        <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-amber-600">
+                                            <AlertCircle size={13} strokeWidth={2.2} />
+                                            <span>Saldo insuficiente</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
+                            <button
+                                type="button"
+                                aria-label="Fechar"
+                                onClick={() => handleClose()}
+                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-800"
+                            >
+                                <X size={17} strokeWidth={2.2} />
+                            </button>
                         </div>
+                        <div className={`mt-4 grid gap-2 ${shouldShowRequiredAmount ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                            <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5">
+                                <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+                                    <WalletCards size={12} strokeWidth={2.1} />
+                                    <span>Saldo</span>
+                                </div>
+                                <p className="text-base font-bold tracking-tight text-gray-900">{formatCents(displayedBalanceInCents)}</p>
+                            </div>
+                            {shouldShowRequiredAmount && (
+                                <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5">
+                                    <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+                                        <MessageCircle size={12} strokeWidth={2.1} />
+                                        <span>Mensagem</span>
+                                    </div>
+                                    <p className="text-base font-bold tracking-tight text-gray-900">{formatCents(requiredAmountInCents ?? 0)}</p>
+                                </div>
+                            )}
+                        </div>
+                        {balanceDeficitInCents > 0 && (
+                            <div className="mt-2 flex items-center justify-between rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs">
+                                <span className="font-medium text-amber-800">Faltam</span>
+                                <span className="font-bold text-amber-900">{formatCents(balanceDeficitInCents)}</span>
+                            </div>
+                        )}
                     </div>
                     <div className="flex w-full flex-1 flex-col overflow-y-auto min-h-0">
 
                         {step === 'amount_and_method' ? (
                             <>
                                 <div className="flex-1 px-5 py-4">
-                                    {insufficientBalanceMessage && (
-                                        <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                                            <AlertCircle size={16} className="mt-0.5 shrink-0 text-amber-600" strokeWidth={2.2} />
-                                            <div className="min-w-0 flex-1">
-                                                <h4 className="text-xs font-semibold uppercase tracking-widest text-amber-800">Saldo insuficiente</h4>
-                                                <p className="mt-1 text-xs leading-relaxed text-amber-700">
-                                                    {insufficientBalanceMessage}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
-
                                     {/* 1. Forma de pagamento */}
                                     <div className="rounded-lg border border-gray-100 bg-white shadow-sm">
                                         <div className="border-b border-gray-50 px-4 py-3">

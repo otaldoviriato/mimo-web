@@ -4,8 +4,15 @@ import React, { createContext, useContext, useState } from 'react';
 import { RechargeModal } from '@/components/RechargeModal';
 import { useAddBalance, useGenerateCardPayment, useGeneratePix } from '@/hooks/useQueries';
 
+export interface RechargeModalContext {
+    currentBalanceInCents?: number;
+    requiredAmountInCents?: number;
+}
+
+type RechargeModalInput = string | RechargeModalContext | React.SyntheticEvent;
+
 interface PaymentContextType {
-    openRechargeModal: (errorMessage?: string | unknown) => void;
+    openRechargeModal: (input?: RechargeModalInput) => void;
 }
 
 const PaymentContext = createContext<PaymentContextType | undefined>(undefined);
@@ -21,16 +28,30 @@ export function usePayment() {
 export function PaymentProvider({ children }: { children: React.ReactNode }) {
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [insufficientBalanceMessage, setInsufficientBalanceMessage] = useState<string | null>(null);
+    const [rechargeContext, setRechargeContext] = useState<RechargeModalContext | null>(null);
 
     const addBalanceMutation = useAddBalance();
     const generatePixMutation = useGeneratePix();
     const generateCardPaymentMutation = useGenerateCardPayment();
 
-    const openRechargeModal = (errorMessage?: string | unknown) => {
-        if (typeof errorMessage === 'string') {
-            setInsufficientBalanceMessage(errorMessage);
+    const openRechargeModal = (input?: RechargeModalInput) => {
+        if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
+
+        if (typeof input === 'string') {
+            setInsufficientBalanceMessage(input);
+            setRechargeContext(null);
+        } else if (
+            input &&
+            typeof input === 'object' &&
+            ('currentBalanceInCents' in input || 'requiredAmountInCents' in input)
+        ) {
+            setInsufficientBalanceMessage(null);
+            setRechargeContext(input as RechargeModalContext);
         } else {
             setInsufficientBalanceMessage(null);
+            setRechargeContext(null);
         }
         setIsModalVisible(true);
     };
@@ -38,6 +59,7 @@ export function PaymentProvider({ children }: { children: React.ReactNode }) {
     const closeRechargeModal = () => {
         setIsModalVisible(false);
         setInsufficientBalanceMessage(null);
+        setRechargeContext(null);
     };
 
     const handleRecharge = async (amount: number) => {
@@ -75,6 +97,7 @@ export function PaymentProvider({ children }: { children: React.ReactNode }) {
                 onGeneratePix={handleGeneratePix}
                 onGenerateCardPayment={handleGenerateCardPayment}
                 insufficientBalanceMessage={insufficientBalanceMessage}
+                rechargeContext={rechargeContext}
             />
         </PaymentContext.Provider>
     );
