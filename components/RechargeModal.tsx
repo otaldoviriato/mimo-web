@@ -545,6 +545,7 @@ export function RechargeModal({
     const balanceDeficitInCents = shouldShowRequiredAmount
         ? Math.max(0, requiredAmountInCents - displayedBalanceInCents)
         : 0;
+    const shouldShowInsufficientContext = balanceDeficitInCents > 0;
     const formatCents = (valueInCents: number) =>
         (valueInCents / 100).toLocaleString('pt-BR', {
             style: 'currency',
@@ -566,12 +567,7 @@ export function RechargeModal({
                                 </div>
                                 <div className="min-w-0">
                                     <Drawer.Title className="truncate text-lg font-bold tracking-tight text-gray-900">Adicionar saldo</Drawer.Title>
-                                    {(insufficientBalanceMessage || balanceDeficitInCents > 0) && (
-                                        <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-amber-600">
-                                            <AlertCircle size={13} strokeWidth={2.2} />
-                                            <span>Saldo insuficiente</span>
-                                        </div>
-                                    )}
+                                    <p className="mt-0.5 text-xs font-medium text-gray-400">Saldo da carteira</p>
                                 </div>
                             </div>
                             <button
@@ -583,36 +579,49 @@ export function RechargeModal({
                                 <X size={17} strokeWidth={2.2} />
                             </button>
                         </div>
-                        <div className={`mt-4 grid gap-2 ${shouldShowRequiredAmount ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                            <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5">
-                                <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-gray-400">
-                                    <WalletCards size={12} strokeWidth={2.1} />
-                                    <span>Saldo</span>
-                                </div>
-                                <p className="text-base font-bold tracking-tight text-gray-900">{formatCents(displayedBalanceInCents)}</p>
-                            </div>
-                            {shouldShowRequiredAmount && (
-                                <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5">
-                                    <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-gray-400">
-                                        <MessageCircle size={12} strokeWidth={2.1} />
-                                        <span>Mensagem</span>
-                                    </div>
-                                    <p className="text-base font-bold tracking-tight text-gray-900">{formatCents(requiredAmountInCents ?? 0)}</p>
-                                </div>
+                        <div className="mt-4 flex items-end justify-between gap-3">
+                            <p className="text-[34px] font-bold leading-none tracking-tight text-gray-900">
+                                {formatCents(displayedBalanceInCents)}
+                            </p>
+                            {displayedBalanceInCents <= 0 && (
+                                <span className="mb-1 rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-500">
+                                    Sem saldo
+                                </span>
                             )}
                         </div>
-                        {balanceDeficitInCents > 0 && (
-                            <div className="mt-2 flex items-center justify-between rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs">
-                                <span className="font-medium text-amber-800">Faltam</span>
-                                <span className="font-bold text-amber-900">{formatCents(balanceDeficitInCents)}</span>
-                            </div>
-                        )}
                     </div>
                     <div className="flex w-full flex-1 flex-col overflow-y-auto min-h-0">
 
                         {step === 'amount_and_method' ? (
                             <>
                                 <div className="flex-1 px-5 py-4">
+                                    {shouldShowInsufficientContext && (
+                                        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3.5">
+                                            <div className="mb-3 flex items-center gap-2 text-amber-700">
+                                                <AlertCircle size={16} strokeWidth={2.2} />
+                                                <p className="text-xs font-semibold uppercase tracking-widest">Saldo insuficiente</p>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-amber-700/75">
+                                                        <MessageCircle size={12} strokeWidth={2.1} />
+                                                        <span>Mensagem</span>
+                                                    </div>
+                                                    <p className="text-sm font-bold text-amber-950">{formatCents(requiredAmountInCents ?? 0)}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="mb-1 text-[11px] font-semibold text-amber-700/75">Faltam</p>
+                                                    <p className="text-sm font-bold text-amber-950">{formatCents(balanceDeficitInCents)}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {!shouldShowInsufficientContext && insufficientBalanceMessage && (
+                                        <div className="mb-4 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-amber-700">
+                                            <AlertCircle size={16} className="shrink-0" strokeWidth={2.2} />
+                                            <p className="text-xs font-semibold uppercase tracking-widest">Saldo insuficiente</p>
+                                        </div>
+                                    )}
                                     {/* 1. Forma de pagamento */}
                                     <div className="rounded-lg border border-gray-100 bg-white shadow-sm">
                                         <div className="border-b border-gray-50 px-4 py-3">
