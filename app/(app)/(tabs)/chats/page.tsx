@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Avatar, TouchableRipple, PullToRefresh } from '@/components';
 import { useChatRooms, useMyProfile, QueryKeys } from '@/hooks/useQueries';
 import { useSocket } from '@/hooks/useSocket';
-import { CheckCircle2, X, WalletCards, Crown, ShieldAlert, Clock, AlertCircle, ChevronRight, MessageCircle, Trash2, ShieldCheck, Copy, Link, Check, Share2, Star } from 'lucide-react';
+import { CheckCircle2, X, WalletCards, Clock, AlertCircle, ChevronRight, MessageCircle, Trash2, ShieldCheck, Share2, Star } from 'lucide-react';
 import { Drawer } from 'vaul';
 
 interface Room {
@@ -73,16 +73,6 @@ export default function ChatsPage() {
     const queryClient = useQueryClient();
     const { socket, connected, socketService, socketVersion } = useSocket(user?.id);
     
-    // Controle do banner de progresso de completude do perfil
-    const [hideProfileProgress, setHideProfileProgress] = useState(true);
-
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            const isDismissed = sessionStorage.getItem('mimo_hide_profile_progress_banner') === 'true';
-            setHideProfileProgress(isDismissed);
-        }
-    }, []);
-
     // Controle do banner de incentivo à verificação de identidade
     const [hideIdentityPrompt, setHideIdentityPrompt] = useState(true);
 
@@ -114,13 +104,31 @@ export default function ChatsPage() {
     const [showSuccessToast, setShowSuccessToast] = useState(false);
     const [copiedProfileLink, setCopiedProfileLink] = useState(false);
 
-    const handleCopyProfileLink = () => {
-        if (typeof window !== 'undefined' && myProfile?.username) {
-            const url = `${window.location.origin}/${myProfile.username}`;
-            navigator.clipboard.writeText(url);
+    const handleShareProfile = async () => {
+        if (typeof window === 'undefined' || !myProfile?.username) return;
+
+        const profileUrl = `${window.location.origin}/${myProfile.username}`;
+        const name = myProfile.name || `@${myProfile.username}`;
+        const shareText = `Ei! Esse é meu perfil no MimoChat - ${name}. Me manda uma mensagem, adoro conversar!`;
+
+        if (typeof navigator !== 'undefined' && navigator.share) {
+            try {
+                await navigator.share({
+                    title: `${name} no MimoChat`,
+                    text: shareText,
+                    url: profileUrl,
+                });
+                return;
+            } catch (err: any) {
+                if (err?.name === 'AbortError') return;
+            }
+        }
+
+        try {
+            await navigator.clipboard.writeText(`${shareText}\n\n${profileUrl}`);
             setCopiedProfileLink(true);
             setTimeout(() => setCopiedProfileLink(false), 2500);
-        }
+        } catch {}
     };
 
     // Resolve a transição pendente assim que a lista de chats é montada
@@ -276,44 +284,37 @@ export default function ChatsPage() {
         return null;
     };
 
-    const [hideShareBanner, setHideShareBanner] = useState(false);
-
-    const renderShareLinkBanner = () => {
-        if (!myProfile || !myProfile.isProfessional || hideShareBanner || !myProfile.username) return null;
-
-        const displayLink = `mimo.chat/${myProfile.username}`;
+    const renderStartEarningOverlay = () => {
+        if (!myProfile?.isProfessional || !myProfile.username || rooms.length > 0) return null;
 
         return (
-            <div className="mx-4 mt-4 bg-gradient-to-r from-purple-50 via-indigo-50/60 to-purple-50 border border-purple-200/80 rounded-2xl p-3.5 shadow-xs animate-in fade-in slide-in-from-top-2 duration-300 relative">
-                <button
-                    onClick={() => setHideShareBanner(true)}
-                    className="absolute top-2.5 right-2.5 p-1 rounded-full text-purple-400 hover:text-purple-600 active:scale-90 transition-colors cursor-pointer z-10"
-                    title="Dispensar"
-                >
-                    <X size={15} />
-                </button>
-                <div className="flex items-center gap-3 pr-6">
-                    <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center p-2 text-white shadow-md shadow-purple-600/20 shrink-0">
-                        <img src="/Logo.svg" alt="Mimo" className="w-full h-full object-contain brightness-0 invert" />
+            <div className="pointer-events-none absolute left-3 right-3 top-3 z-30 flex justify-center md:top-4">
+                <div className="pointer-events-auto w-full max-w-[430px] rounded-xl border border-purple-100 bg-white/95 p-4 shadow-[0_18px_45px_rgba(88,28,135,0.16)] backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-600 shadow-md shadow-purple-600/20">
+                            <img src="/Logo.svg" alt="Mimo" className="h-6 w-6 object-contain brightness-0 invert" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <h3 className="text-sm font-black tracking-tight text-slate-900">Comece a ganhar</h3>
+                            <p className="mt-1 text-xs font-medium leading-snug text-slate-500">
+                                Seu perfil está pronto. Agora compartilhe-o para iniciar sua primeira conversa.
+                            </p>
+                        </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                        <h3 className="font-extrabold text-slate-900 text-xs tracking-tight flex items-center gap-1.5 flex-wrap">
-                            Seu link de perfil:
-                            <span className="font-bold text-purple-700 bg-purple-100/80 px-1.5 py-0.5 rounded text-[11px] truncate max-w-[170px] sm:max-w-none">
-                                {displayLink}
-                            </span>
-                        </h3>
-                        <p className="text-[11px] text-purple-700 font-medium leading-tight mt-0.5">
-                            Divulgue no Instagram/TikTok para receber mensagens!
-                        </p>
-                    </div>
+
                     <button
-                        onClick={handleCopyProfileLink}
-                        className="shrink-0 inline-flex items-center justify-center gap-1.5 bg-purple-600 hover:bg-purple-700 active:scale-95 transition-all text-white text-[11px] font-extrabold px-3 py-2 rounded-xl shadow-md shadow-purple-600/15 cursor-pointer ml-1"
+                        type="button"
+                        onClick={handleShareProfile}
+                        className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-3 text-xs font-extrabold text-white shadow-sm shadow-purple-600/15 transition-all hover:bg-purple-700 active:scale-95"
                     >
-                        {copiedProfileLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                        {copiedProfileLink ? 'Copiado!' : 'Copiar'}
+                        <Share2 className="h-3.5 w-3.5" />
+                        {copiedProfileLink ? 'Link copiado' : 'Compartilhar perfil'}
                     </button>
+
+                    <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold text-slate-500">
+                        <span className="h-2 w-2 rounded-full border border-slate-400" />
+                        Primeira conversa ainda não iniciada
+                    </div>
                 </div>
             </div>
         );
@@ -563,14 +564,10 @@ export default function ChatsPage() {
     }, [refetchRooms, refetchProfile]);
 
     return (
-        <div className="flex flex-col h-full">
+        <div className="relative flex flex-col h-full">
 
-            {/* Banner de Verificação de Identidade ou Link Exclusivo (exibido um de cada vez) */}
-            {(() => {
-                const verificationBanner = renderVerificationBanner();
-                if (verificationBanner) return verificationBanner;
-                return renderShareLinkBanner();
-            })()}
+            {renderVerificationBanner()}
+            {renderStartEarningOverlay()}
 
             {/* Modal de crédito promocional */}
             {giftModal && (

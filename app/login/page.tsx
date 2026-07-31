@@ -25,10 +25,9 @@ function GiftCapture() {
 export default function LoginPage() {
     const router = useRouter();
     const queryClient = useQueryClient();
-    const { isSignedIn } = useAuth();
+    const { isSignedIn, isLoaded: authLoaded, signOut } = useAuth();
     const { isLoaded: signInLoaded, signIn, setActive: setSignInActive } = useSignIn();
     const { isLoaded: signUpLoaded, signUp, setActive: setSignUpActive } = useSignUp();
-
 
     const [email, setEmail] = useState('');
     const [code, setCode] = useState('');
@@ -40,6 +39,7 @@ export default function LoginPage() {
     const [ageAccepted, setAgeAccepted] = useState(false);
     const [showAgeGateTooltip, setShowAgeGateTooltip] = useState(false);
     const [tooltipTimeoutId, setTooltipTimeoutId] = useState<NodeJS.Timeout | null>(null);
+    const [isVerifyingServerSession, setIsVerifyingServerSession] = useState(false);
 
     const triggerAgeGateTooltip = () => {
         if (tooltipTimeoutId) {
@@ -52,13 +52,63 @@ export default function LoginPage() {
         setTooltipTimeoutId(id);
     };
 
+    const isAlreadySignedInError = (err: unknown): boolean => {
+        const e = err as any;
+        const code = e?.errors?.[0]?.code || '';
+        const message = (
+            e?.errors?.[0]?.longMessage ||
+            e?.errors?.[0]?.message ||
+            e?.message ||
+            ''
+        ).toLowerCase();
+
+        return (
+            code === 'already_signed_in' ||
+            code === 'session_exists' ||
+            message.includes('already signed in') ||
+            message.includes('already_signed_in') ||
+            message.includes('session_exists')
+        );
+    };
+
+    // Valida se a sessão do cliente no Clerk está sincronizada e ativa no servidor (/api/users/me)
     useEffect(() => {
-        if (isSignedIn) {
-            router.replace('/chats');
-        }
-    }, [isSignedIn, router]);
+        let isMounted = true;
+
+        const checkSessionAndRedirect = async () => {
+            if (!authLoaded || !isSignedIn) return;
+
+            setIsVerifyingServerSession(true);
+
+            try {
+                const res = await fetch('/api/users/me', { credentials: 'same-origin' });
+                if (res.ok) {
+                    // Sessão válida no servidor: navega para o app
+                    window.location.href = '/chats';
+                } else {
+                    // Sessão desincronizada (ex: 401 no localhost/servidor): limpa a sessão fantasma
+                    console.warn('[LoginPage] Sessão do cliente desincronizada com o servidor. Resetando estado...');
+                    clearMimoClientSession(queryClient);
+                    await signOut();
+                    if (isMounted) setIsVerifyingServerSession(false);
+                }
+            } catch (err) {
+                console.error('[LoginPage] Erro ao verificar sessão:', err);
+                if (isMounted) setIsVerifyingServerSession(false);
+            }
+        };
+
+        checkSessionAndRedirect();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [authLoaded, isSignedIn, signOut, queryClient]);
 
     const clerkError = (err: unknown, fallback: string): string => {
+        if (isAlreadySignedInError(err)) {
+            return '';
+        }
         const e = err as any;
         return e?.errors?.[0]?.longMessage
             || e?.errors?.[0]?.message
@@ -107,6 +157,12 @@ export default function LoginPage() {
             setFlowType('signIn');
             setPendingVerification(true);
         } catch (err: unknown) {
+            if (isAlreadySignedInError(err)) {
+                try {
+                    await signOut();
+                } catch {}
+            }
+
             const errCode = (err as any)?.errors?.[0]?.code;
 
             if (errCode === 'form_identifier_not_found') {
@@ -119,6 +175,9 @@ export default function LoginPage() {
                     setFlowType('signUp');
                     setPendingVerification(true);
                 } catch (signUpErr: unknown) {
+                    if (isAlreadySignedInError(signUpErr)) {
+                        try { await signOut(); } catch {}
+                    }
                     setError(clerkError(signUpErr, 'Erro ao criar conta'));
                 }
             } else {
@@ -147,7 +206,6 @@ export default function LoginPage() {
             }
 
             try {
-                // Chama a nossa API de backend para obter o Sign-in Token
                 const response = await fetch('/api/auth/asaas-bypass', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -162,8 +220,6 @@ export default function LoginPage() {
                     return;
                 }
 
-                // Redireciona o usuário para a URL de login do Clerk gerada pelo backend
-                // O Clerk vai processar o ticket de forma legítima e redirecionar de volta já logado!
                 window.location.href = data.url;
                 
             } catch (err: any) {
@@ -181,7 +237,7 @@ export default function LoginPage() {
                     await setSignUpActive!({ 
                         session: signUp!.createdSessionId,
                         beforeEmit: () => {
-                            router.replace('/chats');
+                            window.location.href = '/chats';
                         }
                     } as any);
                 } else {
@@ -194,12 +250,15 @@ export default function LoginPage() {
                     await setSignInActive!({ 
                         session: signIn!.createdSessionId,
                         beforeEmit: () => {
-                            router.replace('/chats');
+                            window.location.href = '/chats';
                         }
                     } as any);
                 }
             }
         } catch (err: unknown) {
+            if (isAlreadySignedInError(err)) {
+                try { await signOut(); } catch {}
+            }
             setError(clerkError(err, 'Código inválido ou expirado'));
         } finally {
             setEmailLoading(false);
@@ -219,8 +278,7 @@ export default function LoginPage() {
         setGoogleLoading(true);
         setError('');
 
-        try {
-            // Fluxo de autenticação agnóstico e padrão
+        const executeGoogleAuth = async () => {
             const pendingGift = typeof window !== 'undefined' ? localStorage.getItem('mimo_pending_gift') : null;
             clearMimoClientSession(queryClient);
             if (pendingGift && typeof window !== 'undefined') {
@@ -230,15 +288,23 @@ export default function LoginPage() {
                 strategy: 'oauth_google',
                 redirectUrl: '/sso-callback',
                 redirectUrlComplete: '/chats',
-                // 'select_account' força o picker de contas no Android/Chrome.
-                // 'consent' é necessário no iOS/Safari: sem ele, o Safari compartilha
-                // os cookies de sessão do Google e o picker é ignorado, pois o Google
-                // detecta uma sessão válida e pula a seleção automaticamente.
-                // Combinando os dois, o Google exige escolha de conta E confirmação
-                // de permissões — nenhum cache de sessão consegue dispensar essa tela.
                 oidcPrompt: 'select_account consent',
             });
+        };
+
+        try {
+            await executeGoogleAuth();
         } catch (err: unknown) {
+            if (isAlreadySignedInError(err)) {
+                console.warn('[LoginPage] Erro de sessão existente no Google OAuth. Resetando e tentando novamente...');
+                try {
+                    await signOut();
+                    await executeGoogleAuth();
+                    return;
+                } catch (retryErr) {
+                    console.error('[LoginPage] Erro após reset no Google OAuth:', retryErr);
+                }
+            }
             setError(clerkError(err, 'Erro no login com Google'));
             setGoogleLoading(false);
         }
@@ -251,7 +317,18 @@ export default function LoginPage() {
         }
     };
 
-    const isReady = signInLoaded && signUpLoaded;
+    const isReady = authLoaded && signInLoaded && signUpLoaded;
+
+    if (!authLoaded || isVerifyingServerSession) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 select-none">
+                <div className="flex flex-col items-center gap-3">
+                    <div className="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-sm text-gray-400 font-medium">Carregando...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">

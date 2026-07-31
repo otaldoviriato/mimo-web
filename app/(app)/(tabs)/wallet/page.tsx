@@ -589,49 +589,50 @@ export default function WalletPage() {
                 </div>
 
                 {/* ── BENTO BLOCK 3: ASSINANTES (Substitui o Top Faturamento) ── */}
-                <div className="bg-white border border-purple-100/60 rounded-2xl p-5 shadow-[0_4px_20px_rgb(0,0,0,0.015)] flex flex-col justify-between min-h-[220px]">
-                    <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-2">
-                        <span className="text-xs text-gray-500 font-bold uppercase tracking-widest flex items-center gap-1.5">
-                            <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
-                            Assinantes & Recorrência
-                        </span>
-                        <span className="text-[10.5px] text-purple-650 font-bold uppercase tracking-wider bg-purple-50 px-2.5 py-0.5 rounded-md border border-purple-100/50">
-                            Ativos
-                        </span>
-                    </div>
-
-                    <div className="flex-1 flex flex-col justify-center gap-4">
-                        <div className="flex flex-col">
-                            <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider leading-none">Receita Recorrente Mensal</span>
-                            <span className="text-3xl font-black text-slate-800 tracking-tight mt-1">
-                                {renderValue(animatedProjectedRecurring)}
+                {userData?.isSubscriptionEnabled && (
+                    <div className="bg-white border border-purple-100/60 rounded-2xl p-5 shadow-[0_4px_20px_rgb(0,0,0,0.015)] flex flex-col justify-between min-h-[220px]">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-2">
+                            <span className="text-xs text-gray-500 font-bold uppercase tracking-widest">
+                                Assinantes
+                            </span>
+                            <span className="text-[10.5px] text-purple-650 font-bold uppercase tracking-wider bg-purple-50 px-2.5 py-0.5 rounded-md border border-purple-100/50">
+                                Ativos
                             </span>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4 bg-slate-50/70 border border-slate-100 rounded-xl p-3.5">
-                            <button 
-                                onClick={() => setSubscribersModalOpen(true)}
-                                className="flex flex-col text-left cursor-pointer hover:bg-purple-50/40 p-1 rounded-lg transition-colors group focus:outline-none"
-                            >
-                                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1 group-hover:text-purple-600">
-                                    Assinantes
-                                    <span className="text-[8px] text-purple-600 font-extrabold opacity-0 group-hover:opacity-100 transition-opacity">Ver todos</span>
-                                </span>
-                                <span className="text-lg font-black text-slate-800 mt-0.5 group-hover:text-purple-700">{data.subscribersCount ?? 0}</span>
-                            </button>
-                            <div className="flex flex-col border-l border-gray-200/50 pl-4 py-1">
-                                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Preço Unitário</span>
-                                <span className="text-lg font-black text-slate-800 mt-0.5">
-                                    {renderValue(data.subscriptionPrice ?? 0)}
+                        <div className="flex-1 flex flex-col justify-center gap-4">
+                            <div className="flex flex-col">
+                                <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider leading-none">Receita Recorrente Mensal</span>
+                                <span className="text-3xl font-black text-slate-800 tracking-tight mt-1">
+                                    {renderValue(animatedProjectedRecurring)}
                                 </span>
                             </div>
-                        </div>
 
-                        <p className="text-[10.5px] text-gray-400 leading-snug">
-                            Projeção calculada com base no preço atual da assinatura e na quantidade de assinantes ativos.
-                        </p>
+                            <div className="grid grid-cols-2 gap-4 bg-slate-50/70 border border-slate-100 rounded-xl p-3.5">
+                                <button 
+                                    onClick={() => setSubscribersModalOpen(true)}
+                                    className="flex flex-col text-left cursor-pointer hover:bg-purple-50/40 p-1 rounded-lg transition-colors group focus:outline-none"
+                                >
+                                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1 group-hover:text-purple-600">
+                                        Assinantes
+                                        <span className="text-[8px] text-purple-600 font-extrabold opacity-0 group-hover:opacity-100 transition-opacity">Ver todos</span>
+                                    </span>
+                                    <span className="text-lg font-black text-slate-800 mt-0.5 group-hover:text-purple-700">{data.subscribersCount ?? 0}</span>
+                                </button>
+                                <div className="flex flex-col border-l border-gray-200/50 pl-4 py-1">
+                                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Preço Unitário</span>
+                                    <span className="text-lg font-black text-slate-800 mt-0.5">
+                                        {renderValue(data.subscriptionPrice ?? 0)}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <p className="text-[10.5px] text-gray-400 leading-snug">
+                                Projeção calculada com base no preço atual da assinatura e na quantidade de assinantes ativos.
+                            </p>
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* ── BENTO BLOCK 6: ORIGEM DOS GANHOS (Gráfico de Pizza/Donut) ── */}
                 <div className="bg-white border border-purple-100/60 rounded-2xl p-4 shadow-[0_4px_20px_rgb(0,0,0,0.015)] flex flex-col justify-between min-h-[240px]">

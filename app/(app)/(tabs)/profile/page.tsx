@@ -33,7 +33,6 @@ export default function ProfilePage() {
     const { data: rooms = [], refetch: refetchRooms } = useChatRooms();
     const { data: subscriptionsData, refetch: refetchSubscriptions } = useMySubscriptions();
     const cancelSubscriptionMutation = useCancelSubscription();
-    const shouldShowStartEarningPrompt = !!userData?.isProfessional && rooms.length === 0;
 
     const onRefreshCreator = useCallback(async () => {
         await Promise.all([
@@ -462,30 +461,6 @@ export default function ProfilePage() {
                         <Pencil className="w-3.5 h-3.5 text-purple-500" />
                         Editar Perfil
                     </button>
-
-                    {shouldShowStartEarningPrompt && (
-                        <div className="mt-4 w-full max-w-xs rounded-2xl border border-purple-100 bg-white p-4 text-left shadow-sm">
-                            <div className="mb-3">
-                                <h3 className="text-sm font-black text-slate-900 tracking-tight">Comece a ganhar</h3>
-                                <p className="mt-1 text-xs font-medium leading-snug text-slate-500">
-                                    Seu perfil está pronto. Agora compartilhe-o para iniciar sua primeira conversa.
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={handleShare}
-                                className="flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-3 text-xs font-extrabold text-white shadow-sm transition-all active:scale-95"
-                            >
-                                <Share2 className="h-3.5 w-3.5" />
-                                Compartilhar perfil
-                            </button>
-                            <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold text-slate-500">
-                                <span className="h-2 w-2 rounded-full border border-slate-400" />
-                                Primeira conversa ainda não iniciada
-                            </div>
-                        </div>
-                    )}
-
 
                 </div>
 

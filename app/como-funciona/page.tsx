@@ -46,7 +46,7 @@ function ParaCriadorasContent() {
 
     // ─── ESTADOS E LÓGICA DE AUTENTICAÇÃO DO CLERK ───
     const router = useRouter();
-    const { isSignedIn } = useAuth();
+    const { isSignedIn, isLoaded: authLoaded } = useAuth();
     const { isLoaded: signInLoaded, signIn, setActive: setSignInActive } = useSignIn();
     const { isLoaded: signUpLoaded, signUp, setActive: setSignUpActive } = useSignUp();
 
@@ -72,8 +72,29 @@ function ParaCriadorasContent() {
         setTooltipTimeoutId(id);
     };
 
+    const isAlreadySignedInError = (err: unknown): boolean => {
+        const e = err as any;
+        const code = e?.errors?.[0]?.code || '';
+        const message = (
+            e?.errors?.[0]?.longMessage ||
+            e?.errors?.[0]?.message ||
+            e?.message ||
+            ''
+        ).toLowerCase();
+
+        return (
+            code === 'already_signed_in' ||
+            code === 'session_exists' ||
+            message.includes('already signed in') ||
+            message.includes('already_signed_in') ||
+            message.includes('session_exists')
+        );
+    };
 
     const clerkError = (err: unknown, fallback: string): string => {
+        if (isAlreadySignedInError(err)) {
+            return '';
+        }
         const e = err as any;
         return e?.errors?.[0]?.longMessage
             || e?.errors?.[0]?.message
@@ -236,6 +257,10 @@ function ParaCriadorasContent() {
                 unsafeMetadata: buildProfessionalMetadata()
             });
         } catch (err: unknown) {
+            if (isAlreadySignedInError(err)) {
+                router.replace('/chats');
+                return;
+            }
             setError(clerkError(err, 'Erro no login com Google'));
             setGoogleLoading(false);
         }

@@ -191,12 +191,6 @@ export default function OnboardingPage() {
             !!userData.name &&
             !!userData.username;
 
-        if (isFullyCompleted) {
-            localStorage.removeItem(STEP_KEY);
-            router.replace('/chats');
-            return;
-        }
-
         // 1. Usuário que ainda precisa verificar identidade (via API do servidor)
         if (needsIdentity) {
             setStep('identity');
@@ -212,10 +206,10 @@ export default function OnboardingPage() {
             return;
         }
 
-        // 3. Usuário totalmente configurado e sem step pendente → vai para o app direto
-        //    (sem animação de dismiss, pois o usuário não passou pelo fluxo completo nesta sessão)
+        // 3. Usuário totalmente configurado e sem step pendente:
+        // Se ainda não tem nenhuma conversa criada, abre a tela de introdução/compartilhamento ('done')
         if (userData.isProfessional !== undefined && !needsIdentity) {
-            router.replace('/chats');
+            setStep('done');
         }
 
         // 4. isProfessional === undefined → mostra welcome (novo cadastro, fluxo normal)

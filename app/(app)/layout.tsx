@@ -429,7 +429,6 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                 });
         };
 
-        window.addEventListener('popstate', handlePopState, true);
         return () => {
             window.removeEventListener('popstate', handlePopState, true);
         };
@@ -480,12 +479,12 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     }, [isFullyCompleted]);
 
     useEffect(() => {
-        // Redireciona para o onboarding em três casos:
+        // Redireciona para o onboarding nos seguintes casos:
         // 1. Usuário ainda não escolheu seu papel (cliente ou profissional)
         // 2. Profissional que precisa completar a verificação de identidade
         // 3. Usuário no meio do onboarding (step salvo no localStorage) que tentou acessar outra rota
+        // 4. Usuário sem conversas ativas (rooms.length === 0) no primeiro acesso da sessão
         if (pathname === '/onboarding') return;
-        if (isFullyCompleted) return; // Se já está completamente completo, não redireciona!
 
         if (isProfileValid && userData?.isProfessional === undefined) {
             router.replace('/onboarding');
@@ -499,52 +498,23 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             const step = localStorage.getItem('mimo_onboarding_step');
             if (step === 'identity' || step === 'profile') {
                 router.replace('/onboarding');
+                return;
             }
         }
-    }, [isProfileValid, userData?.isProfessional, userNeedsIdentity, isFullyCompleted, pathname, router]);
 
-    // Se o banco local oficial nos disser que o perfil é pendente, limpamos qualquer resíduo local de liberação anterior
-    if (typeof window !== 'undefined' && isProfileValid && userData?.isProfessional && userData?.professionalStatus === 'pending') {
-        if (localStorage.getItem('mimo_professional_released') !== null) {
-            localStorage.removeItem('mimo_professional_released');
+        // Se o usuário está cadastrado, mas tem 0 conversas, exibimos a tela de instrução/compartilhamento de link
+        if (
+            isFullyCompleted &&
+            rooms !== undefined &&
+            rooms.length === 0 &&
+            typeof window !== 'undefined' &&
+            !localStorage.getItem('mimo_zero_rooms_onboard_shown')
+        ) {
+            localStorage.setItem('mimo_zero_rooms_onboard_shown', 'true');
+            router.replace('/onboarding');
         }
-    }
+    }, [isProfileValid, userData?.isProfessional, userNeedsIdentity, isFullyCompleted, rooms, pathname, router]);
 
-    // Evita hydration mismatch e vazamento visual enquanto carrega o perfil ou o estado de liberação local
-    const isResolvingSecurity = (isSignedIn && !isProfileValid) || (isProfileValid && userData?.isProfessional && isProfessionalReleased === null);
-    const shouldShowSplash = !isLoaded || (isSignedIn && !isNavInitialized) || isResolvingSecurity;
-
-    if (shouldShowSplash) {
-        return (
-            <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gradient-to-br from-[#4C1D95] via-[#6D28D9] to-[#8B5CF6] select-none">
-                <div className="flex flex-col items-center animate-fade-in-up">
-                    {/* Logo do MimoChat */}
-                    <div className="relative w-28 h-28 md:w-32 md:h-32 mb-6 rounded-3xl overflow-hidden shadow-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 animate-pulse">
-                        <img 
-                            src="/Logo.svg" 
-                            alt="MimoChat Logo" 
-                            className="w-20 h-20 md:w-24 md:h-24 object-contain"
-                        />
-                    </div>
-                    {/* Nome do Aplicativo */}
-                    <h1 className="text-white text-3xl md:text-4xl font-extrabold tracking-wider drop-shadow-md">
-                        MimoChat
-                    </h1>
-                    <p className="text-purple-200 text-xs md:text-sm tracking-widest mt-1 uppercase font-semibold opacity-80">
-                        Conectando você de verdade
-                    </p>
-                </div>
-                {/* Loader Sutil */}
-                <div className="absolute bottom-12 flex flex-col items-center">
-                    <div className="flex space-x-1.5 justify-center items-center">
-                        <div className="w-2.5 h-2.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2.5 h-2.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2.5 h-2.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                    </div>
-                </div>
-            </div>
-        );
-    }
     if (!isSignedIn) return null;
 
     // Permite que /onboarding renderize seus próprios filhos — ele gerencia todo o fluxo de cadastro.
