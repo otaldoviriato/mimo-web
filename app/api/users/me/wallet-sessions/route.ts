@@ -89,6 +89,13 @@ export async function GET(request: NextRequest) {
             const earnedAmount = creditAmountByMessageId.get(msgIdStr) ?? (msg.receiverId === clerkId ? (msg.receiverEarnings || msg.cost || 0) : 0);
             const clientClerkId = msg.senderId === clerkId ? msg.receiverId : msg.senderId;
 
+            const isMine = msg.senderId === clerkId;
+            const description = msg.isGift
+                ? (isMine ? 'Presente enviado' : 'Presente recebido')
+                : msg.isLockedImage
+                ? (isMine ? 'Mídia privada enviada' : 'Mídia privada desbloqueada')
+                : (isMine ? 'Mensagem enviada' : 'Mensagem recebida');
+
             return {
                 id: msgIdStr,
                 relatedUserId: clientClerkId,
@@ -98,7 +105,7 @@ export async function GET(request: NextRequest) {
                 type: msg.isGift ? 'gift' : msg.isLockedImage ? 'image_unlock' : 'message',
                 amount: earnedAmount,
                 timestamp: msg.timestamp || msg.createdAt,
-                description: msg.isGift ? 'Presente recebido' : msg.isLockedImage ? 'Mídia privada desbloqueada' : 'Mensagem enviada'
+                description
             };
         });
 
