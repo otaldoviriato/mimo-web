@@ -285,39 +285,7 @@ export default function ChatsPage() {
     };
 
     const renderStartEarningOverlay = () => {
-        if (!myProfile?.isProfessional || !myProfile.username || rooms.length > 0) return null;
-
-        return (
-            <div className="pointer-events-none absolute left-3 right-3 top-3 z-30 flex justify-center md:top-4">
-                <div className="pointer-events-auto w-full max-w-[430px] rounded-xl border border-purple-100 bg-white/95 p-4 shadow-[0_18px_45px_rgba(88,28,135,0.16)] backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-300">
-                    <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-600 shadow-md shadow-purple-600/20">
-                            <img src="/Logo.svg" alt="Mimo" className="h-6 w-6 object-contain brightness-0 invert" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <h3 className="text-sm font-black tracking-tight text-slate-900">Comece a ganhar</h3>
-                            <p className="mt-1 text-xs font-medium leading-snug text-slate-500">
-                                Seu perfil está pronto. Agora compartilhe-o para iniciar sua primeira conversa.
-                            </p>
-                        </div>
-                    </div>
-
-                    <button
-                        type="button"
-                        onClick={handleShareProfile}
-                        className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-3 text-xs font-extrabold text-white shadow-sm shadow-purple-600/15 transition-all hover:bg-purple-700 active:scale-95"
-                    >
-                        <Share2 className="h-3.5 w-3.5" />
-                        {copiedProfileLink ? 'Link copiado' : 'Compartilhar perfil'}
-                    </button>
-
-                    <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold text-slate-500">
-                        <span className="h-2 w-2 rounded-full border border-slate-400" />
-                        Primeira conversa ainda não iniciada
-                    </div>
-                </div>
-            </div>
-        );
+        return null;
     };
 
     // ─── Listeners de WebSocket em tempo real ───────────────────────────────
@@ -567,7 +535,6 @@ export default function ChatsPage() {
         <div className="relative flex flex-col h-full">
 
             {renderVerificationBanner()}
-            {renderStartEarningOverlay()}
 
             {/* Modal de crédito promocional */}
             {giftModal && (
@@ -740,16 +707,53 @@ export default function ChatsPage() {
                 {isLoading ? (
                     <ChatListSkeleton />
                 ) : rooms.length === 0 ? (
-                    <div className="flex-1 flex flex-col items-center justify-center px-8 py-20 text-center animate-in fade-in duration-500">
-                        <div className="w-16 h-16 bg-purple-50/80 rounded-2xl flex items-center justify-center mb-4 text-purple-600 border border-purple-100 shadow-inner">
-                            <MessageCircle className="w-7 h-7 text-purple-600" />
+                    <div className="flex-1 flex flex-col items-center justify-center px-6 py-16 text-center animate-in fade-in duration-300">
+                        <div className="w-16 h-16 bg-purple-50/80 rounded-full flex items-center justify-center mb-4 text-purple-600 border border-purple-100/60">
+                            <MessageCircle className="w-8 h-8 text-purple-600" />
                         </div>
-                        <h2 className="text-base font-bold text-slate-900 mb-1">Sem conversas ainda</h2>
-                        <p className="text-slate-500 text-xs max-w-[260px] leading-relaxed">
-                            {myProfile?.isProfessional
-                                ? "Suas conversas aparecerão aqui assim que seus clientes entrarem pelo seu link."
-                                : "Suas mensagens de conversa com perfis do MimoChat aparecerão aqui."}
-                        </p>
+
+                        <h2 className="text-base font-bold text-slate-900 mb-2">
+                            Nenhuma conversa ainda
+                        </h2>
+
+                        {myProfile?.isProfessional ? (
+                            <div className="flex flex-col items-center max-w-xs">
+                                <p className="text-xs text-slate-500 leading-relaxed mb-6">
+                                    O Mimo não traz clientes sozinho. Compartilhe seu perfil nas suas redes para receber mensagens!
+                                </p>
+
+                                <button
+                                    type="button"
+                                    onClick={handleShareProfile}
+                                    className="inline-flex items-center justify-center gap-2 rounded-full bg-purple-600 hover:bg-purple-700 active:scale-[0.98] transition-all text-white text-xs font-bold py-3 px-6 shadow-md shadow-purple-600/20 cursor-pointer"
+                                >
+                                    {copiedProfileLink ? (
+                                        <>
+                                            <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+                                            Link copiado!
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Share2 className="h-4 w-4" />
+                                            Compartilhar meu perfil
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center max-w-xs">
+                                <p className="text-xs text-slate-500 leading-relaxed mb-6">
+                                    Suas conversas no MimoChat aparecerão aqui. Explore perfis para começar!
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => router.push('/search')}
+                                    className="inline-flex items-center justify-center gap-2 rounded-full bg-purple-600 hover:bg-purple-700 active:scale-[0.98] transition-all text-white text-xs font-bold py-3 px-6 shadow-md shadow-purple-600/20 cursor-pointer"
+                                >
+                                    Explorar perfis
+                                </button>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <ul>

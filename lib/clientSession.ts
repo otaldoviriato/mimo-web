@@ -25,6 +25,7 @@ const LOCAL_STORAGE_PREFIXES = [
 const SESSION_STORAGE_EXACT_KEYS = [
     'mimo_pending_gift',
     'mimo_hide_profile_progress_banner',
+    'mimo_zero_rooms_onboard_shown',
 ] as const;
 
 export function clearMimoClientSession(queryClient?: QueryClient) {

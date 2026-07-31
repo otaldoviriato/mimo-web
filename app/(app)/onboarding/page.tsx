@@ -6,7 +6,7 @@ import { useClerk } from '@clerk/nextjs';
 import {
     User, Crown, Check, CheckCircle2, ShieldCheck, CreditCard, Calendar,
     Camera, ChevronLeft, UserCheck, Loader2, X, Plus, AlertCircle, LogOut,
-    Copy, Link2, Share2
+    Share2, Copy, Link2, ArrowRight
 } from 'lucide-react';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useMyProfile } from '@/hooks/useQueries';
@@ -87,12 +87,51 @@ export default function OnboardingPage() {
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [copiedLink, setCopiedLink] = useState(false);
 
-    const handleCopyLink = (url: string) => {
-        if (typeof window !== 'undefined') {
-            navigator.clipboard.writeText(url);
-            setCopiedLink(true);
-            setTimeout(() => setCopiedLink(false), 2500);
+    const copyProfileLink = async (url: string) => {
+        if (typeof window === 'undefined') return;
+
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(url);
+            } else {
+                const textArea = document.createElement('textarea');
+                textArea.value = url;
+                textArea.setAttribute('readonly', '');
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-9999px';
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+            }
+        } catch (err) {
+            console.error('Erro ao copiar link do perfil:', err);
         }
+
+        setCopiedLink(true);
+        setTimeout(() => setCopiedLink(false), 2500);
+    };
+
+    const handleShareProfile = async (url: string) => {
+        if (typeof window === 'undefined') return;
+
+        const shareData = {
+            title: 'MimoChat',
+            text: 'Acesse meu perfil no MimoChat.',
+            url,
+        };
+
+        if (navigator.share) {
+            try {
+                await navigator.share(shareData);
+                return;
+            } catch (err: unknown) {
+                if (err instanceof DOMException && err.name === 'AbortError') return;
+                console.error('Erro ao compartilhar perfil:', err);
+            }
+        }
+
+        await copyProfileLink(url);
     };
 
     const handleConfirmLogout = async () => {
@@ -995,6 +1034,9 @@ export default function OnboardingPage() {
         const fullLink = typeof window !== 'undefined'
             ? `${window.location.origin}/${userSlug}`
             : `mimo.chat/${userSlug}`;
+        const creatorName = displayName || userData?.name || userSlug || 'Seu perfil';
+        const profileImage = photoPreview || userData?.photoUrl;
+        const profileHandle = userSlug ? `@${userSlug}` : '@seu-perfil';
 
         if (!isProf) {
             return (
@@ -1020,103 +1062,129 @@ export default function OnboardingPage() {
         }
 
         return (
-            <div className="flex flex-col h-full bg-slate-50 overflow-y-auto">
-                {/* Header Superior Roxo com a Logo Oficial Mimo */}
-                <div className="bg-gradient-to-r from-purple-700 via-purple-600 to-purple-800 text-white px-6 pt-9 pb-7 text-center shadow-md relative shrink-0">
-                    <div className="w-14 h-14 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center mx-auto mb-3 border border-white/20 shadow-inner">
-                        <img src="/Logo.svg" alt="MimoChat" className="w-8 h-8 object-contain brightness-0 invert" />
+            <div className="flex flex-col h-full min-h-0 bg-slate-50 overflow-hidden">
+                <div className="flex-1 min-h-0 overflow-y-auto px-5 pt-6 pb-6 max-w-md mx-auto w-full flex flex-col justify-between">
+                    <div>
+                        {/* Top Navbar */}
+                        <div className="flex items-center justify-between shrink-0 mb-6">
+                            <div className="h-9 flex items-center gap-2">
+                                <img src="/Logo.svg" alt="MimoChat" className="h-7 w-auto object-contain" />
+                            </div>
+                            <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-sm">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                Perfil ativo
+                            </span>
+                        </div>
+
+                        {/* Title & Headline */}
+                        <div className="text-center space-y-2 mb-6">
+                            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-tight">
+                                Seu perfil está no ar!
+                            </h2>
+                            <p className="text-sm font-medium text-slate-600 max-w-[320px] mx-auto leading-relaxed">
+                                Para começar a receber conversas, compartilhe o link do seu perfil com seu público.
+                            </p>
+                        </div>
+
+                        {/* Profile Preview Card */}
+                        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xl shadow-slate-200/50 overflow-hidden mb-6">
+                            <div className="h-20 bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-700 relative">
+                                <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:12px_12px]" />
+                            </div>
+                            <div className="-mt-10 px-5 pb-5 text-center flex flex-col items-center">
+                                <div className="w-20 h-20 rounded-2xl bg-white p-1 shadow-lg ring-1 ring-slate-100 mb-3 relative">
+                                    <div className="w-full h-full rounded-[14px] overflow-hidden bg-purple-50 flex items-center justify-center">
+                                        {profileImage ? (
+                                            <img src={profileImage} alt="" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <UserCheck className="w-10 h-10 text-purple-600" />
+                                        )}
+                                    </div>
+                                </div>
+                                <h3 className="text-lg font-bold text-slate-900 truncate max-w-[240px]">
+                                    {creatorName}
+                                </h3>
+                                <p className="text-xs font-semibold text-purple-600 mb-4 truncate max-w-[240px]">
+                                    {profileHandle}
+                                </p>
+
+                                {/* Link Copy Box */}
+                                <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-2 flex items-center justify-between gap-2 shadow-inner">
+                                    <div className="flex items-center gap-2 pl-2.5 min-w-0 flex-1">
+                                        <Link2 className="w-4 h-4 text-purple-600 shrink-0" />
+                                        <span className="text-xs font-mono font-medium text-slate-700 truncate">
+                                            {fullLink}
+                                        </span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => copyProfileLink(fullLink)}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+                                            copiedLink
+                                                ? 'bg-emerald-600 text-white shadow-sm'
+                                                : 'bg-purple-600 hover:bg-purple-700 text-white active:scale-95'
+                                        }`}
+                                    >
+                                        {copiedLink ? (
+                                            <>
+                                                <Check className="w-3.5 h-3.5" />
+                                                Copiado
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Copy className="w-3.5 h-3.5" />
+                                                Copiar
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Step-by-step Guide */}
+                        <div className="bg-purple-50/70 border border-purple-100 rounded-2xl p-4 space-y-3">
+                            <h4 className="text-xs font-extrabold uppercase tracking-wider text-purple-900 flex items-center gap-1.5">
+                                Como conseguir novas conversas:
+                            </h4>
+                            <div className="space-y-2.5 text-xs text-slate-700 font-medium">
+                                <div className="flex items-start gap-2.5">
+                                    <div className="w-5 h-5 rounded-full bg-purple-200 text-purple-800 font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">
+                                        1
+                                    </div>
+                                    <p>Copie o seu link exclusivo do MimoChat acima.</p>
+                                </div>
+                                <div className="flex items-start gap-2.5">
+                                    <div className="w-5 h-5 rounded-full bg-purple-200 text-purple-800 font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">
+                                        2
+                                    </div>
+                                    <p>Adicione na bio do <strong>Instagram, TikTok</strong> ou <strong>Status do WhatsApp</strong>.</p>
+                                </div>
+                                <div className="flex items-start gap-2.5">
+                                    <div className="w-5 h-5 rounded-full bg-purple-200 text-purple-800 font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">
+                                        3
+                                    </div>
+                                    <p>Seus seguidores vão clicar no link para iniciar conversas com você!</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <span className="inline-block px-3 py-1 bg-white/15 text-purple-100 rounded-full text-[10px] font-extrabold uppercase tracking-widest mb-2 border border-white/10">
-                        Perfil Criado com Sucesso!
-                    </span>
-                    <h2 className="text-xl md:text-2xl font-black text-white tracking-tight leading-tight max-w-xs mx-auto">
-                        Como começar a ganhar dinheiro com mensagens
-                    </h2>
                 </div>
 
-                <div className="flex-1 px-5 py-6 max-w-md mx-auto w-full flex flex-col justify-start gap-5">
-                    <p className="text-xs text-slate-600 text-center leading-relaxed max-w-sm mx-auto font-medium">
-                        O MimoChat é a sua ferramenta oficial para ganhar dinheiro trocando mensagens. Siga estes 3 passos simples para receber seus primeiros mimos:
-                    </p>
-
-                    {/* Box do Link Exclusivo da Criadora */}
-                    <div className="bg-white border-2 border-purple-200 rounded-2xl p-4 shadow-sm space-y-2.5">
-                        <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-extrabold uppercase tracking-widest text-purple-700 flex items-center gap-1.5">
-                                <Link2 className="w-3.5 h-3.5 text-purple-600" /> Seu Link Exclusivo
-                            </span>
-                            {copiedLink && (
-                                <span className="text-[10px] font-bold text-emerald-600 animate-in fade-in">
-                                    Copiado!
-                                </span>
-                            )}
-                        </div>
-                        <div className="flex items-center gap-2 bg-purple-50/70 border border-purple-100 rounded-xl p-2.5">
-                            <span className="text-xs font-bold text-purple-950 flex-1 truncate">
-                                {fullLink}
-                            </span>
-                            <button
-                                type="button"
-                                onClick={() => handleCopyLink(fullLink)}
-                                className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-extrabold text-xs rounded-xl transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-md shadow-purple-600/20"
-                            >
-                                {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                                {copiedLink ? 'Copiado' : 'Copiar'}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Os 3 Passos de Sucesso */}
-                    <div className="bg-white border border-purple-100 rounded-2xl p-4 shadow-sm space-y-4">
-                        <h3 className="text-xs font-extrabold uppercase tracking-wider text-purple-900 border-b border-slate-100 pb-2.5 flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-purple-600 inline-block" />
-                            Passo a passo para começar:
-                        </h3>
-
-                        <div className="flex items-start gap-3">
-                            <div className="w-7 h-7 rounded-xl bg-purple-600 text-white flex items-center justify-center text-xs font-extrabold shrink-0 mt-0.5 shadow-sm shadow-purple-600/30">
-                                1
-                            </div>
-                            <div className="min-w-0 flex-1">
-                                <p className="text-xs font-bold text-slate-900">Copie e compartilhe seu link</p>
-                                <p className="text-[11px] text-slate-600 leading-snug mt-0.5 font-medium">
-                                    Coloque na bio do seu Instagram, TikTok ou envie nos seus grupos e conversas do WhatsApp.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="flex items-start gap-3">
-                            <div className="w-7 h-7 rounded-xl bg-purple-600 text-white flex items-center justify-center text-xs font-black shrink-0 mt-0.5 shadow-sm shadow-purple-600/30">
-                                2
-                            </div>
-                            <div className="min-w-0 flex-1">
-                                <p className="text-xs font-bold text-slate-900">Homens entram e recarregam créditos</p>
-                                <p className="text-[11px] text-slate-600 leading-snug mt-0.5 font-medium">
-                                    Ao clicar no seu link, eles acessam seu perfil e adicionam saldo para mandar mensagens para você.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="flex items-start gap-3">
-                            <div className="w-7 h-7 rounded-xl bg-purple-600 text-white flex items-center justify-center text-xs font-black shrink-0 mt-0.5 shadow-sm shadow-purple-600/30">
-                                3
-                            </div>
-                            <div className="min-w-0 flex-1">
-                                <p className="text-xs font-bold text-slate-900">Responda mensagens e receba via Pix</p>
-                                <p className="text-[11px] text-slate-600 leading-snug mt-0.5 font-medium">
-                                    Cada mensagem ou foto trocada gera dinheiro no seu saldo. Você pode realizar saques rápidos via Pix a qualquer momento.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* CTA Botão */}
-                <div className="px-5 pt-3 pb-8 shrink-0 bg-white border-t border-slate-100 shadow-lg">
-                    <div className="max-w-md mx-auto">
-                        <PrimaryButton onClick={navigateToApp}>
-                            Ir para Minhas Conversas
+                {/* Bottom Actions Footer */}
+                <div className="px-5 pt-3 pb-[calc(env(safe-area-inset-bottom)+16px)] shrink-0 bg-white border-t border-slate-200/80 shadow-lg">
+                    <div className="max-w-md mx-auto space-y-2.5">
+                        <PrimaryButton onClick={() => handleShareProfile(fullLink)}>
+                            <Share2 className="w-4 h-4" />
+                            Compartilhar meu perfil
                         </PrimaryButton>
+                        <button
+                            type="button"
+                            onClick={navigateToApp}
+                            className="w-full py-3 text-xs font-bold text-slate-600 hover:text-slate-900 active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                        >
+                            Ir para minhas conversas
+                            <ArrowRight className="w-4 h-4" />
+                        </button>
                     </div>
                 </div>
             </div>

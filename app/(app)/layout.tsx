@@ -508,9 +508,9 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             rooms !== undefined &&
             rooms.length === 0 &&
             typeof window !== 'undefined' &&
-            !localStorage.getItem('mimo_zero_rooms_onboard_shown')
+            !sessionStorage.getItem('mimo_zero_rooms_onboard_shown')
         ) {
-            localStorage.setItem('mimo_zero_rooms_onboard_shown', 'true');
+            sessionStorage.setItem('mimo_zero_rooms_onboard_shown', 'true');
             router.replace('/onboarding');
         }
     }, [isProfileValid, userData?.isProfessional, userNeedsIdentity, isFullyCompleted, rooms, pathname, router]);
