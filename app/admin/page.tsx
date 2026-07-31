@@ -206,261 +206,210 @@ export default function AdminPage() {
                                 <StatsCard title="Clientes Trazidos" value={loadingDashboard ? '...' : dashboardData?.metrics?.totalBroughtClients?.value || '0'} icon={UserPlus} color="purple" />
                             </div>
 
-                            {/* Conteúdo Principal: Acompanhamento de Profissionais + Depósitos Recentes */}
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                {/* Tabela Principal de Profissionais (2 Colunas no desktop) */}
-                                <div className="lg:col-span-2 bg-white border border-slate-200/80 rounded-2xl shadow-sm flex flex-col overflow-hidden">
-                                    {/* Header do Painel */}
-                                    <div className="p-5 border-b border-slate-100 bg-white space-y-4">
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                            <div>
-                                                <h3 className="text-base font-bold text-slate-800 tracking-tight flex items-center gap-2">
-                                                    <UserCheck size={18} className="text-purple-600" />
-                                                    Acompanhamento de Profissionais
-                                                </h3>
-                                                <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                                                    Atividade recente e métricas de atribuição de novos clientes masculinos.
-                                                </p>
-                                            </div>
-                                            {/* Campo de Busca */}
-                                            <div className="relative w-full sm:w-64">
-                                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                                <input
-                                                    type="text"
-                                                    placeholder="Buscar profissional..."
-                                                    value={profSearch}
-                                                    onChange={(e) => setProfSearch(e.target.value)}
-                                                    className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
-                                                />
-                                            </div>
+                            {/* Tabela Principal de Profissionais (Largura Total) */}
+                            <div className="w-full bg-white border border-slate-200/80 rounded-2xl shadow-sm flex flex-col overflow-hidden">
+                                {/* Header do Painel */}
+                                <div className="p-5 border-b border-slate-100 bg-white space-y-4">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                        <div>
+                                            <h3 className="text-base font-bold text-slate-800 tracking-tight flex items-center gap-2">
+                                                <UserCheck size={18} className="text-purple-600" />
+                                                Acompanhamento de Profissionais
+                                            </h3>
+                                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                                Atividade recente e métricas de atribuição de novos clientes masculinos.
+                                            </p>
                                         </div>
-
-                                        {/* Seleção de Abas */}
-                                        <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
-                                            <button
-                                                onClick={() => setProfTab('active_absent')}
-                                                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                                    profTab === 'active_absent'
-                                                        ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/20'
-                                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
-                                                }`}
-                                            >
-                                                <span>Ativas & Ausentes</span>
-                                                <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${
-                                                    profTab === 'active_absent' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-                                                }`}>
-                                                    {dashboardData?.activeAndAbsentProfessionals?.length || 0}
-                                                </span>
-                                            </button>
-
-                                            <button
-                                                onClick={() => setProfTab('inactive')}
-                                                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                                    profTab === 'inactive'
-                                                        ? 'bg-rose-600 text-white shadow-sm shadow-rose-600/20'
-                                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
-                                                }`}
-                                            >
-                                                <span>Inativas (&gt; 7 dias)</span>
-                                                <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${
-                                                    profTab === 'inactive' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-                                                }`}>
-                                                    {dashboardData?.inactiveProfessionals?.length || 0}
-                                                </span>
-                                            </button>
+                                        {/* Campo de Busca */}
+                                        <div className="relative w-full sm:w-64">
+                                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="Buscar profissional..."
+                                                value={profSearch}
+                                                onChange={(e) => setProfSearch(e.target.value)}
+                                                className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
+                                            />
                                         </div>
                                     </div>
 
-                                    {/* Tabela de Dados */}
-                                    <div className="flex-1 overflow-x-auto">
-                                        {loadingDashboard ? (
-                                            <div className="py-20 flex flex-col items-center justify-center gap-2">
-                                                <div className="animate-spin h-6 w-6 text-purple-600 rounded-full border-2 border-slate-200 border-t-purple-600" />
-                                                <span className="text-xs text-slate-400 font-semibold">Carregando profissionais...</span>
-                                            </div>
-                                        ) : (() => {
-                                            const rawList = profTab === 'active_absent'
-                                                ? (dashboardData?.activeAndAbsentProfessionals || [])
-                                                : (dashboardData?.inactiveProfessionals || []);
+                                    {/* Seleção de Abas */}
+                                    <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                                        <button
+                                            onClick={() => setProfTab('active_absent')}
+                                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                                profTab === 'active_absent'
+                                                    ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/20'
+                                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
+                                            }`}
+                                        >
+                                            <span>Ativas & Ausentes</span>
+                                            <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${
+                                                profTab === 'active_absent' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                                            }`}>
+                                                {dashboardData?.activeAndAbsentProfessionals?.length || 0}
+                                            </span>
+                                        </button>
 
-                                            const filtered = rawList.filter((prof: any) => {
-                                                if (!profSearch.trim()) return true;
-                                                const q = profSearch.toLowerCase().trim().replace('@', '');
-                                                return (
-                                                    prof.name?.toLowerCase().includes(q) ||
-                                                    prof.username?.toLowerCase().includes(q) ||
-                                                    prof.email?.toLowerCase().includes(q)
-                                                );
-                                            });
-
-                                            if (filtered.length === 0) {
-                                                return (
-                                                    <div className="py-20 text-center space-y-2">
-                                                        <UserX size={32} className="mx-auto text-slate-300 stroke-[1.5]" />
-                                                        <p className="text-xs font-semibold text-slate-500">
-                                                            {profSearch ? 'Nenhuma profissional encontrada para esta busca.' : 'Nenhuma profissional cadastrada nesta aba.'}
-                                                        </p>
-                                                    </div>
-                                                );
-                                            }
-
-                                            return (
-                                                <table className="w-full text-left border-collapse">
-                                                    <thead>
-                                                        <tr className="border-b border-slate-100 bg-slate-50/50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                                            <th className="py-3 px-4">Profissional</th>
-                                                            <th className="py-3 px-3">Status</th>
-                                                            <th className="py-3 px-3 text-center">Clientes Trazidos</th>
-                                                            <th className="py-3 px-3">Última Atração</th>
-                                                            <th className="py-3 px-3">Último Acesso</th>
-                                                            <th className="py-3 px-4 text-right">Faturamento</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-slate-100 text-xs">
-                                                        {filtered.map((prof: any) => (
-                                                            <tr key={prof.clerkId} className="hover:bg-slate-50/80 transition-colors group">
-                                                                {/* Profissional Info */}
-                                                                <td className="py-3 px-4">
-                                                                    <div className="flex items-center gap-3">
-                                                                        {prof.photoUrl ? (
-                                                                            <img src={prof.photoUrl} alt={prof.name} className="w-9 h-9 rounded-xl object-cover border border-slate-200 shrink-0" />
-                                                                        ) : (
-                                                                            <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs shrink-0">
-                                                                                {prof.name[0]?.toUpperCase() || 'P'}
-                                                                            </div>
-                                                                        )}
-                                                                        <div className="flex flex-col min-w-0">
-                                                                            <Link href={`/admin/users/${prof.clerkId}`} className="font-bold text-slate-800 hover:text-purple-600 transition-colors truncate flex items-center gap-1">
-                                                                                {prof.name}
-                                                                                <ExternalLink size={11} className="opacity-0 group-hover:opacity-100 transition-opacity text-purple-600 shrink-0" />
-                                                                            </Link>
-                                                                            <span className="text-[10px] text-slate-400 font-semibold truncate">@{prof.username}</span>
-                                                                        </div>
-                                                                    </div>
-                                                                </td>
-
-                                                                {/* Status Badge */}
-                                                                <td className="py-3 px-3 whitespace-nowrap">
-                                                                    {prof.status === 'active' && (
-                                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-bold text-[10px]">
-                                                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                                                            Ativa ({formatRelativeTime(prof.lastAccessAt)})
-                                                                        </span>
-                                                                    )}
-                                                                    {prof.status === 'absent' && (
-                                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200/80 font-bold text-[10px]">
-                                                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                                                                            Ausente ({formatRelativeTime(prof.lastAccessAt)})
-                                                                        </span>
-                                                                    )}
-                                                                    {prof.status === 'inactive' && (
-                                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200 font-bold text-[10px]">
-                                                                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                                                                            Inativa ({formatRelativeTime(prof.lastAccessAt)})
-                                                                        </span>
-                                                                    )}
-                                                                </td>
-
-                                                                {/* Clientes Trazidos */}
-                                                                <td className="py-3 px-3 text-center whitespace-nowrap">
-                                                                    <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-black ${
-                                                                        prof.broughtClientsCount > 0
-                                                                            ? 'bg-purple-50 text-purple-700 border border-purple-200/60'
-                                                                            : 'bg-slate-50 text-slate-400 border border-slate-100'
-                                                                    }`}>
-                                                                        {prof.broughtClientsCount} {prof.broughtClientsCount === 1 ? 'cliente' : 'clientes'}
-                                                                    </span>
-                                                                </td>
-
-                                                                {/* Última Atração */}
-                                                                <td className="py-3 px-3 whitespace-nowrap text-slate-600 font-medium text-[11px]">
-                                                                    {prof.lastClientBroughtAt ? (
-                                                                        <div className="flex flex-col">
-                                                                            <span className="font-bold text-slate-700">{formatRelativeTime(prof.lastClientBroughtAt)}</span>
-                                                                            <span className="text-[9px] text-slate-400">
-                                                                                {new Date(prof.lastClientBroughtAt).toLocaleDateString('pt-BR')} às {new Date(prof.lastClientBroughtAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                                                            </span>
-                                                                        </div>
-                                                                    ) : (
-                                                                        <span className="text-slate-400 italic text-[11px]">Nenhum ainda</span>
-                                                                    )}
-                                                                </td>
-
-                                                                {/* Último Acesso */}
-                                                                <td className="py-3 px-3 whitespace-nowrap text-slate-600 font-medium text-[11px]">
-                                                                    {prof.lastAccessAt ? (
-                                                                        <div className="flex flex-col">
-                                                                            <span>{new Date(prof.lastAccessAt).toLocaleDateString('pt-BR')}</span>
-                                                                            <span className="text-[9px] text-slate-400">
-                                                                                {new Date(prof.lastAccessAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                                                            </span>
-                                                                        </div>
-                                                                    ) : (
-                                                                        <span className="text-slate-400 italic text-[11px]">N/D</span>
-                                                                    )}
-                                                                </td>
-
-                                                                {/* Faturamento */}
-                                                                <td className="py-3 px-4 text-right whitespace-nowrap">
-                                                                    <span className="font-extrabold text-slate-800 text-xs">
-                                                                        {(prof.totalEarned || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                                                    </span>
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            );
-                                        })()}
+                                        <button
+                                            onClick={() => setProfTab('inactive')}
+                                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                                profTab === 'inactive'
+                                                    ? 'bg-rose-600 text-white shadow-sm shadow-rose-600/20'
+                                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
+                                            }`}
+                                        >
+                                            <span>Inativas (&gt; 7 dias)</span>
+                                            <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${
+                                                profTab === 'inactive' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                                            }`}>
+                                                {dashboardData?.inactiveProfessionals?.length || 0}
+                                            </span>
+                                        </button>
                                     </div>
                                 </div>
 
-                                {/* Painel Secundário: Últimos Depósitos */}
-                                <div className="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-sm flex flex-col h-fit">
-                                    <div className="mb-4">
-                                        <h3 className="text-base font-bold text-slate-800 tracking-tight flex items-center gap-2">
-                                            <TrendingUp size={18} className="text-emerald-600" />
-                                            Últimos Depósitos
-                                        </h3>
-                                        <p className="text-[11px] text-slate-500 font-medium">Recargas recentes via AbacatePay.</p>
-                                    </div>
-                                    <div className="space-y-2 flex-1">
-                                        {loadingDashboard ? (
-                                            <div className="py-16 flex flex-col items-center justify-center gap-2">
-                                                <div className="animate-spin h-6 w-6 text-purple-600 rounded-full border-2 border-slate-200 border-t-purple-600" />
-                                                <span className="text-[10px] text-slate-400 font-semibold">Carregando depósitos...</span>
-                                            </div>
-                                        ) : dashboardData?.recentTransactions?.length > 0 ? (
-                                            dashboardData.recentTransactions.map((tx: any) => (
-                                                <div key={tx.id} className="flex items-center gap-3 p-2.5 hover:bg-slate-50 rounded-xl transition-all border border-transparent hover:border-slate-100 group">
-                                                    <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 shrink-0">
-                                                        <CheckCircle2 size={14} />
-                                                    </div>
-                                                    <div className="flex flex-col min-w-0 flex-1">
-                                                        {tx.userId ? (
-                                                            <Link href={`/admin/users/${tx.userId}`} className="text-xs font-bold text-purple-600 hover:text-purple-800 hover:underline transition-colors text-left truncate">
-                                                                {tx.user}
-                                                            </Link>
-                                                        ) : (
-                                                            <span className="text-xs font-bold text-slate-800 truncate">{tx.user}</span>
-                                                        )}
-                                                        <span className="text-[10px] text-slate-400 font-semibold truncate">{tx.type} · {tx.time}</span>
-                                                    </div>
-                                                    <div className="text-right flex items-center gap-1.5 shrink-0">
-                                                        <div className="flex flex-col text-right">
-                                                            <span className="text-[11px] font-bold text-slate-700 block">{tx.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                                                            <span className="text-[8px] text-slate-400 font-semibold uppercase">{tx.displayId || tx.id}</span>
-                                                        </div>
-                                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(tx.id, tx.displayId || tx.id); }} className="p-1 hover:text-rose-600 rounded-lg text-slate-350 hover:bg-rose-50 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" title="Excluir Transação">
-                                                            <Trash2 size={12} />
-                                                        </button>
-                                                    </div>
+                                {/* Tabela de Dados */}
+                                <div className="flex-1 overflow-x-auto">
+                                    {loadingDashboard ? (
+                                        <div className="py-20 flex flex-col items-center justify-center gap-2">
+                                            <div className="animate-spin h-6 w-6 text-purple-600 rounded-full border-2 border-slate-200 border-t-purple-600" />
+                                            <span className="text-xs text-slate-400 font-semibold">Carregando profissionais...</span>
+                                        </div>
+                                    ) : (() => {
+                                        const rawList = profTab === 'active_absent'
+                                            ? (dashboardData?.activeAndAbsentProfessionals || [])
+                                            : (dashboardData?.inactiveProfessionals || []);
+
+                                        const filtered = rawList.filter((prof: any) => {
+                                            if (!profSearch.trim()) return true;
+                                            const q = profSearch.toLowerCase().trim().replace('@', '');
+                                            return (
+                                                prof.name?.toLowerCase().includes(q) ||
+                                                prof.username?.toLowerCase().includes(q) ||
+                                                prof.email?.toLowerCase().includes(q)
+                                            );
+                                        });
+
+                                        if (filtered.length === 0) {
+                                            return (
+                                                <div className="py-20 text-center space-y-2">
+                                                    <UserX size={32} className="mx-auto text-slate-300 stroke-[1.5]" />
+                                                    <p className="text-xs font-semibold text-slate-500">
+                                                        {profSearch ? 'Nenhuma profissional encontrada para esta busca.' : 'Nenhuma profissional cadastrada nesta aba.'}
+                                                    </p>
                                                 </div>
-                                            ))
-                                        ) : (
-                                            <div className="py-16 text-center text-xs font-semibold text-slate-400">Nenhum depósito recente.</div>
-                                        )}
-                                    </div>
+                                            );
+                                        }
+
+                                        return (
+                                            <table className="w-full text-left border-collapse">
+                                                <thead>
+                                                    <tr className="border-b border-slate-100 bg-slate-50/50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                                        <th className="py-3 px-4">Profissional</th>
+                                                        <th className="py-3 px-3">Status</th>
+                                                        <th className="py-3 px-3 text-center">Clientes Trazidos</th>
+                                                        <th className="py-3 px-3">Última Atração</th>
+                                                        <th className="py-3 px-3">Último Acesso</th>
+                                                        <th className="py-3 px-4 text-right">Faturamento</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100 text-xs">
+                                                    {filtered.map((prof: any) => (
+                                                        <tr key={prof.clerkId} className="hover:bg-slate-50/80 transition-colors group">
+                                                            {/* Profissional Info */}
+                                                            <td className="py-3 px-4">
+                                                                <div className="flex items-center gap-3">
+                                                                    {prof.photoUrl ? (
+                                                                        <img src={prof.photoUrl} alt={prof.name} className="w-9 h-9 rounded-xl object-cover border border-slate-200 shrink-0" />
+                                                                    ) : (
+                                                                        <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                                                            {prof.name[0]?.toUpperCase() || 'P'}
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="flex flex-col min-w-0">
+                                                                        <Link href={`/admin/users/${prof.clerkId}`} className="font-bold text-slate-800 hover:text-purple-600 transition-colors truncate flex items-center gap-1">
+                                                                            {prof.name}
+                                                                            <ExternalLink size={11} className="opacity-0 group-hover:opacity-100 transition-opacity text-purple-600 shrink-0" />
+                                                                        </Link>
+                                                                        <span className="text-[10px] text-slate-400 font-semibold truncate">@{prof.username}</span>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+
+                                                            {/* Status Badge */}
+                                                            <td className="py-3 px-3 whitespace-nowrap">
+                                                                {prof.status === 'active' && (
+                                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-bold text-[10px]">
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                                        Ativa ({formatRelativeTime(prof.lastAccessAt)})
+                                                                    </span>
+                                                                )}
+                                                                {prof.status === 'absent' && (
+                                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200/80 font-bold text-[10px]">
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                                                        Ausente ({formatRelativeTime(prof.lastAccessAt)})
+                                                                    </span>
+                                                                )}
+                                                                {prof.status === 'inactive' && (
+                                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200 font-bold text-[10px]">
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                                                        Inativa ({formatRelativeTime(prof.lastAccessAt)})
+                                                                    </span>
+                                                                )}
+                                                            </td>
+
+                                                            {/* Clientes Trazidos */}
+                                                            <td className="py-3 px-3 text-center whitespace-nowrap">
+                                                                <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-black ${
+                                                                    prof.broughtClientsCount > 0
+                                                                        ? 'bg-purple-50 text-purple-700 border border-purple-200/60'
+                                                                        : 'bg-slate-50 text-slate-400 border border-slate-100'
+                                                                }`}>
+                                                                    {prof.broughtClientsCount} {prof.broughtClientsCount === 1 ? 'cliente' : 'clientes'}
+                                                                </span>
+                                                            </td>
+
+                                                            {/* Última Atração */}
+                                                            <td className="py-3 px-3 whitespace-nowrap text-slate-600 font-medium text-[11px]">
+                                                                {prof.lastClientBroughtAt ? (
+                                                                    <div className="flex flex-col">
+                                                                        <span className="font-bold text-slate-700">{formatRelativeTime(prof.lastClientBroughtAt)}</span>
+                                                                        <span className="text-[9px] text-slate-400">
+                                                                            {new Date(prof.lastClientBroughtAt).toLocaleDateString('pt-BR')} às {new Date(prof.lastClientBroughtAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                                        </span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-slate-400 italic text-[11px]">Nenhum ainda</span>
+                                                                )}
+                                                            </td>
+
+                                                            {/* Último Acesso */}
+                                                            <td className="py-3 px-3 whitespace-nowrap text-slate-600 font-medium text-[11px]">
+                                                                {prof.lastAccessAt ? (
+                                                                    <div className="flex flex-col">
+                                                                        <span>{new Date(prof.lastAccessAt).toLocaleDateString('pt-BR')}</span>
+                                                                        <span className="text-[9px] text-slate-400">
+                                                                            {new Date(prof.lastAccessAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                                        </span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-slate-400 italic text-[11px]">N/D</span>
+                                                                )}
+                                                            </td>
+
+                                                            {/* Faturamento */}
+                                                            <td className="py-3 px-4 text-right whitespace-nowrap">
+                                                                <span className="font-extrabold text-slate-800 text-xs">
+                                                                    {(prof.totalEarned || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                         </div>
