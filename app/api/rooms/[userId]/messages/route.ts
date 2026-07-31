@@ -13,7 +13,7 @@ export async function GET(
         const { userId: authUserId } = await auth();
 
         // Garantir que o usuário só acessa suas próprias mensagens
-        if (!authUserId || authUserId !== userId) {
+        if (!authUserId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
@@ -33,7 +33,7 @@ export async function GET(
             ? [`${parts[0]}_${parts[1]}`, `${parts[2]}_${parts[3]}`] 
             : [roomId];
             
-        if (!participants.includes(userId)) {
+        if (!participants.includes(authUserId)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
@@ -42,7 +42,7 @@ export async function GET(
         const filter: any = { roomId };
         
         // Mensagens que não foram deletadas pelo usuário
-        filter.deletedFor = { $nin: [userId] };
+        filter.deletedFor = { $nin: [authUserId] };
 
         // Filtrar mensagens anteriores ao timestamp
         if (before) {

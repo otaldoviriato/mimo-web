@@ -943,6 +943,38 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         }
     }, [user?.id, otherUserId]);
 
+    // Fallback HTTP para carregar mensagens da API se o socket atrasar ou falhar
+    useEffect(() => {
+        if (!user?.id || !otherUserId) return;
+
+        const currentRoomId = [user.id, otherUserId].sort().join('_');
+        axios.get(`/api/rooms/${user.id}/messages`, {
+            params: { roomId: currentRoomId, limit: 50 }
+        })
+        .then((res) => {
+            if (Array.isArray(res.data)) {
+                setMessages((prev) => {
+                    if (prev.length === 0) {
+                        return res.data;
+                    }
+                    const existingIds = new Set(prev.map(m => m._id));
+                    const newFromHttp = res.data.filter((m: any) => !existingIds.has(m._id));
+                    if (newFromHttp.length === 0) return prev;
+                    return [...res.data, ...prev.filter(m => !res.data.some((h: any) => h._id === m._id))].sort(
+                        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+                    );
+                });
+                setLoadingMessages(false);
+            }
+        })
+        .catch((err) => {
+            console.error('Erro no fallback HTTP de mensagens:', err);
+        })
+        .finally(() => {
+            setLoadingMessages(false);
+        });
+    }, [user?.id, otherUserId]);
+
     // Salva apenas as últimas 50 mensagens no cache local para não sobrecarregar o armazenamento
     useEffect(() => {
         if (typeof window !== 'undefined' && user?.id && otherUserId && !loadingMessages) {
