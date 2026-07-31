@@ -76,6 +76,22 @@ interface ChatRoom {
     history: ChatMessage[];
 }
 
+interface ChatSession {
+    id: string;
+    roomId?: string;
+    userA: { name: string; email: string; clerkId: string; photoUrl?: string | null };
+    userB: { name: string; email: string; clerkId: string; photoUrl?: string | null };
+    startTime: string;
+    endTime: string;
+    timeRangeLabel: string;
+    durationMinutes: number;
+    messagesCount: number;
+    mediaCount: number;
+    giftCount: number;
+    totalRevenue: number;
+    itemsCount: number;
+}
+
 interface WithdrawalRecord {
     id: string;
     amount: number;
@@ -109,6 +125,9 @@ export default function UserDetailPage() {
 
     // Estados do Gerenciamento de Salas de Chat da Profissional
     const [rooms, setRooms] = useState<ChatRoom[]>([]);
+    const [sessions, setSessions] = useState<ChatSession[]>([]);
+    const [chatSubTab, setChatSubTab] = useState<'relationships' | 'sessions'>('relationships');
+    const [timeoutMinutes, setTimeoutMinutes] = useState<number>(30);
     const [loadingRooms, setLoadingRooms] = useState(true);
     const [selectedAuditChat, setSelectedAuditChat] = useState<ChatRoom | null>(null);
     const [auditLoadingMore, setAuditLoadingMore] = useState(false);
@@ -117,6 +136,7 @@ export default function UserDetailPage() {
     const auditContainerRef = useRef<HTMLDivElement>(null);
     const [galleryExpanded, setGalleryExpanded] = useState(false);
     const [pendingAuditChat, setPendingAuditChat] = useState<ChatRoom | null>(null);
+    const [pendingAuditSessionRange, setPendingAuditSessionRange] = useState<{ startTime?: string; endTime?: string } | null>(null);
     const [justificationText, setJustificationText] = useState('');
 
     // Inputs
@@ -136,7 +156,7 @@ export default function UserDetailPage() {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Busca as salas de chat envolvidas
+    // Busca as salas de chat envolvidas e sessões
     const fetchRooms = async () => {
         setLoadingRooms(true);
         try {
@@ -144,6 +164,8 @@ export default function UserDetailPage() {
             if (response.ok) {
                 const data = await response.json();
                 setRooms(data.rooms || []);
+                setSessions(data.sessions || []);
+                if (data.timeoutMinutes) setTimeoutMinutes(data.timeoutMinutes);
             } else {
                 toast.error('Erro ao buscar salas de chat.');
             }
@@ -156,7 +178,7 @@ export default function UserDetailPage() {
     };
 
     // Abre o modal de auditoria buscando o histórico de mensagens reais
-    const handleOpenAuditModal = async (chat: ChatRoom, reason: string) => {
+    const handleOpenAuditModal = async (chat: ChatRoom, reason: string, startTime?: string, endTime?: string) => {
         setSelectedAuditChat({
             ...chat,
             history: []
@@ -165,7 +187,11 @@ export default function UserDetailPage() {
         setIsFirstAuditLoad(true);
 
         try {
-            const response = await fetch(`/api/admin/rooms/${chat.id}/messages?limit=50&reason=${encodeURIComponent(reason)}`);
+            let url = `/api/admin/rooms/${chat.id}/messages?limit=50&reason=${encodeURIComponent(reason)}`;
+            if (startTime && endTime) {
+                url += `&startTime=${encodeURIComponent(startTime)}&endTime=${encodeURIComponent(endTime)}`;
+            }
+            const response = await fetch(url);
             if (response.ok) {
                 const data = await response.json();
                 const history = data.history || [];
@@ -1130,105 +1156,256 @@ export default function UserDetailPage() {
                         </div>
                     )}
 
-                    {/* Salas de Chat e Auditoria */}
+                    {/* Salas de Chat e Auditoria com Sub-abas */}
                     <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-6">
-                        <div>
-                            <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                                <MessageCircle size={16} className="text-purple-600" />
-                                Salas de Chat e Auditoria
-                            </h3>
-                            <p className="text-[11px] text-slate-400 font-medium mt-0.5">Visualize as trocas de mensagens deste perfil para fins de moderação e auditoria.</p>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                            <div>
+                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                                    <MessageCircle size={16} className="text-purple-600" />
+                                    Salas de Chat e Auditoria
+                                </h3>
+                                <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                                    Visualize as conversas por relacionamentos globais ou por sessões de troca contínua (intervalo máximo de 30 min).
+                                </p>
+                            </div>
+
+                            <div className="flex items-center p-1 bg-slate-100/90 rounded-xl border border-slate-200/60 self-start sm:self-auto">
+                                <button
+                                    type="button"
+                                    onClick={() => setChatSubTab('relationships')}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                                        chatSubTab === 'relationships'
+                                            ? 'bg-white text-purple-700 shadow-xs border border-slate-200/40 font-extrabold'
+                                            : 'text-slate-500 hover:text-slate-800'
+                                    }`}
+                                >
+                                    Clientes (Relacionamentos)
+                                    <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-purple-50 text-purple-700 font-black">
+                                        {rooms.length}
+                                    </span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setChatSubTab('sessions')}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                                        chatSubTab === 'sessions'
+                                            ? 'bg-white text-purple-700 shadow-xs border border-slate-200/40 font-extrabold'
+                                            : 'text-slate-500 hover:text-slate-800'
+                                    }`}
+                                >
+                                    Conversas (Sessões)
+                                    <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-purple-50 text-purple-700 font-black">
+                                        {sessions.length}
+                                    </span>
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                                        <th className="py-4 px-6">Contato / Participante</th>
-                                        <th className="py-4 px-6">Mensagens</th>
-                                        <th className="py-4 px-6">Faturamento</th>
-                                        <th className="py-4 px-6">Última Mensagem</th>
-                                        <th className="py-4 px-6">Último Contato</th>
-                                        <th className="py-4 px-6 text-center">Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {loadingRooms ? (
-                                        <tr>
-                                            <td colSpan={6} className="py-12 text-center text-xs font-semibold text-slate-400">
-                                                <div className="flex flex-col items-center gap-2 justify-center">
-                                                    <Loader2 size={16} className="animate-spin text-purple-600" />
-                                                    <span>Buscando conversas reais...</span>
-                                                </div>
-                                            </td>
+                        {chatSubTab === 'relationships' ? (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+                                            <th className="py-4 px-6">Contato / Participante</th>
+                                            <th className="py-4 px-6">Mensagens</th>
+                                            <th className="py-4 px-6">Faturamento Acumulado</th>
+                                            <th className="py-4 px-6">Última Mensagem</th>
+                                            <th className="py-4 px-6">Último Contato</th>
+                                            <th className="py-4 px-6 text-center">Ações</th>
                                         </tr>
-                                    ) : rooms.length > 0 ? (
-                                        rooms.map((chat) => {
-                                            const otherParticipant = chat.userA.clerkId === clerkId ? chat.userB : chat.userA;
-                                            const otherInitials = otherParticipant.name ? 
-                                                (otherParticipant.name.split(' ').length >= 2 ? `${otherParticipant.name.split(' ')[0][0]}${otherParticipant.name.split(' ')[1][0]}` : otherParticipant.name.substring(0,2)) : 'US';
-                                            return (
-                                                <tr key={chat.id} className="hover:bg-slate-50/40 transition-colors group">
-                                                    <td className="py-4 px-6">
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-700 border border-blue-100 flex items-center justify-center font-bold text-xs">
-                                                                {otherInitials.toUpperCase()}
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {loadingRooms ? (
+                                            <tr>
+                                                <td colSpan={6} className="py-12 text-center text-xs font-semibold text-slate-400">
+                                                    <div className="flex flex-col items-center gap-2 justify-center">
+                                                        <Loader2 size={16} className="animate-spin text-purple-600" />
+                                                        <span>Buscando conversas reais...</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ) : rooms.length > 0 ? (
+                                            rooms.map((chat) => {
+                                                const otherParticipant = chat.userA.clerkId === clerkId ? chat.userB : chat.userA;
+                                                const otherInitials = otherParticipant.name ? 
+                                                    (otherParticipant.name.split(' ').length >= 2 ? `${otherParticipant.name.split(' ')[0][0]}${otherParticipant.name.split(' ')[1][0]}` : otherParticipant.name.substring(0,2)) : 'US';
+                                                return (
+                                                    <tr key={chat.id} className="hover:bg-slate-50/40 transition-colors group">
+                                                        <td className="py-4 px-6">
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-700 border border-blue-100 flex items-center justify-center font-bold text-xs">
+                                                                    {otherInitials.toUpperCase()}
+                                                                </div>
+                                                                <div className="flex flex-col min-w-0">
+                                                                    <span className="text-xs font-bold text-slate-800 leading-tight truncate">{otherParticipant.name}</span>
+                                                                    <span className="text-[10px] text-slate-400 font-semibold truncate">{otherParticipant.email}</span>
+                                                                </div>
                                                             </div>
-                                                            <div className="flex flex-col min-w-0">
-                                                                <span className="text-xs font-bold text-slate-800 leading-tight truncate">{otherParticipant.name}</span>
-                                                                <span className="text-[10px] text-slate-400 font-semibold truncate">{otherParticipant.email}</span>
+                                                        </td>
+                                                        <td className="py-4 px-6 text-xs text-slate-650 font-bold">
+                                                            {chat.messagesCount}
+                                                        </td>
+                                                        <td className="py-4 px-6">
+                                                            <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                                                                <Coins size={12} className="text-amber-500" />
+                                                                {chat.totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-4 px-6 text-xs text-slate-550 max-w-xs truncate" title={chat.lastMessage}>
+                                                            {chat.lastMessage}
+                                                        </td>
+                                                        <td className="py-4 px-6 text-xs text-slate-500 font-bold">
+                                                            {chat.time}
+                                                        </td>
+                                                        <td className="py-4 px-6 text-center" onClick={(e) => e.stopPropagation()}>
+                                                            <div className="flex justify-center gap-2">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setPendingAuditChat(chat);
+                                                                        setPendingAuditSessionRange(null);
+                                                                        setJustificationText('');
+                                                                    }}
+                                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-100 text-purple-600 text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-xs active:scale-95"
+                                                                >
+                                                                    <Eye size={12} />
+                                                                    Auditar
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDeleteRoom(chat.id, otherParticipant.name)}
+                                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-100 text-rose-600 text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-xs active:scale-95"
+                                                                >
+                                                                    <Trash2 size={12} />
+                                                                    Excluir
+                                                                </button>
                                                             </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="py-4 px-6 text-xs text-slate-650 font-bold">
-                                                        {chat.messagesCount}
-                                                    </td>
-                                                    <td className="py-4 px-6">
-                                                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                                                            <Coins size={12} className="text-amber-500" />
-                                                            {chat.totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                                        </span>
-                                                    </td>
-                                                    <td className="py-4 px-6 text-xs text-slate-550 max-w-xs truncate" title={chat.lastMessage}>
-                                                        {chat.lastMessage}
-                                                    </td>
-                                                    <td className="py-4 px-6 text-xs text-slate-500 font-bold">
-                                                        {chat.time}
-                                                    </td>
-                                                    <td className="py-4 px-6 text-center" onClick={(e) => e.stopPropagation()}>
-                                                        <div className="flex justify-center gap-2">
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={6} className="py-12 text-center text-xs font-semibold text-slate-400">
+                                                    Nenhum relacionamento de cliente encontrado até o momento.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+                                            <th className="py-4 px-6">Cliente (Relacionamento)</th>
+                                            <th className="py-4 px-6">Horário da Sessão</th>
+                                            <th className="py-4 px-6">Composição</th>
+                                            <th className="py-4 px-6">Faturamento da Sessão</th>
+                                            <th className="py-4 px-6 text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {loadingRooms ? (
+                                            <tr>
+                                                <td colSpan={5} className="py-12 text-center text-xs font-semibold text-slate-400">
+                                                    <div className="flex flex-col items-center gap-2 justify-center">
+                                                        <Loader2 size={16} className="animate-spin text-purple-600" />
+                                                        <span>Calculando sessões de conversa...</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ) : sessions.length > 0 ? (
+                                            sessions.map((session) => {
+                                                const clientObj = session.userA.clerkId === clerkId ? session.userB : session.userA;
+                                                const clientInitials = clientObj.name ? 
+                                                    (clientObj.name.split(' ').length >= 2 ? `${clientObj.name.split(' ')[0][0]}${clientObj.name.split(' ')[1][0]}` : clientObj.name.substring(0,2)) : 'CL';
+                                                
+                                                const matchingRoom = rooms.find(r => 
+                                                    (r.userA.clerkId === clientObj.clerkId || r.userB.clerkId === clientObj.clerkId)
+                                                ) || {
+                                                    id: session.roomId || `${clerkId}_${clientObj.clerkId}`,
+                                                    userA: session.userA,
+                                                    userB: session.userB,
+                                                    messagesCount: session.messagesCount,
+                                                    lastMessage: 'Sessão de conversa auditada',
+                                                    time: session.timeRangeLabel,
+                                                    totalRevenue: session.totalRevenue,
+                                                    history: []
+                                                };
+
+                                                return (
+                                                    <tr key={session.id} className="hover:bg-slate-50/40 transition-colors group">
+                                                        <td className="py-4 px-6">
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div className="w-8 h-8 rounded-full bg-purple-50 text-purple-700 border border-purple-100 flex items-center justify-center font-bold text-xs">
+                                                                    {clientInitials.toUpperCase()}
+                                                                </div>
+                                                                <div className="flex flex-col min-w-0">
+                                                                    <span className="text-xs font-bold text-slate-800 leading-tight truncate">{clientObj.name}</span>
+                                                                    <span className="text-[10px] text-slate-400 font-semibold truncate">{clientObj.email}</span>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-4 px-6">
+                                                            <div className="flex flex-col">
+                                                                <span className="text-xs font-bold text-slate-800">{session.timeRangeLabel}</span>
+                                                                <span className="text-[10px] text-slate-400 font-medium">Duração: {session.durationMinutes} min</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-4 px-6">
+                                                            <div className="flex items-center gap-1 flex-wrap">
+                                                                {session.messagesCount > 0 && (
+                                                                    <span className="text-[9.5px] bg-purple-50 text-purple-700 border border-purple-100 px-2 py-0.5 rounded-md font-bold">
+                                                                        {session.messagesCount} msgs
+                                                                    </span>
+                                                                )}
+                                                                {session.mediaCount > 0 && (
+                                                                    <span className="text-[9.5px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-md font-bold">
+                                                                        {session.mediaCount} mídias
+                                                                    </span>
+                                                                )}
+                                                                {session.giftCount > 0 && (
+                                                                    <span className="text-[9.5px] bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-md font-bold">
+                                                                        {session.giftCount} presentes
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-4 px-6">
+                                                            <span className="text-xs font-black text-emerald-600 flex items-center gap-1">
+                                                                + {session.totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-4 px-6 text-center" onClick={(e) => e.stopPropagation()}>
                                                             <button
                                                                 onClick={() => {
-                                                                    setPendingAuditChat(chat);
+                                                                    setPendingAuditChat(matchingRoom);
+                                                                    setPendingAuditSessionRange({
+                                                                        startTime: session.startTime,
+                                                                        endTime: session.endTime
+                                                                    });
                                                                     setJustificationText('');
                                                                 }}
-                                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-100 text-purple-600 text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-sm active:scale-95"
+                                                                className="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-100 text-purple-600 text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-xs active:scale-95"
                                                             >
                                                                 <Eye size={12} />
-                                                                Auditar
+                                                                Auditar Sessão
                                                             </button>
-                                                            <button
-                                                                onClick={() => handleDeleteRoom(chat.id, otherParticipant.name)}
-                                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-100 text-rose-600 text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-sm active:scale-95"
-                                                            >
-                                                                <Trash2 size={12} />
-                                                                Excluir
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={6} className="py-12 text-center text-xs font-semibold text-slate-400">
-                                                Nenhuma conversa encontrada para este perfil até o momento.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={5} className="py-12 text-center text-xs font-semibold text-slate-400">
+                                                    Nenhuma sessão de conversa encontrada para este perfil até o momento.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
                 </main>
             </div>
@@ -1361,6 +1538,7 @@ export default function UserDetailPage() {
                                 type="button"
                                 onClick={() => {
                                     setPendingAuditChat(null);
+                                    setPendingAuditSessionRange(null);
                                     setJustificationText('');
                                 }}
                                 className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
@@ -1371,8 +1549,14 @@ export default function UserDetailPage() {
                                 type="button"
                                 onClick={() => {
                                     if (justificationText.trim().length >= 5) {
-                                        handleOpenAuditModal(pendingAuditChat, justificationText.trim());
+                                        handleOpenAuditModal(
+                                            pendingAuditChat,
+                                            justificationText.trim(),
+                                            pendingAuditSessionRange?.startTime,
+                                            pendingAuditSessionRange?.endTime
+                                        );
                                         setPendingAuditChat(null);
+                                        setPendingAuditSessionRange(null);
                                         setJustificationText('');
                                     }
                                 }}

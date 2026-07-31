@@ -25,7 +25,9 @@ import {
     CheckCircle2,
     Clock3,
     XCircle,
-    Star
+    Star,
+    ChevronDown,
+    ChevronUp
 } from 'lucide-react';
 
 const formatCPF = (cpf?: string) => {
@@ -125,6 +127,35 @@ interface WalletDashboardData {
     monthlyWithdrawalsCount?: number;
 }
 
+interface WalletSessionItem {
+    id: string;
+    type: 'message' | 'image_unlock' | 'gift' | 'other';
+    amount: number;
+    timestamp: string;
+    description?: string;
+}
+
+interface WalletSession {
+    sessionId: string;
+    relatedUserId: string;
+    clientName: string;
+    clientUsername: string;
+    clientPhotoUrl: string | null;
+    startTime: string;
+    endTime: string;
+    durationMinutes: number;
+    messagesCount: number;
+    mediaCount: number;
+    giftCount: number;
+    totalEarnings: number;
+    items: WalletSessionItem[];
+}
+
+interface WalletSessionsData {
+    sessions: WalletSession[];
+    timeoutMinutes: number;
+}
+
 export default function WalletPage() {
     const { data: userData, refetch: refetchProfile } = useMyProfile();
     const router = useTransitionRouter();
@@ -140,6 +171,8 @@ export default function WalletPage() {
     const [subscribersModalOpen, setSubscribersModalOpen] = useState(false);
     const [withdrawFeedback, setWithdrawFeedback] = useState<'created' | 'approved' | 'failed' | null>(null);
     const [lastSeenWithdrawalStatus, setLastSeenWithdrawalStatus] = useState<string | null>(null);
+    const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
+    const [showAllSessions, setShowAllSessions] = useState(false);
 
     const [showValues, setShowValues] = useState<boolean>(() => {
         if (typeof window !== 'undefined') {
@@ -172,6 +205,17 @@ export default function WalletPage() {
         staleTime: 60 * 1000,
         placeholderData: (prev) => prev,
         refetchInterval: 30 * 1000
+    });
+
+    // Query de Extrato de Conversas (Sessões de 30 min)
+    const { data: sessionsData, isLoading: loadingSessions } = useQuery<WalletSessionsData>({
+        queryKey: ['wallet', 'sessions'],
+        queryFn: async () => {
+            const res = await fetch('/api/users/me/wallet-sessions');
+            if (!res.ok) throw new Error('Falha ao buscar extrato de conversas por sessão');
+            return res.json();
+        },
+        staleTime: 60 * 1000,
     });
 
     const handleRequestWithdraw = async () => {
@@ -504,6 +548,147 @@ export default function WalletPage() {
                                     className="text-[11px] font-extrabold text-purple-600 hover:text-purple-700 self-center py-1.5 px-3 rounded-lg bg-purple-50 hover:bg-purple-100/80 transition-all active:scale-[0.98] mt-1 border border-purple-100/30"
                                 >
                                     {isExpanded ? 'Recolher histórico' : 'Carregar mais saques'}
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* ── BENTO BLOCK: EXTRATO DE CONVERSAS (SESSÕES DE 30 MIN) ── */}
+                <div className="bg-white border border-purple-100/60 rounded-2xl p-5 shadow-[0_4px_20px_rgb(0,0,0,0.012)] flex flex-col gap-4">
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                        <div className="flex items-center gap-2">
+                            <div className="w-6.5 h-6.5 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600 border border-purple-100/50 shrink-0">
+                                <MessageSquare className="w-3.5 h-3.5" />
+                            </div>
+                            <div>
+                                <span className="text-xs text-slate-700 font-extrabold uppercase tracking-wider block leading-none">
+                                    Extrato de Conversas (Sessões)
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-medium leading-tight mt-0.5 block">
+                                    Blocos de troca contínua de mensagens (intervalo máximo de 30 min)
+                                </span>
+                            </div>
+                        </div>
+
+                        {sessionsData?.timeoutMinutes && (
+                            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-100/60 uppercase tracking-wider">
+                                {sessionsData.timeoutMinutes} min
+                            </span>
+                        )}
+                    </div>
+
+                    {loadingSessions ? (
+                        <div className="flex flex-col gap-2 py-4 animate-pulse">
+                            <div className="h-14 bg-slate-50 rounded-xl" />
+                            <div className="h-14 bg-slate-50 rounded-xl" />
+                        </div>
+                    ) : !sessionsData?.sessions || sessionsData.sessions.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-8 gap-2 bg-slate-50/50 rounded-xl text-center px-4">
+                            <Clock3 className="w-6 h-6 text-slate-300" />
+                            <p className="text-xs text-gray-500 font-medium">Nenhum extrato de sessão de conversa ainda.</p>
+                            <p className="text-[10.5px] text-gray-400">As conversas pagas trocadas continuamente formarão blocos explicativos do seu saldo.</p>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-3">
+                            {(showAllSessions ? sessionsData.sessions : sessionsData.sessions.slice(0, 5)).map((session) => {
+                                const isExpandedSession = expandedSessionId === session.sessionId;
+                                const startDate = new Date(session.startTime);
+                                const endDate = new Date(session.endTime);
+                                const dateStr = startDate.toLocaleDateString('pt-BR');
+                                const startStr = startDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                                const endStr = endDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+                                return (
+                                    <div
+                                        key={session.sessionId}
+                                        className="border border-slate-100 rounded-xl p-3 bg-slate-50/40 hover:bg-slate-50 transition-colors flex flex-col gap-2"
+                                    >
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <Avatar uri={session.clientPhotoUrl} size={32} />
+                                                <div className="min-w-0">
+                                                    <h4 className="text-xs font-bold text-slate-900 truncate leading-tight">
+                                                        {session.clientName}
+                                                    </h4>
+                                                    <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1 truncate">
+                                                        <span>{dateStr}</span>
+                                                        <span>•</span>
+                                                        <span>{startStr} às {endStr}</span>
+                                                        <span>({session.durationMinutes} min)</span>
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <span className="text-xs font-black text-emerald-600">
+                                                    + {renderValue(session.totalEarnings)}
+                                                </span>
+                                                <button
+                                                    onClick={() => setExpandedSessionId(isExpandedSession ? null : session.sessionId)}
+                                                    className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-purple-600 transition-colors"
+                                                    title={isExpandedSession ? "Recolher detalhes" : "Ver detalhamento do bloco"}
+                                                >
+                                                    {isExpandedSession ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Badges explicativos do que compôs essa conversa */}
+                                        <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-slate-100/60">
+                                            {session.messagesCount > 0 && (
+                                                <span className="text-[9.5px] bg-purple-50 text-purple-700 border border-purple-100 px-2 py-0.5 rounded-md font-bold flex items-center gap-1">
+                                                    <MessageSquare className="w-2.5 h-2.5" />
+                                                    {session.messagesCount} msgs
+                                                </span>
+                                            )}
+                                            {session.mediaCount > 0 && (
+                                                <span className="text-[9.5px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-md font-bold flex items-center gap-1">
+                                                    <ImageIcon className="w-2.5 h-2.5" />
+                                                    {session.mediaCount} {session.mediaCount === 1 ? 'mídia' : 'mídias'}
+                                                </span>
+                                            )}
+                                            {session.giftCount > 0 && (
+                                                <span className="text-[9.5px] bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-md font-bold flex items-center gap-1">
+                                                    <Gift className="w-2.5 h-2.5" />
+                                                    {session.giftCount} {session.giftCount === 1 ? 'presente' : 'presentes'}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* Detalhamento dos Itens do Bloco de Sessão */}
+                                        {isExpandedSession && session.items && (
+                                            <div className="mt-2 pt-2 border-t border-slate-200/60 flex flex-col gap-1.5 bg-white p-2.5 rounded-lg border border-slate-100">
+                                                <span className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wider">
+                                                    Composição do Bloco de Faturamento
+                                                </span>
+                                                {session.items.map((item) => (
+                                                    <div key={item.id} className="flex items-center justify-between text-[11px] py-0.5 border-b border-slate-50 last:border-b-0">
+                                                        <div className="flex items-center gap-1.5 text-slate-600">
+                                                            <span className="text-slate-400 text-[10px]">
+                                                                {new Date(item.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                            </span>
+                                                            <span className="font-medium">
+                                                                {item.description || (item.type === 'message' ? 'Mensagem' : item.type === 'image_unlock' ? 'Mídia Privada' : 'Presente')}
+                                                            </span>
+                                                        </div>
+                                                        <span className="font-bold text-slate-800">
+                                                            {renderValue(item.amount)}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+
+                            {sessionsData.sessions.length > 5 && (
+                                <button
+                                    onClick={() => setShowAllSessions(!showAllSessions)}
+                                    className="text-[11px] font-extrabold text-purple-600 hover:text-purple-700 self-center py-1.5 px-3 rounded-lg bg-purple-50 hover:bg-purple-100/80 transition-all active:scale-[0.98] mt-1 border border-purple-100/30"
+                                >
+                                    {showAllSessions ? 'Recolher sessões' : 'Ver todas as sessões'}
                                 </button>
                             )}
                         </div>

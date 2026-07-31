@@ -44,11 +44,13 @@ export async function GET(
         const before = searchParams.get('before');
         const limitStr = searchParams.get('limit');
         const reason = searchParams.get('reason');
+        const startTime = searchParams.get('startTime');
+        const endTime = searchParams.get('endTime');
         const limit = limitStr ? parseInt(limitStr, 10) : 50;
 
-        // Se before não for fornecido, trata-se do acesso inicial à auditoria.
+        // Se before/startTime não for fornecido, trata-se do acesso inicial à auditoria.
         // Nesse caso, a justificativa (reason) é obrigatória.
-        if (!before) {
+        if (!before && !startTime) {
             if (!reason || reason.trim() === '') {
                 return NextResponse.json({ error: 'A justificativa de auditoria é obrigatória para acessar as mensagens desta conversa.' }, { status: 400 });
             }
@@ -78,7 +80,7 @@ export async function GET(
         }
 
         // Se for o acesso inicial e a justificativa for informada, salvar no log de auditoria
-        if (!before && reason) {
+        if ((!before || startTime) && reason) {
             const adminUser = await User.findOne({ clerkId: userId }).select('name username email').lean();
             const adminName = adminUser?.name || adminUser?.username || `Admin (${userId.substring(0, 8)})`;
             const adminEmail = adminUser?.email;
@@ -95,13 +97,18 @@ export async function GET(
         }
 
         const filter: any = { roomId: resolvedRoomIdStr };
-        if (before) {
+
+        if (startTime && endTime) {
+            filter.timestamp = {
+                $gte: new Date(startTime),
+                $lte: new Date(endTime)
+            };
+        } else if (before) {
             filter.timestamp = { $lt: new Date(before) };
         }
 
-
         const messages = await Message.find(filter)
-            .sort({ timestamp: -1 }) // Mais recente primeiro para buscar corretamente o final da conversa
+            .sort({ timestamp: -1 })
             .limit(limit)
             .lean() as any[];
 
@@ -109,7 +116,6 @@ export async function GET(
         const messagesMapped = messages.map(msg => {
             const date = msg.timestamp ? new Date(msg.timestamp) : new Date();
             
-            // Formatar data de forma amigável
             const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
             const dateStr = date.toLocaleDateString('pt-BR');
             const formattedTime = `${dateStr} às ${timeStr}`;
@@ -124,7 +130,6 @@ export async function GET(
             };
         });
 
-        // Retorna em ordem cronológica (mais antiga primeiro)
         return NextResponse.json({ history: messagesMapped.reverse() });
 
     } catch (error: any) {
