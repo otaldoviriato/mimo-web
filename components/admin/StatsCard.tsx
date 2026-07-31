@@ -9,7 +9,7 @@ interface StatsCardProps {
     change?: string;
     isPositive?: boolean;
     icon: LucideIcon;
-    color: 'purple' | 'green' | 'blue' | 'amber';
+    color: 'purple' | 'green' | 'blue' | 'amber' | 'rose';
 }
 
 export function StatsCard({ title, value, change, isPositive, icon: Icon, color }: StatsCardProps) {
@@ -29,6 +29,10 @@ export function StatsCard({ title, value, change, isPositive, icon: Icon, color 
         amber: {
             bg: 'bg-amber-50 text-amber-600 border-amber-100',
             glow: 'hover:shadow-amber-500/5',
+        },
+        rose: {
+            bg: 'bg-rose-50 text-rose-600 border-rose-100',
+            glow: 'hover:shadow-rose-500/5',
         },
     };
 

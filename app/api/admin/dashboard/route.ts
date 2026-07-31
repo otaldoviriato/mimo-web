@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
-import { Room } from '@/models/Room';
 import { Message } from '@/models/Message';
 import { Transaction } from '@/models/Transaction';
 import { MicroTransaction } from '@/models/MicroTransaction';
@@ -12,22 +11,6 @@ const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-// Auxiliar para calcular variação percentual
-function calculateChange(current: number, previous: number): { change: string; isPositive: boolean } {
-    if (previous === 0) {
-        return {
-            change: current > 0 ? '+100%' : '0%',
-            isPositive: current >= 0,
-        };
-    }
-    const diff = ((current - previous) / previous) * 100;
-    const sign = diff >= 0 ? '+' : '';
-    return {
-        change: `${sign}${diff.toFixed(1)}%`,
-        isPositive: diff >= 0,
-    };
-}
 
 export async function GET(request: NextRequest) {
     try {
@@ -48,29 +31,80 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Acesso proibido. Apenas administradores.' }, { status: 403 });
         }
 
-        // 2. Determinar o período comparativo
-        const searchParams = request.nextUrl.searchParams;
-        let period = searchParams.get('period') || '';
-        
-        const validPeriods = ['none', 'week', 'month'];
-        if (!validPeriods.includes(period)) {
-            period = settings?.comparisonPeriod || 'none';
-        }
-
         const now = new Date();
-        let startDate: Date | null = null;
-        let prevStartDate: Date | null = null;
+        const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-        if (period === 'week') {
-            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            prevStartDate = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-        } else if (period === 'month') {
-            startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            prevStartDate = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+        // --- CÁLCULO DE ATRIBUIÇÃO DE CLIENTES (AQUISITION / PRIMEIRA CONVERSA) ---
+        // 2. Buscar todos os clientes masculinos (não profissionais)
+        const maleClients = await User.find({
+            isProfessional: { $ne: true }
+        }).select('clerkId name username photoUrl createdAt').lean();
+
+        const maleClientIds = maleClients.map(c => c.clerkId);
+        const maleClientsMap = new Map(maleClients.map(c => [c.clerkId, c]));
+
+        // Buscar a 1ª mensagem enviada por cada cliente masculino (min timestamp por senderId)
+        let firstMessages: any[] = [];
+        if (maleClientIds.length > 0) {
+            firstMessages = await Message.aggregate([
+                {
+                    $match: {
+                        senderId: { $in: maleClientIds },
+                        isSystem: { $ne: true }
+                    }
+                },
+                { $sort: { timestamp: 1 } },
+                {
+                    $group: {
+                        _id: '$senderId',
+                        receiverId: { $first: '$receiverId' },
+                        firstMsgTime: { $first: '$timestamp' }
+                    }
+                }
+            ]);
         }
 
-        // --- CÁLCULO DE MÉTRICAS ---
+        // Mapa de atribuição por profissional (clerkId -> { count, lastAttributedAt, broughtClients })
+        const attributionMap = new Map<string, {
+            count: number;
+            lastAttributedAt: Date | null;
+            broughtClients: Array<{ clerkId: string; name: string; username: string; photoUrl: string | null; date: Date }>;
+        }>();
 
+        for (const item of firstMessages) {
+            const profId = item.receiverId;
+            const clientObj = maleClientsMap.get(item._id);
+            if (!clientObj || !profId) continue;
+
+            if (!attributionMap.has(profId)) {
+                attributionMap.set(profId, {
+                    count: 0,
+                    lastAttributedAt: null,
+                    broughtClients: []
+                });
+            }
+
+            const attr = attributionMap.get(profId)!;
+            attr.count += 1;
+
+            const msgDate = item.firstMsgTime ? new Date(item.firstMsgTime) : new Date();
+            if (!attr.lastAttributedAt || msgDate > attr.lastAttributedAt) {
+                attr.lastAttributedAt = msgDate;
+            }
+
+            attr.broughtClients.push({
+                clerkId: clientObj.clerkId,
+                name: clientObj.name || `@${clientObj.username}`,
+                username: clientObj.username,
+                photoUrl: clientObj.photoUrl || null,
+                date: msgDate
+            });
+        }
+
+        const totalBroughtClientsCount = firstMessages.length;
+
+        // --- BUSCA E CLASSIFICAÇÃO DAS PROFISSIONAIS ---
         const onboardingCompletedFilter = {
             $or: [
                 { onboardingStep: 'completed' },
@@ -78,301 +112,94 @@ export async function GET(request: NextRequest) {
             ]
         };
 
-        const activeUserThresholdDays = settings?.activeUserThresholdDays || 7;
-        const activeThresholdDate = new Date(now.getTime() - activeUserThresholdDays * 24 * 60 * 60 * 1000);
-
-        // A. Clientes Ativos & B. Profissionais Ativos
-        let activeClients = 0;
-        let activeClientsChange = '';
-        let isActiveClientsPositive = true;
-
-        let activeProfessionals = 0;
-        let activeProfessionalsChange = '';
-        let isActiveProfessionalsPositive = true;
-
-        const baseClientFilter = {
-            ...onboardingCompletedFilter,
-            isProfessional: { $ne: true }
-        };
-
-        const baseProfessionalFilter = {
+        const allProfessionals = await User.find({
             ...onboardingCompletedFilter,
             isProfessional: true
-        };
+        }).select('clerkId username name photoUrl lastAccessAt lastSeen updatedAt createdAt phone email balance').lean() as any[];
 
-        if (startDate && prevStartDate) {
-            const currActiveClients = await User.countDocuments({
-                ...baseClientFilter,
-                lastAccessAt: { $gte: startDate }
-            });
-            const prevActiveClients = await User.countDocuments({
-                ...baseClientFilter,
-                lastAccessAt: { $gte: prevStartDate, $lt: startDate }
-            });
-            const resClients = calculateChange(currActiveClients, prevActiveClients);
-            activeClients = currActiveClients;
-            activeClientsChange = resClients.change;
-            isActiveClientsPositive = resClients.isPositive;
+        const profClerkIds = allProfessionals.map(p => p.clerkId);
 
-            const currActiveProfs = await User.countDocuments({
-                ...baseProfessionalFilter,
-                lastAccessAt: { $gte: startDate }
-            });
-            const prevActiveProfs = await User.countDocuments({
-                ...baseProfessionalFilter,
-                lastAccessAt: { $gte: prevStartDate, $lt: startDate }
-            });
-            const resProfs = calculateChange(currActiveProfs, prevActiveProfs);
-            activeProfessionals = currActiveProfs;
-            activeProfessionalsChange = resProfs.change;
-            isActiveProfessionalsPositive = resProfs.isPositive;
-        } else {
-            activeClients = await User.countDocuments({
-                ...baseClientFilter,
-                lastAccessAt: { $gte: activeThresholdDate }
-            });
-            activeProfessionals = await User.countDocuments({
-                ...baseProfessionalFilter,
-                lastAccessAt: { $gte: activeThresholdDate }
-            });
-        }
+        // Faturamento por profissional
+        const earningsAgg = await MicroTransaction.aggregate([
+            { $match: { userId: { $in: profClerkIds }, type: 'credit' } },
+            { $group: { _id: '$userId', total: { $sum: '$amount' } } }
+        ]);
+        const earningsMap = new Map<string, number>(earningsAgg.map(e => [e._id, e.total / 100]));
 
-        // C. Conversas Ativas
-        let activeChats = 0;
-        let chatsChange = '';
-        let isChatsPositive = true;
+        const subscriptionEarningsAgg = await Transaction.aggregate([
+            { $match: { userId: { $in: profClerkIds }, type: 'credit', source: 'subscription', status: 'COMPLETED' } },
+            { $group: { _id: '$userId', total: { $sum: '$amount' } } }
+        ]);
+        const subscriptionEarningsMap = new Map<string, number>(subscriptionEarningsAgg.map(s => [s._id, s.total / 100]));
 
-        if (startDate && prevStartDate) {
-            const currActiveRooms = await Message.distinct('roomId', { timestamp: { $gte: startDate } });
-            activeChats = currActiveRooms.length;
+        let active24hCount = 0;
+        let absentCount = 0;
+        let inactiveCount = 0;
 
-            const prevActiveRooms = await Message.distinct('roomId', { timestamp: { $gte: prevStartDate, $lt: startDate } });
-            const res = calculateChange(currActiveRooms.length, prevActiveRooms.length);
-            chatsChange = res.change;
-            isChatsPositive = res.isPositive;
-        } else {
-            const allActiveRooms = await Message.distinct('roomId');
-            activeChats = allActiveRooms.length;
-        }
+        const activeAndAbsentProfessionals: any[] = [];
+        const inactiveProfessionals: any[] = [];
 
-        // D. Mensagens Enviadas
-        let totalMessages = 0;
-        let messagesChange = '';
-        let isMessagesPositive = true;
+        for (const prof of allProfessionals) {
+            const lastAccessDate = prof.lastAccessAt || prof.lastSeen || prof.updatedAt || prof.createdAt;
+            const lastAccess = lastAccessDate ? new Date(lastAccessDate) : new Date(0);
+            const diffMs = now.getTime() - lastAccess.getTime();
 
-        if (startDate && prevStartDate) {
-            const currMessages = await Message.countDocuments({ timestamp: { $gte: startDate } });
-            totalMessages = currMessages;
-
-            const prevMessages = await Message.countDocuments({ timestamp: { $gte: prevStartDate, $lt: startDate } });
-            const res = calculateChange(currMessages, prevMessages);
-            messagesChange = res.change;
-            isMessagesPositive = res.isPositive;
-        } else {
-            totalMessages = await Message.countDocuments();
-        }
-
-        // --- GRÁFICO DE DESEMPENHO (Últimos 7 dias) ---
-        const weekdayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-        const activityData = [];
-
-        for (let i = 6; i >= 0; i--) {
-            const dStart = new Date();
-            dStart.setHours(0, 0, 0, 0);
-            dStart.setDate(dStart.getDate() - i);
-
-            const dEnd = new Date(dStart);
-            dEnd.setDate(dEnd.getDate() + 1);
-
-            const dayLabel = weekdayNames[dStart.getDay()];
-
-            const msgsCount = await Message.countDocuments({ timestamp: { $gte: dStart, $lt: dEnd } });
-            const usrsCount = await User.countDocuments({ ...onboardingCompletedFilter, createdAt: { $gte: dStart, $lt: dEnd } });
-
-            activityData.push({
-                label: dayLabel,
-                messages: msgsCount,
-                users: usrsCount,
-            });
-        }
-
-        // --- LISTAS COMPARATIVAS DE PRINCIPAIS USUÁRIOS ATIVOS ---
-        const activeUsersList = await User.find({
-            ...onboardingCompletedFilter,
-            lastAccessAt: { $gte: activeThresholdDate }
-        })
-            .select('clerkId username name photoUrl isProfessional')
-            .lean() as any[];
-
-        const activeClerkIds = activeUsersList.map(u => u.clerkId);
-
-        let activeClientsData: any[] = [];
-        let activeProfessionalsData: any[] = [];
-
-        if (activeClerkIds.length > 0) {
-            // 1. Quantidade de salas ativas por usuário (com bidirecionalidade obrigatória nas últimas 48h)
-            const activeRoomsLimit = new Date(Date.now() - 48 * 60 * 60 * 1000);
-
-            // Buscar salas ativas na janela de tempo
-            const activeRoomsDocs = await Room.find({
-                participants: { $in: activeClerkIds },
-                lastMessageTime: { $gte: activeRoomsLimit }
-            }).select('participants').lean();
-
-            const activeRoomsMap = new Map<string, number>();
-
-            if (activeRoomsDocs.length > 0) {
-                // Montar virtualRoomIds (formato usado pelas mensagens: p1_p2 ordenado)
-                const roomVirtualMap = new Map<string, string[]>(); // virtualRoomId → participants
-                for (const room of activeRoomsDocs) {
-                    const vId = (room.participants as string[]).slice().sort().join('_');
-                    roomVirtualMap.set(vId, room.participants as string[]);
-                }
-                const virtualRoomIds = Array.from(roomVirtualMap.keys());
-
-                // Quais roomIds têm mensagens de pelo menos 2 remetentes distintos?
-                const biSendersAgg = await Message.aggregate([
-                    {
-                        $match: {
-                            roomId: { $in: virtualRoomIds },
-                            isSystem: { $ne: true }
-                        }
-                    },
-                    { $group: { _id: { roomId: '$roomId', senderId: '$senderId' } } },
-                    { $group: { _id: '$_id.roomId', senderCount: { $sum: 1 } } },
-                    { $match: { senderCount: { $gte: 2 } } }
-                ]);
-
-                // Montar mapa userId → count de salas bilaterais ativas
-                for (const { _id: vId } of biSendersAgg) {
-                    const participants = roomVirtualMap.get(vId) ?? [];
-                    for (const p of participants) {
-                        if (activeClerkIds.includes(p)) {
-                            activeRoomsMap.set(p, (activeRoomsMap.get(p) ?? 0) + 1);
-                        }
-                    }
-                }
+            let status: 'active' | 'absent' | 'inactive' = 'inactive';
+            if (lastAccess >= twentyFourHoursAgo) {
+                status = 'active';
+                active24hCount += 1;
+            } else if (lastAccess >= sevenDaysAgo) {
+                status = 'absent';
+                absentCount += 1;
+            } else {
+                status = 'inactive';
+                inactiveCount += 1;
             }
 
-
-            // 2. Total recarregado por clientes (em reais)
-            const depositsAgg = await Transaction.aggregate([
-                { $match: { userId: { $in: activeClerkIds }, source: 'recharge', status: 'PAID' } },
-                { $group: { _id: '$userId', total: { $sum: '$amount' } } }
-            ]);
-            const depositsMap = new Map<string, number>(depositsAgg.map(d => [d._id, d.total]));
-
-            // Agregação de recargas nos últimos 30 dias para obter o nível do cliente
-            const startOf30Days = new Date();
-            startOf30Days.setDate(startOf30Days.getDate() - 30);
-            const recharges30DaysAgg = await Transaction.aggregate([
-                { $match: { userId: { $in: activeClerkIds }, source: 'recharge', status: 'PAID', timestamp: { $gte: startOf30Days } } },
-                { $group: { _id: '$userId', total: { $sum: '$amount' } } }
-            ]);
-            const recharges30DaysMap = new Map<string, number>(recharges30DaysAgg.map(r => [r._id, r.total]));
-
-            const globalSettings = await AppSettings.findOne({ key: 'global' }).select('clientLevels').lean() as any;
-
-            const getClientLevel = (amount: number): any => {
-                if (!globalSettings?.clientLevels || globalSettings.clientLevels.length === 0) {
-                    let levelName = 'Novo';
-                    let color = '#64748B';
-                    let icon = 'Medal';
-                    if (amount > 0 && amount <= 100) { levelName = 'Bronze'; color = '#D97706'; }
-                    else if (amount > 100 && amount <= 500) { levelName = 'Prata'; color = '#64748B'; }
-                    else if (amount > 500 && amount <= 1000) { levelName = 'Ouro'; color = '#EAB308'; icon = 'Crown'; }
-                    else if (amount > 1000) { levelName = 'VIP'; color = '#000000'; icon = 'Crown'; }
-                    return { name: levelName, color, icon };
-                }
-                const sortedLevels = [...globalSettings.clientLevels].sort((a: any, b: any) => b.minAmount - a.minAmount);
-                for (const lvl of sortedLevels) {
-                    if (amount >= lvl.minAmount) {
-                        return { name: lvl.name, color: lvl.color, icon: lvl.icon };
-                    }
-                }
-                return { name: 'Novo', color: '#64748B', icon: 'Medal' };
+            const attrInfo = attributionMap.get(prof.clerkId) || {
+                count: 0,
+                lastAttributedAt: null,
+                broughtClients: []
             };
 
-            // 3. Faturamento obtido por profissionais (em reais)
-            const earningsAgg = await MicroTransaction.aggregate([
-                { $match: { userId: { $in: activeClerkIds }, type: 'credit' } },
-                { $group: { _id: '$userId', total: { $sum: '$amount' } } }
-            ]);
-            const earningsMap = new Map<string, number>(earningsAgg.map(e => [e._id, e.total / 100]));
+            // Ordenar clientes trazidos mais recentes primeiro
+            attrInfo.broughtClients.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-            const subscriptionEarningsAgg = await Transaction.aggregate([
-                { $match: { userId: { $in: activeClerkIds }, type: 'credit', source: 'subscription', status: 'COMPLETED' } },
-                { $group: { _id: '$userId', total: { $sum: '$amount' } } }
-            ]);
-            const subscriptionEarningsMap = new Map<string, number>(subscriptionEarningsAgg.map(s => [s._id, s.total / 100]));
+            const totalEarned = (earningsMap.get(prof.clerkId) || 0) + (subscriptionEarningsMap.get(prof.clerkId) || 0);
 
-            // 4. Mensagens trocadas por usuário
-            const messagesAgg = await Message.aggregate([
-                { $match: { isSystem: { $ne: true }, $or: [{ senderId: { $in: activeClerkIds } }, { receiverId: { $in: activeClerkIds } }] } },
-                { $project: { parties: { $setUnion: [['$senderId'], ['$receiverId']] } } },
-                { $unwind: '$parties' },
-                { $match: { parties: { $in: activeClerkIds } } },
-                { $group: { _id: '$parties', total: { $sum: 1 } } }
-            ]);
-            const messagesMap = new Map<string, number>(messagesAgg.map(m => [m._id, m.total]));
+            const profData = {
+                clerkId: prof.clerkId,
+                username: prof.username,
+                name: prof.name || prof.username,
+                photoUrl: prof.photoUrl || null,
+                email: prof.email,
+                phone: prof.phone || null,
+                status,
+                lastAccessAt: lastAccess,
+                broughtClientsCount: attrInfo.count,
+                lastClientBroughtAt: attrInfo.lastAttributedAt,
+                broughtClients: attrInfo.broughtClients.slice(0, 5),
+                totalEarned
+            };
 
-            // 5. Mensagens trocadas na última semana
-            const oneWeekAgo = new Date();
-            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-            const messagesLastWeekAgg = await Message.aggregate([
-                { $match: { isSystem: { $ne: true }, timestamp: { $gte: oneWeekAgo }, $or: [{ senderId: { $in: activeClerkIds } }, { receiverId: { $in: activeClerkIds } }] } },
-                { $project: { parties: { $setUnion: [['$senderId'], ['$receiverId']] } } },
-                { $unwind: '$parties' },
-                { $match: { parties: { $in: activeClerkIds } } },
-                { $group: { _id: '$parties', total: { $sum: 1 } } }
-            ]);
-            const messagesLastWeekMap = new Map<string, number>(messagesLastWeekAgg.map(m => [m._id, m.total]));
-
-            // Agrupar Clientes
-            activeClientsData = activeUsersList
-                .filter(u => !u.isProfessional)
-                .map(u => {
-                    const totalRecharged = depositsMap.get(u.clerkId) || 0;
-                    const activeRoomsCount = activeRoomsMap.get(u.clerkId) || 0;
-                    const totalMessages = messagesMap.get(u.clerkId) || 0;
-                    const messagesLastWeek = messagesLastWeekMap.get(u.clerkId) || 0;
-                    return {
-                        clerkId: u.clerkId,
-                        username: u.username,
-                        name: u.name || u.username,
-                        photoUrl: u.photoUrl || null,
-                        activeRoomsCount,
-                        totalRecharged,
-                        totalMessages,
-                        messagesLastWeek,
-                        clientLevel: getClientLevel(recharges30DaysMap.get(u.clerkId) || 0)
-                    };
-                })
-                .sort((a, b) => b.activeRoomsCount - a.activeRoomsCount || b.totalRecharged - a.totalRecharged)
-                .slice(0, 5);
-
-            // Agrupar Profissionais
-            activeProfessionalsData = activeUsersList
-                .filter(u => u.isProfessional)
-                .map(u => {
-                    const totalEarned = (earningsMap.get(u.clerkId) || 0) + (subscriptionEarningsMap.get(u.clerkId) || 0);
-                    const activeRoomsCount = activeRoomsMap.get(u.clerkId) || 0;
-                    const totalMessages = messagesMap.get(u.clerkId) || 0;
-                    const messagesLastWeek = messagesLastWeekMap.get(u.clerkId) || 0;
-                    return {
-                        clerkId: u.clerkId,
-                        username: u.username,
-                        name: u.name || u.username,
-                        photoUrl: u.photoUrl || null,
-                        activeRoomsCount,
-                        totalEarned,
-                        totalMessages,
-                        messagesLastWeek
-                    };
-                })
-                .sort((a, b) => b.activeRoomsCount - a.activeRoomsCount || b.totalEarned - a.totalEarned)
-                .slice(0, 5);
+            if (status === 'active' || status === 'absent') {
+                activeAndAbsentProfessionals.push(profData);
+            } else {
+                inactiveProfessionals.push(profData);
+            }
         }
+
+        // Ordenação das listas:
+        // Profissionais Ativas/Ausentes: Ordenadas primariamente por Clientes Trazidos (desc), depois por último acesso (desc)
+        activeAndAbsentProfessionals.sort((a, b) => {
+            if (b.broughtClientsCount !== a.broughtClientsCount) {
+                return b.broughtClientsCount - a.broughtClientsCount;
+            }
+            return new Date(b.lastAccessAt).getTime() - new Date(a.lastAccessAt).getTime();
+        });
+
+        // Profissionais Inativas: Ordenadas por último acesso (desc)
+        inactiveProfessionals.sort((a, b) => new Date(b.lastAccessAt).getTime() - new Date(a.lastAccessAt).getTime());
 
         // --- ÚLTIMOS DEPÓSITOS (Apenas recharge PAID) ---
         const rawTransactions = await Transaction.find({
@@ -398,7 +225,6 @@ export async function GET(request: NextRequest) {
             const valInReais = tx.amount || 0;
             const typeLabel = tx.type === 'PIX' ? 'Recarga Pix' : 'Recarga Cartão';
 
-            // Formatação do tempo
             const txDate = tx.timestamp ? new Date(tx.timestamp) : new Date();
             const diffMs = now.getTime() - txDate.getTime();
             const diffMin = Math.floor(diffMs / 60000);
@@ -431,33 +257,15 @@ export async function GET(request: NextRequest) {
 
         // 3. Responder
         return NextResponse.json({
-            period,
             metrics: {
-                activeClients: {
-                    value: activeClients.toLocaleString('pt-BR'),
-                    change: period !== 'none' ? activeClientsChange : null,
-                    isPositive: isActiveClientsPositive
-                },
-                activeProfessionals: {
-                    value: activeProfessionals.toLocaleString('pt-BR'),
-                    change: period !== 'none' ? activeProfessionalsChange : null,
-                    isPositive: isActiveProfessionalsPositive
-                },
-                activeChats: {
-                    value: activeChats.toLocaleString('pt-BR'),
-                    change: period !== 'none' ? chatsChange : null,
-                    isPositive: isChatsPositive
-                },
-                messages: {
-                    value: totalMessages.toLocaleString('pt-BR'),
-                    change: period !== 'none' ? messagesChange : null,
-                    isPositive: isMessagesPositive
-                }
+                active24h: { value: active24hCount.toLocaleString('pt-BR') },
+                absent: { value: absentCount.toLocaleString('pt-BR') },
+                inactive: { value: inactiveCount.toLocaleString('pt-BR') },
+                totalBroughtClients: { value: totalBroughtClientsCount.toLocaleString('pt-BR') }
             },
-            activityData,
+            activeAndAbsentProfessionals,
+            inactiveProfessionals,
             recentTransactions: mappedTransactions,
-            activeClientsData,
-            activeProfessionalsData,
         });
 
     } catch (error: any) {
@@ -465,3 +273,4 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
     }
 }
+
