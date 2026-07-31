@@ -23,6 +23,7 @@ export interface ConversationSession {
     giftCount: number;
     totalEarnings: number; // total em centavos para a profissional
     totalRevenue?: number; // total em centavos gasto pelo cliente
+    isTwoWaySession: boolean; // Indica se houve envio de mensagens de AMBOS os participantes no bloco
     items: SessionItem[];
 }
 
@@ -73,7 +74,7 @@ export function groupEventsIntoSessions(
     // Processar cada relacionamento para identificar blocos de 30 min
     for (const key of Object.keys(groupedByRelation)) {
         const relationEvents = groupedByRelation[key];
-        let currentSession: ConversationSession | null = null;
+        let currentSession: (ConversationSession & { sendersSet: Set<string> }) | null = null;
 
         for (const event of relationEvents) {
             const eventItem: SessionItem = {
@@ -86,7 +87,12 @@ export function groupEventsIntoSessions(
                 receiverId: event.receiverId
             };
 
+            const sender = event.senderId || (event.type === 'message' ? 'user_a' : 'user_b');
+
             if (!currentSession) {
+                const sendersSet = new Set<string>();
+                if (sender) sendersSet.add(sender);
+
                 currentSession = {
                     sessionId: `${key}_${event.parsedDate.getTime()}`,
                     roomId: event.roomId,
@@ -99,6 +105,8 @@ export function groupEventsIntoSessions(
                     giftCount: event.type === 'gift' ? 1 : 0,
                     totalEarnings: event.amount,
                     totalRevenue: event.amount,
+                    isTwoWaySession: false,
+                    sendersSet,
                     items: [eventItem]
                 };
             } else {
@@ -120,10 +128,16 @@ export function groupEventsIntoSessions(
                         currentSession.totalRevenue += event.amount;
                     }
 
+                    if (sender) currentSession.sendersSet.add(sender);
+                    currentSession.isTwoWaySession = currentSession.sendersSet.size >= 2;
                     currentSession.items.push(eventItem);
                 } else {
                     // Inicia uma nova sessão de conversa
+                    currentSession.isTwoWaySession = currentSession.sendersSet.size >= 2;
                     allSessions.push(currentSession);
+
+                    const sendersSet = new Set<string>();
+                    if (sender) sendersSet.add(sender);
 
                     currentSession = {
                         sessionId: `${key}_${event.parsedDate.getTime()}`,
@@ -137,6 +151,8 @@ export function groupEventsIntoSessions(
                         giftCount: event.type === 'gift' ? 1 : 0,
                         totalEarnings: event.amount,
                         totalRevenue: event.amount,
+                        isTwoWaySession: false,
+                        sendersSet,
                         items: [eventItem]
                     };
                 }
@@ -144,6 +160,7 @@ export function groupEventsIntoSessions(
         }
 
         if (currentSession) {
+            currentSession.isTwoWaySession = currentSession.sendersSet.size >= 2;
             allSessions.push(currentSession);
         }
     }

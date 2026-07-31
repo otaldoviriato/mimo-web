@@ -646,6 +646,28 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             .catch(() => undefined);
     }, []);
 
+    // Efeito para scrollar e destacar mensagem específica vinda do extrato da carteira
+    useEffect(() => {
+        if (typeof window === 'undefined' || loadingMessages || messages.length === 0) return;
+
+        const targetMessageId = new URLSearchParams(window.location.search).get('targetMessageId');
+        if (!targetMessageId) return;
+
+        const timer = setTimeout(() => {
+            const el = document.getElementById(`msg-${targetMessageId}`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.add('ring-4', 'ring-purple-500/60', 'ring-offset-2', 'rounded-2xl', 'bg-purple-100/70', 'transition-all', 'duration-500');
+                
+                setTimeout(() => {
+                    el.classList.remove('ring-4', 'ring-purple-500/60', 'ring-offset-2', 'bg-purple-100/70');
+                }, 3500);
+            }
+        }, 400);
+
+        return () => clearTimeout(timer);
+    }, [loadingMessages, messages]);
+
     const latestPartnerMessage = React.useMemo(() => {
         return messages.filter(m => m.senderId === otherUserId).slice(-1)[0];
     }, [messages, otherUserId]);

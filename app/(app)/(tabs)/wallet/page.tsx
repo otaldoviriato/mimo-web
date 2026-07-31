@@ -27,7 +27,8 @@ import {
     XCircle,
     Star,
     ChevronDown,
-    ChevronUp
+    ChevronUp,
+    ExternalLink
 } from 'lucide-react';
 
 const formatCPF = (cpf?: string) => {
@@ -708,18 +709,30 @@ export default function WalletPage() {
                                                         Composição do Bloco de Faturamento
                                                     </span>
                                                     {session.items.map((item) => (
-                                                        <div key={item.id} className="flex items-center justify-between text-[11px] py-0.5 border-b border-slate-50 last:border-b-0">
+                                                        <div
+                                                            key={item.id}
+                                                            onClick={() => {
+                                                                if (session.relatedUserId) {
+                                                                    router.push(`/chat/${session.relatedUserId}?targetMessageId=${item.id}`);
+                                                                }
+                                                            }}
+                                                            className="flex items-center justify-between text-[11px] py-1 px-1.5 rounded-md hover:bg-purple-50/70 cursor-pointer transition-colors border-b border-slate-50 last:border-b-0 group"
+                                                            title="Ir para esta mensagem no chat"
+                                                        >
                                                             <div className="flex items-center gap-1.5 text-slate-600">
                                                                 <span className="text-slate-400 text-[10px]">
                                                                     {new Date(item.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                                                 </span>
-                                                                <span className="font-medium">
+                                                                <span className="font-medium group-hover:text-purple-700 transition-colors">
                                                                     {item.description || (item.type === 'message' ? 'Mensagem' : item.type === 'image_unlock' ? 'Mídia Privada' : 'Presente')}
                                                                 </span>
                                                             </div>
-                                                            <span className="font-bold text-slate-800">
-                                                                {renderValue(item.amount)}
-                                                            </span>
+                                                            <div className="flex items-center gap-1">
+                                                                <span className="font-bold text-slate-800">
+                                                                    {renderValue(item.amount)}
+                                                                </span>
+                                                                <ExternalLink className="w-2.5 h-2.5 text-slate-400 group-hover:text-purple-600 transition-colors" />
+                                                            </div>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -756,13 +769,19 @@ export default function WalletPage() {
                                     return (
                                         <div
                                             key={item.id}
-                                            className="border border-slate-100 rounded-xl p-3 bg-slate-50/40 hover:bg-slate-50 transition-colors flex items-center justify-between gap-3"
+                                            onClick={() => {
+                                                if (item.relatedUserId) {
+                                                    router.push(`/chat/${item.relatedUserId}?targetMessageId=${item.id}`);
+                                                }
+                                            }}
+                                            className="border border-slate-100 rounded-xl p-3 bg-slate-50/40 hover:bg-purple-50/50 hover:border-purple-100 transition-all cursor-pointer flex items-center justify-between gap-3 group"
+                                            title="Ir para esta mensagem no chat"
                                         >
                                             <div className="flex items-center gap-2.5 min-w-0">
                                                 <Avatar uri={item.clientPhotoUrl} size={30} />
                                                 <div className="min-w-0">
                                                     <div className="flex items-center gap-1.5">
-                                                        <h4 className="text-xs font-bold text-slate-900 truncate leading-tight">
+                                                        <h4 className="text-xs font-bold text-slate-900 group-hover:text-purple-700 transition-colors truncate leading-tight">
                                                             {item.clientName}
                                                         </h4>
                                                         <span className="text-[9px] bg-slate-200/60 text-slate-600 font-bold px-1.5 py-0.2 rounded uppercase">
@@ -777,9 +796,12 @@ export default function WalletPage() {
                                                 </div>
                                             </div>
 
-                                            <span className="text-xs font-black text-emerald-600 shrink-0">
-                                                + {renderValue(item.amount)}
-                                            </span>
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                <span className="text-xs font-black text-emerald-600">
+                                                    + {renderValue(item.amount)}
+                                                </span>
+                                                <ExternalLink className="w-3 h-3 text-slate-300 group-hover:text-purple-600 transition-colors" />
+                                            </div>
                                         </div>
                                     );
                                 })}

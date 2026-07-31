@@ -47,16 +47,19 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        // 3. Buscar mensagens associadas para usar a data/hora ORIGINAL do envio da mídia/mensagem
+        // 3. Buscar mensagens associadas para obter timestamp original E remetente (senderId)
         const messageIds = microTxs.map(t => t.messageId).filter(Boolean) as string[];
         const originalMessages = await Message.find({ _id: { $in: messageIds } })
-            .select('_id timestamp')
+            .select('_id senderId receiverId timestamp')
             .lean();
 
-        const messageTimestampMap = new Map<string, Date>();
+        const messageDataMap = new Map<string, { timestamp: Date; senderId: string }>();
         originalMessages.forEach((m: any) => {
-            if (m.timestamp) {
-                messageTimestampMap.set(m._id.toString(), new Date(m.timestamp));
+            if (m._id) {
+                messageDataMap.set(m._id.toString(), {
+                    timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
+                    senderId: m.senderId
+                });
             }
         });
 
@@ -75,14 +78,17 @@ export async function GET(request: NextRequest) {
             });
         });
 
-        // 5. Mapear para entrada de eventos brutos (usando timestamp da mensagem original para mídias)
+        // 5. Mapear para entrada de eventos brutos com o senderId correto
         const events: RawEventInput[] = microTxs.map((tx: any) => {
-            const originalTimestamp = tx.messageId ? messageTimestampMap.get(tx.messageId.toString()) : null;
-            const eventTimestamp = originalTimestamp || tx.timestamp || tx.createdAt;
+            const originalMsgData = tx.messageId ? messageDataMap.get(tx.messageId.toString()) : null;
+            const eventTimestamp = originalMsgData?.timestamp || tx.timestamp || tx.createdAt;
+            const senderId = originalMsgData?.senderId || tx.relatedUserId || 'cliente';
 
             return {
                 id: tx._id.toString(),
                 relatedUserId: tx.relatedUserId || 'desconhecido',
+                senderId,
+                receiverId: clerkId,
                 type: (['message', 'image_unlock', 'gift'].includes(tx.source) ? tx.source : 'other') as any,
                 amount: tx.amount || 0,
                 timestamp: eventTimestamp,
@@ -99,11 +105,12 @@ export async function GET(request: NextRequest) {
         // 6. Agrupar em sessões de conversa (intervalo <= timeoutMinutes)
         const allGroupedSessions = groupEventsIntoSessions(events, timeoutMinutes);
 
-        // 7. Separar em Sessões de Conversa (troca contínua) e Mensagens/Mídias Avulsas
-        const multiItemSessions = allGroupedSessions.filter(s => s.items.length > 1);
-        const singleItemSessions = allGroupedSessions.filter(s => s.items.length === 1);
+        // 7. Filtrar Sessões de Conversa VÁLIDAS: Devem ser bi-direcionais (isTwoWaySession === true e items.length >= 2)
+        // Se ocorreu apenas um lado enviando mensagens (isTwoWaySession === false), os itens vão para Mensagens Avulsas.
+        const twoWaySessions = allGroupedSessions.filter(s => s.isTwoWaySession && s.items.length >= 2);
+        const singleSideSessions = allGroupedSessions.filter(s => !s.isTwoWaySession || s.items.length < 2);
 
-        const enrichedSessions = multiItemSessions.map(session => {
+        const enrichedSessions = twoWaySessions.map(session => {
             const clientInfo = clientMap.get(session.relatedUserId);
             return {
                 ...session,
@@ -113,21 +120,27 @@ export async function GET(request: NextRequest) {
             };
         });
 
-        const standaloneItems = singleItemSessions.map(session => {
+        // Extrair itens individuais de sessões de 1 único lado para compor as Mensagens Avulsas
+        const standaloneItems: any[] = [];
+        singleSideSessions.forEach(session => {
             const clientInfo = clientMap.get(session.relatedUserId);
-            const item = session.items[0];
-            return {
-                id: item.id,
-                type: item.type,
-                amount: item.amount,
-                timestamp: item.timestamp,
-                description: item.description,
-                relatedUserId: session.relatedUserId,
-                clientName: clientInfo?.name || 'Cliente Mimo',
-                clientUsername: clientInfo?.username || 'cliente',
-                clientPhotoUrl: clientInfo?.photoUrl || null
-            };
+            session.items.forEach(item => {
+                standaloneItems.push({
+                    id: item.id,
+                    type: item.type,
+                    amount: item.amount,
+                    timestamp: item.timestamp,
+                    description: item.description,
+                    relatedUserId: session.relatedUserId,
+                    clientName: clientInfo?.name || 'Cliente Mimo',
+                    clientUsername: clientInfo?.username || 'cliente',
+                    clientPhotoUrl: clientInfo?.photoUrl || null
+                });
+            });
         });
+
+        // Ordenar mensagens avulsas das mais recentes para as mais antigas
+        standaloneItems.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
         const totalSessionsEarnings = enrichedSessions.reduce((sum, s) => sum + s.totalEarnings, 0);
         const totalStandaloneEarnings = standaloneItems.reduce((sum, item) => sum + item.amount, 0);
