@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
         const allProfessionals = await User.find({
             ...onboardingCompletedFilter,
             isProfessional: true
-        }).select('clerkId username name photoUrl lastAccessAt lastSeen updatedAt createdAt phone email balance').lean() as any[];
+        }).select('clerkId username name photoUrl lastAccessAt lastSeen updatedAt createdAt phone email balance accessCount').lean() as any[];
 
         const profClerkIds = allProfessionals.map(p => p.clerkId);
 
@@ -167,6 +167,27 @@ export async function GET(request: NextRequest) {
 
             const totalEarned = (earningsMap.get(prof.clerkId) || 0) + (subscriptionEarningsMap.get(prof.clerkId) || 0);
 
+            // Cálculo da frequência média de acessos
+            const accessCount = prof.accessCount || 0;
+            const createdAtDate = prof.createdAt ? new Date(prof.createdAt) : now;
+            const daysDiff = Math.max(1, (now.getTime() - createdAtDate.getTime()) / (1000 * 60 * 60 * 24));
+
+            let avgFrequencyLabel = 'Nenhum acesso';
+            if (accessCount > 0) {
+                const accessesPerDay = accessCount / daysDiff;
+                if (accessesPerDay >= 1) {
+                    avgFrequencyLabel = `${accessesPerDay.toFixed(1)}x / dia`;
+                } else {
+                    const accessesPerWeek = accessesPerDay * 7;
+                    if (accessesPerWeek >= 1) {
+                        avgFrequencyLabel = `${accessesPerWeek.toFixed(1)}x / semana`;
+                    } else {
+                        const daysPerAccess = Math.round(1 / accessesPerDay);
+                        avgFrequencyLabel = `1x a cada ${daysPerAccess} dias`;
+                    }
+                }
+            }
+
             const profData = {
                 clerkId: prof.clerkId,
                 username: prof.username,
@@ -176,6 +197,8 @@ export async function GET(request: NextRequest) {
                 phone: prof.phone || null,
                 status,
                 lastAccessAt: lastAccess,
+                accessCount,
+                avgFrequencyLabel,
                 broughtClientsCount: attrInfo.count,
                 lastClientBroughtAt: attrInfo.lastAttributedAt,
                 broughtClients: attrInfo.broughtClients.slice(0, 5),

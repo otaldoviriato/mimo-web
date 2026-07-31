@@ -308,6 +308,8 @@ export default function AdminPage() {
                                                     <tr className="border-b border-slate-100 bg-slate-50/50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                                                         <th className="py-3 px-4">Profissional</th>
                                                         <th className="py-3 px-3">Status</th>
+                                                        <th className="py-3 px-3 text-center">Total Acessos</th>
+                                                        <th className="py-3 px-3 text-center">Frequência Média</th>
                                                         <th className="py-3 px-3 text-center">Clientes Trazidos</th>
                                                         <th className="py-3 px-3">Última Atração</th>
                                                         <th className="py-3 px-3">Último Acesso</th>
@@ -357,6 +359,20 @@ export default function AdminPage() {
                                                                         Inativa ({formatRelativeTime(prof.lastAccessAt)})
                                                                     </span>
                                                                 )}
+                                                            </td>
+
+                                                            {/* Total Acessos */}
+                                                            <td className="py-3 px-3 text-center whitespace-nowrap">
+                                                                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-xs">
+                                                                    {prof.accessCount || 0} {prof.accessCount === 1 ? 'acesso' : 'acessos'}
+                                                                </span>
+                                                            </td>
+
+                                                            {/* Frequência Média */}
+                                                            <td className="py-3 px-3 text-center whitespace-nowrap">
+                                                                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100 font-bold text-[11px]">
+                                                                    {prof.avgFrequencyLabel || 'Nenhum acesso'}
+                                                                </span>
                                                             </td>
 
                                                             {/* Clientes Trazidos */}
