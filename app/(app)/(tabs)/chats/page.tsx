@@ -719,7 +719,7 @@ export default function ChatsPage() {
                         {myProfile?.isProfessional ? (
                             <div className="flex flex-col items-center max-w-xs">
                                 <p className="text-xs text-slate-500 leading-relaxed mb-6">
-                                    O Mimo não traz clientes sozinho. Compartilhe seu perfil nas suas redes para receber mensagens!
+                                    Compartilhe seu perfil para começar a receber mensagens.
                                 </p>
 
                                 <button
