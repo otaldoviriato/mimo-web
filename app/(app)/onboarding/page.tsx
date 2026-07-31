@@ -246,9 +246,10 @@ export default function OnboardingPage() {
         }
 
         // 3. Usuário totalmente configurado e sem step pendente:
-        // Se ainda não tem nenhuma conversa criada, abre a tela de introdução/compartilhamento ('done')
+        // Provisoriamente redireciona direto para o app (tela de compartilhamento ignorada por enquanto)
         if (userData.isProfessional !== undefined && !needsIdentity) {
-            setStep('done');
+            navigateToApp();
+            return;
         }
 
         // 4. isProfessional === undefined → mostra welcome (novo cadastro, fluxo normal)
@@ -504,9 +505,9 @@ export default function OnboardingPage() {
             if (!r2.ok) throw new Error(d2.error || 'Erro ao atualizar o perfil');
 
             await refetch();
-            // Cadastro concluído — remove o step salvo para liberar o acesso normal ao app
+            // Cadastro concluído — remove o step salvo e vai direto para o app (sem passar por 'done' por enquanto)
             localStorage.removeItem(STEP_KEY);
-            go('done');
+            navigateToApp();
         } catch (err: any) {
             setProfError(err.message || 'Erro ao salvar. Tente novamente.');
         } finally {
