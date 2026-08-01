@@ -164,9 +164,21 @@ interface WalletStandaloneItem {
     clientPhotoUrl: string | null;
 }
 
+interface WalletStandaloneGroup {
+    clientId: string;
+    clientName: string;
+    clientUsername: string;
+    clientPhotoUrl: string | null;
+    totalAmount: number;
+    itemsCount: number;
+    lastTimestamp: string;
+    items: WalletStandaloneItem[];
+}
+
 interface WalletSessionsData {
     sessions: WalletSession[];
     standaloneItems: WalletStandaloneItem[];
+    standaloneGroups?: WalletStandaloneGroup[];
     totalSessionsEarnings: number;
     totalStandaloneEarnings: number;
     timeoutMinutes: number;
@@ -188,6 +200,7 @@ export default function WalletPage() {
     const [withdrawFeedback, setWithdrawFeedback] = useState<'created' | 'approved' | 'failed' | null>(null);
     const [lastSeenWithdrawalStatus, setLastSeenWithdrawalStatus] = useState<string | null>(null);
     const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
+    const [expandedStandaloneClientId, setExpandedStandaloneClientId] = useState<string | null>(null);
     const [showAllSessions, setShowAllSessions] = useState(false);
     const [showAllStandalone, setShowAllStandalone] = useState(false);
     const [activeExtratoTab, setActiveExtratoTab] = useState<'sessions' | 'standalone'>('sessions');
@@ -622,6 +635,46 @@ export default function WalletPage() {
                         </div>
                     </div>
 
+                    {/* Card Explicativo de Faturamento da Carteira */}
+                    {sessionsData && (sessionsData.totalSessionsEarnings + sessionsData.totalStandaloneEarnings > 0) && (
+                        <div className="bg-gradient-to-r from-purple-50/80 via-white to-purple-50/50 p-3 rounded-xl border border-purple-100/60 mb-1 flex flex-col gap-2">
+                            <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                                <span className="flex items-center gap-1.5 text-purple-900">
+                                    <TrendingUp className="w-3.5 h-3.5 text-purple-650" />
+                                    Resumo da Composição do Faturamento
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                    Inatividade: {sessionsData.timeoutMinutes} min
+                                </span>
+                            </div>
+                            
+                            {(() => {
+                                const total = sessionsData.totalSessionsEarnings + sessionsData.totalStandaloneEarnings;
+                                const pctSessions = total > 0 ? Math.round((sessionsData.totalSessionsEarnings / total) * 100) : 0;
+                                const pctStandalone = total > 0 ? 100 - pctSessions : 0;
+                                
+                                return (
+                                    <div className="flex flex-col gap-1.5">
+                                        <div className="w-full bg-slate-200/80 rounded-full h-2 flex overflow-hidden">
+                                            <div className="bg-purple-600 h-full transition-all duration-500" style={{ width: `${pctSessions}%` }} />
+                                            <div className="bg-amber-400 h-full transition-all duration-500" style={{ width: `${pctStandalone}%` }} />
+                                        </div>
+                                        <div className="flex items-center justify-between text-[10.5px] font-semibold pt-0.5">
+                                            <div className="flex items-center gap-1 text-purple-700">
+                                                <span className="w-2 h-2 rounded-full bg-purple-600" />
+                                                <span>Sessões de Conversa: <strong>{pctSessions}%</strong> ({renderValue(sessionsData.totalSessionsEarnings)})</span>
+                                            </div>
+                                            <div className="flex items-center gap-1 text-slate-600">
+                                                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                                                <span>Mensagens Avulsas: <strong>{pctStandalone}%</strong> ({renderValue(sessionsData.totalStandaloneEarnings)})</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    )}
+
                     {loadingSessions ? (
                         <div className="flex flex-col gap-2 py-4 animate-pulse">
                             <div className="h-14 bg-slate-50 rounded-xl" />
@@ -633,7 +686,7 @@ export default function WalletPage() {
                             <div className="flex flex-col items-center justify-center py-8 gap-2 bg-slate-50/50 rounded-xl text-center px-4">
                                 <Clock3 className="w-6 h-6 text-slate-300" />
                                 <p className="text-xs text-gray-500 font-medium">Nenhuma sessão de conversa contínua encontrada.</p>
-                                <p className="text-[10.5px] text-gray-400">Mensagens trocadas continuamente em até 30 min formam sessões explicativas do saldo.</p>
+                                <p className="text-[10.5px] text-gray-400">Mensagens trocadas continuamente formam sessões explicativas do saldo.</p>
                             </div>
                         ) : (
                             <div className="flex flex-col gap-3">
@@ -743,57 +796,96 @@ export default function WalletPage() {
                             </div>
                         )
                     ) : (
-                        /* VISÃO DE MENSAGENS E MÍDIAS AVULSAS */
-                        !sessionsData?.standaloneItems || sessionsData.standaloneItems.length === 0 ? (
+                        /* VISÃO CONSOLIDADA DE MENSAGENS E MÍDIAS AVULSAS POR CLIENTE */
+                        (!sessionsData?.standaloneGroups || sessionsData.standaloneGroups.length === 0) && (!sessionsData?.standaloneItems || sessionsData.standaloneItems.length === 0) ? (
                             <div className="flex flex-col items-center justify-center py-8 gap-2 bg-slate-50/50 rounded-xl text-center px-4">
                                 <Clock3 className="w-6 h-6 text-slate-300" />
                                 <p className="text-xs text-gray-500 font-medium">Nenhuma mensagem ou mídia avulsa registrada.</p>
                                 <p className="text-[10.5px] text-gray-400">Interações isoladas que não formaram sessão contínua serão listadas aqui.</p>
                             </div>
                         ) : (
-                            <div className="flex flex-col gap-2">
-                                {(showAllStandalone ? sessionsData.standaloneItems : sessionsData.standaloneItems.slice(0, 5)).map((item) => {
-                                    const date = new Date(item.timestamp);
-                                    const dateStr = date.toLocaleDateString('pt-BR');
-                                    const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                            <div className="flex flex-col gap-2.5">
+                                {((sessionsData?.standaloneGroups && sessionsData.standaloneGroups.length > 0)
+                                    ? (showAllStandalone ? sessionsData.standaloneGroups : sessionsData.standaloneGroups.slice(0, 5))
+                                    : []
+                                ).map((group) => {
+                                    const isExpandedGroup = expandedStandaloneClientId === group.clientId;
+                                    const lastDate = new Date(group.lastTimestamp);
+                                    const dateStr = lastDate.toLocaleDateString('pt-BR');
 
                                     return (
                                         <div
-                                            key={item.id}
-                                            className="border border-slate-100 rounded-xl p-3 bg-slate-50/40 flex items-center justify-between gap-3"
+                                            key={group.clientId}
+                                            className="border border-slate-100 rounded-xl p-3 bg-slate-50/40 hover:bg-slate-50 transition-all flex flex-col gap-2"
                                         >
-                                            <div className="flex items-center gap-2.5 min-w-0">
-                                                <Avatar uri={item.clientPhotoUrl} size={30} />
-                                                <div className="min-w-0">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <h4 className="text-xs font-bold text-slate-900 truncate leading-tight">
-                                                            {item.clientName}
-                                                        </h4>
-                                                        <span className="text-[9px] bg-slate-200/60 text-slate-600 font-bold px-1.5 py-0.2 rounded uppercase">
-                                                            Avulsa
-                                                        </span>
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                    <Avatar uri={group.clientPhotoUrl} size={32} />
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <h4 className="text-xs font-bold text-slate-900 truncate leading-tight">
+                                                                {group.clientName}
+                                                            </h4>
+                                                            <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200/60 font-bold px-1.5 py-0.2 rounded uppercase">
+                                                                {group.itemsCount} {group.itemsCount === 1 ? 'item avulso' : 'itens avulsos'}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                                                            Última interação: {dateStr}
+                                                        </p>
                                                     </div>
-                                                    <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1 truncate">
-                                                        <span>{item.description || 'Mensagem'}</span>
-                                                        <span>•</span>
-                                                        <span>{dateStr} às {timeStr}</span>
-                                                    </p>
+                                                </div>
+
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <span className="text-xs font-black text-emerald-600">
+                                                        + {renderValue(group.totalAmount)}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => setExpandedStandaloneClientId(isExpandedGroup ? null : group.clientId)}
+                                                        className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-purple-600 transition-colors"
+                                                        title={isExpandedGroup ? "Recolher itens" : "Ver detalhamento dos itens avulsos"}
+                                                    >
+                                                        {isExpandedGroup ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                                    </button>
                                                 </div>
                                             </div>
 
-                                            <span className="text-xs font-black text-emerald-600 shrink-0">
-                                                + {renderValue(item.amount)}
-                                            </span>
+                                            {/* Detalhamento dos Itens Avulsos do Cliente */}
+                                            {isExpandedGroup && group.items && (
+                                                <div className="mt-1 pt-2 border-t border-slate-200/60 flex flex-col gap-1.5 bg-white p-2.5 rounded-lg border border-slate-100">
+                                                    <span className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wider">
+                                                        Itens Avulsos com este Cliente
+                                                    </span>
+                                                    {group.items.map((item) => (
+                                                        <div
+                                                            key={item.id}
+                                                            className="flex items-center justify-between text-[11px] py-1 px-1.5 rounded-md border-b border-slate-50 last:border-b-0"
+                                                        >
+                                                            <div className="flex items-center gap-1.5 text-slate-600">
+                                                                <span className="text-slate-400 text-[10px]">
+                                                                    {new Date(item.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                                </span>
+                                                                <span className="font-medium">
+                                                                    {item.description || (item.type === 'message' ? 'Mensagem' : item.type === 'image_unlock' ? 'Mídia Privada' : 'Presente')}
+                                                                </span>
+                                                            </div>
+                                                            <span className="font-bold text-slate-800">
+                                                                + {renderValue(item.amount)}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}
 
-                                {sessionsData.standaloneItems.length > 5 && (
+                                {(sessionsData?.standaloneGroups?.length || 0) > 5 && (
                                     <button
                                         onClick={() => setShowAllStandalone(!showAllStandalone)}
                                         className="text-[11px] font-extrabold text-purple-600 hover:text-purple-700 self-center py-1.5 px-3 rounded-lg bg-purple-50 hover:bg-purple-100/80 transition-all active:scale-[0.98] mt-1 border border-purple-100/30"
                                     >
-                                        {showAllStandalone ? 'Recolher avulsas' : 'Ver todas as avulsas'}
+                                        {showAllStandalone ? 'Recolher avulsas' : 'Ver todos os clientes avulsos'}
                                     </button>
                                 )}
                             </div>

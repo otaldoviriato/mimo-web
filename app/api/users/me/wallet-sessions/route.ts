@@ -24,9 +24,9 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
         }
 
-        // 1. Obter parâmetro de timeout global (default 30 min)
+        // 1. Obter parâmetro de timeout global (default 60 min se não definido)
         const settings = await AppSettings.findOne({ key: 'global' }).lean();
-        const timeoutMinutes = settings?.chatSessionTimeoutMinutes ?? 30;
+        const timeoutMinutes = settings?.chatSessionTimeoutMinutes ?? 60;
 
         // 2. Buscar microtransações de crédito da profissional
         const microTxs = await MicroTransaction.find({
@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({
                 sessions: [],
                 standaloneItems: [],
+                standaloneGroups: [],
                 totalSessionsEarnings: 0,
                 totalStandaloneEarnings: 0,
                 timeoutMinutes
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
 
         // 3. Mapear os ganhos de crédito por messageId
         const creditAmountByMessageId = new Map<string, number>();
-        const orphanTxs: any[] = []; // Microtransações sem mensagem associada (ex: presentes diretos)
+        const orphanTxs: any[] = [];
 
         microTxs.forEach((tx: any) => {
             if (tx.messageId) {
@@ -123,17 +124,15 @@ export async function GET(request: NextRequest) {
             });
         });
 
-        // 8. Agrupar em sessões de conversa usando a janela de 30 min
+        // 8. Agrupar em sessões de conversa usando a janela de inatividade
         const allGroupedSessions = groupEventsIntoSessions(rawEvents, timeoutMinutes);
 
-        // 9. Filtrar Sessões de Conversa VÁLIDAS:
-        // Uma Sessão de Conversa exige bi-direcionalidade (isTwoWaySession === true: mensagens de AMBOS os participantes no bloco) E que tenha gerado ganho acumulado > 0.
+        // 9. Filtrar Sessões de Conversa VÁLIDAS (bi-direcionais e com ganho acumulado > 0)
         const twoWaySessions = allGroupedSessions.filter(s => s.isTwoWaySession && s.items.length >= 2 && s.totalEarnings > 0);
         const singleSideSessions = allGroupedSessions.filter(s => !s.isTwoWaySession || s.items.length < 2 || !twoWaySessions.includes(s));
 
         const enrichedSessions = twoWaySessions.map(session => {
             const clientInfo = clientMap.get(session.relatedUserId);
-            // Filtrar apenas os itens da sessão que representam faturamento (amount > 0) para exibir na composição
             const paidItems = session.items.filter(item => item.amount > 0);
 
             return {
@@ -145,7 +144,7 @@ export async function GET(request: NextRequest) {
             };
         });
 
-        // 10. Extrair apenas os itens PAGOS (amount > 0) de blocos sem bi-direcionalidade para Mensagens Avulsas
+        // 10. Extrair itens PAGOS de blocos sem bi-direcionalidade para Mensagens Avulsas
         const standaloneItemsMap = new Map<string, any>();
         singleSideSessions.forEach(session => {
             const clientInfo = clientMap.get(session.relatedUserId);
@@ -169,12 +168,43 @@ export async function GET(request: NextRequest) {
         const standaloneItems = Array.from(standaloneItemsMap.values());
         standaloneItems.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
+        // 11. Consolidação Visual: Agrupar mensagens avulsas POR CLIENTE para zerar poluição visual
+        const standaloneByClient = new Map<string, any>();
+
+        standaloneItems.forEach(item => {
+            const clientId = item.relatedUserId;
+            if (!standaloneByClient.has(clientId)) {
+                standaloneByClient.set(clientId, {
+                    clientId,
+                    clientName: item.clientName,
+                    clientUsername: item.clientUsername,
+                    clientPhotoUrl: item.clientPhotoUrl,
+                    totalAmount: 0,
+                    itemsCount: 0,
+                    lastTimestamp: item.timestamp,
+                    items: []
+                });
+            }
+
+            const group = standaloneByClient.get(clientId);
+            group.totalAmount += item.amount;
+            group.itemsCount += 1;
+            group.items.push(item);
+            if (new Date(item.timestamp) > new Date(group.lastTimestamp)) {
+                group.lastTimestamp = item.timestamp;
+            }
+        });
+
+        const standaloneGroups = Array.from(standaloneByClient.values());
+        standaloneGroups.sort((a, b) => new Date(b.lastTimestamp).getTime() - new Date(a.lastTimestamp).getTime());
+
         const totalSessionsEarnings = enrichedSessions.reduce((sum, s) => sum + s.totalEarnings, 0);
         const totalStandaloneEarnings = standaloneItems.reduce((sum, item) => sum + item.amount, 0);
 
         return NextResponse.json({
             sessions: enrichedSessions,
             standaloneItems,
+            standaloneGroups,
             totalSessionsEarnings,
             totalStandaloneEarnings,
             timeoutMinutes
