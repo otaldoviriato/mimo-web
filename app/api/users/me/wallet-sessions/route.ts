@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { MicroTransaction } from '@/models/MicroTransaction';
 import { Message } from '@/models/Message';
+import { AppSettings } from '@/models/AppSettings';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,11 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
         }
 
-        // 1. Buscar TODAS as microtransações de crédito da criadora (FONTE ABSOLUTA DA VERDADE DO FATURAMENTO)
+        // 1. Obter parâmetro de timeout global (default 180 min se não definido)
+        const settings = await AppSettings.findOne({ key: 'global' }).lean();
+        const timeoutMinutes = settings?.chatSessionTimeoutMinutes ?? 180;
+
+        // 2. Buscar TODAS as microtransações de crédito da criadora (FONTE DA VERDADE DO DINHEIRO)
         const microTxs = await MicroTransaction.find({
             userId: clerkId,
             type: 'credit',
@@ -38,11 +43,11 @@ export async function GET(request: NextRequest) {
                 standaloneGroups: [],
                 totalSessionsEarnings: 0,
                 totalStandaloneEarnings: 0,
-                timeoutMinutes: 180
+                timeoutMinutes
             });
         }
 
-        // 2. Mapear os clientes envolvidos e buscar mensagens das salas
+        // 3. Mapear os clientes envolvidos e buscar mensagens das salas
         const relatedUserIds = Array.from(new Set(microTxs.map((t: any) => t.relatedUserId).filter(Boolean))) as string[];
         const roomIds = relatedUserIds.map(clientClerkId => [clerkId, clientClerkId].sort().join('_'));
 
@@ -51,7 +56,18 @@ export async function GET(request: NextRequest) {
             .sort({ timestamp: 1 })
             .lean();
 
-        // 3. Buscar dados dos clientes para fotos e nomes
+        // Mapear mensagens por ID e por sala para consulta rápida
+        const msgById = new Map<string, any>();
+        const msgsByRoom = new Map<string, any[]>();
+
+        roomMessages.forEach((m: any) => {
+            msgById.set(m._id.toString(), m);
+            const rId = m.roomId || [m.senderId, m.receiverId].sort().join('_');
+            if (!msgsByRoom.has(rId)) msgsByRoom.set(rId, []);
+            msgsByRoom.get(rId)!.push(m);
+        });
+
+        // 4. Buscar dados dos clientes para fotos e nomes
         const clients = await User.find({ clerkId: { $in: relatedUserIds } })
             .select('clerkId name username photoUrl')
             .lean();
@@ -65,30 +81,85 @@ export async function GET(request: NextRequest) {
             });
         });
 
-        // 4. Agrupar mensagens por sala para mapear janelas de resposta da criadora
-        const msgsByRoom = new Map<string, any[]>();
-        roomMessages.forEach((m: any) => {
-            const rId = m.roomId || [m.senderId, m.receiverId].sort().join('_');
-            if (!msgsByRoom.has(rId)) msgsByRoom.set(rId, []);
-            msgsByRoom.get(rId)!.push(m);
+        // 5. Mapear as janelas temporais de Sessões Bi-direcionais VÁLIDAS para cada sala
+        // REGRA RÍGIDA: Uma Sessão de Conversa DEVE ter pelo menos 2 mensagens trocadas E participação de ambos os participantes.
+        const validSessionsByRoom = new Map<string, any[]>();
+
+        msgsByRoom.forEach((roomMsgs, rId) => {
+            const sortedMsgs = roomMsgs.slice().sort((a, b) => new Date(a.timestamp || a.createdAt).getTime() - new Date(b.timestamp || b.createdAt).getTime());
+            let currentSession: any = null;
+            const roomSessions: any[] = [];
+
+            sortedMsgs.forEach((msg: any) => {
+                const mTs = new Date(msg.timestamp || msg.createdAt);
+
+                if (!currentSession) {
+                    currentSession = {
+                        roomId: rId,
+                        clientClerkId: msg.senderId === clerkId ? msg.receiverId : msg.senderId,
+                        senders: new Set([msg.senderId]),
+                        startTime: mTs,
+                        endTime: mTs,
+                        messages: [msg]
+                    };
+                } else {
+                    const diffMin = (mTs.getTime() - currentSession.endTime.getTime()) / (1000 * 60);
+                    if (diffMin <= timeoutMinutes) {
+                        currentSession.endTime = mTs;
+                        currentSession.senders.add(msg.senderId);
+                        currentSession.messages.push(msg);
+                    } else {
+                        roomSessions.push(currentSession);
+                        currentSession = {
+                            roomId: rId,
+                            clientClerkId: msg.senderId === clerkId ? msg.receiverId : msg.senderId,
+                            senders: new Set([msg.senderId]),
+                            startTime: mTs,
+                            endTime: mTs,
+                            messages: [msg]
+                        };
+                    }
+                }
+            });
+
+            if (currentSession) roomSessions.push(currentSession);
+
+            // Filtrar apenas sessões que tenham pelo menos 2 mensagens E remetentes bi-direcionais
+            const validTwoWaySessions = roomSessions.filter(s => s.senders.size >= 2 && s.messages.length >= 2);
+            validSessionsByRoom.set(rId, validTwoWaySessions);
         });
 
-        // 5. Agrupar Microtransações por Sala e identificar Sessões vs Avulsas
-        const sessionsMap = new Map<string, any>(); // key: roomId_sessionTimestamp -> Session Object
+        // 6. Atribuir CADA MicroTransaction à sua Sessão de Conversa (usando o momento de ENVIO original da mídia)
+        const sessionsResultMap = new Map<string, any>();
         const standaloneItems: any[] = [];
 
         microTxs.forEach((tx: any) => {
             const clientClerkId = tx.relatedUserId || 'desconhecido';
             const rId = [clerkId, clientClerkId].sort().join('_');
-            const txTs = new Date(tx.timestamp || tx.createdAt).getTime();
+            const txTs = new Date(tx.timestamp || tx.createdAt);
 
-            const roomMsgs = msgsByRoom.get(rId) || [];
-            const creatorMsgs = roomMsgs.filter(m => m.senderId === clerkId);
+            // CORREÇÃO PONTO 1: Tentar encontrar o momento de ENVIO ORIGINAL da mensagem/mídia no chat
+            let origMsgTimestamp = txTs;
+            if (tx.messageId && msgById.has(tx.messageId.toString())) {
+                const orig = msgById.get(tx.messageId.toString());
+                origMsgTimestamp = new Date(orig.timestamp || orig.createdAt);
+            } else if (tx.source === 'image_unlock' || tx.source === 'gift') {
+                // Se o desbloqueio aconteceu depois, procurar a mídia enviada no chat na mesma sala antes ou na conversa
+                const roomMsgs = msgsByRoom.get(rId) || [];
+                const matchedMedia = roomMsgs.slice().reverse().find(m => {
+                    const mTs = new Date(m.timestamp || m.createdAt);
+                    return (m.isLockedImage || m.isGift) && mTs.getTime() <= txTs.getTime();
+                });
+                if (matchedMedia) {
+                    origMsgTimestamp = new Date(matchedMedia.timestamp || matchedMedia.createdAt);
+                }
+            }
 
-            // Verificar se houve resposta/conversa da criadora com o cliente em até 12h da transação (ciclo de conversa)
-            const matchedCreatorMsg = creatorMsgs.find(cm => {
-                const cmTs = new Date(cm.timestamp || cm.createdAt).getTime();
-                return Math.abs(txTs - cmTs) <= 12 * 60 * 60 * 1000;
+            // Verificar se o momento de envio original caiu dentro de alguma Sessão Bi-direcional VÁLIDA
+            const roomSessions = validSessionsByRoom.get(rId) || [];
+            const matchedSession = roomSessions.find(s => {
+                const marginMs = 15 * 60 * 1000; // Margem de 15 min de tolerância
+                return origMsgTimestamp.getTime() >= (s.startTime.getTime() - marginMs) && origMsgTimestamp.getTime() <= (s.endTime.getTime() + marginMs);
             });
 
             const clientInfo = clientMap.get(clientClerkId);
@@ -110,53 +181,49 @@ export async function GET(request: NextRequest) {
                 clientPhotoUrl: clientInfo?.photoUrl || null
             };
 
-            if (matchedCreatorMsg && roomMsgs.length >= 2) {
-                // Pertence a uma Sessão de Conversa Bi-direcional
-                const sessionDateKey = new Date(txTs).toISOString().split('T')[0]; // Agrupar por ciclo/dia de conversa
-                const sessionKey = `${rId}_${sessionDateKey}`;
+            if (matchedSession) {
+                // Pertence a uma Sessão de Conversa Bi-direcional VÁLIDA
+                const sessionKey = `${rId}_${matchedSession.startTime.getTime()}`;
 
-                if (!sessionsMap.has(sessionKey)) {
-                    sessionsMap.set(sessionKey, {
+                if (!sessionsResultMap.has(sessionKey)) {
+                    sessionsResultMap.set(sessionKey, {
                         sessionId: sessionKey,
                         relatedUserId: clientClerkId,
                         clientName: clientInfo?.name || 'Cliente Mimo',
                         clientUsername: clientInfo?.username || 'cliente',
                         clientPhotoUrl: clientInfo?.photoUrl || null,
-                        startTime: tx.timestamp || tx.createdAt,
-                        endTime: tx.timestamp || tx.createdAt,
-                        durationMinutes: 30,
-                        messagesCount: 0,
-                        mediaCount: 0,
-                        giftCount: 0,
+                        startTime: matchedSession.startTime,
+                        endTime: matchedSession.endTime,
+                        durationMinutes: Math.max(1, Math.round((matchedSession.endTime.getTime() - matchedSession.startTime.getTime()) / (1000 * 60))),
+                        messagesCount: matchedSession.messages.filter((m: any) => !m.isLockedImage && !m.isGift).length,
+                        mediaCount: matchedSession.messages.filter((m: any) => m.isLockedImage).length,
+                        giftCount: matchedSession.messages.filter((m: any) => m.isGift).length,
                         totalEarnings: 0,
                         items: []
                     });
                 }
 
-                const sObj = sessionsMap.get(sessionKey);
+                const sObj = sessionsResultMap.get(sessionKey);
                 sObj.totalEarnings += (tx.amount || 0);
                 sObj.items.push(txItem);
-                
-                if (tx.source === 'gift') sObj.giftCount += 1;
-                else if (tx.source === 'image_unlock') sObj.mediaCount += 1;
-                else sObj.messagesCount += 1;
 
                 if (new Date(txItem.timestamp) < new Date(sObj.startTime)) sObj.startTime = txItem.timestamp;
                 if (new Date(txItem.timestamp) > new Date(sObj.endTime)) sObj.endTime = txItem.timestamp;
                 sObj.durationMinutes = Math.max(1, Math.round((new Date(sObj.endTime).getTime() - new Date(sObj.startTime).getTime()) / (1000 * 60)));
 
             } else {
-                // É uma mensagem/mídia avulsa sem réplica/conversa da criadora
+                // É uma mensagem ou mídia avulsa fora de sessão bi-direcional
                 standaloneItems.push(txItem);
             }
         });
 
-        const enrichedSessions = Array.from(sessionsMap.values());
+        // Filtrar apenas sessões que tiveram ganho acumulado > 0
+        const enrichedSessions = Array.from(sessionsResultMap.values()).filter(s => s.totalEarnings > 0);
         enrichedSessions.sort((a, b) => new Date(b.endTime).getTime() - new Date(a.endTime).getTime());
 
         standaloneItems.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-        // 6. Consolidação Visual das Mensagens Avulsas POR CLIENTE
+        // 7. Consolidação Visual das Mensagens Avulsas POR CLIENTE
         const standaloneByClient = new Map<string, any>();
 
         standaloneItems.forEach(item => {
@@ -195,7 +262,7 @@ export async function GET(request: NextRequest) {
             standaloneGroups,
             totalSessionsEarnings,
             totalStandaloneEarnings,
-            timeoutMinutes: 180
+            timeoutMinutes
         });
 
     } catch (error: any) {
