@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { Sidebar } from '@/components/admin/Sidebar';
@@ -28,7 +28,16 @@ import {
     Unlock,
     ChevronDown,
     ChevronUp,
-    Award
+    Award,
+    Ticket,
+    CreditCard,
+    TrendingUp,
+    Maximize2,
+    Search,
+    Filter,
+    ChevronLeft,
+    ChevronRight,
+    ArrowDownLeft
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -48,6 +57,20 @@ interface UserDetail {
     chargePerCharNonSubscribers: number;
     pixKey?: string;
     createdAt?: string;
+}
+
+interface ClientFinancialRecord {
+    id: string;
+    amount: number;
+    type: string;
+    source: string;
+    category: 'recharge' | 'gift' | 'campaign';
+    label: string;
+    status: string;
+    statusLabel: string;
+    couponCode?: string | null;
+    createdAt: string;
+    rawTimestamp: number;
 }
 
 interface GalleryItemType {
@@ -119,9 +142,21 @@ export default function UserDetailPage() {
     const [user, setUser] = useState<UserDetail | null>(null);
     const [gallery, setGallery] = useState<GalleryItemType[]>([]);
     const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>([]);
+    const [financialHistory, setFinancialHistory] = useState<ClientFinancialRecord[]>([]);
     const [subscribers, setSubscribers] = useState<any[]>([]);
     const [subscribersPage, setSubscribersPage] = useState(1);
     const [showPrivatePhotos, setShowPrivatePhotos] = useState(false);
+
+    // Modais e Filtros de Histórico
+    const [showAllWithdrawalsModal, setShowAllWithdrawalsModal] = useState(false);
+    const [withdrawalFilter, setWithdrawalFilter] = useState<'all' | 'concluido' | 'pendente' | 'rejeitado'>('all');
+    const [withdrawalPage, setWithdrawalPage] = useState(1);
+    const [withdrawalSearch, setWithdrawalSearch] = useState('');
+
+    const [showAllFinancialModal, setShowAllFinancialModal] = useState(false);
+    const [financialFilter, setFinancialFilter] = useState<'all' | 'recharge' | 'gift' | 'campaign'>('all');
+    const [financialPage, setFinancialPage] = useState(1);
+    const [financialSearch, setFinancialSearch] = useState('');
 
     // Estados do Gerenciamento de Salas de Chat da Profissional
     const [rooms, setRooms] = useState<ChatRoom[]>([]);
@@ -309,6 +344,7 @@ export default function UserDetailPage() {
                     setUser(data.user);
                     setGallery(data.gallery || []);
                     setWithdrawals(data.withdrawals || []);
+                    setFinancialHistory(data.financialHistory || []);
                     setSubscribers(data.subscribers || []);
                     
                     // Preenche os states dos inputs
@@ -497,6 +533,29 @@ export default function UserDetailPage() {
             if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
+
+    const filteredWithdrawals = useMemo(() => {
+        return withdrawals.filter(w => {
+            const matchesStatus = withdrawalFilter === 'all' || w.status === withdrawalFilter;
+            const matchesSearch = !withdrawalSearch || 
+                w.pixKey.toLowerCase().includes(withdrawalSearch.toLowerCase()) || 
+                w.amount.toString().includes(withdrawalSearch) ||
+                w.createdAt.toLowerCase().includes(withdrawalSearch.toLowerCase());
+            return matchesStatus && matchesSearch;
+        });
+    }, [withdrawals, withdrawalFilter, withdrawalSearch]);
+
+    const filteredFinancialHistory = useMemo(() => {
+        return financialHistory.filter(f => {
+            const matchesCategory = financialFilter === 'all' || f.category === financialFilter;
+            const matchesSearch = !financialSearch || 
+                f.label.toLowerCase().includes(financialSearch.toLowerCase()) || 
+                (f.couponCode && f.couponCode.toLowerCase().includes(financialSearch.toLowerCase())) ||
+                f.amount.toString().includes(financialSearch) ||
+                f.createdAt.toLowerCase().includes(financialSearch.toLowerCase());
+            return matchesCategory && matchesSearch;
+        });
+    }, [financialHistory, financialFilter, financialSearch]);
 
     const handleSidebarTabChange = (tabId: string) => {
         router.push(`/admin?tab=${tabId}`);
@@ -1082,17 +1141,57 @@ export default function UserDetailPage() {
                         );
                     })()}
 
-                    {/* Histórico de Retiradas */}
+                    {/* Histórico de Retiradas (Profissional) */}
                     {isProfessional && (
                         <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-6">
-                            <div>
-                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                                    <Coins size={16} className="text-purple-600" />
-                                    Histórico de Retiradas
-                                </h3>
-                                <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-                                    Veja as retiradas solicitadas por esta profissional.
-                                </p>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                                <div>
+                                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                                        <Coins size={16} className="text-purple-600" />
+                                        Histórico de Retiradas
+                                    </h3>
+                                    <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                                        Veja as últimas retiradas solicitadas por esta profissional e acesse o histórico completo.
+                                    </p>
+                                </div>
+                                {withdrawals.length > 5 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => { setShowAllWithdrawalsModal(true); setWithdrawalPage(1); setWithdrawalSearch(''); setWithdrawalFilter('all'); }}
+                                        className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                                    >
+                                        <Maximize2 size={13} />
+                                        Ver Todas ({withdrawals.length})
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Cards de Resumo */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 shadow-sm">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Pago (Concluído)</span>
+                                    <span className="text-xl font-black text-emerald-600 mt-1 block">
+                                        {withdrawals
+                                            .filter(w => w.status === 'concluido')
+                                            .reduce((acc, w) => acc + w.amount, 0)
+                                            .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </span>
+                                </div>
+                                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 shadow-sm">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Pendente / Processando</span>
+                                    <span className="text-xl font-black text-amber-600 mt-1 block">
+                                        {withdrawals
+                                            .filter(w => w.status === 'pendente' || w.status === 'processando')
+                                            .reduce((acc, w) => acc + w.amount, 0)
+                                            .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </span>
+                                </div>
+                                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 shadow-sm">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total de Retiradas</span>
+                                    <span className="text-xl font-black text-slate-800 mt-1 block">
+                                        {withdrawals.length} {withdrawals.length === 1 ? 'solicitação' : 'solicitações'}
+                                    </span>
+                                </div>
                             </div>
 
                             <div className="overflow-x-auto">
@@ -1107,7 +1206,7 @@ export default function UserDetailPage() {
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {withdrawals.length > 0 ? (
-                                            withdrawals.map((withdrawal) => (
+                                            withdrawals.slice(0, 5).map((withdrawal) => (
                                                 <tr key={withdrawal.id} className="hover:bg-slate-50/40 transition-colors group">
                                                     <td className="py-4 px-6">
                                                         <span className="text-sm font-extrabold text-slate-800">
@@ -1153,6 +1252,160 @@ export default function UserDetailPage() {
                                     </tbody>
                                 </table>
                             </div>
+
+                            {withdrawals.length > 5 && (
+                                <div className="pt-2 text-center">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setShowAllWithdrawalsModal(true); setWithdrawalPage(1); setWithdrawalSearch(''); setWithdrawalFilter('all'); }}
+                                        className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200/80 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-xs flex items-center justify-center gap-2"
+                                    >
+                                        <Maximize2 size={14} />
+                                        Ver Histórico Completo de Retiradas ({withdrawals.length})
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Histórico Financeiro do Cliente (Depósitos, Recargas e Cupons) */}
+                    {!isProfessional && (
+                        <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-6">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                                <div>
+                                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                                        <TrendingUp size={16} className="text-purple-600" />
+                                        Histórico Financeiro (Depósitos, Recargas e Cupons)
+                                    </h3>
+                                    <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                                        Acompanhe os depósitos efetuados, recargas de saldo (PIX/Cartão) e resgates de cupons deste cliente.
+                                    </p>
+                                </div>
+                                {financialHistory.length > 5 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => { setShowAllFinancialModal(true); setFinancialPage(1); setFinancialFilter('all'); setFinancialSearch(''); }}
+                                        className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                                    >
+                                        <Maximize2 size={13} />
+                                        Ver Todos ({financialHistory.length})
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Cards de Resumo do Cliente */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div className="bg-slate-900 text-white rounded-2xl p-4 shadow-sm border border-slate-800">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Saldo Atual na Carteira</span>
+                                    <span className="text-xl font-black text-emerald-400 mt-1 block">
+                                        {balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </span>
+                                </div>
+                                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 shadow-sm">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block flex items-center gap-1">
+                                        <CreditCard size={12} className="text-blue-500" />
+                                        Total Recarregado (PIX/CC)
+                                    </span>
+                                    <span className="text-xl font-black text-slate-800 mt-1 block">
+                                        {financialHistory
+                                            .filter(f => f.category === 'recharge' && (f.status === 'PAID' || f.status === 'COMPLETED' || f.status === 'debit'))
+                                            .reduce((acc, item) => acc + item.amount, 0)
+                                            .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </span>
+                                </div>
+                                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 shadow-sm">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block flex items-center gap-1">
+                                        <Ticket size={12} className="text-purple-500" />
+                                        Total em Cupons / Prêmios
+                                    </span>
+                                    <span className="text-xl font-black text-slate-800 mt-1 block">
+                                        {financialHistory
+                                            .filter(f => (f.category === 'gift' || f.category === 'campaign') && (f.status === 'PAID' || f.status === 'COMPLETED' || f.status === 'debit'))
+                                            .reduce((acc, item) => acc + item.amount, 0)
+                                            .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Tabela das Últimas Movimentações */}
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+                                            <th className="py-4 px-6">Tipo / Movimentação</th>
+                                            <th className="py-4 px-6">Valor Creditado</th>
+                                            <th className="py-4 px-6">Data & Hora</th>
+                                            <th className="py-4 px-6">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {financialHistory.length > 0 ? (
+                                            financialHistory.slice(0, 5).map((item) => (
+                                                <tr key={item.id} className="hover:bg-slate-50/40 transition-colors group">
+                                                    <td className="py-4 px-6">
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
+                                                                item.category === 'gift' ? 'bg-purple-50 text-purple-600 border border-purple-100' :
+                                                                item.category === 'campaign' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                                                                'bg-blue-50 text-blue-600 border border-blue-100'
+                                                            }`}>
+                                                                {item.category === 'gift' ? <Ticket size={14} /> :
+                                                                 item.category === 'campaign' ? <Coins size={14} /> : <CreditCard size={14} />}
+                                                            </div>
+                                                            <div className="flex flex-col min-w-0">
+                                                                <span className="text-xs font-bold text-slate-800 leading-tight">{item.label}</span>
+                                                                {item.couponCode && (
+                                                                    <span className="text-[10px] text-purple-600 font-mono font-bold">Código: {item.couponCode}</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-4 px-6">
+                                                        <span className="text-sm font-extrabold text-emerald-600">
+                                                            + {item.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-4 px-6 text-xs text-slate-500 font-semibold">
+                                                        {item.createdAt}
+                                                    </td>
+                                                    <td className="py-4 px-6">
+                                                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                                                            item.statusLabel === 'Aprovado' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                                            item.statusLabel === 'Pendente' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                                            'bg-rose-50 text-rose-700 border-rose-100'
+                                                        }`}>
+                                                            <span className={`w-1.5 h-1.5 rounded-full ${
+                                                                item.statusLabel === 'Aprovado' ? 'bg-emerald-500' :
+                                                                item.statusLabel === 'Pendente' ? 'bg-amber-500' : 'bg-rose-500'
+                                                            }`} />
+                                                            {item.statusLabel}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={4} className="py-12 text-center text-xs font-semibold text-slate-400">
+                                                    Nenhum depósito ou cupom encontrado para este cliente até o momento.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {financialHistory.length > 5 && (
+                                <div className="pt-2 text-center">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setShowAllFinancialModal(true); setFinancialPage(1); setFinancialFilter('all'); setFinancialSearch(''); }}
+                                        className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200/80 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-xs flex items-center justify-center gap-2"
+                                    >
+                                        <Maximize2 size={14} />
+                                        Ver Histórico Completo de Depósitos e Cupons ({financialHistory.length})
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -1566,6 +1819,295 @@ export default function UserDetailPage() {
                                 Confirmar Acesso
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Histórico Completo de Retiradas (Profissional) */}
+            {showAllWithdrawalsModal && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+                        {/* Modal Header */}
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                                    <Coins size={18} className="text-purple-600" />
+                                    Histórico Completo de Retiradas — {name || username}
+                                </h3>
+                                <p className="text-xs text-slate-400 font-medium">Todas as retiradas via PIX solicitadas por esta profissional ({withdrawals.length} registros).</p>
+                            </div>
+                            <button
+                                onClick={() => setShowAllWithdrawalsModal(false)}
+                                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Controles de Busca e Filtros */}
+                        <div className="p-4 bg-slate-50 border-b border-slate-100 flex flex-col sm:flex-row gap-3 items-center justify-between">
+                            <div className="relative w-full sm:w-64">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por PIX, valor ou data..."
+                                    value={withdrawalSearch}
+                                    onChange={(e) => { setWithdrawalSearch(e.target.value); setWithdrawalPage(1); }}
+                                    className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 font-medium text-slate-700"
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-1 bg-slate-200/60 p-1 rounded-xl w-full sm:w-auto">
+                                {(['all', 'concluido', 'pendente', 'rejeitado'] as const).map((st) => (
+                                    <button
+                                        key={st}
+                                        onClick={() => { setWithdrawalFilter(st); setWithdrawalPage(1); }}
+                                        className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                                            withdrawalFilter === st ? 'bg-white text-purple-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                                        }`}
+                                    >
+                                        {st === 'all' ? 'Todas' : st === 'concluido' ? 'Concluídas' : st === 'pendente' ? 'Pendentes' : 'Rejeitadas'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Tabela do Modal */}
+                        <div className="flex-1 overflow-y-auto p-6">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+                                        <th className="py-3 px-4">Valor</th>
+                                        <th className="py-3 px-4">Chave PIX</th>
+                                        <th className="py-3 px-4">Solicitado em</th>
+                                        <th className="py-3 px-4">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {filteredWithdrawals.length > 0 ? (
+                                        filteredWithdrawals
+                                            .slice((withdrawalPage - 1) * 10, withdrawalPage * 10)
+                                            .map((w) => (
+                                                <tr key={w.id} className="hover:bg-slate-50/60 transition-colors">
+                                                    <td className="py-3 px-4">
+                                                        <span className="text-sm font-extrabold text-slate-800">
+                                                            {w.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3 px-4">
+                                                        <span className="text-xs font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                                            {w.pixKey}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3 px-4 text-xs text-slate-500 font-medium">
+                                                        {w.createdAt}
+                                                    </td>
+                                                    <td className="py-3 px-4">
+                                                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                                                            w.status === 'concluido' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                                            w.status === 'processando' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                                                            w.status === 'pendente' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                                            'bg-rose-50 text-rose-700 border-rose-100'
+                                                        }`}>
+                                                            <span className={`w-1.5 h-1.5 rounded-full ${
+                                                                w.status === 'concluido' ? 'bg-emerald-500' :
+                                                                w.status === 'processando' ? 'bg-blue-500' :
+                                                                w.status === 'pendente' ? 'bg-amber-500' : 'bg-rose-500'
+                                                            }`} />
+                                                            {w.status === 'concluido' ? 'Pago' :
+                                                             w.status === 'processando' ? 'Processando' :
+                                                             w.status === 'pendente' ? 'Pendente' : 'Recusada'}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={4} className="py-12 text-center text-xs font-semibold text-slate-400">
+                                                Nenhum registro de retirada encontrado com os filtros aplicados.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Modal Footer / Paginação */}
+                        {filteredWithdrawals.length > 10 && (
+                            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+                                <span className="text-xs text-slate-500 font-medium">
+                                    Mostrando {Math.min((withdrawalPage - 1) * 10 + 1, filteredWithdrawals.length)} a {Math.min(withdrawalPage * 10, filteredWithdrawals.length)} de {filteredWithdrawals.length} registros
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        disabled={withdrawalPage === 1}
+                                        onClick={() => setWithdrawalPage(p => Math.max(1, p - 1))}
+                                        className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-white disabled:opacity-50 transition-all cursor-pointer"
+                                    >
+                                        Anterior
+                                    </button>
+                                    <span className="text-xs font-bold text-slate-700 px-2">
+                                        {withdrawalPage} / {Math.ceil(filteredWithdrawals.length / 10)}
+                                    </span>
+                                    <button
+                                        disabled={withdrawalPage >= Math.ceil(filteredWithdrawals.length / 10)}
+                                        onClick={() => setWithdrawalPage(p => Math.min(Math.ceil(filteredWithdrawals.length / 10), p + 1))}
+                                        className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-white disabled:opacity-50 transition-all cursor-pointer"
+                                    >
+                                        Próxima
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Histórico Financeiro Completo (Cliente) */}
+            {showAllFinancialModal && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+                        {/* Modal Header */}
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                                    <TrendingUp size={18} className="text-purple-600" />
+                                    Histórico Financeiro Completo — {name || username}
+                                </h3>
+                                <p className="text-xs text-slate-400 font-medium">Depósitos, recargas PIX/Cartão e resgates de cupons ({financialHistory.length} movimentações).</p>
+                            </div>
+                            <button
+                                onClick={() => setShowAllFinancialModal(false)}
+                                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Controles de Busca e Filtros */}
+                        <div className="p-4 bg-slate-50 border-b border-slate-100 flex flex-col sm:flex-row gap-3 items-center justify-between">
+                            <div className="relative w-full sm:w-64">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por cupom, descrição ou valor..."
+                                    value={financialSearch}
+                                    onChange={(e) => { setFinancialSearch(e.target.value); setFinancialPage(1); }}
+                                    className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 font-medium text-slate-700"
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-1 bg-slate-200/60 p-1 rounded-xl w-full sm:w-auto">
+                                {(['all', 'recharge', 'gift', 'campaign'] as const).map((cat) => (
+                                    <button
+                                        key={cat}
+                                        onClick={() => { setFinancialFilter(cat); setFinancialPage(1); }}
+                                        className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                                            financialFilter === cat ? 'bg-white text-purple-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                                        }`}
+                                    >
+                                        {cat === 'all' ? 'Todas' : cat === 'recharge' ? 'Recargas' : cat === 'gift' ? 'Cupons' : 'Campanhas'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Tabela do Modal */}
+                        <div className="flex-1 overflow-y-auto p-6">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+                                        <th className="py-3 px-4">Tipo / Movimentação</th>
+                                        <th className="py-3 px-4">Valor Creditado</th>
+                                        <th className="py-3 px-4">Data & Hora</th>
+                                        <th className="py-3 px-4">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {filteredFinancialHistory.length > 0 ? (
+                                        filteredFinancialHistory
+                                            .slice((financialPage - 1) * 10, financialPage * 10)
+                                            .map((item) => (
+                                                <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                                                    <td className="py-3 px-4">
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
+                                                                item.category === 'gift' ? 'bg-purple-50 text-purple-600 border border-purple-100' :
+                                                                item.category === 'campaign' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                                                                'bg-blue-50 text-blue-600 border border-blue-100'
+                                                            }`}>
+                                                                {item.category === 'gift' ? <Ticket size={14} /> :
+                                                                 item.category === 'campaign' ? <Coins size={14} /> : <CreditCard size={14} />}
+                                                            </div>
+                                                            <div className="flex flex-col min-w-0">
+                                                                <span className="text-xs font-bold text-slate-800 leading-tight">{item.label}</span>
+                                                                {item.couponCode && (
+                                                                    <span className="text-[10px] text-purple-600 font-mono font-bold">Código: {item.couponCode}</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-3 px-4">
+                                                        <span className="text-sm font-extrabold text-emerald-600">
+                                                            + {item.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3 px-4 text-xs text-slate-500 font-medium">
+                                                        {item.createdAt}
+                                                    </td>
+                                                    <td className="py-3 px-4">
+                                                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                                                            item.statusLabel === 'Aprovado' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                                            item.statusLabel === 'Pendente' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                                            'bg-rose-50 text-rose-700 border-rose-100'
+                                                        }`}>
+                                                            <span className={`w-1.5 h-1.5 rounded-full ${
+                                                                item.statusLabel === 'Aprovado' ? 'bg-emerald-500' :
+                                                                item.statusLabel === 'Pendente' ? 'bg-amber-500' : 'bg-rose-500'
+                                                            }`} />
+                                                            {item.statusLabel}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={4} className="py-12 text-center text-xs font-semibold text-slate-400">
+                                                Nenhuma movimentação financeira encontrada com os filtros aplicados.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Modal Footer / Paginação */}
+                        {filteredFinancialHistory.length > 10 && (
+                            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+                                <span className="text-xs text-slate-500 font-medium">
+                                    Mostrando {Math.min((financialPage - 1) * 10 + 1, filteredFinancialHistory.length)} a {Math.min(financialPage * 10, filteredFinancialHistory.length)} de {filteredFinancialHistory.length} movimentações
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        disabled={financialPage === 1}
+                                        onClick={() => setFinancialPage(p => Math.max(1, p - 1))}
+                                        className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-white disabled:opacity-50 transition-all cursor-pointer"
+                                    >
+                                        Anterior
+                                    </button>
+                                    <span className="text-xs font-bold text-slate-700 px-2">
+                                        {financialPage} / {Math.ceil(filteredFinancialHistory.length / 10)}
+                                    </span>
+                                    <button
+                                        disabled={financialPage >= Math.ceil(filteredFinancialHistory.length / 10)}
+                                        onClick={() => setFinancialPage(p => Math.min(Math.ceil(filteredFinancialHistory.length / 10), p + 1))}
+                                        className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-white disabled:opacity-50 transition-all cursor-pointer"
+                                    >
+                                        Próxima
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

@@ -106,6 +106,66 @@ export async function GET(
             clientLevel = getClientLevel(total30Days);
         }
 
+        // Histórico financeiro de movimentações de crédito (depósitos, recargas e cupons)
+        const clientFinancialTransactions = await Transaction.find({
+            userId: clerkId,
+            $or: [
+                { source: { $in: ['recharge', 'gift', 'campaign'] } },
+                { type: { $in: ['promotional_credit_grant', 'PIX', 'CC', 'credit'] } }
+            ]
+        }).sort({ timestamp: -1, createdAt: -1 }).lean();
+
+        const financialHistory = clientFinancialTransactions.map((tx: any) => {
+            const txDate = tx.timestamp || tx.createdAt || new Date();
+            let rawAmount = tx.amount || 0;
+            // Normalizar valor para Reais (BRL)
+            if (tx.source === 'gift' || tx.source === 'campaign' || tx.type === 'promotional_credit_grant') {
+                if (rawAmount >= 100) {
+                    rawAmount = rawAmount / 100;
+                }
+            } else if (tx.source === 'recharge') {
+                if (rawAmount > 1000 && Number.isInteger(rawAmount)) {
+                    rawAmount = rawAmount / 100;
+                }
+            }
+
+            let category: 'recharge' | 'gift' | 'campaign' = 'recharge';
+            let label = tx.type === 'PIX' ? 'Recarga PIX' : tx.type === 'CC' ? 'Recarga Cartão' : 'Recarga de Saldo';
+
+            if (tx.source === 'gift') {
+                category = 'gift';
+                const codeName = tx.metadata?.giftCode || tx.metadata?.code || '';
+                label = codeName ? `Resgate de Cupom (${codeName})` : 'Resgate de Cupom';
+            } else if (tx.source === 'campaign' || tx.type === 'promotional_credit_grant') {
+                category = 'campaign';
+                label = 'Crédito Promocional';
+            }
+
+            let statusLabel = 'Aprovado';
+            if (tx.status === 'PENDING') statusLabel = 'Pendente';
+            if (tx.status === 'CANCELLED') statusLabel = 'Cancelado';
+
+            return {
+                id: tx._id.toString(),
+                amount: rawAmount,
+                type: tx.type,
+                source: tx.source,
+                category,
+                label,
+                status: tx.status || 'PAID',
+                statusLabel,
+                couponCode: tx.metadata?.giftCode || tx.metadata?.code || null,
+                createdAt: new Date(txDate).toLocaleString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }).replace(',', ' às'),
+                rawTimestamp: new Date(txDate).getTime()
+            };
+        });
+
         return NextResponse.json({
             user: {
                 ...userObj,
@@ -132,7 +192,8 @@ export async function GET(
                 hiddenFromUserAt: withdrawal.hiddenFromUserAt ? new Date(withdrawal.hiddenFromUserAt).toLocaleString('pt-BR') : null,
                 createdAt: withdrawal.createdAt ? new Date(withdrawal.createdAt).toLocaleString('pt-BR') : 'N/A',
                 updatedAt: withdrawal.updatedAt ? new Date(withdrawal.updatedAt).toLocaleString('pt-BR') : 'N/A',
-            }))
+            })),
+            financialHistory
         });
     } catch (error: any) {
         console.error('Erro ao obter detalhes do usuário pelo admin:', error);
