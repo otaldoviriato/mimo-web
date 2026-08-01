@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
         const settings = await AppSettings.findOne({ key: 'global' }).lean();
         const timeoutMinutes = settings?.chatSessionTimeoutMinutes ?? 180;
 
-        // 2. Buscar TODAS as microtransações de crédito da criadora (FONTE DA VERDADE DO DINHEIRO)
+        // 2. Buscar TODAS as microtransações de crédito da criadora (FONTE ABSOLUTA DA VERDADE DO DINHEIRO)
         const microTxs = await MicroTransaction.find({
             userId: clerkId,
             type: 'credit',
@@ -56,17 +56,6 @@ export async function GET(request: NextRequest) {
             .sort({ timestamp: 1 })
             .lean();
 
-        // Mapear mensagens por ID e por sala para consulta rápida
-        const msgById = new Map<string, any>();
-        const msgsByRoom = new Map<string, any[]>();
-
-        roomMessages.forEach((m: any) => {
-            msgById.set(m._id.toString(), m);
-            const rId = m.roomId || [m.senderId, m.receiverId].sort().join('_');
-            if (!msgsByRoom.has(rId)) msgsByRoom.set(rId, []);
-            msgsByRoom.get(rId)!.push(m);
-        });
-
         // 4. Buscar dados dos clientes para fotos e nomes
         const clients = await User.find({ clerkId: { $in: relatedUserIds } })
             .select('clerkId name username photoUrl')
@@ -81,144 +70,160 @@ export async function GET(request: NextRequest) {
             });
         });
 
-        // 5. Mapear as janelas temporais de Sessões Bi-direcionais VÁLIDAS para cada sala
-        // REGRA RÍGIDA: Uma Sessão de Conversa DEVE ter pelo menos 2 mensagens trocadas E participação de ambos os participantes.
-        const validSessionsByRoom = new Map<string, any[]>();
-
-        msgsByRoom.forEach((roomMsgs, rId) => {
-            const sortedMsgs = roomMsgs.slice().sort((a, b) => new Date(a.timestamp || a.createdAt).getTime() - new Date(b.timestamp || b.createdAt).getTime());
-            let currentSession: any = null;
-            const roomSessions: any[] = [];
-
-            sortedMsgs.forEach((msg: any) => {
-                const mTs = new Date(msg.timestamp || msg.createdAt);
-
-                if (!currentSession) {
-                    currentSession = {
-                        roomId: rId,
-                        clientClerkId: msg.senderId === clerkId ? msg.receiverId : msg.senderId,
-                        senders: new Set([msg.senderId]),
-                        startTime: mTs,
-                        endTime: mTs,
-                        messages: [msg]
-                    };
-                } else {
-                    const diffMin = (mTs.getTime() - currentSession.endTime.getTime()) / (1000 * 60);
-                    if (diffMin <= timeoutMinutes) {
-                        currentSession.endTime = mTs;
-                        currentSession.senders.add(msg.senderId);
-                        currentSession.messages.push(msg);
-                    } else {
-                        roomSessions.push(currentSession);
-                        currentSession = {
-                            roomId: rId,
-                            clientClerkId: msg.senderId === clerkId ? msg.receiverId : msg.senderId,
-                            senders: new Set([msg.senderId]),
-                            startTime: mTs,
-                            endTime: mTs,
-                            messages: [msg]
-                        };
-                    }
-                }
-            });
-
-            if (currentSession) roomSessions.push(currentSession);
-
-            // Filtrar apenas sessões que tenham pelo menos 2 mensagens E remetentes bi-direcionais
-            const validTwoWaySessions = roomSessions.filter(s => s.senders.size >= 2 && s.messages.length >= 2);
-            validSessionsByRoom.set(rId, validTwoWaySessions);
+        // 5. Agrupar microtransações e mensagens por sala (roomId)
+        const txsByRoom = new Map<string, any[]>();
+        microTxs.forEach((tx: any) => {
+            const rId = [clerkId, tx.relatedUserId || 'desconhecido'].sort().join('_');
+            if (!txsByRoom.has(rId)) txsByRoom.set(rId, []);
+            txsByRoom.get(rId)!.push(tx);
         });
 
-        // 6. Atribuir CADA MicroTransaction à sua Sessão de Conversa (usando o momento de ENVIO original da mídia)
-        const sessionsResultMap = new Map<string, any>();
+        const msgsByRoom = new Map<string, any[]>();
+        roomMessages.forEach((m: any) => {
+            const rId = m.roomId || [m.senderId, m.receiverId].sort().join('_');
+            if (!msgsByRoom.has(rId)) msgsByRoom.set(rId, []);
+            msgsByRoom.get(rId)!.push(m);
+        });
+
+        const sessionsMap = new Map<string, any>();
         const standaloneItems: any[] = [];
 
-        microTxs.forEach((tx: any) => {
-            const clientClerkId = tx.relatedUserId || 'desconhecido';
-            const rId = [clerkId, clientClerkId].sort().join('_');
-            const txTs = new Date(tx.timestamp || tx.createdAt);
+        // 6. Processar sala por sala com validação rígida de sessões bi-direcionais
+        txsByRoom.forEach((txs, rId) => {
+            const msgs = msgsByRoom.get(rId) || [];
+            const creatorMsgs = msgs.filter((m: any) => m.senderId === clerkId);
 
-            // CORREÇÃO PONTO 1: Tentar encontrar o momento de ENVIO ORIGINAL da mensagem/mídia no chat
-            let origMsgTimestamp = txTs;
-            if (tx.messageId && msgById.has(tx.messageId.toString())) {
-                const orig = msgById.get(tx.messageId.toString());
-                origMsgTimestamp = new Date(orig.timestamp || orig.createdAt);
-            } else if (tx.source === 'image_unlock' || tx.source === 'gift') {
-                // Se o desbloqueio aconteceu depois, procurar a mídia enviada no chat na mesma sala antes ou na conversa
-                const roomMsgs = msgsByRoom.get(rId) || [];
-                const matchedMedia = roomMsgs.slice().reverse().find(m => {
-                    const mTs = new Date(m.timestamp || m.createdAt);
-                    return (m.isLockedImage || m.isGift) && mTs.getTime() <= txTs.getTime();
-                });
-                if (matchedMedia) {
-                    origMsgTimestamp = new Date(matchedMedia.timestamp || matchedMedia.createdAt);
-                }
-            }
-
-            // Verificar se o momento de envio original caiu dentro de alguma Sessão Bi-direcional VÁLIDA
-            const roomSessions = validSessionsByRoom.get(rId) || [];
-            const matchedSession = roomSessions.find(s => {
-                const marginMs = 15 * 60 * 1000; // Margem de 15 min de tolerância
-                return origMsgTimestamp.getTime() >= (s.startTime.getTime() - marginMs) && origMsgTimestamp.getTime() <= (s.endTime.getTime() + marginMs);
-            });
-
-            const clientInfo = clientMap.get(clientClerkId);
-            const itemDesc = tx.source === 'gift'
-                ? 'Presente recebido'
-                : tx.source === 'image_unlock'
-                ? 'Mídia privada desbloqueada'
-                : 'Mensagem recebida';
-
-            const txItem = {
-                id: tx._id.toString(),
-                type: tx.source || 'message',
-                amount: tx.amount || 0,
-                timestamp: tx.timestamp || tx.createdAt,
-                description: itemDesc,
-                relatedUserId: clientClerkId,
-                clientName: clientInfo?.name || 'Cliente Mimo',
-                clientUsername: clientInfo?.username || 'cliente',
-                clientPhotoUrl: clientInfo?.photoUrl || null
-            };
-
-            if (matchedSession) {
-                // Pertence a uma Sessão de Conversa Bi-direcional VÁLIDA
-                const sessionKey = `${rId}_${matchedSession.startTime.getTime()}`;
-
-                if (!sessionsResultMap.has(sessionKey)) {
-                    sessionsResultMap.set(sessionKey, {
-                        sessionId: sessionKey,
+            if (creatorMsgs.length === 0) {
+                // Se a criadora nunca enviou nenhuma mensagem na sala -> 100% das transações são Avulsas
+                txs.forEach((tx: any) => {
+                    const clientClerkId = tx.relatedUserId || 'desconhecido';
+                    const clientInfo = clientMap.get(clientClerkId);
+                    standaloneItems.push({
+                        id: tx._id.toString(),
+                        type: tx.source || 'message',
+                        amount: tx.amount || 0,
+                        timestamp: tx.timestamp || tx.createdAt,
+                        description: tx.source === 'gift' ? 'Presente recebido' : tx.source === 'image_unlock' ? 'Mídia privada desbloqueada' : 'Mensagem recebida',
                         relatedUserId: clientClerkId,
                         clientName: clientInfo?.name || 'Cliente Mimo',
                         clientUsername: clientInfo?.username || 'cliente',
-                        clientPhotoUrl: clientInfo?.photoUrl || null,
-                        startTime: matchedSession.startTime,
-                        endTime: matchedSession.endTime,
-                        durationMinutes: Math.max(1, Math.round((matchedSession.endTime.getTime() - matchedSession.startTime.getTime()) / (1000 * 60))),
-                        messagesCount: matchedSession.messages.filter((m: any) => !m.isLockedImage && !m.isGift).length,
-                        mediaCount: matchedSession.messages.filter((m: any) => m.isLockedImage).length,
-                        giftCount: matchedSession.messages.filter((m: any) => m.isGift).length,
-                        totalEarnings: 0,
-                        items: []
+                        clientPhotoUrl: clientInfo?.photoUrl || null
                     });
+                });
+            } else {
+                // Mapear sessões válidas na sala (janela de inatividade, bi-direcionalidade e >= 2 mensagens)
+                const sortedMsgs = msgs.slice().sort((a, b) => new Date(a.timestamp || a.createdAt).getTime() - new Date(b.timestamp || b.createdAt).getTime());
+                let currentSession: any = null;
+                const validSessions: any[] = [];
+
+                sortedMsgs.forEach((m: any) => {
+                    const mTs = new Date(m.timestamp || m.createdAt);
+                    if (!currentSession) {
+                        currentSession = {
+                            senders: new Set([m.senderId]),
+                            startTime: mTs,
+                            endTime: mTs,
+                            messages: [m]
+                        };
+                    } else {
+                        const diffMin = (mTs.getTime() - currentSession.endTime.getTime()) / (1000 * 60);
+                        if (diffMin <= timeoutMinutes) {
+                            currentSession.endTime = mTs;
+                            currentSession.senders.add(m.senderId);
+                            currentSession.messages.push(m);
+                        } else {
+                            if (currentSession.senders.size >= 2 && currentSession.messages.length >= 2) {
+                                validSessions.push(currentSession);
+                            }
+                            currentSession = {
+                                senders: new Set([m.senderId]),
+                                startTime: mTs,
+                                endTime: mTs,
+                                messages: [m]
+                            };
+                        }
+                    }
+                });
+                if (currentSession && currentSession.senders.size >= 2 && currentSession.messages.length >= 2) {
+                    validSessions.push(currentSession);
                 }
 
-                const sObj = sessionsResultMap.get(sessionKey);
-                sObj.totalEarnings += (tx.amount || 0);
-                sObj.items.push(txItem);
+                // Atribuir cada transação de crédito (mensagem, desbloqueio de mídia ou presente) à sessão bi-direcional correspondente
+                txs.forEach((tx: any) => {
+                    const txTs = new Date(tx.timestamp || tx.createdAt).getTime();
+                    const clientClerkId = tx.relatedUserId || 'desconhecido';
+                    const clientInfo = clientMap.get(clientClerkId);
 
-                if (new Date(txItem.timestamp) < new Date(sObj.startTime)) sObj.startTime = txItem.timestamp;
-                if (new Date(txItem.timestamp) > new Date(sObj.endTime)) sObj.endTime = txItem.timestamp;
-                sObj.durationMinutes = Math.max(1, Math.round((new Date(sObj.endTime).getTime() - new Date(sObj.startTime).getTime()) / (1000 * 60)));
+                    const txItem = {
+                        id: tx._id.toString(),
+                        type: tx.source || 'message',
+                        amount: tx.amount || 0,
+                        timestamp: tx.timestamp || tx.createdAt,
+                        description: tx.source === 'gift' ? 'Presente recebido' : tx.source === 'image_unlock' ? 'Mídia privada desbloqueada' : 'Mensagem recebida',
+                        relatedUserId: clientClerkId,
+                        clientName: clientInfo?.name || 'Cliente Mimo',
+                        clientUsername: clientInfo?.username || 'cliente',
+                        clientPhotoUrl: clientInfo?.photoUrl || null
+                    };
 
-            } else {
-                // É uma mensagem ou mídia avulsa fora de sessão bi-direcional
-                standaloneItems.push(txItem);
+                    if (validSessions.length === 0) {
+                        standaloneItems.push(txItem);
+                        return;
+                    }
+
+                    // Encontrar a sessão bi-direcional mais próxima no tempo daquela sala
+                    let closestSession: any = null;
+                    let minDiffMs = Infinity;
+
+                    validSessions.forEach(s => {
+                        let diffMs = 0;
+                        if (txTs < s.startTime.getTime()) diffMs = s.startTime.getTime() - txTs;
+                        else if (txTs > s.endTime.getTime()) diffMs = txTs - s.endTime.getTime();
+
+                        if (diffMs < minDiffMs) {
+                            minDiffMs = diffMs;
+                            closestSession = s;
+                        }
+                    });
+
+                    // Janela de 24 horas para desbloqueio de mídias/mensagens no mesmo ciclo de conversa daquela sala
+                    if (closestSession && minDiffMs <= 24 * 60 * 60 * 1000) {
+                        const sessionKey = `${rId}_${closestSession.startTime.getTime()}`;
+
+                        if (!sessionsMap.has(sessionKey)) {
+                            sessionsMap.set(sessionKey, {
+                                sessionId: sessionKey,
+                                relatedUserId: clientClerkId,
+                                clientName: clientInfo?.name || 'Cliente Mimo',
+                                clientUsername: clientInfo?.username || 'cliente',
+                                clientPhotoUrl: clientInfo?.photoUrl || null,
+                                startTime: closestSession.startTime,
+                                endTime: closestSession.endTime,
+                                durationMinutes: Math.max(1, Math.round((closestSession.endTime.getTime() - closestSession.startTime.getTime()) / (1000 * 60))),
+                                messagesCount: closestSession.messages.filter((m: any) => !m.isLockedImage && !m.isGift).length,
+                                mediaCount: closestSession.messages.filter((m: any) => m.isLockedImage).length,
+                                giftCount: closestSession.messages.filter((m: any) => m.isGift).length,
+                                totalEarnings: 0,
+                                items: []
+                            });
+                        }
+
+                        const sObj = sessionsMap.get(sessionKey);
+                        sObj.totalEarnings += (tx.amount || 0);
+                        sObj.items.push(txItem);
+
+                        if (new Date(txItem.timestamp) < new Date(sObj.startTime)) sObj.startTime = txItem.timestamp;
+                        if (new Date(txItem.timestamp) > new Date(sObj.endTime)) sObj.endTime = txItem.timestamp;
+                        sObj.durationMinutes = Math.max(1, Math.round((new Date(sObj.endTime).getTime() - new Date(sObj.startTime).getTime()) / (1000 * 60)));
+
+                    } else {
+                        standaloneItems.push(txItem);
+                    }
+                });
             }
         });
 
-        // Filtrar apenas sessões que tiveram ganho acumulado > 0
-        const enrichedSessions = Array.from(sessionsResultMap.values()).filter(s => s.totalEarnings > 0);
+        const enrichedSessions = Array.from(sessionsMap.values()).filter(s => s.totalEarnings > 0);
         enrichedSessions.sort((a, b) => new Date(b.endTime).getTime() - new Date(a.endTime).getTime());
 
         standaloneItems.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
