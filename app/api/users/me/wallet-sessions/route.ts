@@ -24,11 +24,11 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
         }
 
-        // 1. Obter parâmetro de timeout global (default 60 min se não definido)
+        // 1. Obter parâmetro de timeout global (default 180 min se não definido)
         const settings = await AppSettings.findOne({ key: 'global' }).lean();
-        const timeoutMinutes = settings?.chatSessionTimeoutMinutes ?? 60;
+        const timeoutMinutes = settings?.chatSessionTimeoutMinutes ?? 180;
 
-        // 2. Buscar microtransações de crédito da profissional
+        // 2. Buscar microtransações de crédito da profissional para identificar os clientes envolvidos
         const microTxs = await MicroTransaction.find({
             userId: clerkId,
             type: 'credit',
@@ -48,15 +48,11 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        // 3. Mapear os ganhos de crédito por messageId
+        // 3. Mapear os ganhos de crédito por ID de mensagem (se disponível)
         const creditAmountByMessageId = new Map<string, number>();
-        const orphanTxs: any[] = [];
-
         microTxs.forEach((tx: any) => {
             if (tx.messageId) {
                 creditAmountByMessageId.set(tx.messageId.toString(), tx.amount || 0);
-            } else {
-                orphanTxs.push(tx);
             }
         });
 
@@ -64,7 +60,7 @@ export async function GET(request: NextRequest) {
         const relatedUserIds = Array.from(new Set(microTxs.map(t => t.relatedUserId).filter(Boolean))) as string[];
         const roomIds = relatedUserIds.map(clientClerkId => [clerkId, clientClerkId].sort().join('_'));
 
-        // 5. Buscar o histórico COMPLETO de mensagens das salas (incluindo as mensagens da profissional)
+        // 5. Buscar o histórico COMPLETO de mensagens das salas (incluindo as respostas da profissional)
         const roomMessages = await Message.find({ roomId: { $in: roomIds } })
             .select('_id roomId senderId receiverId content cost receiverEarnings isGift isLockedImage timestamp createdAt')
             .sort({ timestamp: 1 })
@@ -84,7 +80,7 @@ export async function GET(request: NextRequest) {
             });
         });
 
-        // 7. Mapear todas as mensagens das salas em RawEventInput
+        // 7. Mapear todas as mensagens das salas em RawEventInput (sem duplicar transações órfãs)
         const rawEvents: RawEventInput[] = roomMessages.map((msg: any) => {
             const msgIdStr = msg._id.toString();
             const earnedAmount = creditAmountByMessageId.get(msgIdStr) ?? (msg.receiverId === clerkId ? (msg.receiverEarnings || msg.cost || 0) : 0);
@@ -110,26 +106,15 @@ export async function GET(request: NextRequest) {
             };
         });
 
-        // Adicionar também transações órfãs (presentes sem mensagem associada)
-        orphanTxs.forEach((tx: any) => {
-            rawEvents.push({
-                id: tx._id.toString(),
-                relatedUserId: tx.relatedUserId || 'desconhecido',
-                senderId: tx.relatedUserId || 'cliente',
-                receiverId: clerkId,
-                type: (['message', 'image_unlock', 'gift'].includes(tx.source) ? tx.source : 'other') as any,
-                amount: tx.amount || 0,
-                timestamp: tx.timestamp || tx.createdAt,
-                description: tx.source === 'gift' ? 'Presente recebido' : 'Crédito de conversa'
-            });
-        });
-
         // 8. Agrupar em sessões de conversa usando a janela de inatividade
         const allGroupedSessions = groupEventsIntoSessions(rawEvents, timeoutMinutes);
 
-        // 9. Filtrar Sessões de Conversa VÁLIDAS (bi-direcionais e com ganho acumulado > 0)
-        const twoWaySessions = allGroupedSessions.filter(s => s.isTwoWaySession && s.items.length >= 2 && s.totalEarnings > 0);
-        const singleSideSessions = allGroupedSessions.filter(s => !s.isTwoWaySession || s.items.length < 2 || !twoWaySessions.includes(s));
+        // 9. Filtrar Sessões de Conversa VÁLIDAS:
+        // Uma Sessão de Conversa exige bi-direcionalidade (isTwoWaySession === true: mensagens de AMBOS os participantes no bloco)
+        // E ganho acumulado significativo na sessão (ex: pelo menos R$ 0,50 ou 50 centavos para evitar micro-blocos de centavos soltos).
+        const minSessionEarnings = 50; // 50 centavos mínimo para destacar como Sessão de Conversa
+        const twoWaySessions = allGroupedSessions.filter(s => s.isTwoWaySession && s.items.length >= 2 && s.totalEarnings >= minSessionEarnings);
+        const singleSideSessions = allGroupedSessions.filter(s => !twoWaySessions.includes(s));
 
         const enrichedSessions = twoWaySessions.map(session => {
             const clientInfo = clientMap.get(session.relatedUserId);
@@ -144,7 +129,7 @@ export async function GET(request: NextRequest) {
             };
         });
 
-        // 10. Extrair itens PAGOS de blocos sem bi-direcionalidade para Mensagens Avulsas
+        // 10. Extrair itens PAGOS (amount > 0) de blocos que não viraram sessão principal para Mensagens Avulsas
         const standaloneItemsMap = new Map<string, any>();
         singleSideSessions.forEach(session => {
             const clientInfo = clientMap.get(session.relatedUserId);
@@ -168,7 +153,7 @@ export async function GET(request: NextRequest) {
         const standaloneItems = Array.from(standaloneItemsMap.values());
         standaloneItems.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-        // 11. Consolidação Visual: Agrupar mensagens avulsas POR CLIENTE para zerar poluição visual
+        // 11. Consolidação Visual: Agrupar mensagens avulsas POR CLIENTE
         const standaloneByClient = new Map<string, any>();
 
         standaloneItems.forEach(item => {
