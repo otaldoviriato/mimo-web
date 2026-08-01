@@ -585,7 +585,8 @@ export default function WalletPage() {
                     )}
                 </div>
 
-                {/* ── BENTO BLOCK: EXTRATO DE GANHOS (SESSÕES + MENSAGENS AVULSAS) ── */}
+                {/* ── BENTO BLOCK: EXTRATO DE GANHOS (SESSÕES + MENSAGENS AVULSAS) (OCULTO TEMPORARIAMENTE) ── */}
+                {/* 
                 <div className="bg-white border border-purple-100/60 rounded-2xl p-5 shadow-[0_4px_20px_rgb(0,0,0,0.012)] flex flex-col gap-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
                         <div className="flex items-center gap-2">
@@ -602,7 +603,6 @@ export default function WalletPage() {
                             </div>
                         </div>
 
-                        {/* Alternador de Abas de Extrato */}
                         <div className="flex items-center p-1 bg-slate-100/80 rounded-xl border border-slate-200/50 self-start sm:self-auto">
                             <button
                                 type="button"
@@ -635,7 +635,6 @@ export default function WalletPage() {
                         </div>
                     </div>
 
-                    {/* Card Explicativo de Faturamento da Carteira */}
                     {sessionsData && (sessionsData.totalSessionsEarnings + sessionsData.totalStandaloneEarnings > 0) && (
                         <div className="bg-gradient-to-r from-purple-50/80 via-white to-purple-50/50 p-3 rounded-xl border border-purple-100/60 mb-1 flex flex-col gap-2">
                             <div className="flex items-center justify-between text-xs font-bold text-slate-800">
@@ -681,7 +680,6 @@ export default function WalletPage() {
                             <div className="h-14 bg-slate-50 rounded-xl" />
                         </div>
                     ) : activeExtratoTab === 'sessions' ? (
-                        /* VISÃO DE SESSÕES DE CONVERSA */
                         !sessionsData?.sessions || sessionsData.sessions.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-8 gap-2 bg-slate-50/50 rounded-xl text-center px-4">
                                 <Clock3 className="w-6 h-6 text-slate-300" />
@@ -733,7 +731,6 @@ export default function WalletPage() {
                                                 </div>
                                             </div>
 
-                                            {/* Badges explicativos do que compôs essa conversa */}
                                             <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-slate-100/60">
                                                 {session.messagesCount > 0 && (
                                                     <span className="text-[9.5px] bg-purple-50 text-purple-700 border border-purple-100 px-2 py-0.5 rounded-md font-bold flex items-center gap-1">
@@ -755,7 +752,6 @@ export default function WalletPage() {
                                                 )}
                                             </div>
 
-                                            {/* Detalhamento dos Itens do Bloco de Sessão */}
                                             {isExpandedSession && session.items && (
                                                 <div className="mt-2 pt-2 border-t border-slate-200/60 flex flex-col gap-1.5 bg-white p-2.5 rounded-lg border border-slate-100">
                                                     <span className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wider">
@@ -796,7 +792,6 @@ export default function WalletPage() {
                             </div>
                         )
                     ) : (
-                        /* VISÃO CONSOLIDADA DE MENSAGENS E MÍDIAS AVULSAS POR CLIENTE */
                         (!sessionsData?.standaloneGroups || sessionsData.standaloneGroups.length === 0) && (!sessionsData?.standaloneItems || sessionsData.standaloneItems.length === 0) ? (
                             <div className="flex flex-col items-center justify-center py-8 gap-2 bg-slate-50/50 rounded-xl text-center px-4">
                                 <Clock3 className="w-6 h-6 text-slate-300" />
@@ -850,7 +845,6 @@ export default function WalletPage() {
                                                 </div>
                                             </div>
 
-                                            {/* Detalhamento dos Itens Avulsos do Cliente */}
                                             {isExpandedGroup && group.items && (
                                                 <div className="mt-1 pt-2 border-t border-slate-200/60 flex flex-col gap-1.5 bg-white p-2.5 rounded-lg border border-slate-100">
                                                     <span className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wider">
@@ -892,7 +886,6 @@ export default function WalletPage() {
                         )
                     )}
 
-                    {/* Somatório Explicativo do Saldo */}
                     {sessionsData && (
                         <div className="mt-1 pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between text-[11px] text-slate-500 gap-2 bg-slate-50/60 p-2.5 rounded-xl">
                             <span className="font-bold text-slate-600">Total Explicado no Extrato:</span>
@@ -908,6 +901,7 @@ export default function WalletPage() {
                         </div>
                     )}
                 </div>
+                */}
 
                 {/* ── BENTO BLOCK 5: GRÁFICO DE EVOLUÇÃO (Faturamento Mensal em Barras) ── */}
                 <div className="bg-white border border-purple-100/60 rounded-2xl p-4 shadow-[0_4px_20px_rgb(0,0,0,0.015)] flex flex-col justify-between min-h-[210px]">
