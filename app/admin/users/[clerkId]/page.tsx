@@ -608,7 +608,7 @@ export default function UserDetailPage() {
                     {/* Botão Voltar e Cabeçalho */}
                     <div className="flex items-center justify-between">
                         <button
-                            onClick={() => router.push(`/admin?tab=${isProfessional ? 'professionals' : 'clients'}`)}
+                            onClick={() => router.push(isProfessional ? '/admin/professionals' : '/admin/clients')}
                             className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors bg-white px-4 py-2.5 rounded-xl border border-slate-200 shadow-sm cursor-pointer"
                         >
                             <ArrowLeft size={14} />
