@@ -16,6 +16,7 @@ import { FinancialTab } from '@/components/admin/FinancialTab';
 import { HelpTicketsTab } from '@/components/admin/HelpTicketsTab';
 import { InstitutionalEmailsTab } from '@/components/admin/InstitutionalEmailsTab';
 import { SettingsPlatformPage } from '@/components/admin/settings/SettingsPlatformPage';
+import { SettingsAlertsPage } from '@/components/admin/settings/SettingsAlertsPage';
 import { SettingsChatPage } from '@/components/admin/settings/SettingsChatPage';
 import { SettingsPricingPage } from '@/components/admin/settings/SettingsPricingPage';
 import { SettingsProfilesPage } from '@/components/admin/settings/SettingsProfilesPage';
@@ -41,6 +42,7 @@ const TAB_TITLES: Record<string, string> = {
     'institutional-emails': 'E-mails Institucionais',
     'identity-verifications': 'Verificações de Selos de Autenticidade',
     'settings-platform': 'Configurações — Plataforma & Operação',
+    'settings-alerts': 'Configurações — Alertas do Admin',
     'settings-chat': 'Configurações — Chat & Sessões',
     'settings-explore': 'Configurações — Explorar & Desempate',
     'settings-pricing': 'Configurações — Precificação & Assinaturas',
@@ -448,6 +450,7 @@ export default function AdminPage() {
                             saving={settings.saving} saveSettings={settings.saveSettings}
                         />
                     )}
+                    {activeTab === 'settings-alerts' && <SettingsAlertsPage />}
                     {activeTab === 'settings-chat' && (
                         <SettingsChatPage
                             chatSessionTimeoutMinutes={settings.chatSessionTimeoutMinutes} setChatSessionTimeoutMinutes={settings.setChatSessionTimeoutMinutes}

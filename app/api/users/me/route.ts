@@ -14,6 +14,7 @@ import { grantWelcomeCredit } from '@/lib/creditCampaign';
 import { Resend } from 'resend';
 import { buildProfileRoleMetadata, getCreatorLandingProfileRole } from '@/lib/profileRole';
 import { subscriptionPriceBRLToCents } from '@/lib/subscriptionBilling';
+import { sendAdminAlert } from '@/lib/adminAlerts';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
 
@@ -640,6 +641,38 @@ export async function PATCH(request: NextRequest) {
             },
             { returnDocument: 'after', runValidators: true, upsert: true }
         );
+
+        // Disparo de Alerta de Nova Profissional para Administradores
+        if (
+            user.isProfessional &&
+            user.onboardingStep === 'completed' &&
+            currentUser?.onboardingStep !== 'completed'
+        ) {
+            sendAdminAlert('new_professional', {
+                title: '🟣 Nova Profissional Cadastrada!',
+                body: `A usuária @${user.username || 'sem_username'} (${user.name || 'Sem nome'}) concluiu o cadastro no MimoChat.`,
+                emailSubject: `[MimoChat Admin] Nova profissional cadastrada: ${user.name || '@' + user.username}`,
+                emailHtml: `
+                    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 580px; margin: 0 auto; padding: 24px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; color: #1e293b;">
+                        <div style="text-align: center; margin-bottom: 24px;">
+                            <h1 style="font-size: 20px; font-weight: 800; color: #7e22ce; margin: 0 0 8px 0;">Nova Profissional Cadastrada 🟣</h1>
+                            <p style="font-size: 14px; color: #64748b; margin: 0;">Uma nova criadora de conteúdo concluiu 100% o cadastro no MimoChat.</p>
+                        </div>
+                        <div style="background-color: #faf5ff; border: 1px solid #f3e8ff; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+                            <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: bold; color: #581c87;">👤 Dados da Profissional:</p>
+                            <p style="margin: 0 0 4px 0; font-size: 13px; color: #334155;"><strong>Nome:</strong> ${user.name || 'Não informado'}</p>
+                            <p style="margin: 0 0 4px 0; font-size: 13px; color: #334155;"><strong>Username:</strong> @${user.username || 'sem_username'}</p>
+                            <p style="margin: 0 0 4px 0; font-size: 13px; color: #334155;"><strong>E-mail:</strong> ${user.email || 'Não informado'}</p>
+                            <p style="margin: 0; font-size: 13px; color: #334155;"><strong>Data:</strong> ${new Date().toLocaleString('pt-BR')}</p>
+                        </div>
+                        <div style="text-align: center; margin-top: 24px;">
+                            <a href="https://www.mimochat.com.br/admin/users/${user.clerkId}" style="display: inline-block; background-color: #7e22ce; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 14px;">Ver Perfil no MimoAdmin</a>
+                        </div>
+                    </div>
+                `,
+                url: `https://www.mimochat.com.br/admin/users/${user.clerkId}`
+            }).catch(err => console.error('[AdminAlert] Erro ao disparar alerta de nova profissional:', err));
+        }
 
         // Se isProfessional mudou, deleta todas as conversas do usuário e atualiza metadados
         if (isProfessionalChanging) {

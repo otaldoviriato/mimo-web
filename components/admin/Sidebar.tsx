@@ -24,7 +24,8 @@ import {
     ShieldCheck,
     ChevronDown,
     Compass,
-    Award
+    Award,
+    Bell
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -37,6 +38,7 @@ interface SidebarProps {
 
 const SETTINGS_TABS = [
     { id: 'settings-platform', label: 'Plataforma & Operação', icon: Globe },
+    { id: 'settings-alerts', label: 'Alertas & Notificações', icon: Bell },
     { id: 'settings-chat', label: 'Chat & Sessões', icon: Clock },
     { id: 'settings-explore', label: 'Explorar', icon: Compass },
     { id: 'settings-pricing', label: 'Precificação & Assinaturas', icon: Coins },

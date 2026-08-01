@@ -1,0 +1,174 @@
+[browser] Clerk: Clerk has been loaded with development keys. Development instances have strict usage limits and should not be used when deploying your application to production. Learn more: https://clerk.com/docs/deployments/overview (https://assured-skylark-3.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js:12:6133)
+[browser] Clerk: Clerk has been loaded with development keys. Development instances have strict usage limits and should not be used when deploying your application to production. Learn more: https://clerk.com/docs/deployments/overview (https://assured-skylark-3.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js:12:6133)
+[browser] Clerk: Clerk has been loaded with development keys. Development instances have strict usage limits and should not be used when deploying your application to production. Learn more: https://clerk.com/docs/deployments/overview (https://assured-skylark-3.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js:12:6133)
+⨯ ./app/login/page.tsx:34:1
+'import', and 'export' cannot be used outside of module code
+  [90m32 |[0m }
+  [90m33 |[0m
+[31m[1m>[0m [90m34 |[0m [36mexport[0m [36mdefault[0m [36mfunction[0m [33mLoginPage[0m() {
+  [90m   |[0m [31m[1m^^^^^^[0m
+  [90m35 |[0m     [36mconst[0m router = useRouter();
+  [90m36 |[0m     [36mconst[0m queryClient = useQueryClient();
+  [90m37 |[0m             triggerAgeGateTooltip();
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/login/page.tsx [Client Component Browser]
+    ./app/login/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/login/page.tsx [Client Component SSR]
+    ./app/login/page.tsx [Server Component]
+
+
+[browser] Uncaught Error: ./app/login/page.tsx:34:1
+'import', and 'export' cannot be used outside of module code
+  32 | }
+  33 |
+> 34 | export default function LoginPage() {
+     | ^^^^^^
+  35 |     const router = useRouter();
+  36 |     const queryClient = useQueryClient();
+  37 |             triggerAgeGateTooltip();
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/login/page.tsx [Client Component Browser]
+    ./app/login/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/login/page.tsx [Client Component SSR]
+    ./app/login/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./app/login/page.tsx:34:1)
+    at <unknown> (Error: (./app/login/page.tsx:34:1)
+[browser] ./app/login/page.tsx:34:1
+'import', and 'export' cannot be used outside of module code
+  32 | }
+  33 |
+> 34 | export default function LoginPage() {
+     | ^^^^^^
+  35 |     const router = useRouter();
+  36 |     const queryClient = useQueryClient();
+  37 |             triggerAgeGateTooltip();
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/login/page.tsx [Client Component Browser]
+    ./app/login/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/login/page.tsx [Client Component SSR]
+    ./app/login/page.tsx [Server Component] 
+[browser] ./app/login/page.tsx:34:1
+'import', and 'export' cannot be used outside of module code
+  32 | }
+  33 |
+> 34 | export default function LoginPage() {
+     | ^^^^^^
+  35 |     const router = useRouter();
+  36 |     const queryClient = useQueryClient();
+  37 |             triggerAgeGateTooltip();
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/login/page.tsx [Client Component Browser]
+    ./app/login/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/login/page.tsx [Client Component SSR]
+    ./app/login/page.tsx [Server Component] 
+[browser] ./app/login/page.tsx:34:1
+'import', and 'export' cannot be used outside of module code
+  32 | }
+  33 |
+> 34 | export default function LoginPage() {
+     | ^^^^^^
+  35 |     const router = useRouter();
+  36 |     const queryClient = useQueryClient();
+  37 |             triggerAgeGateTooltip();
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/login/page.tsx [Client Component Browser]
+    ./app/login/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/login/page.tsx [Client Component SSR]
+    ./app/login/page.tsx [Server Component] 
+[browser] ./app/login/page.tsx:257:13
+Expression expected
+  255 |             }
+  256 |             await signIn.authenticateWithRedirect({
+> 257 |             <Suspense fallback={null}>
+      |             ^
+  258 |                 <GiftCapture />
+  259 |             </Suspense>
+  260 |             {/* Elemento exigido pelo Clerk para CAPTCHA em flows customizados */}
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/login/page.tsx [Client Component Browser]
+    ./app/login/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/login/page.tsx [Client Component SSR]
+    ./app/login/page.tsx [Server Component] 
+⨯ ./app/login/page.tsx:257:13
+Expression expected
+  [90m255 |[0m             }
+  [90m256 |[0m             [36mawait[0m signIn.authenticateWithRedirect({
+[31m[1m>[0m [90m257 |[0m             <[33mSuspense[0m fallback={[36mnull[0m}>
+  [90m    |[0m             [31m[1m^[0m
+  [90m258 |[0m                 <[33mGiftCapture[0m />
+  [90m259 |[0m             </[33mSuspense[0m>
+  [90m260 |[0m             {[90m/* Elemento exigido pelo Clerk para CAPTCHA em flows customizados */[0m}
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/login/page.tsx [Client Component Browser]
+    ./app/login/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/login/page.tsx [Client Component SSR]
+    ./app/login/page.tsx [Server Component]
+
+
+[browser] Clerk: Clerk has been loaded with development keys. Development instances have strict usage limits and should not be used when deploying your application to production. Learn more: https://clerk.com/docs/deployments/overview (https://assured-skylark-3.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js:12:6133)
+[browser] Clerk: Clerk has been loaded with development keys. Development instances have strict usage limits and should not be used when deploying your application to production. Learn more: https://clerk.com/docs/deployments/overview (https://assured-skylark-3.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js:12:6133)
+[browser] Clerk: Clerk has been loaded with development keys. Development instances have strict usage limits and should not be used when deploying your application to production. Learn more: https://clerk.com/docs/deployments/overview (https://assured-skylark-3.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js:12:6133)
+[browser] The final argument passed to useEffect changed size between renders. The order and size of this array must remain constant.
+
+Previous: [true, true, [object Object]]
+Incoming: [true, true] 
+    at LoginPage (app/login/page.tsx:73:14)
+    at Set.forEach (<anonymous>)
+  71 |     };
+  72 |
+> 73 |     useEffect(() => {
+     |              ^
+  74 |         if (authLoaded && isSignedIn) {
+  75 |             window.location.href = '/chats';
+  76 |         } (app/login/page.tsx:73:14)
+[browser] Clerk: Clerk has been loaded with development keys. Development instances have strict usage limits and should not be used when deploying your application to production. Learn more: https://clerk.com/docs/deployments/overview (https://assured-skylark-3.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js:12:6133)
+[browser] Clerk: Clerk has been loaded with development keys. Development instances have strict usage limits and should not be used when deploying your application to production. Learn more: https://clerk.com/docs/deployments/overview (https://assured-skylark-3.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js:12:6133)
+[browser] Clerk: Clerk has been loaded with development keys. Development instances have strict usage limits and should not be used when deploying your application to production. Learn more: https://clerk.com/docs/deployments/overview (https://assured-skylark-3.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js:12:6133)
+[browser] Clerk: Clerk has been loaded with development keys. Development instances have strict usage limits and should not be used when deploying your application to production. Learn more: https://clerk.com/docs/deployments/overview (https://assured-skylark-3.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js:12:6133)
+[browser] Clerk: Clerk has been loaded with development keys. Development instances have strict usage limits and should not be used when deploying your application to production. Learn more: https://clerk.com/docs/deployments/overview (https://assured-skylark-3.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js:12:6133)
+[browser] Clerk: Clerk has been loaded with development keys. Development instances have strict usage limits and should not be used when deploying your application to production. Learn more: https://clerk.com/docs/deployments/overview (https://assured-skylark-3.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js:12:6133)
+[browser] Clerk: Clerk has been loaded with development keys. Development instances have strict usage limits and should not be used when deploying your application to production. Learn more: https://clerk.com/docs/deployments/overview (https://assured-skylark-3.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js:12:6133)
