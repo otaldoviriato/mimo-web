@@ -110,9 +110,10 @@ export async function GET(
         const clientFinancialTransactions = await Transaction.find({
             userId: clerkId,
             $or: [
-                { source: { $in: ['recharge', 'gift', 'campaign'] } },
+                { source: { $in: ['recharge', 'gift'] } },
                 { type: { $in: ['promotional_credit_grant', 'PIX', 'CC', 'credit'] } }
-            ]
+            ],
+            type: { $ne: 'promotional_credit_usage' }
         }).sort({ timestamp: -1, createdAt: -1 }).lean();
 
         const financialHistory = clientFinancialTransactions.map((tx: any) => {
@@ -120,9 +121,7 @@ export async function GET(
             let rawAmount = tx.amount || 0;
             // Normalizar valor para Reais (BRL)
             if (tx.source === 'gift' || tx.source === 'campaign' || tx.type === 'promotional_credit_grant') {
-                if (rawAmount >= 100) {
-                    rawAmount = rawAmount / 100;
-                }
+                rawAmount = rawAmount / 100;
             } else if (tx.source === 'recharge') {
                 if (rawAmount > 1000 && Number.isInteger(rawAmount)) {
                     rawAmount = rawAmount / 100;
