@@ -1,12 +1,26 @@
 'use client';
 
-import React, { useState, useEffect, use } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, use } from 'react';
 import axios from 'axios';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useUser } from '@clerk/nextjs';
 import { Avatar } from '@/components/Avatar';
 import { useUserById, useUserByUsername } from '@/hooks/useQueries';
-import { ShieldCheck, ArrowLeft, MessageSquare, Calendar, Gift, Image as ImageIcon, ExternalLink, Clock } from 'lucide-react';
+import {
+    ShieldCheck,
+    ArrowLeft,
+    MessageSquare,
+    Calendar,
+    Gift,
+    Image as ImageIcon,
+    ExternalLink,
+    Clock,
+    ChevronLeft,
+    ChevronRight,
+    X,
+    Play,
+    ChevronDown
+} from 'lucide-react';
 
 function isClerkUserId(value: string) {
     return value.startsWith('user_');
@@ -44,6 +58,58 @@ interface MediaItem {
 interface ChatInfoPageProps {
     params?: Promise<{ userId: string }>;
     userId?: string;
+}
+
+const INITIAL_BATCH_SIZE = 12;
+const BATCH_INCREMENT = 9;
+
+function LazyMediaThumbnail({
+    item,
+    onClick
+}: {
+    item: MediaItem;
+    onClick: () => void;
+}) {
+    const [loaded, setLoaded] = useState(false);
+
+    return (
+        <div
+            onClick={onClick}
+            className="aspect-square bg-slate-100 rounded-2xl overflow-hidden relative group cursor-pointer border border-slate-100 shadow-xs active:scale-[0.97] transition-all transform duration-150"
+        >
+            {!loaded && (
+                <div className="absolute inset-0 bg-slate-200 animate-pulse flex items-center justify-center">
+                    <ImageIcon className="w-5 h-5 text-slate-300" />
+                </div>
+            )}
+
+            {item.isVideo ? (
+                <video
+                    src={item.url}
+                    onLoadedData={() => setLoaded(true)}
+                    className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+                    muted
+                    playsInline
+                />
+            ) : (
+                <img
+                    src={item.thumbnailUrl || item.url}
+                    alt="Mídia da conversa"
+                    loading="lazy"
+                    onLoad={() => setLoaded(true)}
+                    className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+                />
+            )}
+
+            {item.isVideo && (
+                <div className="absolute inset-0 bg-black/25 flex items-center justify-center text-white transition-opacity group-hover:bg-black/35">
+                    <div className="w-8 h-8 rounded-full bg-black/40 backdrop-blur-xs flex items-center justify-center">
+                        <Play className="w-4 h-4 text-white fill-white ml-0.5" />
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 }
 
 export default function ChatInfoPage({ params, userId: propUserId }: ChatInfoPageProps) {
@@ -93,16 +159,13 @@ export default function ChatInfoPage({ params, userId: propUserId }: ChatInfoPag
                     }
                 })
                 .catch(() => {
-                    // Ignora 401 silenciosamente, as mídias locais das mensagens do cache serão exibidas normalmente
+                    // Ignora silenciosamente, exibirá mídias do cache local se houver
                 });
         }
     }, [user?.id, otherUserId, targetClerkId]);
 
-    // Estado para exibição em modal da mídia selecionada
-    const [selectedMedia, setSelectedMedia] = useState<{ url: string; isVideo?: boolean } | null>(null);
-
     // Mídias trocadas válidas e não expiradas
-    const mediaItems = React.useMemo(() => {
+    const mediaItems = useMemo(() => {
         const now = new Date();
         
         // 1. Mídias históricas válidas
@@ -144,9 +207,106 @@ export default function ChatInfoPage({ params, userId: propUserId }: ChatInfoPag
         return [...validHistorical, ...newLocalMedias];
     }, [historicalMedia, messages]);
 
+    // Paginação e carregamento progressivo de mídias
+    const [visibleCount, setVisibleCount] = useState(INITIAL_BATCH_SIZE);
+    const [hasExpanded, setHasExpanded] = useState(false);
+    const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+    const handleLoadMore = () => {
+        setHasExpanded(true);
+        setVisibleCount(prev => Math.min(prev + BATCH_INCREMENT, mediaItems.length));
+    };
+
+    // Scroll Infinito após expandir / clicar em "Ver mais"
+    useEffect(() => {
+        if (!hasExpanded || visibleCount >= mediaItems.length) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting) {
+                    setVisibleCount(prev => Math.min(prev + BATCH_INCREMENT, mediaItems.length));
+                }
+            },
+            { threshold: 0.2 }
+        );
+
+        const currentSentinel = sentinelRef.current;
+        if (currentSentinel) {
+            observer.observe(currentSentinel);
+        }
+
+        return () => {
+            if (currentSentinel) observer.unobserve(currentSentinel);
+        };
+    }, [hasExpanded, visibleCount, mediaItems.length]);
+
+    // Estado do Modal de Mídia em Tela Cheia
+    const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+    const [showControls, setShowControls] = useState(true);
+
+    const activeMedia = selectedIndex !== null ? mediaItems[selectedIndex] : null;
+
+    const handlePrev = useCallback(() => {
+        if (selectedIndex === null) return;
+        setSelectedIndex(prev => (prev !== null && prev > 0 ? prev - 1 : prev));
+    }, [selectedIndex]);
+
+    const handleNext = useCallback(() => {
+        if (selectedIndex === null) return;
+        setSelectedIndex(prev => (prev !== null && prev < mediaItems.length - 1 ? prev + 1 : prev));
+    }, [selectedIndex, mediaItems.length]);
+
+    // Suporte a teclado no modal (setas esquerda/direita e Escape)
+    useEffect(() => {
+        if (selectedIndex === null) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'ArrowLeft') {
+                handlePrev();
+            } else if (e.key === 'ArrowRight') {
+                handleNext();
+            } else if (e.key === 'Escape') {
+                setSelectedIndex(null);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedIndex, handlePrev, handleNext]);
+
+    // Manipulação de Gestos Swipe no Modal em Tela Cheia
+    const touchStartX = useRef<number | null>(null);
+    const touchStartY = useRef<number | null>(null);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        touchStartX.current = e.touches[0].clientX;
+        touchStartY.current = e.touches[0].clientY;
+    };
+
+    const handleTouchEnd = (e: React.TouchEvent) => {
+        if (touchStartX.current === null || touchStartY.current === null) return;
+
+        const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+        const deltaY = e.changedTouches[0].clientY - touchStartY.current;
+
+        // Se for um gesto horizontal claro
+        if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
+            if (deltaX > 0) {
+                handlePrev();
+            } else {
+                handleNext();
+            }
+        } else if (Math.abs(deltaX) < 10 && Math.abs(deltaY) < 10) {
+            // Toque rápido no meio da mídia -> alterna visibilidade das setas e barras
+            setShowControls(prev => !prev);
+        }
+
+        touchStartX.current = null;
+        touchStartY.current = null;
+    };
+
     // Estatísticas da conversa
     const totalMessages = messages.length;
-    
     const firstMessage = messages.length > 0 ? messages[0] : null;
     const firstMessageDate = firstMessage ? new Date(firstMessage.timestamp) : null;
     
@@ -163,7 +323,7 @@ export default function ChatInfoPage({ params, userId: propUserId }: ChatInfoPag
 
     if (!receiver && isResolvingReceiver) {
         return (
-            <div className="min-h-screen bg-slate-50 text-slate-900">
+            <div className="h-screen w-full overflow-y-auto bg-slate-50 text-slate-900">
                 <div className="sticky top-0 z-30 bg-purple-600 text-white px-4 py-3.5 flex items-center gap-3 shadow-md">
                     <button
                         onClick={() => router.back()}
@@ -187,7 +347,7 @@ export default function ChatInfoPage({ params, userId: propUserId }: ChatInfoPag
 
     if (!receiver && !isResolvingReceiver) {
         return (
-            <div className="min-h-screen bg-slate-50 text-slate-900">
+            <div className="h-screen w-full overflow-y-auto bg-slate-50 text-slate-900">
                 <div className="sticky top-0 z-30 bg-purple-600 text-white px-4 py-3.5 flex items-center gap-3 shadow-md">
                     <button
                         onClick={() => router.back()}
@@ -208,8 +368,10 @@ export default function ChatInfoPage({ params, userId: propUserId }: ChatInfoPag
         );
     }
 
+    const visibleItems = mediaItems.slice(0, visibleCount);
+
     return (
-        <div className="min-h-screen bg-slate-50 text-slate-900 pb-12">
+        <div className="h-screen w-full overflow-y-auto bg-slate-50 text-slate-900 pb-16 scroll-smooth">
             {/* Cabeçalho */}
             <div className="sticky top-0 z-30 bg-purple-600 text-white px-4 py-3.5 flex items-center gap-3 shadow-md">
                 <button
@@ -330,50 +492,136 @@ export default function ChatInfoPage({ params, userId: propUserId }: ChatInfoPag
                         <p className="text-xs text-slate-400">Fotos e vídeos não expirados enviados na conversa aparecerão aqui.</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-3 gap-2">
-                        {mediaItems.map((item: any, idx: number) => (
-                            <div
-                                key={item.id || item.url || idx}
-                                onClick={() => setSelectedMedia({ url: item.url, isVideo: item.isVideo })}
-                                className="aspect-square bg-slate-200 rounded-2xl overflow-hidden relative group cursor-pointer border border-slate-100 shadow-xs active:scale-95 transition-transform"
-                            >
-                                {item.isVideo ? (
-                                    <video src={item.url} className="w-full h-full object-cover" />
-                                ) : (
-                                    <img src={item.url} alt="Mídia" className="w-full h-full object-cover" />
-                                )}
-                                {item.isVideo && (
-                                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center text-white">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                            <path d="M8 5v14l11-7z" />
-                                        </svg>
-                                    </div>
-                                )}
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-3 gap-2">
+                            {visibleItems.map((item, idx) => (
+                                <LazyMediaThumbnail
+                                    key={item.id || item.url || idx}
+                                    item={item}
+                                    onClick={() => {
+                                        setShowControls(true);
+                                        setSelectedIndex(idx);
+                                    }}
+                                />
+                            ))}
+                        </div>
+
+                        {/* Botão Ver Mais Mídias */}
+                        {visibleCount < mediaItems.length && !hasExpanded && (
+                            <div className="pt-2 text-center">
+                                <button
+                                    onClick={handleLoadMore}
+                                    className="w-full bg-white hover:bg-slate-100 active:scale-[0.98] border border-slate-200 text-purple-700 font-bold py-3 px-4 rounded-2xl shadow-xs transition-all flex items-center justify-center gap-2 text-sm"
+                                >
+                                    <span>Ver mais mídias ({mediaItems.length - visibleCount} restantes)</span>
+                                    <ChevronDown className="w-4 h-4" />
+                                </button>
                             </div>
-                        ))}
+                        )}
+
+                        {/* Sentinela para Scroll Infinito após acionar "Ver mais" */}
+                        {hasExpanded && visibleCount < mediaItems.length && (
+                            <div ref={sentinelRef} className="py-4 flex justify-center items-center">
+                                <div className="w-6 h-6 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
 
-            {/* Modal de Mídia em Tela Cheia */}
-            {selectedMedia && (
+            {/* Modal de Mídia em Tela Cheia (Galeria Lightbox) */}
+            {selectedIndex !== null && activeMedia && (
                 <div
-                    className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200"
-                    onClick={() => setSelectedMedia(null)}
+                    className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center select-none backdrop-blur-md animate-in fade-in duration-200 overflow-hidden"
+                    onTouchStart={handleTouchStart}
+                    onTouchEnd={handleTouchEnd}
                 >
-                    <button
-                        onClick={() => setSelectedMedia(null)}
-                        className="absolute top-4 right-4 text-white/80 hover:text-white p-2 rounded-full bg-black/40 hover:bg-black/60 transition-colors"
+                    {/* Barra Superior de Controles */}
+                    <div
+                        className={`absolute top-0 inset-x-0 z-30 p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex items-center justify-between text-white transition-opacity duration-300 ${
+                            showControls ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+                        }`}
                     >
-                        ✕
-                    </button>
-                    {selectedMedia.isVideo ? (
-                        <video src={selectedMedia.url} controls autoPlay className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl" />
-                    ) : (
-                        <img src={selectedMedia.url} alt="Mídia em tela cheia" className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl" />
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold uppercase tracking-wider bg-white/15 backdrop-blur-md px-2.5 py-1 rounded-full text-white/90">
+                                {activeMedia.isVideo ? 'Vídeo' : 'Foto'}
+                            </span>
+                            <span className="text-xs font-semibold text-white/80">
+                                {selectedIndex + 1} de {mediaItems.length}
+                            </span>
+                        </div>
+
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedIndex(null);
+                            }}
+                            className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors active:scale-95"
+                            aria-label="Fechar"
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
+                    </div>
+
+                    {/* Seta Esquerda */}
+                    {selectedIndex > 0 && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handlePrev();
+                            }}
+                            className={`absolute left-3 top-1/2 -translate-y-1/2 z-30 p-3 rounded-full bg-black/50 hover:bg-black/80 border border-white/10 text-white shadow-lg transition-all active:scale-90 ${
+                                showControls ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+                            }`}
+                            aria-label="Mídia Anterior"
+                        >
+                            <ChevronLeft className="w-6 h-6" />
+                        </button>
                     )}
+
+                    {/* Seta Direita */}
+                    {selectedIndex < mediaItems.length - 1 && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleNext();
+                            }}
+                            className={`absolute right-3 top-1/2 -translate-y-1/2 z-30 p-3 rounded-full bg-black/50 hover:bg-black/80 border border-white/10 text-white shadow-lg transition-all active:scale-90 ${
+                                showControls ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+                            }`}
+                            aria-label="Próxima Mídia"
+                        >
+                            <ChevronRight className="w-6 h-6" />
+                        </button>
+                    )}
+
+                    {/* Exibição Central da Mídia */}
+                    <div
+                        className="w-full h-full flex items-center justify-center p-2 md:p-8"
+                        onClick={() => setShowControls(prev => !prev)}
+                    >
+                        {activeMedia.isVideo ? (
+                            <video
+                                key={activeMedia.url}
+                                src={activeMedia.url}
+                                controls
+                                autoPlay
+                                playsInline
+                                onClick={(e) => e.stopPropagation()}
+                                className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain"
+                            />
+                        ) : (
+                            <img
+                                key={activeMedia.url}
+                                src={activeMedia.url}
+                                alt="Mídia em tela cheia"
+                                className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl transition-transform duration-200"
+                            />
+                        )}
+                    </div>
                 </div>
             )}
         </div>
     );
 }
+
