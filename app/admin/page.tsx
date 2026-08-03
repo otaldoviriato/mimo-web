@@ -5,9 +5,28 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAdminContext } from '@/context/AdminSettingsContext';
 import { StatsCard } from '@/components/admin/StatsCard';
+import { SortableColumnHeader } from '@/components/admin/SortableColumnHeader';
 import {
     UserCheck, UserX, UserPlus, Clock, Search, ExternalLink
 } from 'lucide-react';
+
+type SortKey =
+    | 'name'
+    | 'status'
+    | 'accessCount'
+    | 'avgFrequency'
+    | 'broughtClientsCount'
+    | 'lastClientBroughtAt'
+    | 'lastAccessAt'
+    | 'totalEarned';
+
+type SortDir = 'asc' | 'desc';
+
+const STATUS_WEIGHT: Record<string, number> = {
+    active: 3,
+    absent: 2,
+    inactive: 1,
+};
 
 const TAB_MAPPINGS: Record<string, string> = {
     dashboard: '/admin',
@@ -56,6 +75,18 @@ export default function AdminDashboardPage() {
 
     const [profTab, setProfTab] = useState<'active_absent' | 'inactive'>('active_absent');
     const [profSearch, setProfSearch] = useState('');
+
+    const [sortKey, setSortKey] = useState<SortKey | null>(null);
+    const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+    const handleSort = (key: SortKey) => {
+        if (sortKey === key) {
+            setSortDir(prev => (prev === 'desc' ? 'asc' : 'desc'));
+        } else {
+            setSortKey(key);
+            setSortDir(key === 'name' || key === 'status' ? 'asc' : 'desc');
+        }
+    };
 
     // Suporte a links antigos com ?tab=... para redirecionamento transparente
     useEffect(() => {
@@ -160,7 +191,60 @@ export default function AdminDashboardPage() {
                             );
                         });
 
-                        if (filtered.length === 0) {
+                        const displayList = (() => {
+                            if (!sortKey) return filtered;
+
+                            return [...filtered].sort((a: any, b: any) => {
+                                let valA: any = 0;
+                                let valB: any = 0;
+
+                                switch (sortKey) {
+                                    case 'name':
+                                        valA = a.name || a.username || '';
+                                        valB = b.name || b.username || '';
+                                        break;
+                                    case 'status':
+                                        valA = STATUS_WEIGHT[a.status] || 0;
+                                        valB = STATUS_WEIGHT[b.status] || 0;
+                                        break;
+                                    case 'accessCount':
+                                        valA = a.accessCount || 0;
+                                        valB = b.accessCount || 0;
+                                        break;
+                                    case 'avgFrequency':
+                                        valA = a.avgFrequencyValue || 0;
+                                        valB = b.avgFrequencyValue || 0;
+                                        break;
+                                    case 'broughtClientsCount':
+                                        valA = a.broughtClientsCount || 0;
+                                        valB = b.broughtClientsCount || 0;
+                                        break;
+                                    case 'lastClientBroughtAt':
+                                        valA = a.lastClientBroughtAt ? new Date(a.lastClientBroughtAt).getTime() : 0;
+                                        valB = b.lastClientBroughtAt ? new Date(b.lastClientBroughtAt).getTime() : 0;
+                                        break;
+                                    case 'lastAccessAt':
+                                        valA = a.lastAccessAt ? new Date(a.lastAccessAt).getTime() : 0;
+                                        valB = b.lastAccessAt ? new Date(b.lastAccessAt).getTime() : 0;
+                                        break;
+                                    case 'totalEarned':
+                                        valA = a.totalEarned || 0;
+                                        valB = b.totalEarned || 0;
+                                        break;
+                                }
+
+                                if (typeof valA === 'string' && typeof valB === 'string') {
+                                    const cmp = valA.localeCompare(valB, 'pt-BR');
+                                    return sortDir === 'asc' ? cmp : -cmp;
+                                }
+
+                                const numA = Number(valA);
+                                const numB = Number(valB);
+                                return sortDir === 'asc' ? numA - numB : numB - numA;
+                            });
+                        })();
+
+                        if (displayList.length === 0) {
                             return (
                                 <div className="py-20 text-center space-y-2">
                                     <UserX size={32} className="mx-auto text-slate-300 stroke-[1.5]" />
@@ -175,18 +259,78 @@ export default function AdminDashboardPage() {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="border-b border-slate-100 bg-slate-50/50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                        <th className="py-3 px-4">Profissional</th>
-                                        <th className="py-3 px-3">Status</th>
-                                        <th className="py-3 px-3 text-center">Total Acessos</th>
-                                        <th className="py-3 px-3 text-center">Frequência Média</th>
-                                        <th className="py-3 px-3 text-center">Clientes Trazidos</th>
-                                        <th className="py-3 px-3">Última Atração</th>
-                                        <th className="py-3 px-3">Último Acesso</th>
-                                        <th className="py-3 px-4 text-right">Faturamento</th>
+                                        <th className="py-3 px-4">
+                                            <SortableColumnHeader
+                                                label="Profissional"
+                                                active={sortKey === 'name'}
+                                                direction={sortDir}
+                                                onClick={() => handleSort('name')}
+                                            />
+                                        </th>
+                                        <th className="py-3 px-3">
+                                            <SortableColumnHeader
+                                                label="Status"
+                                                active={sortKey === 'status'}
+                                                direction={sortDir}
+                                                onClick={() => handleSort('status')}
+                                            />
+                                        </th>
+                                        <th className="py-3 px-3 text-center">
+                                            <SortableColumnHeader
+                                                label="Total Acessos"
+                                                active={sortKey === 'accessCount'}
+                                                direction={sortDir}
+                                                onClick={() => handleSort('accessCount')}
+                                                align="center"
+                                            />
+                                        </th>
+                                        <th className="py-3 px-3 text-center">
+                                            <SortableColumnHeader
+                                                label="Frequência Média"
+                                                active={sortKey === 'avgFrequency'}
+                                                direction={sortDir}
+                                                onClick={() => handleSort('avgFrequency')}
+                                                align="center"
+                                            />
+                                        </th>
+                                        <th className="py-3 px-3 text-center">
+                                            <SortableColumnHeader
+                                                label="Clientes Trazidos"
+                                                active={sortKey === 'broughtClientsCount'}
+                                                direction={sortDir}
+                                                onClick={() => handleSort('broughtClientsCount')}
+                                                align="center"
+                                            />
+                                        </th>
+                                        <th className="py-3 px-3">
+                                            <SortableColumnHeader
+                                                label="Última Atração"
+                                                active={sortKey === 'lastClientBroughtAt'}
+                                                direction={sortDir}
+                                                onClick={() => handleSort('lastClientBroughtAt')}
+                                            />
+                                        </th>
+                                        <th className="py-3 px-3">
+                                            <SortableColumnHeader
+                                                label="Último Acesso"
+                                                active={sortKey === 'lastAccessAt'}
+                                                direction={sortDir}
+                                                onClick={() => handleSort('lastAccessAt')}
+                                            />
+                                        </th>
+                                        <th className="py-3 px-4 text-right">
+                                            <SortableColumnHeader
+                                                label="Faturamento"
+                                                active={sortKey === 'totalEarned'}
+                                                direction={sortDir}
+                                                onClick={() => handleSort('totalEarned')}
+                                                align="right"
+                                            />
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 text-xs">
-                                    {filtered.map((prof: any) => (
+                                    {displayList.map((prof: any) => (
                                         <tr key={prof.clerkId} className="hover:bg-slate-50/80 transition-colors group">
                                             {/* Profissional Info */}
                                             <td className="py-3 px-4">

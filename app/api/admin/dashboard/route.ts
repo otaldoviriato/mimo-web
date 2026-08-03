@@ -188,6 +188,8 @@ export async function GET(request: NextRequest) {
                 }
             }
 
+            const accessesPerDay = accessCount > 0 ? (accessCount / daysDiff) : 0;
+
             const profData = {
                 clerkId: prof.clerkId,
                 username: prof.username,
@@ -199,6 +201,7 @@ export async function GET(request: NextRequest) {
                 lastAccessAt: lastAccess,
                 accessCount,
                 avgFrequencyLabel,
+                avgFrequencyValue: accessesPerDay,
                 broughtClientsCount: attrInfo.count,
                 lastClientBroughtAt: attrInfo.lastAttributedAt,
                 broughtClients: attrInfo.broughtClients.slice(0, 5),

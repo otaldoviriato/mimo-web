@@ -7,13 +7,17 @@ interface SortableColumnHeaderProps {
     active: boolean;
     direction: 'asc' | 'desc';
     onClick: () => void;
+    className?: string;
+    align?: 'left' | 'center' | 'right';
 }
 
-export function SortableColumnHeader({ label, active, direction, onClick }: SortableColumnHeaderProps) {
+export function SortableColumnHeader({ label, active, direction, onClick, className = '', align = 'left' }: SortableColumnHeaderProps) {
+    const justifyClass = align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : 'justify-start';
+
     return (
         <button
             onClick={onClick}
-            className="flex items-center gap-1 hover:text-purple-600 transition-colors cursor-pointer select-none"
+            className={`flex items-center gap-1 hover:text-purple-600 transition-colors cursor-pointer select-none ${justifyClass} ${className}`}
         >
             {label}
             {active ? (
