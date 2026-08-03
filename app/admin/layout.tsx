@@ -36,7 +36,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     const { settings, isLoaded, isSignedIn, userId } = useAdminContext();
     const { isAuthorized, loadingSettings } = settings;
 
-    const title = PATH_TITLES[pathname] ?? 'MimoAdmin';
+    const title = PATH_TITLES[pathname] ?? (pathname.startsWith('/admin/users/') ? 'Editar Perfil Dedicado' : 'MimoAdmin');
     const isSettingsTab = pathname.startsWith('/admin/settings');
 
     if (!isLoaded || loadingSettings) {

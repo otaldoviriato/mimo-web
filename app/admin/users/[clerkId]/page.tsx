@@ -3,8 +3,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
-import { Sidebar } from '@/components/admin/Sidebar';
-import { DashboardHeader } from '@/components/admin/DashboardHeader';
 import { 
     ArrowLeft, 
     Save, 
@@ -557,54 +555,21 @@ export default function UserDetailPage() {
         });
     }, [financialHistory, financialFilter, financialSearch]);
 
-    const handleSidebarTabChange = (tabId: string) => {
-        router.push(`/admin?tab=${tabId}`);
-    };
-
-    // 1. Loading
+    // Loading
     if (!isLoaded || loadingData) {
         return (
-            <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-900">
+            <div className="w-full py-20 flex flex-col items-center justify-center">
                 <div className="flex flex-col items-center animate-pulse">
-                    <Loader2 size={40} className="text-purple-500 animate-spin mb-4" />
-                    <h2 className="text-white text-lg font-bold">Carregando Perfil...</h2>
-                    <p className="text-slate-400 text-xs mt-1">Buscando dados cadastrais e galeria do banco...</p>
-                </div>
-            </div>
-        );
-    }
-
-    // 2. Não Autorizado
-    if (!isAuthorized) {
-        return (
-            <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 p-6">
-                <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center space-y-6">
-                    <div className="w-16 h-16 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center border border-rose-500/20 mx-auto">
-                        <X size={32} />
-                    </div>
-                    <h2 className="text-white text-xl font-bold">Acesso Restrito</h2>
-                    <p className="text-slate-400 text-sm">Sua conta atual não possui permissões administrativas para gerenciar perfis no backoffice.</p>
-                    <button
-                        onClick={() => router.replace('/admin')}
-                        className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold rounded-xl transition-all"
-                    >
-                        Voltar ao Painel
-                    </button>
+                    <Loader2 size={40} className="text-purple-600 animate-spin mb-4" />
+                    <h2 className="text-slate-800 text-lg font-bold">Carregando Perfil...</h2>
+                    <p className="text-slate-500 text-xs mt-1 font-medium">Buscando dados cadastrais e galeria do banco...</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="flex bg-slate-50 min-h-screen font-sans">
-            {/* Sidebar Fixa à Esquerda */}
-            <Sidebar activeTab={isProfessional ? 'professionals' : 'clients'} setActiveTab={handleSidebarTabChange} />
-
-            {/* Conteúdo Principal */}
-            <div className="flex-1 flex flex-col min-w-0">
-                <DashboardHeader title="Editar Perfil Dedicado" />
-
-                <main className="flex-1 p-8 overflow-y-auto space-y-8 max-w-5xl w-full mx-auto pb-24">
+        <div className="space-y-8 max-w-5xl w-full mx-auto pb-24">
                     {/* Botão Voltar e Cabeçalho */}
                     <div className="flex items-center justify-between">
                         <button
@@ -1660,8 +1625,6 @@ export default function UserDetailPage() {
                             </div>
                         )}
                     </div>
-                </main>
-            </div>
 
             {/* MODAL DE AUDITORIA DE CONVERSAS (WhatsApp Style) */}
             {selectedAuditChat && (
