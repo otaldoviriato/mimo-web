@@ -28,6 +28,8 @@ interface Room {
         name?: string;
         photoUrl?: string;
         isProfessional?: boolean;
+        isTeam?: boolean;
+        teamTitle?: string;
         balance?: number;
         isHighSpender?: boolean;
         isOnline?: boolean;
@@ -816,6 +818,12 @@ export default function ChatsPage() {
                                                     <span className={`text-base truncate ${hasUnread ? 'font-bold text-gray-900' : 'font-semibold text-gray-800'}`}>
                                                         {room.otherUser?.name || room.otherUser?.username || `Usuário ${otherUserId?.substring(0, 8)}`}
                                                     </span>
+                                                    {room.otherUser?.isTeam && (
+                                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                                                            <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                                                            Equipe Mimo ✓
+                                                        </span>
+                                                    )}
                                                     {room.otherUser?.isProfessional && room.otherUser?.identityStatus === 'approved' && (
                                                         <ShieldCheck className="w-4 h-4 text-purple-600 shrink-0" />
                                                     )}

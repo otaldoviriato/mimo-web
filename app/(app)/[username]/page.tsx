@@ -72,8 +72,8 @@ export default function UserProfilePage({ params, username: propUsername, onBack
     const hasChat = !!galleryData?.hasChat;
     // Um usuário nunca pode conversar consigo mesmo, nem com outro usuário do mesmo tipo.
     // Profissionais só podem conversar com clientes se a conversa já tiver sido iniciada pelo cliente.
-    const sameUserType = !!me && !!user && !!me.isProfessional === !!user.isProfessional;
-    const canMessage = !isOwner && !sameUserType && (!me?.isProfessional || hasChat);
+    const sameUserType = !!me && !!user && !me.isTeam && !user.isTeam && !!me.isProfessional === !!user.isProfessional;
+    const canMessage = !isOwner && !sameUserType && (!me?.isProfessional || hasChat || me?.isTeam);
     const showSubscribeButton = user?.isProfessional && user?.isSubscriptionEnabled && !isSubscriber && !isOwner;
 
     const currentGalleryItems = useMemo<PublicProfileGalleryItem[]>(() => {
@@ -328,10 +328,16 @@ export default function UserProfilePage({ params, username: propUsername, onBack
 
             {/* Content */}
             <div className="px-6 mt-4 flex flex-col items-center">
-                <div className="flex items-center gap-1.5 justify-center">
+                <div className="flex items-center gap-1.5 justify-center flex-wrap">
                     <h1 className="text-2xl font-black text-gray-900 tracking-tight text-center">
                         {user.name || `@${user.username}`}
                     </h1>
+                    {user.isTeam && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                            Equipe Mimo ✓
+                        </span>
+                    )}
                     {user.isProfessional && user.identityStatus === 'approved' && (
                         <ShieldCheck className="w-5 h-5 text-purple-600 shrink-0" />
                     )}
@@ -339,6 +345,20 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                 <p className="text-purple-600 font-bold text-sm tracking-wide mt-0.5">
                     @{user.username}
                 </p>
+
+                {user.isTeam && (
+                    <div className="w-full max-w-sm mt-3 mb-2 p-3.5 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/80 rounded-2xl text-left flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700 shrink-0 mt-0.5">
+                            <ShieldCheck className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h4 className="text-xs font-bold text-emerald-950 uppercase tracking-wide">Membro Oficial da Equipe Mimo</h4>
+                            <p className="text-xs text-emerald-800 leading-snug mt-0.5">
+                                Esta conta é um perfil oficial de ativação e suporte da Equipe Mimo. As conversas com a equipe são 100% gratuitas e seguras.
+                            </p>
+                        </div>
+                    </div>
+                )}
 
                 {/* Painel de Perfil do Cliente */}
                 {me?.isProfessional && !user.isProfessional && relationshipStats && (() => {

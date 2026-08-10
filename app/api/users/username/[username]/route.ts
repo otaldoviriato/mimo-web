@@ -30,7 +30,7 @@ export async function GET(
         await connectToDatabase();
 
         let user = await User.findOne({ username: cleanUsername }).select(
-            'clerkId username name email photoUrl coverUrl isProfessional professionalStatus identityStatus subscriptionPrice isSubscriptionEnabled chargePerCharSubscribers chargePerCharNonSubscribers subscribers balance bio avgResponseTimeMinutes'
+            'clerkId username name email photoUrl coverUrl isProfessional professionalStatus identityStatus subscriptionPrice isSubscriptionEnabled chargePerCharSubscribers chargePerCharNonSubscribers subscribers balance bio avgResponseTimeMinutes isTeam teamTitle'
         );
 
         if (!user) {
@@ -407,6 +407,8 @@ export async function GET(
                 photoUrl: user.photoUrl,
                 coverUrl: user.coverUrl,
                 isProfessional: user.isProfessional,
+                isTeam: Boolean(user.isTeam),
+                teamTitle: user.teamTitle || 'Equipe Mimo',
                 identityStatus: user.identityStatus || null,
                 subscriptionPrice: user.subscriptionPrice || 0,
                 isSubscriptionEnabled: user.isSubscriptionEnabled ?? false,

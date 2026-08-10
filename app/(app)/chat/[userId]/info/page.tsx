@@ -398,13 +398,33 @@ export default function ChatInfoPage({ params, userId: propUserId }: ChatInfoPag
                         <h2 className="text-xl font-bold text-slate-900 tracking-tight">
                             {receiver?.name || receiver?.username || 'Usuário Mimo'}
                         </h2>
+                        {receiver?.isTeam && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                                Equipe Mimo ✓
+                            </span>
+                        )}
                         {receiver?.isProfessional && receiver?.identityStatus === 'approved' && (
                             <ShieldCheck className="w-5 h-5 text-purple-600 shrink-0" />
                         )}
                     </div>
 
                     {receiver?.username && (
-                        <p className="text-sm font-medium text-slate-400 mb-4">@{receiver.username}</p>
+                        <p className="text-sm font-medium text-slate-400 mb-2">@{receiver.username}</p>
+                    )}
+
+                    {receiver?.isTeam && (
+                        <div className="w-full mt-2 mb-4 p-3.5 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/80 rounded-2xl text-left flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700 shrink-0 mt-0.5">
+                                <ShieldCheck className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h4 className="text-xs font-bold text-emerald-950 uppercase tracking-wide">Membro Oficial da Equipe Mimo</h4>
+                                <p className="text-xs text-emerald-800 leading-snug mt-0.5">
+                                    Esta conta é um perfil oficial de ativação e suporte da Equipe Mimo. As conversas com a equipe são 100% gratuitas e seguras.
+                                </p>
+                            </div>
+                        </div>
                     )}
 
                     {/* Botão Ver Perfil Completo */}
