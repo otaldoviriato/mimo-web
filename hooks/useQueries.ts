@@ -92,12 +92,7 @@ export function useMyProfile() {
             }
             return undefined;
         },
-        initialDataUpdatedAt: () => {
-            if (typeof window !== 'undefined' && localStorage.getItem('mimo_profile')) {
-                return Date.now();
-            }
-            return 0;
-        },
+        initialDataUpdatedAt: 0,
         enabled: !!clerkUser?.id,
         refetchOnMount: 'always',
         staleTime: 5 * 60 * 1000,
@@ -195,13 +190,11 @@ export function useChatRooms() {
             }
             return undefined;
         },
-        initialDataUpdatedAt: () => {
-            if (typeof window !== 'undefined' && user?.id && localStorage.getItem(`mimo_rooms_${user.id}`)) {
-                return Date.now();
-            }
-            return 0;
-        },
-        staleTime: 60 * 1000,
+        initialDataUpdatedAt: 0,
+        refetchOnMount: 'always',
+        refetchOnWindowFocus: true,
+        refetchInterval: 15000,
+        staleTime: 10 * 1000,
     });
 
     useEffect(() => {

@@ -27,7 +27,14 @@ export async function GET(
         // Professionals only see a conversation after its first message.
         // This also hides empty rooms left behind by the previous join flow.
         const roomFilter = currentUser?.isProfessional
-            ? { participants: userId, lastMessageTime: { $exists: true }, deletedBy: { $nin: [userId] } }
+            ? {
+                participants: userId,
+                $or: [
+                    { lastMessageTime: { $exists: true, $ne: null } },
+                    { lastMessage: { $exists: true, $ne: '' } }
+                ],
+                deletedBy: { $nin: [userId] }
+            }
             : { participants: userId, deletedBy: { $nin: [userId] } };
 
         const rooms = await Room.find(roomFilter)

@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
             });
         }
 
+        let createdMessageDoc: any = null;
         // Enviar mensagem se fornecida
         if (initialMessage && initialMessage.trim().length > 0) {
             const message = await Message.create({
@@ -66,10 +67,25 @@ export async function POST(request: NextRequest) {
                 timestamp: new Date(),
             });
 
+            createdMessageDoc = message;
             room.lastMessage = initialMessage.trim().substring(0, 100);
             room.lastMessageTime = message.timestamp || new Date();
             await room.save();
         }
+
+        // Notificar servidor de chat em tempo real via socket / push notification
+        const chatServerUrl = process.env.NEXT_PUBLIC_CHAT_SERVER_URL || 'http://localhost:3001';
+        fetch(`${chatServerUrl}/api/internal/notify-activation-chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                roomId,
+                senderId: userId,
+                receiverId: professionalId,
+                initialMessage: initialMessage?.trim(),
+                message: createdMessageDoc ? createdMessageDoc.toObject() : undefined
+            })
+        }).catch((err) => console.error('[start-chat] Failed to notify chat server:', err));
 
         // Atualizar modelo de ativação
         let activation = await ProfessionalActivation.findOne({ professionalId });
