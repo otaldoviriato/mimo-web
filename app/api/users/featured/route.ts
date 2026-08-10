@@ -36,13 +36,12 @@ export async function GET(request: NextRequest) {
         };
 
         if (currentUser?.isProfessional) {
-            queryFilter.isProfessional = { $ne: true };
-            queryFilter.hideFromExplore = { $ne: true };
-        } else {
-            queryFilter.isProfessional = true;
-            queryFilter.professionalStatus = 'approved';
-            queryFilter.hideFromExplore = { $ne: true };
+            return NextResponse.json({ users: [] });
         }
+
+        queryFilter.isProfessional = true;
+        queryFilter.professionalStatus = 'approved';
+        queryFilter.hideFromExplore = { $ne: true };
 
         // Encontrar criadores/clientes em destaque
         const featuredUsers = await User.find(queryFilter)

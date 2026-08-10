@@ -69,10 +69,11 @@ export default function UserProfilePage({ params, username: propUsername, onBack
 
     const isSubscriber = galleryData?.isSubscriber;
     const isOwner = galleryData?.isOwner;
-    // Um usuário nunca pode conversar consigo mesmo, nem com outro usuário do mesmo tipo
-    // (profissional com profissional, cliente com cliente).
+    const hasChat = !!galleryData?.hasChat;
+    // Um usuário nunca pode conversar consigo mesmo, nem com outro usuário do mesmo tipo.
+    // Profissionais só podem conversar com clientes se a conversa já tiver sido iniciada pelo cliente.
     const sameUserType = !!me && !!user && !!me.isProfessional === !!user.isProfessional;
-    const canMessage = !isOwner && !sameUserType;
+    const canMessage = !isOwner && !sameUserType && (!me?.isProfessional || hasChat);
     const showSubscribeButton = user?.isProfessional && user?.isSubscriptionEnabled && !isSubscriber && !isOwner;
 
     const currentGalleryItems = useMemo<PublicProfileGalleryItem[]>(() => {

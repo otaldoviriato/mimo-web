@@ -36,6 +36,12 @@ export default function SearchPage() {
     const [activeFilter, setActiveFilter] = useState<'online' | 'novos' | 'todos'>('online');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
 
+    useEffect(() => {
+        if (userData?.isProfessional) {
+            router.replace('/chats');
+        }
+    }, [userData, router]);
+
     const getEmptyStateMessage = () => {
         if (userData?.isProfessional) {
             if (activeFilter === 'online') {

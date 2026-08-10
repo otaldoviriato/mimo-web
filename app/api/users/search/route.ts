@@ -37,11 +37,11 @@ export async function GET(request: NextRequest) {
         };
 
         if (currentUser?.isProfessional) {
-            queryFilter.isProfessional = { $ne: true };
-        } else {
-            queryFilter.isProfessional = true;
-            queryFilter.professionalStatus = 'approved';
+            return NextResponse.json({ users: [] });
         }
+
+        queryFilter.isProfessional = true;
+        queryFilter.professionalStatus = 'approved';
 
         const foundUsers = await User.find({
             $or: [
