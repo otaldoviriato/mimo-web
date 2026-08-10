@@ -450,6 +450,54 @@ const compressImage = (file: File, maxW = 1600, maxH = 1600, quality = 0.82): Pr
     });
 };
 
+function CollapsibleTextMessage({ content, isMine }: { content: string; isMine: boolean }) {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const THRESHOLD = 300;
+    const MAX_LINES = 5;
+
+    const lines = content.split('\n');
+    const isLong = content.length > THRESHOLD || lines.length > MAX_LINES;
+
+    if (!isLong) {
+        return (
+            <span className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                {content}
+            </span>
+        );
+    }
+
+    let previewContent = content;
+    if (!isExpanded) {
+        if (lines.length > MAX_LINES) {
+            previewContent = lines.slice(0, MAX_LINES).join('\n');
+            if (previewContent.length > THRESHOLD) {
+                previewContent = previewContent.slice(0, THRESHOLD);
+            }
+        } else {
+            previewContent = content.slice(0, THRESHOLD);
+        }
+    }
+
+    return (
+        <span className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+            {isExpanded ? content : `${previewContent.trim()}...`}
+            {' '}
+            <button
+                type="button"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setIsExpanded((prev) => !prev);
+                }}
+                className={`inline-flex items-center text-xs font-bold underline ml-1 cursor-pointer select-none ${
+                    isMine ? 'text-purple-200 hover:text-white' : 'text-purple-600 hover:text-purple-800'
+                }`}
+            >
+                {isExpanded ? 'Ver menos' : 'Ver mais'}
+            </button>
+        </span>
+    );
+}
+
 export default function ChatPage({ params, userId: propUserId, giftCode: propGiftCode, onBack, isSubPage = false, isClosing = false }: ChatPageProps) {
     const resolvedParams = params ? use(params) : null;
     const otherUserId = propUserId || resolvedParams?.userId || '';
@@ -3097,9 +3145,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                         </>
                                     ) : (
                                         <div className="relative">
-                                            <span className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                                                {item.content}
-                                            </span>
+                                            <CollapsibleTextMessage content={item.content} isMine={isMine} />
                                             <div className="inline-flex items-center gap-1.5 float-right mt-2 ml-2 mb-[-2px]">
                                                 <span className={`text-[10px] font-medium ${isMine ? 'text-purple-200/70' : 'text-gray-400'}`}>
                                                     {(() => {
@@ -3342,7 +3388,6 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                 onBlur={() => setIsInputFocused(false)}
                                 placeholder="Digite sua mensagem..."
                                 rows={1}
-                                maxLength={500}
                                 className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none leading-5 py-0.5 disabled:text-gray-400"
                                 style={{ maxHeight: '96px' }}
                                 onInput={(e) => {
