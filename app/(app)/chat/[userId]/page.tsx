@@ -1912,16 +1912,17 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         }
         
         const charCount = messageText.trim().length;
+        const isTeamMemberInvolved = userData?.isTeam || receiver?.isTeam;
         let costInCents = 0;
-        if (charCount > 0 && receiver?.isProfessional && !monetizationDisabled) {
+        if (charCount > 0 && receiver?.isProfessional && !monetizationDisabled && !isTeamMemberInvolved) {
             const costPerCharInCents = currentRate * 100;
             const rawCostInCents = charCount * costPerCharInCents;
             costInCents = Math.max(1, Math.ceil(rawCostInCents));
         }
 
-        console.log('[handleSend] Dados de custo. charCount:', charCount, 'receiverIsProfessional:', receiver?.isProfessional, 'costInCents:', costInCents, 'balance:', balance);
+        console.log('[handleSend] Dados de custo. charCount:', charCount, 'receiverIsProfessional:', receiver?.isProfessional, 'isTeamMemberInvolved:', isTeamMemberInvolved, 'costInCents:', costInCents, 'balance:', balance);
 
-        if (receiver?.isProfessional && balance < costInCents) {
+        if (!isTeamMemberInvolved && receiver?.isProfessional && balance < costInCents) {
             console.warn('[handleSend] Saldo insuficiente. Requerido:', costInCents, 'Disponível:', balance);
             openRechargeModal({
                 currentBalanceInCents: balance,
@@ -1993,7 +1994,8 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         const tempId = `temp-audio-${Date.now()}`;
         const previewUrl = URL.createObjectURL(audioBlob);
 
-        const estimatedAudioCostInCents = audioCostPerSecondInCents > 0
+        const isTeamMemberInvolved = userData?.isTeam || receiver?.isTeam;
+        const estimatedAudioCostInCents = (!isTeamMemberInvolved && audioCostPerSecondInCents > 0)
             ? Math.max(1, Math.ceil(audioCostPerSecondInCents * durationInSeconds))
             : 0;
 
@@ -2282,13 +2284,14 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
     const charCount = messageText.trim().length;
     const isSubscriber = chatPricing?.isSubscriber ?? false;
-    const currentRate = (receiver?.isProfessional && !monetizationDisabled)
+    const isTeamMemberInvolved = userData?.isTeam || receiver?.isTeam;
+    const currentRate = (receiver?.isProfessional && !monetizationDisabled && !isTeamMemberInvolved)
         ? (isSubscriber
             ? (chatPricing?.defaultPricePerCharSubscribers ?? 0)
             : (chatPricing?.defaultPricePerCharNonSubscribers ?? 0))
         : 0;
     let estimatedCostInCents = 0;
-    if (charCount > 0 && receiver?.isProfessional && !monetizationDisabled) {
+    if (charCount > 0 && receiver?.isProfessional && !monetizationDisabled && !isTeamMemberInvolved) {
         estimatedCostInCents = Math.max(1, Math.ceil(charCount * currentRate * 100));
     }
 
@@ -2296,10 +2299,12 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const audioPriceMultiplier = chatPricing?.audioPriceMultiplier ?? 5;
     const audioCostPerSecondInCents = currentRate > 0 ? (currentRate * 100 * audioPriceMultiplier) : 0;
     // Quantos segundos de áudio o saldo atual do cliente consegue pagar (undefined = sem limite, mensagem gratuita).
-    const maxAudioDurationSeconds = audioCostPerSecondInCents > 0
+    const maxAudioDurationSeconds = (audioCostPerSecondInCents > 0 && !isTeamMemberInvolved)
         ? Math.floor(balance / audioCostPerSecondInCents)
         : undefined;
     const shouldShowLowBalanceAlert = !userData?.isProfessional &&
+        !userData?.isTeam &&
+        !receiver?.isTeam &&
         receiver?.isProfessional &&
         !monetizationDisabled &&
         lowBalanceThresholdInCents > 0 &&
