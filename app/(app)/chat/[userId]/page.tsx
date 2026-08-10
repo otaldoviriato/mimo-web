@@ -2320,7 +2320,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     // (profissional com profissional, cliente com cliente). O servidor também bloqueia isso,
     // mas escondemos a UI de chat aqui para não exibir uma conversa inválida.
     const isSelfChat = !!user?.id && user.id === otherUserId;
-    const isSameUserType = !!userData && !!receiver && !!userData.isProfessional === !!receiver.isProfessional;
+    const isSameUserType = !!userData && !!receiver && !userData.isTeam && !receiver.isTeam && !!userData.isProfessional === !!receiver.isProfessional;
     if (isSelfChat || isSameUserType) {
         return (
             <div
@@ -2414,6 +2414,12 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                     <p className="text-base font-bold text-white truncate tracking-tight">
                                         {receiver?.name || receiver?.username || (otherUserId ? `Usuário ${otherUserId.substring(0, 8)}` : 'Conversa')}
                                     </p>
+                                    {receiver?.isTeam && (
+                                        <span className="text-[10px] bg-emerald-500/90 text-white font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider shrink-0 flex items-center gap-1 border border-white/20">
+                                            <ShieldCheck className="w-3 h-3 text-white" />
+                                            Equipe Mimo ✓
+                                        </span>
+                                    )}
                                     {receiver?.isProfessional && receiver?.identityStatus === 'approved' && (
                                         <ShieldCheck className="w-4 h-4 text-white shrink-0" />
                                     )}
@@ -2532,6 +2538,13 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     </>
                 )}
             </div>
+
+            {(receiver?.isTeam || userData?.isTeam) && (
+                <div className="shrink-0 z-10 flex items-center justify-center gap-2 border-b border-emerald-200/80 bg-emerald-50 px-4 py-2 text-center text-xs font-bold text-emerald-800">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Conversa Oficial com a Equipe Mimo — Atendimento e suporte de ativação gratuito</span>
+                </div>
+            )}
 
             {shouldShowLowBalanceAlert && (
                 <button

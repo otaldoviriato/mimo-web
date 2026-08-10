@@ -61,6 +61,9 @@ export interface IUser extends Document {
     subscriberDiscountPercentage?: number;
     financialLastViewedAt?: Date;
     engagementEmailsSent?: string[];
+    isTeam?: boolean;
+    teamTitle?: string;
+    activationLastViewedAt?: Date;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -261,6 +264,18 @@ const UserSchema = new Schema<IUser>({
     engagementEmailsSent: {
         type: [String],
         default: [],
+    },
+    isTeam: {
+        type: Boolean,
+        default: false,
+        index: true,
+    },
+    teamTitle: {
+        type: String,
+        default: 'Equipe Mimo',
+    },
+    activationLastViewedAt: {
+        type: Date,
     },
 }, {
     timestamps: true,

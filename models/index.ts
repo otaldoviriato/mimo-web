@@ -44,5 +44,5 @@ export type { ICreditGrant } from './CreditGrant';
 export { CreditUsage } from './CreditUsage';
 export type { ICreditUsage } from './CreditUsage';
 
-
-
+export { ProfessionalActivation } from './ProfessionalActivation';
+export type { IProfessionalActivation } from './ProfessionalActivation';

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useMyProfile } from '@/hooks/useQueries';
@@ -9,9 +9,7 @@ import { Avatar } from '@/components/Avatar';
 import { useUser } from '@clerk/nextjs';
 import { PWAPromoModal } from '@/components/PWAPromoModal';
 import { NotifPromoModal } from '@/components/NotifPromoModal';
-import { Settings, ShieldAlert, Search, Pencil } from 'lucide-react';
-
-// As abas são geradas dinamicamente dentro do componente com base no tipo de perfil (profissional ou não)
+import { Settings, ShieldAlert, Search, Pencil, UserCheck, ShieldCheck } from 'lucide-react';
 
 export default function TabsLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
@@ -21,8 +19,24 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
     const balance = userData?.balance ?? 0;
 
     const isProfessional = !!userData?.isProfessional;
+    const isTeam = !!userData?.isTeam;
+    const [unviewedCount, setUnviewedCount] = useState(0);
+
+    useEffect(() => {
+        if (isTeam) {
+            fetch('/api/team/activation/professionals?status=unviewed')
+                .then(res => res.ok ? res.json() : null)
+                .then(data => {
+                    if (data && typeof data.unviewedCount === 'number') {
+                        setUnviewedCount(data.unviewedCount);
+                    }
+                })
+                .catch(console.error);
+        }
+    }, [isTeam, pathname]);
 
     const currentTabLabel = 
+        pathname === '/activation' ? 'Ativação' :
         pathname === '/wallet' ? 'Carteira' :
         pathname === '/search' ? 'Explorar' :
         pathname === '/profile' ? 'Perfil' : 'Conversas';
@@ -38,7 +52,20 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                 </svg>
             ),
         },
-        ...(isProfessional ? [
+        ...(isTeam ? [
+            {
+                href: '/activation',
+                label: 'Ativação',
+                icon: (active: boolean) => (
+                    <span className="relative inline-flex items-center justify-center">
+                        <UserCheck size={22} className={active ? 'text-purple-600 stroke-[2.5]' : 'text-gray-400 stroke-2'} />
+                        {unviewedCount > 0 && (
+                            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white animate-pulse" />
+                        )}
+                    </span>
+                ),
+            }
+        ] : isProfessional ? [
             {
                 href: '/wallet',
                 label: 'Carteira',
@@ -119,16 +146,25 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
 
                 {/* Balance + User */}
                 <div className="px-4 pb-5 border-t border-gray-100 pt-4 flex flex-col gap-3">
-                    <BalanceDisplay balance={balance} size="md" />
+                    {!isTeam && (
+                        <BalanceDisplay balance={balance} size="md" />
+                    )}
                     <div className="flex items-center gap-2 px-1">
                         <Avatar uri={userData?.photoUrl} size={32} />
                         <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-gray-800 truncate">
+                            <p className="text-sm font-semibold text-gray-800 truncate flex items-center gap-1">
                                 {userData?.name || userData?.username || user?.username || ''}
                             </p>
-                            <p className="text-xs text-gray-400 truncate">
-                                @{userData?.username || ''}
-                            </p>
+                            {isTeam ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md mt-0.5">
+                                    <ShieldCheck size={11} className="text-emerald-600" />
+                                    {userData?.teamTitle || 'Equipe Mimo ✓'}
+                                </span>
+                            ) : (
+                                <p className="text-xs text-gray-400 truncate">
+                                    @{userData?.username || ''}
+                                </p>
+                            )}
                         </div>
                     </div>
                     {userData?.isAdmin && (
@@ -215,9 +251,9 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                 {children}
             </div>
 
-            {/* Modal de instalação PWA — aparece uma vez por sessão quando o Chrome libera o prompt */}
+            {/* Modal de instalação PWA */}
             <PWAPromoModal />
-            {/* Modal de notificações — aparece uma vez por sessão quando em modo standalone e permissão ainda não concedida */}
+            {/* Modal de notificações */}
             <NotifPromoModal />
 
             {/* Bottom nav (mobile) */}

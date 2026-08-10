@@ -101,8 +101,34 @@ export function ClientsTable() {
         }
     };
 
+    // Ação: Tornar Usuário Membro da Equipe
+    const handlePromoteToTeam = async (clerkId: string, name: string) => {
+        if (!confirm(`Deseja tornar "${name}" um Membro da Equipe Mimo?\nEle deixará de ser classificado como cliente comum e passará a ter acesso à aba Ativação.`)) {
+            return;
+        }
 
+        try {
+            const res = await fetch(`/api/admin/users/${clerkId}/team-status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isTeam: true })
+            });
 
+            if (res.ok) {
+                toast.success(`"${name}" agora faz parte da Equipe Mimo!`, {
+                    style: { borderRadius: '12px', background: '#1E293B', color: '#FFF' }
+                });
+                setUsers(prev => prev.filter(u => u.clerkId !== clerkId));
+                setSelectedUserMenu(null);
+            } else {
+                const data = await res.json();
+                toast.error(data.error || 'Erro ao promover usuário.');
+            }
+        } catch (err) {
+            console.error('Erro ao promover:', err);
+            toast.error('Erro de conexão ao tentar promover.');
+        }
+    };
     const getInitials = (name: string) => {
         const parts = name.split(' ');
         if (parts.length >= 2) {
@@ -347,8 +373,17 @@ export function ClientsTable() {
                                                                 <Edit size={14} className="text-slate-400" />
                                                                 Editar Perfil
                                                             </button>
-
-
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedUserMenu(null);
+                                                                    handlePromoteToTeam(user.clerkId, user.name);
+                                                                }}
+                                                                className="w-full flex items-center gap-2 px-4 py-2 text-xs font-bold text-purple-700 hover:bg-purple-50 cursor-pointer text-left"
+                                                            >
+                                                                <ShieldCheck size={14} className="text-purple-600" />
+                                                                Tornar parte da equipe
+                                                            </button>
                                                         </div>
 
                                                         <div className="py-1">

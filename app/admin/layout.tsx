@@ -11,6 +11,7 @@ const PATH_TITLES: Record<string, string> = {
     '/admin': 'Painel Geral',
     '/admin/clients': 'Gerenciamento de Clientes',
     '/admin/professionals': 'Gerenciamento de Profissionais',
+    '/admin/team': 'Gerenciamento de Equipe',
     '/admin/identity-verifications': 'Verificações de Selos de Autenticidade',
     '/admin/rooms': 'Auditoria de Conversas',
     '/admin/financial': 'Movimentações Financeiras',

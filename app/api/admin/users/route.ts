@@ -40,11 +40,14 @@ export async function GET(request: NextRequest) {
         
         let filter: any = {};
         
-        // Filtro de perfil profissional / cliente
-        if (role === 'professional' || isProfessionalParam === 'true') {
+        // Filtro de perfil profissional / cliente / equipe
+        if (role === 'team') {
+            filter.isTeam = true;
+        } else if (role === 'professional' || isProfessionalParam === 'true') {
             filter.isProfessional = true;
         } else if (role === 'client' || isProfessionalParam === 'false') {
             filter.isProfessional = { $ne: true };
+            filter.isTeam = { $ne: true };
         }
 
         // Filtro de onboardingStatus
@@ -100,7 +103,7 @@ export async function GET(request: NextRequest) {
         }
 
         let queryChain = User.find(filter)
-            .select('clerkId username name email photoUrl balance isProfessional onboardingStep createdAt taxId phone pixKey subscriptionPrice lastSeen isOnline accessCount lastAccessAt')
+            .select('clerkId username name email photoUrl balance isProfessional isTeam teamTitle onboardingStep createdAt taxId phone pixKey subscriptionPrice lastSeen isOnline accessCount lastAccessAt')
             .sort({ createdAt: -1 });
 
         if (limitVal > 0) {
@@ -209,6 +212,8 @@ export async function GET(request: NextRequest) {
                 photoUrl: u.photoUrl || null,
                 balance: u.balance || 0,
                 isProfessional: u.isProfessional || false,
+                isTeam: u.isTeam || false,
+                teamTitle: u.teamTitle || 'Equipe Mimo',
                 createdAt: u.createdAt ? new Date(u.createdAt).toLocaleDateString('pt-BR') : 'N/A',
                 taxId: u.taxId || '',
                 phone: u.phone || '',
