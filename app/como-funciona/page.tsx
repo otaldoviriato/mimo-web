@@ -254,6 +254,7 @@ function ParaCriadorasContent() {
                 strategy: 'oauth_google',
                 redirectUrl: '/sso-callback',
                 redirectUrlComplete: '/chats',
+                oidcPrompt: 'select_account',
                 unsafeMetadata: buildProfessionalMetadata()
             });
         } catch (err: unknown) {

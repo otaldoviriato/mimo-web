@@ -288,7 +288,7 @@ export default function LoginPage() {
                 strategy: 'oauth_google',
                 redirectUrl: '/sso-callback',
                 redirectUrlComplete: '/chats',
-                oidcPrompt: 'select_account consent',
+                oidcPrompt: 'select_account',
             });
         };
 
