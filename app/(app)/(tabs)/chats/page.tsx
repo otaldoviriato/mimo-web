@@ -9,6 +9,7 @@ import { useChatRooms, useMyProfile, QueryKeys } from '@/hooks/useQueries';
 import { useSocket } from '@/hooks/useSocket';
 import { CheckCircle2, X, WalletCards, Clock, AlertCircle, ChevronRight, MessageCircle, Trash2, ShieldCheck, Share2, Star } from 'lucide-react';
 import { Drawer } from 'vaul';
+import { buildProfileShareUrl } from '@/lib/referral';
 
 interface Room {
     _id: string;
@@ -109,7 +110,7 @@ export default function ChatsPage() {
     const handleShareProfile = async () => {
         if (typeof window === 'undefined' || !myProfile?.username) return;
 
-        const profileUrl = `${window.location.origin}/${myProfile.username}`;
+        const profileUrl = buildProfileShareUrl(window.location.origin, myProfile.username, user?.id || myProfile.clerkId);
         const name = myProfile.name || `@${myProfile.username}`;
         const shareText = `Ei! Esse é meu perfil no MimoChat - ${name}. Me manda uma mensagem, adoro conversar!`;
 

@@ -12,6 +12,7 @@ import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@clerk/nextjs';
 import { userApi } from '@/services/api';
+import { REFERRAL_STORAGE_KEY } from '@/lib/referral';
 
 const CHAT_SERVER_URL = process.env.NEXT_PUBLIC_CHAT_SERVER_URL || 'http://localhost:3001';
 
@@ -70,6 +71,9 @@ export function useMyProfile() {
             const user = response?.user ?? null;
             if (typeof window !== 'undefined' && user) {
                 localStorage.setItem('mimo_profile', JSON.stringify(user));
+                if (user.acquiredByProfessionalId) {
+                    localStorage.removeItem(REFERRAL_STORAGE_KEY);
+                }
             }
             return user;
         },

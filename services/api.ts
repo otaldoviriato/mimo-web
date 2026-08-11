@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { REFERRAL_STORAGE_KEY } from '@/lib/referral';
 
 // No Next.js, as rotas /api/* são servidas pelo próprio app.
 // Usamos path relativo (sem baseURL) para que o browser envie os cookies
@@ -22,6 +23,22 @@ export const setupAxiosInterceptors = (getToken: () => Promise<string | null>) =
                 const token = await getToken();
                 if (token) {
                     config.headers.Authorization = `Bearer ${token}`;
+                }
+                if (typeof window !== 'undefined') {
+                    const storedReferral = localStorage.getItem(REFERRAL_STORAGE_KEY);
+                    if (storedReferral) {
+                        try {
+                            const referral = JSON.parse(storedReferral);
+                            if (referral?.professionalId) {
+                                config.headers['x-mimo-referral-professional-id'] = referral.professionalId;
+                            }
+                            if (referral?.professionalUsername) {
+                                config.headers['x-mimo-referral-professional-username'] = referral.professionalUsername;
+                            }
+                        } catch {
+                            localStorage.removeItem(REFERRAL_STORAGE_KEY);
+                        }
+                    }
                 }
             } catch (error) {
                 console.error('[Axios Interceptor] Failed to get token', error);

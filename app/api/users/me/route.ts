@@ -15,8 +15,38 @@ import { Resend } from 'resend';
 import { buildProfileRoleMetadata, getCreatorLandingProfileRole } from '@/lib/profileRole';
 import { subscriptionPriceBRLToCents } from '@/lib/subscriptionBilling';
 import { sendAdminAlert } from '@/lib/adminAlerts';
+import { getReferralFromRequestHeaders, getReferralFromUnsafeMetadata, type ReferralMetadata } from '@/lib/referral';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
+
+async function applyReferralAttribution(user: any, referral?: ReferralMetadata) {
+    if (!user || !referral || user.isProfessional !== false || user.acquiredByProfessionalId) {
+        return user;
+    }
+    if (referral.professionalId === user.clerkId) {
+        return user;
+    }
+
+    const professional = await User.findOne({
+        clerkId: referral.professionalId,
+        isProfessional: true,
+    }).select('clerkId username').lean() as any;
+
+    if (!professional) {
+        console.warn(`[Referral] Profissional ${referral.professionalId} não encontrada para atribuir cliente ${user.clerkId}`);
+        return user;
+    }
+
+    user.acquiredByProfessionalId = professional.clerkId;
+    user.acquiredByProfessionalUsername = professional.username || referral.professionalUsername;
+    user.acquisitionSource = 'profile_share';
+    const capturedAt = new Date(referral.capturedAt);
+    user.acquiredAt = Number.isNaN(capturedAt.getTime()) ? new Date() : capturedAt;
+    await user.save();
+
+    console.log(`[Referral] Cliente ${user.clerkId} atribuído à profissional ${professional.clerkId} via profile_share`);
+    return user;
+}
 
 // GET /api/users/me - Get current user
 export async function GET(request: NextRequest) {
@@ -72,6 +102,8 @@ export async function GET(request: NextRequest) {
                 const username = clerkUser.username || `user_${cleanId.substring(Math.max(0, cleanId.length - 8))}`;
 
                 const roleMetadata = getCreatorLandingProfileRole(clerkUser.unsafeMetadata);
+                const pendingReferral = getReferralFromUnsafeMetadata(clerkUser.unsafeMetadata)
+                    || getReferralFromRequestHeaders(request.headers);
                 const isProfessional = roleMetadata === 'professional' ? true : (roleMetadata === 'client' ? false : undefined);
                 const professionalStatus = null; 
 
@@ -93,6 +125,7 @@ export async function GET(request: NextRequest) {
                 }
 
                 user = await User.create(userFields);
+                user = await applyReferralAttribution(user, pendingReferral);
             } catch (createError: any) {
                 if (createError.code === 11000) {
                     user = await User.findOne({ clerkId: userId });
@@ -120,6 +153,8 @@ export async function GET(request: NextRequest) {
                 const client = await clerkClient();
                 const clerkUser = await client.users.getUser(userId);
                 const explicitRole = getCreatorLandingProfileRole(clerkUser.unsafeMetadata);
+                const pendingReferral = getReferralFromUnsafeMetadata(clerkUser.unsafeMetadata)
+                    || getReferralFromRequestHeaders(request.headers);
                 const isProfessionalClerk = explicitRole === 'professional';
 
                 if (isProfessionalClerk && !user.isProfessional) {
@@ -127,6 +162,7 @@ export async function GET(request: NextRequest) {
                     user.professionalStatus = null;
                     await user.save();
                 }
+                user = await applyReferralAttribution(user, pendingReferral);
             } catch (syncErr: any) {
                 console.warn('[GET /api/users/me] Falha ao sincronizar metadados do Clerk:', syncErr);
             }
@@ -412,6 +448,10 @@ export async function GET(request: NextRequest) {
                 isTeam: Boolean(user.isTeam),
                 teamTitle: user.teamTitle || 'Equipe Mimo',
                 activationLastViewedAt: user.activationLastViewedAt || null,
+                acquiredByProfessionalId: user.acquiredByProfessionalId,
+                acquiredByProfessionalUsername: user.acquiredByProfessionalUsername,
+                acquisitionSource: user.acquisitionSource,
+                acquiredAt: user.acquiredAt,
                 professionalStatus: user.professionalStatus,
                 identityStatus: user.identityStatus || null,
                 subscriptionPrice: user.subscriptionPrice || 0,
@@ -645,6 +685,8 @@ export async function PATCH(request: NextRequest) {
             { returnDocument: 'after', runValidators: true, upsert: true }
         );
 
+        await applyReferralAttribution(user, getReferralFromRequestHeaders(request.headers));
+
         // Disparo de Alerta de Nova Profissional para Administradores
         if (
             user.isProfessional &&
@@ -763,6 +805,10 @@ export async function PATCH(request: NextRequest) {
                 hasPushToken: Boolean(user.fcmToken || (user.fcmTokens && user.fcmTokens.length > 0)),
                 hideFromExplore: user.hideFromExplore ?? false,
                 avgResponseTimeMinutes: user.avgResponseTimeMinutes,
+                acquiredByProfessionalId: user.acquiredByProfessionalId,
+                acquiredByProfessionalUsername: user.acquiredByProfessionalUsername,
+                acquisitionSource: user.acquisitionSource,
+                acquiredAt: user.acquiredAt,
             },
         });
     } catch (error: any) {

@@ -13,6 +13,7 @@ import { useMyProfile } from '@/hooks/useQueries';
 import { ImageCropper } from '@/components/ImageCropper';
 import { useQueryClient } from '@tanstack/react-query';
 import { clearMimoClientSession } from '@/lib/clientSession';
+import { buildProfileShareUrl } from '@/lib/referral';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -1032,8 +1033,8 @@ export default function OnboardingPage() {
     const renderDone = () => {
         const isProf = userData?.isProfessional || role === 'professional';
         const userSlug = username || userData?.username || '';
-        const fullLink = typeof window !== 'undefined'
-            ? `${window.location.origin}/${userSlug}`
+        const fullLink = typeof window !== 'undefined' && userData?.clerkId
+            ? buildProfileShareUrl(window.location.origin, userSlug, userData.clerkId)
             : `mimo.chat/${userSlug}`;
         const creatorName = displayName || userData?.name || userSlug || 'Seu perfil';
         const profileImage = photoPreview || userData?.photoUrl;

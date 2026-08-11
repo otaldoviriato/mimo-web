@@ -9,6 +9,7 @@ import { Input } from '@/components/Input';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { clearMimoClientSession } from '@/lib/clientSession';
+import { REFERRAL_STORAGE_KEY, getReferralFromSearchParams, type ReferralMetadata } from '@/lib/referral';
 
 function GiftCapture() {
     const searchParams = useSearchParams();
@@ -17,6 +18,10 @@ function GiftCapture() {
         if (gift?.trim()) {
             // localStorage persiste em redirects OAuth no PWA (sessionStorage pode ser destruído)
             localStorage.setItem('mimo_pending_gift', gift.trim());
+        }
+        const referral = getReferralFromSearchParams(searchParams);
+        if (referral) {
+            localStorage.setItem(REFERRAL_STORAGE_KEY, JSON.stringify(referral));
         }
     }, [searchParams]);
     return null;
@@ -116,6 +121,20 @@ export default function LoginPage() {
             || fallback;
     };
 
+    const getPendingReferral = (): ReferralMetadata | undefined => {
+        if (typeof window === 'undefined') return undefined;
+        const stored = localStorage.getItem(REFERRAL_STORAGE_KEY);
+        if (!stored) return undefined;
+
+        try {
+            const parsed = JSON.parse(stored) as ReferralMetadata;
+            return parsed?.professionalId ? parsed : undefined;
+        } catch {
+            localStorage.removeItem(REFERRAL_STORAGE_KEY);
+            return undefined;
+        }
+    };
+
     const onSendCode = async () => {
         if (!email.trim()) { setError('Por favor, insira seu email'); return; }
         if (!signInLoaded || !signUpLoaded) { setError('Serviço de autenticação não carregado'); return; }
@@ -168,7 +187,11 @@ export default function LoginPage() {
             if (errCode === 'form_identifier_not_found') {
                 // Conta não existe — cria transparentemente sem o usuário perceber
                 try {
-                    const signUpParams: any = { emailAddress: email };
+                    const pendingReferral = getPendingReferral();
+                    const signUpParams: any = {
+                        emailAddress: email,
+                        ...(pendingReferral ? { unsafeMetadata: { mimoReferral: pendingReferral } } : {}),
+                    };
 
                     await signUp!.create(signUpParams);
                     await signUp!.prepareEmailAddressVerification({ strategy: 'email_code' });
@@ -280,16 +303,31 @@ export default function LoginPage() {
 
         const executeGoogleAuth = async () => {
             const pendingGift = typeof window !== 'undefined' ? localStorage.getItem('mimo_pending_gift') : null;
+            const pendingReferral = getPendingReferral();
             clearMimoClientSession(queryClient);
             if (pendingGift && typeof window !== 'undefined') {
                 localStorage.setItem('mimo_pending_gift', pendingGift);
             }
-            await signIn.authenticateWithRedirect({
+            if (pendingReferral && typeof window !== 'undefined') {
+                localStorage.setItem(REFERRAL_STORAGE_KEY, JSON.stringify(pendingReferral));
+            }
+
+            const oauthParams = {
                 strategy: 'oauth_google',
                 redirectUrl: '/sso-callback',
                 redirectUrlComplete: '/chats',
                 oidcPrompt: 'select_account',
-            });
+            } as const;
+
+            if (pendingReferral) {
+                await signUp.authenticateWithRedirect({
+                    ...oauthParams,
+                    unsafeMetadata: { mimoReferral: pendingReferral },
+                } as any);
+                return;
+            }
+
+            await signIn.authenticateWithRedirect(oauthParams);
         };
 
         try {

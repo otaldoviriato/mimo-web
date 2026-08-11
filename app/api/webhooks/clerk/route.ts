@@ -7,9 +7,29 @@ import { AppSettings } from '@/models/AppSettings';
 import { Resend } from 'resend';
 import { getCreatorLandingProfileRole } from '@/lib/profileRole';
 import { grantWelcomeCredit } from '@/lib/creditCampaign';
+import { getReferralFromUnsafeMetadata, type ReferralMetadata } from '@/lib/referral';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
 const webhookSecret = process.env.CLERK_WEBHOOK_SECRET || '';
+
+async function buildReferralAttribution(id: string, referral?: ReferralMetadata) {
+    if (!referral || referral.professionalId === id) return {};
+
+    const professional = await User.findOne({
+        clerkId: referral.professionalId,
+        isProfessional: true,
+    }).select('clerkId username').lean() as any;
+
+    if (!professional) return {};
+
+    const capturedAt = new Date(referral.capturedAt);
+    return {
+        acquiredByProfessionalId: professional.clerkId,
+        acquiredByProfessionalUsername: professional.username || referral.professionalUsername,
+        acquisitionSource: 'profile_share',
+        acquiredAt: Number.isNaN(capturedAt.getTime()) ? new Date() : capturedAt,
+    };
+}
 
 export async function POST(req: Request) {
     // Verificar assinatura do webhook do Clerk
@@ -58,6 +78,7 @@ export async function POST(req: Request) {
         const email = email_addresses[0]?.email_address?.toLowerCase()?.trim();
 
         const roleMetadata = getCreatorLandingProfileRole(unsafe_metadata);
+        const referralMetadata = getReferralFromUnsafeMetadata(unsafe_metadata);
         const isProfessional = roleMetadata === 'professional' ? true : (roleMetadata === 'client' ? false : undefined);
         const professionalStatus = null; // Inicializa como null (verificação de identidade pendente de envio)
 
@@ -70,6 +91,9 @@ export async function POST(req: Request) {
         };
         if (isProfessional !== undefined) {
             updateSet.isProfessional = isProfessional;
+        }
+        if (isProfessional === false) {
+            Object.assign(updateSet, await buildReferralAttribution(id, referralMetadata));
         }
 
         const settings = await AppSettings.findOne({ key: 'global' });

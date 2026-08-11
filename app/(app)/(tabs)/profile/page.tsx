@@ -11,6 +11,7 @@ import { usePayment } from '@/context/PaymentContext';
 import { PullToRefresh } from '@/components';
 import { Settings, Share2, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, ShieldAlert, Heart, Globe, Crown, Camera, Gift, CreditCard, QrCode, Star, Info, CheckCircle2, X, MoreVertical, ChevronLeft, ChevronRight, ExternalLink, CalendarClock, AlertCircle, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { buildProfileShareUrl } from '@/lib/referral';
 
 export default function ProfilePage() {
     const { user } = useUser();
@@ -144,7 +145,7 @@ export default function ProfilePage() {
     const handleShare = async () => {
         if (typeof window === 'undefined' || !userData?.username) return;
 
-        const profileUrl = `${window.location.origin}/${userData.username}`;
+        const profileUrl = buildProfileShareUrl(window.location.origin, userData.username, user?.id || userData.clerkId);
         const name       = userData.name || `@${userData.username}`;
         const shareText  = `Ei! Esse é meu perfil no MimoChat — ${name}. Me manda uma mensagem, adoro conversar! 💬`;
 

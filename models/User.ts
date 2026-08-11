@@ -64,6 +64,10 @@ export interface IUser extends Document {
     isTeam?: boolean;
     teamTitle?: string;
     activationLastViewedAt?: Date;
+    acquiredByProfessionalId?: string;
+    acquiredByProfessionalUsername?: string;
+    acquisitionSource?: 'profile_share' | 'first_paid_message';
+    acquiredAt?: Date;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -275,6 +279,20 @@ const UserSchema = new Schema<IUser>({
         default: 'Equipe Mimo',
     },
     activationLastViewedAt: {
+        type: Date,
+    },
+    acquiredByProfessionalId: {
+        type: String,
+        index: true,
+    },
+    acquiredByProfessionalUsername: {
+        type: String,
+    },
+    acquisitionSource: {
+        type: String,
+        enum: ['profile_share', 'first_paid_message'],
+    },
+    acquiredAt: {
         type: Date,
     },
 }, {

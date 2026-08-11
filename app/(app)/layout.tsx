@@ -16,6 +16,7 @@ import ChatPage from './chat/[userId]/page';
 import ChatInfoPage from './chat/[userId]/info/page';
 import UserProfilePage from './[username]/page';
 import SettingsPage from './settings/page';
+import { REFERRAL_STORAGE_KEY, getReferralFromSearchParams } from '@/lib/referral';
 
 
 const isTabRoute = (path: string) => {
@@ -442,6 +443,10 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                 if (gift) {
                     // localStorage persiste em redirects OAuth no PWA (sessionStorage pode ser destruído)
                     localStorage.setItem('mimo_pending_gift', gift);
+                }
+                const referral = getReferralFromSearchParams(searchParams);
+                if (referral) {
+                    localStorage.setItem(REFERRAL_STORAGE_KEY, JSON.stringify(referral));
                 }
                 const currentPath = window.location.pathname + window.location.search;
                 if (
