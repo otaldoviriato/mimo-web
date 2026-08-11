@@ -15,6 +15,7 @@ import { Resend } from 'resend';
 import { buildProfileRoleMetadata, getCreatorLandingProfileRole } from '@/lib/profileRole';
 import { subscriptionPriceBRLToCents } from '@/lib/subscriptionBilling';
 import { sendAdminAlert } from '@/lib/adminAlerts';
+import { sendNewProfessionalTeamAlert } from '@/lib/teamAlerts';
 import { getReferralFromRequestHeaders, getReferralFromUnsafeMetadata, type ReferralMetadata } from '@/lib/referral';
 import { calculateOnboardingStep } from '@/lib/onboarding';
 
@@ -678,6 +679,13 @@ export async function PATCH(request: NextRequest) {
             user.onboardingStep === 'completed' &&
             currentUser?.onboardingStep !== 'completed'
         ) {
+            sendNewProfessionalTeamAlert({
+                clerkId: user.clerkId,
+                name: user.name,
+                username: user.username,
+                email: user.email,
+            }).catch(err => console.error('[TeamAlert] Erro ao disparar alerta de nova profissional para equipe:', err));
+
             sendAdminAlert('new_professional', {
                 title: '🟣 Nova Profissional Cadastrada!',
                 body: `A usuária @${user.username || 'sem_username'} (${user.name || 'Sem nome'}) concluiu o cadastro no MimoChat.`,
