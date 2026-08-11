@@ -17,6 +17,7 @@ import ChatInfoPage from './chat/[userId]/info/page';
 import UserProfilePage from './[username]/page';
 import SettingsPage from './settings/page';
 import { REFERRAL_STORAGE_KEY, getReferralFromSearchParams } from '@/lib/referral';
+import { calculateOnboardingStep } from '@/lib/onboarding';
 
 
 const isTabRoute = (path: string) => {
@@ -26,31 +27,16 @@ const isTabRoute = (path: string) => {
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const { isLoaded, isSignedIn, getToken } = useAuth();
     const { user } = useUser();
-    const { data: userData, refetch: refetchProfile } = useMyProfile();
+    const { data: userData, isLoading: isProfileLoading, refetch: refetchProfile } = useMyProfile();
     
     // Garante que o perfil carregado no cache/Query pertence ao usuário atualmente logado no Clerk
     const isProfileValid = !!(userData && user && userData.clerkId === user.id);
     
-    // O usuário precisa de validação de identidade se ele escolheu a role mas não tem CPF (taxId)
-    const userNeedsIdentity =
-        isProfileValid &&
-        userData.isProfessional !== undefined &&
-        !userData.taxId;
+    const onboardingStep = isProfileValid ? calculateOnboardingStep(userData) : null;
 
-    const hasPhoto = !!userData?.photoUrl && userData.photoUrl.trim() !== '';
-    const hasName = !!userData?.name && userData.name.trim() !== '';
-    const hasUsername = !!userData?.username && userData.username.trim() !== '';
-    const hasTaxId = !!userData?.taxId;
-
-    // Determina dinamicamente se o usuário já preencheu absolutamente todos os dados.
-    // Se o usuário já tem a foto de perfil cadastrada, ele completou o onboarding e nunca deve voltar.
-    const isFullyCompleted =
-        isProfileValid &&
-        (hasPhoto ||
-         (userData.isProfessional !== undefined &&
-          (!userData.isProfessional || hasTaxId) &&
-          hasName &&
-          hasUsername));
+    const isFullyCompleted = onboardingStep === 'completed';
+    const isProfileResolved = isLoaded && isSignedIn && !isProfileLoading && isProfileValid;
+    const shouldBlockAppRender = isLoaded && isSignedIn && (!isProfileResolved || !isFullyCompleted);
 
     const router = useRouter();
     const pathname = usePathname();
@@ -63,7 +49,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
     const queryClient = useQueryClient();
     const { socket, connected, socketVersion } = useSocket(user?.id);
-    const { data: rooms = [] } = useChatRooms();
+    const { data: rooms = [] } = useChatRooms({ enabled: isFullyCompleted });
 
     const [welcomeNotice, setWelcomeNotice] = React.useState<{
         grantId: string;
@@ -484,27 +470,11 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     }, [isFullyCompleted]);
 
     useEffect(() => {
-        // Redireciona para o onboarding nos seguintes casos:
-        // 1. Usuário ainda não escolheu seu papel (cliente ou profissional)
-        // 2. Profissional que precisa completar a verificação de identidade
-        // 3. Usuário no meio do onboarding (step salvo no localStorage) que tentou acessar outra rota
-        // 4. Usuário sem conversas ativas (rooms.length === 0) no primeiro acesso da sessão
         if (pathname === '/onboarding') return;
 
-        if (isProfileValid && userData?.isProfessional === undefined) {
+        if (isProfileResolved && !isFullyCompleted) {
             router.replace('/onboarding');
             return;
-        }
-        if (userNeedsIdentity) {
-            router.replace('/onboarding');
-            return;
-        }
-        if (isProfileValid && typeof window !== 'undefined') {
-            const step = localStorage.getItem('mimo_onboarding_step');
-            if (step === 'identity' || step === 'profile') {
-                router.replace('/onboarding');
-                return;
-            }
         }
 
         // Se o usuário está cadastrado, mas tem 0 conversas, exibimos a tela de instrução/compartilhamento de link
@@ -518,7 +488,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             sessionStorage.setItem('mimo_zero_rooms_onboard_shown', 'true');
             router.replace('/onboarding');
         }
-    }, [isProfileValid, userData?.isProfessional, userNeedsIdentity, isFullyCompleted, rooms, pathname, router]);
+    }, [isProfileResolved, isFullyCompleted, rooms, pathname, router]);
 
     if (!isSignedIn) return null;
 
@@ -535,23 +505,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     // (flash visual). A leitura de localStorage é segura aqui porque este componente
     // é 'use client' e nunca executa no servidor.
     //
-    // Três condições bloqueiam o acesso ao app:
-    //  1. isProfessional === undefined  → usuário nunca escolheu cliente/profissional
-    //  2. professionalNeedsIdentity     → profissional sem verificação de identidade
-    //  3. mimo_onboarding_step no localStorage → no meio do fluxo de cadastro
-    const hasPendingOnboardingStep =
-        isProfileValid &&
-        !isFullyCompleted &&
-        typeof window !== 'undefined' &&
-        (['identity', 'profile'].includes(localStorage.getItem('mimo_onboarding_step') ?? ''));
-
-    const needsOnboarding =
-        !isFullyCompleted &&
-        ((isProfileValid && userData?.isProfessional === undefined) ||
-        userNeedsIdentity ||
-        hasPendingOnboardingStep);
-
-    if (needsOnboarding) {
+    if (shouldBlockAppRender) {
         return (
             <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gradient-to-br from-[#4C1D95] via-[#6D28D9] to-[#8B5CF6] select-none">
                 <div className="relative w-24 h-24 rounded-3xl overflow-hidden shadow-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 animate-pulse">

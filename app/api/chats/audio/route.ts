@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { uploadToGCS } from '@/lib/gcs';
 import { v4 as uuidv4 } from 'uuid';
+import { requireCompletedOnboarding } from '@/lib/apiOnboardingGuard';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,9 @@ export async function POST(request: NextRequest) {
         if (!userId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+
+        const onboardingGuard = await requireCompletedOnboarding(userId);
+        if (onboardingGuard) return onboardingGuard;
 
         const formData = await request.formData();
         const file = formData.get('file') as File | null;

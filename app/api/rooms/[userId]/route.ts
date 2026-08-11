@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { connectToDatabase } from '@/lib/db';
 import { Room } from '@/models/Room';
 import { User } from '@/models/User';
 import mongoose from 'mongoose';
+import { requireCompletedOnboarding } from '@/lib/apiOnboardingGuard';
 
 export async function GET(
     request: NextRequest,
@@ -18,7 +18,8 @@ export async function GET(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        await connectToDatabase();
+        const onboardingGuard = await requireCompletedOnboarding(userId);
+        if (onboardingGuard) return onboardingGuard;
 
         const currentUser = await User.findOne({ clerkId: userId })
             .select('isProfessional')
@@ -99,7 +100,8 @@ export async function POST(
             return NextResponse.json({ error: 'RoomId is required' }, { status: 400 });
         }
 
-        await connectToDatabase();
+        const onboardingGuard = await requireCompletedOnboarding(userId);
+        if (onboardingGuard) return onboardingGuard;
 
         let query: any;
         if (mongoose.Types.ObjectId.isValid(roomId)) {

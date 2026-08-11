@@ -16,6 +16,7 @@ import { buildProfileRoleMetadata, getCreatorLandingProfileRole } from '@/lib/pr
 import { subscriptionPriceBRLToCents } from '@/lib/subscriptionBilling';
 import { sendAdminAlert } from '@/lib/adminAlerts';
 import { getReferralFromRequestHeaders, getReferralFromUnsafeMetadata, type ReferralMetadata } from '@/lib/referral';
+import { calculateOnboardingStep } from '@/lib/onboarding';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
 
@@ -312,18 +313,7 @@ export async function GET(request: NextRequest) {
         }
 
         // --- AUTO-CORREÇÃO DINÂMICA DO ONBOARDING STEP ---
-        const hasPhoto = !!user.photoUrl && user.photoUrl.trim() !== '';
-        const hasName = !!user.name && user.name.trim() !== '';
-        const hasUsername = !!user.username && user.username.trim() !== '';
-
-        let calculatedStep: 'welcome' | 'identity' | 'profile' | 'completed' = 'welcome';
-        if (hasPhoto && hasName && hasUsername) {
-            calculatedStep = 'completed';
-        } else if (user.taxId && user.taxId.trim() !== '') {
-            calculatedStep = 'profile';
-        } else if (user.isProfessional !== undefined && user.isProfessional !== null) {
-            calculatedStep = 'identity';
-        }
+        const calculatedStep = calculateOnboardingStep(user);
 
         if (user.onboardingStep !== calculatedStep) {
             user.onboardingStep = calculatedStep;
@@ -562,19 +552,13 @@ export async function PATCH(request: NextRequest) {
         const nextTaxId = taxId !== undefined ? taxId : currentUser?.taxId;
         const nextIsProfessional = isProfessional !== undefined ? isProfessional : currentUser?.isProfessional;
 
-        const hasPhotoForStep = !!nextPhoto && nextPhoto.trim() !== '';
-        const hasNameForStep = !!nextName && nextName.trim() !== '';
-        const hasUsernameForStep = !!nextUsername && nextUsername.trim() !== '';
-
-        if (hasPhotoForStep && hasNameForStep && hasUsernameForStep) {
-            updateData.onboardingStep = 'completed';
-        } else if (nextTaxId && nextTaxId.trim() !== '') {
-            updateData.onboardingStep = 'profile';
-        } else if (nextIsProfessional !== undefined && nextIsProfessional !== null) {
-            updateData.onboardingStep = 'identity';
-        } else {
-            updateData.onboardingStep = 'welcome';
-        }
+        updateData.onboardingStep = calculateOnboardingStep({
+            photoUrl: nextPhoto,
+            name: nextName,
+            username: nextUsername,
+            taxId: nextTaxId,
+            isProfessional: nextIsProfessional,
+        });
         
         if (isSubscriptionEnabled !== undefined) {
             updateData.isSubscriptionEnabled = Boolean(isSubscriptionEnabled);

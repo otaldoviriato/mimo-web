@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import { calculateOnboardingStep } from '@/lib/onboarding';
 
 export interface ICard {
     id: string;
@@ -300,21 +301,7 @@ const UserSchema = new Schema<IUser>({
 });
 
 UserSchema.pre('save', async function () {
-    const user = this;
-    
-    const hasPhoto = !!user.photoUrl && user.photoUrl.trim() !== '';
-    const hasName = !!user.name && user.name.trim() !== '';
-    const hasUsername = !!user.username && user.username.trim() !== '';
-
-    if (hasPhoto && hasName && hasUsername) {
-        user.onboardingStep = 'completed';
-    } else if (user.taxId && user.taxId.trim() !== '') {
-        user.onboardingStep = 'profile';
-    } else if (user.isProfessional !== undefined && user.isProfessional !== null) {
-        user.onboardingStep = 'identity';
-    } else {
-        user.onboardingStep = 'welcome';
-    }
+    this.onboardingStep = calculateOnboardingStep(this);
 });
 
 // No Next.js dev mode, o modelo pode ficar em cache com schema antigo.

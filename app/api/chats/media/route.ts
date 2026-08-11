@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { uploadToGCS, uploadBufferToGCS } from '@/lib/gcs';
 import { v4 as uuidv4 } from 'uuid';
 import sharp from 'sharp';
+import { requireCompletedOnboarding } from '@/lib/apiOnboardingGuard';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minutos para processar vídeos grandes
@@ -16,6 +17,9 @@ export async function POST(request: NextRequest) {
         if (!userId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+
+        const onboardingGuard = await requireCompletedOnboarding(userId);
+        if (onboardingGuard) return onboardingGuard;
 
         const formData = await request.formData();
         const file = formData.get('file') as File | null;

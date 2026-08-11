@@ -14,6 +14,7 @@ import { ImageCropper } from '@/components/ImageCropper';
 import { useQueryClient } from '@tanstack/react-query';
 import { clearMimoClientSession } from '@/lib/clientSession';
 import { buildProfileShareUrl } from '@/lib/referral';
+import { calculateOnboardingStep } from '@/lib/onboarding';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -206,6 +207,7 @@ export default function OnboardingPage() {
     const [profLoading,  setProfLoading]  = useState(false);
     const [profError,    setProfError]    = useState('');
     const [mounted,      setMounted]      = useState(false);
+    const [initialStepResolved, setInitialStepResolved] = useState(false);
 
     useEffect(() => { setMounted(true); return () => setMounted(false); }, []);
 
@@ -223,37 +225,34 @@ export default function OnboardingPage() {
         }
         if (userData.photoUrl) setPhotoPreview(userData.photoUrl);
 
-        const needsIdentity = userData.isProfessional !== undefined && !userData.taxId;
-        const isFullyCompleted =
-            userData.isProfessional !== undefined &&
-            !!userData.taxId &&
-            !!userData.photoUrl &&
-            !!userData.name &&
-            !!userData.username;
+        const serverStep = calculateOnboardingStep(userData);
 
-        // 1. Usuário que ainda precisa verificar identidade (via API do servidor)
-        if (needsIdentity) {
+        if (serverStep === 'completed') {
+            localStorage.removeItem(STEP_KEY);
+            router.replace('/chats');
+            return;
+        }
+
+        if (serverStep === 'identity') {
+            setInitialStepResolved(true);
             setStep('identity');
             localStorage.setItem(STEP_KEY, 'identity');
             return;
         }
 
-        // 2. Restaura o step persistido caso o usuário tenha recarregado a página
-        //    ou aberto uma nova aba enquanto estava no meio do onboarding.
         const saved = localStorage.getItem(STEP_KEY) as Step | null;
+        if (serverStep === 'profile') {
+            setInitialStepResolved(true);
+            setStep('profile');
+            localStorage.setItem(STEP_KEY, 'profile');
+            return;
+        }
+
         if (saved === 'identity' || saved === 'profile') {
-            setStep(saved);
-            return;
+            localStorage.removeItem(STEP_KEY);
         }
-
-        // 3. Usuário totalmente configurado e sem step pendente:
-        // Provisoriamente redireciona direto para o app (tela de compartilhamento ignorada por enquanto)
-        if (userData.isProfessional !== undefined && !needsIdentity) {
-            navigateToApp();
-            return;
-        }
-
-        // 4. isProfessional === undefined → mostra welcome (novo cadastro, fluxo normal)
+        setInitialStepResolved(true);
+        setStep('welcome');
     }, [userData]);
 
     // ── Navegação entre steps com animação ──────────────────────────────────
@@ -465,6 +464,7 @@ export default function OnboardingPage() {
 
     const handleProfileSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!displayName.trim()) { setProfError('Informe seu nome para continuar.'); return; }
         if (!photoPreview) { setProfError('Adicione uma foto de perfil para continuar.'); return; }
         if (!username.trim()) { setProfError('Informe um nome de usuário.'); return; }
         if (!/^[a-z0-9._-]+$/.test(username)) {
@@ -1204,6 +1204,16 @@ export default function OnboardingPage() {
     };
 
     // ── Render raiz ───────────────────────────────────────────────────────────
+    if (!initialStepResolved) {
+        return (
+            <div className="fixed inset-0 z-[9999] bg-white flex items-center justify-center">
+                <div className="w-16 h-16 rounded-2xl bg-purple-50 flex items-center justify-center border border-purple-100 animate-pulse">
+                    <img src="/Logo.svg" alt="MimoChat" className="w-10 h-10 object-contain" />
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className={`fixed inset-0 z-[9999] bg-white overflow-hidden ${isDismissing ? 'animate-onboard-dismiss' : ''}`}>
             {/* Layer de saída: anima para fora */}

@@ -142,7 +142,7 @@ export function useMyProfile() {
 }
 
 // ─── Hook: salas de chat ────────────────────────────────────────────────────
-export function useChatRooms() {
+export function useChatRooms(options: { enabled?: boolean } = {}) {
     const { user } = useUser();
 
     const query = useQuery({
@@ -180,7 +180,7 @@ export function useChatRooms() {
             }
             return rooms;
         },
-        enabled: !!user?.id,
+        enabled: !!user?.id && (options.enabled ?? true),
         initialData: () => {
             if (typeof window !== 'undefined' && user?.id) {
                 const cached = localStorage.getItem(`mimo_rooms_${user.id}`);

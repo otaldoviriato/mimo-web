@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { Message } from '@/models/Message';
+import { requireCompletedOnboarding } from '@/lib/apiOnboardingGuard';
 
 export async function GET(
     request: NextRequest,
@@ -32,6 +33,9 @@ export async function GET(
         if (!participants.includes(userId)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+
+        const onboardingGuard = await requireCompletedOnboarding(userId);
+        if (onboardingGuard) return onboardingGuard;
 
         await connectToDatabase();
 

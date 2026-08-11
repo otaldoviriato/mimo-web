@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
+import { calculateOnboardingStep } from '@/lib/onboarding';
 import { uploadToGCS } from '@/lib/gcs';
 import { v4 as uuidv4 } from 'uuid';
 import { Resend } from 'resend';
@@ -370,14 +371,12 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Determina dinamicamente o onboardingStep. Se já tiver foto, nome e username, vai para completed.
-        const nextPhoto = user.photoUrl;
-        const nextName = user.name;
-        const nextUsername = user.username;
-        const hasPhotoForStep = !!nextPhoto && nextPhoto.trim() !== '';
-        const hasNameForStep = !!nextName && nextName.trim() !== '';
-        const hasUsernameForStep = !!nextUsername && nextUsername.trim() !== '';
-        const nextOnboardingStep = (hasPhotoForStep && hasNameForStep && hasUsernameForStep) ? 'completed' : 'profile';
+        const nextOnboardingStep = calculateOnboardingStep({
+            ...user.toObject(),
+            taxId: cpfClean,
+            birthDate: birthDateObj,
+            isProfessional: user.isProfessional ?? false,
+        });
 
         // 5. Atualizar usuário no banco de dados e liberar a conta da criadora se for profissional
         const updatedUser = await User.findOneAndUpdate(

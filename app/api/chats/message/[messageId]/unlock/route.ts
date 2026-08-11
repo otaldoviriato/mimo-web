@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
+import { requireCompletedOnboarding } from '@/lib/apiOnboardingGuard';
 
 const CHAT_SERVER_URL = process.env.NEXT_PUBLIC_CHAT_SERVER_URL || 'http://localhost:3001';
 
@@ -13,6 +14,9 @@ export async function POST(
         if (!userId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+
+        const onboardingGuard = await requireCompletedOnboarding(userId);
+        if (onboardingGuard) return onboardingGuard;
 
         const { messageId } = await params;
 
