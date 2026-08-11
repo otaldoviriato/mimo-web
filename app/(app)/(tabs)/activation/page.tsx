@@ -4,8 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
     Search, UserCheck, MessageSquare, CheckCircle2, Clock, 
-    ArrowRightLeft, Edit3, Send, RefreshCw, X, Activity,
-    Wallet, BanknoteArrowDown, CalendarDays, Radio
+    Send, RefreshCw, X, Activity, Wallet, BanknoteArrowDown, 
+    CalendarDays, Radio, ExternalLink
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useMyProfile } from '@/hooks/useQueries';
@@ -35,25 +35,11 @@ export default function ActivationPage() {
     const { data: myProfile } = useMyProfile();
 
     const [professionals, setProfessionals] = useState<any[]>([]);
-    const [teamMembers, setTeamMembers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState<FilterStatus>('pending');
     const [unviewedCount, setUnviewedCount] = useState(0);
     const [totalCount, setTotalCount] = useState(0);
-
-    // Modal de Notas & Estágio
-    const [editingItem, setEditingItem] = useState<any | null>(null);
-    const [editStage, setEditStage] = useState('');
-    const [editStatus, setEditStatus] = useState<'pending' | 'contacted' | 'activated' | 'not_interested'>('pending');
-    const [editNotes, setEditNotes] = useState('');
-    const [editNextSteps, setEditNextSteps] = useState('');
-    const [savingEdit, setSavingEdit] = useState(false);
-
-    // Modal de Transferência
-    const [transferringItem, setTransferringItem] = useState<any | null>(null);
-    const [selectedTargetMember, setSelectedTargetMember] = useState('');
-    const [savingTransfer, setSavingTransfer] = useState(false);
 
     // Modal de Iniciar Conversa com Mensagem Pronta
     const [chatTargetItem, setChatTargetItem] = useState<any | null>(null);
@@ -69,7 +55,6 @@ export default function ActivationPage() {
                 setProfessionals(data.professionals || []);
                 setUnviewedCount(data.unviewedCount || 0);
                 setTotalCount(data.totalProfessionals || 0);
-                setTeamMembers(data.teamMembers || []);
             } else {
                 toast.error('Erro ao carregar fila de ativação.');
             }
@@ -92,63 +77,6 @@ export default function ActivationPage() {
         }, searchQuery ? 300 : 0);
         return () => clearTimeout(timer);
     }, [searchQuery, activeFilter]);
-
-    // Ação: Salvar Transferência
-    const handleSaveTransfer = async () => {
-        if (!transferringItem) return;
-        setSavingTransfer(true);
-        try {
-            const res = await fetch(`/api/team/activation/professionals/${transferringItem.clerkId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    assignedTeamMemberId: selectedTargetMember || null,
-                })
-            });
-            if (res.ok) {
-                toast.success('Atendimento transferido com sucesso!');
-                setTransferringItem(null);
-                fetchActivationData(searchQuery, activeFilter);
-            } else {
-                toast.error('Erro ao transferir atendimento.');
-            }
-        } catch (err) {
-            console.error('Erro:', err);
-            toast.error('Erro de conexão.');
-        } finally {
-            setSavingTransfer(false);
-        }
-    };
-
-    // Ação: Salvar Notas & Estágio
-    const handleSaveEdit = async () => {
-        if (!editingItem) return;
-        setSavingEdit(true);
-        try {
-            const res = await fetch(`/api/team/activation/professionals/${editingItem.clerkId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    status: editStatus,
-                    stage: editStage,
-                    notes: editNotes,
-                    nextSteps: editNextSteps,
-                })
-            });
-            if (res.ok) {
-                toast.success('Notas e estágio atualizados!');
-                setEditingItem(null);
-                fetchActivationData(searchQuery, activeFilter);
-            } else {
-                toast.error('Erro ao atualizar notas.');
-            }
-        } catch (err) {
-            console.error('Erro:', err);
-            toast.error('Erro de conexão.');
-        } finally {
-            setSavingEdit(false);
-        }
-    };
 
     // Ação: Iniciar Conversa com Mensagem Pronta
     const handleStartChat = async () => {
@@ -191,7 +119,7 @@ export default function ActivationPage() {
             if (diffHours < 24) return `há ${diffHours} h`;
             const diffDays = Math.floor(diffHours / 24);
             return `há ${diffDays} dias`;
-        } catch (e) {
+        } catch {
             return 'N/A';
         }
     };
@@ -533,7 +461,7 @@ export default function ActivationPage() {
                                                 )}
                                                 {act.notes && (
                                                     <p className="text-slate-500 italic truncate">
-                                                        💬 "{act.notes}"
+                                                        💬 &quot;{act.notes}&quot;
                                                     </p>
                                                 )}
                                             </div>
@@ -541,40 +469,23 @@ export default function ActivationPage() {
                                     </div>
 
                                     {/* Botões de Ação */}
-                                    <div className="pt-4 border-t border-slate-100 mt-4 grid grid-cols-3 gap-2">
-                                            <button
-                                                onClick={() => {
-                                                    setTransferringItem(prof);
-                                                    setSelectedTargetMember(act.assignedTeamMemberId || '');
-                                                }}
-                                                className="min-w-0 px-2 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
-                                                title="Transferir para outro membro"
-                                            >
-                                                <ArrowRightLeft size={13} />
-                                                Transferir
-                                            </button>
-
-                                            <button
-                                                onClick={() => {
-                                                    setEditingItem(prof);
-                                                    setEditStatus(act.status || 'pending');
-                                                    setEditStage(act.stage || 'Aguardando 1º contato');
-                                                    setEditNotes(act.notes || '');
-                                                    setEditNextSteps(act.nextSteps || '');
-                                                }}
-                                                className="min-w-0 px-2 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
-                                                title="Editar notas e estágio"
-                                            >
-                                                <Edit3 size={13} />
-                                                Notas
-                                            </button>
+                                    <div className="pt-4 border-t border-slate-100 mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-2">
+                                        <a
+                                            href={`/${prof.username}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="min-w-0 h-11 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5"
+                                        >
+                                            <ExternalLink size={14} />
+                                            Ver perfil
+                                        </a>
 
                                         <button
                                             onClick={() => openChatModal(prof)}
-                                            className="min-w-0 px-2 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                                            className="min-w-0 h-11 px-4 bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold rounded-lg transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
                                         >
-                                            <MessageSquare size={13} />
-                                            Conversar
+                                            <MessageSquare size={15} />
+                                            Conversar / ver conversa
                                         </button>
                                     </div>
                                 </div>
@@ -650,131 +561,6 @@ export default function ActivationPage() {
                 </div>
             )}
 
-            {/* MODAL: Editar Estágio & Notas */}
-            {editingItem && (
-                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl relative animate-fade-in-up">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                            <h3 className="font-bold text-slate-900 text-base">Registrar Notas & Estágio</h3>
-                            <button onClick={() => setEditingItem(null)} className="text-slate-400 hover:text-slate-600">
-                                <X size={18} />
-                            </button>
-                        </div>
-
-                        <div className="space-y-3 text-xs">
-                            <div>
-                                <label className="font-bold text-slate-700 block mb-1">Status da Ativação:</label>
-                                <select
-                                    value={editStatus}
-                                    onChange={(e) => setEditStatus(e.target.value as any)}
-                                    className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-800"
-                                >
-                                    <option value="pending">Aguardando 1º Contato</option>
-                                    <option value="contacted">Em Ativação (Em Contato)</option>
-                                    <option value="activated">Ativada (Concluída ✓)</option>
-                                    <option value="not_interested">Sem Interesse / Inativa</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="font-bold text-slate-700 block mb-1">Estágio Atual:</label>
-                                <input
-                                    type="text"
-                                    value={editStage}
-                                    onChange={(e) => setEditStage(e.target.value)}
-                                    placeholder="Ex: Em onboarding, foto enviada..."
-                                    className="w-full p-2.5 border border-slate-200 rounded-xl font-medium text-slate-800"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="font-bold text-slate-700 block mb-1">Observações Internas:</label>
-                                <textarea
-                                    rows={3}
-                                    value={editNotes}
-                                    onChange={(e) => setEditNotes(e.target.value)}
-                                    placeholder="Notas da equipe sobre esta profissional..."
-                                    className="w-full p-2.5 border border-slate-200 rounded-xl font-medium text-slate-800"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="font-bold text-slate-700 block mb-1">Próximos Passos:</label>
-                                <input
-                                    type="text"
-                                    value={editNextSteps}
-                                    onChange={(e) => setEditNextSteps(e.target.value)}
-                                    placeholder="Ex: Checar envio de documento amanhã..."
-                                    className="w-full p-2.5 border border-slate-200 rounded-xl font-medium text-slate-800"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
-                            <button
-                                onClick={() => setEditingItem(null)}
-                                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleSaveEdit}
-                                disabled={savingEdit}
-                                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
-                            >
-                                {savingEdit ? 'Salvando...' : 'Salvar Alterações'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* MODAL: Transferir Atendimento */}
-            {transferringItem && (
-                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl relative animate-fade-in-up">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                            <h3 className="font-bold text-slate-900 text-base">Transferir Responsável</h3>
-                            <button onClick={() => setTransferringItem(null)} className="text-slate-400 hover:text-slate-600">
-                                <X size={18} />
-                            </button>
-                        </div>
-
-                        <p className="text-xs text-slate-500">
-                            Selecione o membro da equipe que assumirá o atendimento de <strong className="text-slate-800">{transferringItem.name || '@' + transferringItem.username}</strong>:
-                        </p>
-
-                        <select
-                            value={selectedTargetMember}
-                            onChange={(e) => setSelectedTargetMember(e.target.value)}
-                            className="w-full p-3 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 bg-slate-50"
-                        >
-                            <option value="">Nenhum (Deixar sem responsável)</option>
-                            {teamMembers.map(tm => (
-                                <option key={tm.clerkId} value={tm.clerkId}>
-                                    {tm.name || tm.username} ({tm.teamTitle})
-                                </option>
-                            ))}
-                        </select>
-
-                        <div className="flex items-center justify-end gap-3 pt-2">
-                            <button
-                                onClick={() => setTransferringItem(null)}
-                                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleSaveTransfer}
-                                disabled={savingTransfer}
-                                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
-                            >
-                                {savingTransfer ? 'Transferindo...' : 'Confirmar Transferência'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
