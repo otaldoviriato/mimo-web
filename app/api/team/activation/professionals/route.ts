@@ -62,6 +62,7 @@ type ActivationRow = {
 type BroughtUserRow = {
     clerkId: string;
     acquiredByProfessionalId?: string;
+    acquiredByProfessionalUsername?: string;
     acquisitionSource?: string;
     createdAt?: Date | string;
 };
@@ -74,9 +75,11 @@ type RoomRow = {
 
 type RoomUserRow = {
     clerkId: string;
+    username?: string;
     isProfessional?: boolean;
     isTeam?: boolean;
     acquiredByProfessionalId?: string;
+    acquiredByProfessionalUsername?: string;
 };
 
 type TeamMemberRow = {
@@ -180,6 +183,12 @@ export async function GET(request: NextRequest) {
             .lean() as ProfessionalRow[];
 
         const profIds = professionals.map(p => p.clerkId);
+        const profUsernames = professionals.map(p => p.username).filter(Boolean) as string[];
+        const professionalIdByUsername = new Map(
+            professionals
+                .filter((p): p is ProfessionalRow & { username: string } => Boolean(p.username))
+                .map(p => [p.username, p.clerkId])
+        );
         const activeThresholdDays = Math.max(1, Number(settings?.activeUserThresholdDays || 7));
         const activeSince = new Date(Date.now() - activeThresholdDays * 24 * 60 * 60 * 1000);
 
@@ -217,13 +226,20 @@ export async function GET(request: NextRequest) {
         }
 
         const broughtUsers = await User.find({
-            acquiredByProfessionalId: { $in: profIds },
-            isProfessional: false,
-        }).select('clerkId acquiredByProfessionalId acquisitionSource createdAt').lean() as BroughtUserRow[];
+            isProfessional: { $ne: true },
+            $or: [
+                { acquiredByProfessionalId: { $in: profIds } },
+                { acquiredByProfessionalId: { $in: profUsernames } },
+                { acquiredByProfessionalUsername: { $in: profUsernames } },
+            ],
+        }).select('clerkId acquiredByProfessionalId acquiredByProfessionalUsername acquisitionSource createdAt').lean() as BroughtUserRow[];
 
         const broughtUsersByProfessional = new Map<string, BroughtUserRow[]>();
         for (const client of broughtUsers) {
-            const ownerId = client.acquiredByProfessionalId;
+            const ownerId = profIds.includes(client.acquiredByProfessionalId || '')
+                ? client.acquiredByProfessionalId
+                : professionalIdByUsername.get(client.acquiredByProfessionalId || '')
+                    || professionalIdByUsername.get(client.acquiredByProfessionalUsername || '');
             if (!ownerId) continue;
             const list = broughtUsersByProfessional.get(ownerId) || [];
             list.push(client);
@@ -239,7 +255,7 @@ export async function GET(request: NextRequest) {
             rooms.flatMap(room => Array.isArray(room.participants) ? room.participants : [])
         ));
         const roomUsers = await User.find({ clerkId: { $in: participantIds } })
-            .select('clerkId isProfessional isTeam acquiredByProfessionalId')
+            .select('clerkId username isProfessional isTeam acquiredByProfessionalId acquiredByProfessionalUsername')
             .lean() as RoomUserRow[];
         const roomUserMap = new Map(roomUsers.map(u => [u.clerkId, u]));
 
@@ -269,7 +285,10 @@ export async function GET(request: NextRequest) {
 
                 const lastConversationAt = room.lastMessageTime ? new Date(room.lastMessageTime) : null;
                 const isActiveConversation = !!lastConversationAt && lastConversationAt >= activeSince;
-                const isOwnClient = otherUser.acquiredByProfessionalId === profId;
+                const professional = professionals.find(p => p.clerkId === profId);
+                const isOwnClient = otherUser.acquiredByProfessionalId === profId
+                    || (!!professional?.username && otherUser.acquiredByProfessionalId === professional.username)
+                    || (!!professional?.username && otherUser.acquiredByProfessionalUsername === professional.username);
 
                 metrics.totalConversationsCount++;
                 if (isActiveConversation) metrics.activeConversationsCount++;
