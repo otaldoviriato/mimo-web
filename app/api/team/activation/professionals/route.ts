@@ -5,6 +5,7 @@ import { User } from '@/models/User';
 import { ProfessionalActivation } from '@/models/ProfessionalActivation';
 import { AppSettings } from '@/models/AppSettings';
 import { Room } from '@/models/Room';
+import { WithdrawRequest } from '@/models/WithdrawRequest';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -33,6 +34,7 @@ type ProfessionalRow = {
     phone?: string;
     city?: string;
     state?: string;
+    balance?: number;
     createdAt: Date | string;
     onboardingStep?: string;
     professionalStatus?: string | null;
@@ -83,6 +85,15 @@ type TeamMemberRow = {
     username?: string;
     photoUrl?: string;
     teamTitle?: string;
+};
+
+type WithdrawRow = {
+    userId: string;
+    amount: number;
+    netAmount?: number | null;
+    status: 'pendente' | 'processando' | 'concluido' | 'rejeitado';
+    createdAt: Date | string;
+    updatedAt?: Date | string;
 };
 
 type UserFilter = {
@@ -164,7 +175,7 @@ export async function GET(request: NextRequest) {
         }
 
         const professionals = await User.find(userFilter)
-            .select('clerkId username name email photoUrl phone city state createdAt onboardingStep professionalStatus identityStatus isOnline lastSeen')
+            .select('clerkId username name email photoUrl phone city state balance createdAt onboardingStep professionalStatus identityStatus isOnline lastSeen')
             .sort({ createdAt: -1 })
             .lean() as ProfessionalRow[];
 
@@ -175,6 +186,35 @@ export async function GET(request: NextRequest) {
         // Buscar dados de ativação
         const activations = await ProfessionalActivation.find({ professionalId: { $in: profIds } }).lean() as ActivationRow[];
         const activationMap = new Map(activations.map(a => [a.professionalId, a]));
+
+        const withdrawals = await WithdrawRequest.find({ userId: { $in: profIds } })
+            .select('userId amount netAmount status createdAt updatedAt')
+            .sort({ createdAt: -1 })
+            .lean() as WithdrawRow[];
+
+        const withdrawalMetricsByProfessional = new Map<string, {
+            withdrawalsCount: number;
+            lastWithdrawalAmount: number | null;
+            lastWithdrawalNetAmount: number | null;
+            lastWithdrawalStatus: WithdrawRow['status'] | null;
+            lastWithdrawalAt: Date | string | null;
+        }>();
+
+        for (const withdrawal of withdrawals) {
+            const current = withdrawalMetricsByProfessional.get(withdrawal.userId);
+            if (current) {
+                current.withdrawalsCount++;
+                continue;
+            }
+
+            withdrawalMetricsByProfessional.set(withdrawal.userId, {
+                withdrawalsCount: 1,
+                lastWithdrawalAmount: withdrawal.amount,
+                lastWithdrawalNetAmount: withdrawal.netAmount ?? withdrawal.amount,
+                lastWithdrawalStatus: withdrawal.status,
+                lastWithdrawalAt: withdrawal.createdAt,
+            });
+        }
 
         const broughtUsers = await User.find({
             acquiredByProfessionalId: { $in: profIds },
@@ -274,6 +314,13 @@ export async function GET(request: NextRequest) {
                 activeOwnClientConversationsCount: 0,
                 lastConversationAt: null,
             };
+            const withdrawalMetrics = withdrawalMetricsByProfessional.get(p.clerkId) || {
+                withdrawalsCount: 0,
+                lastWithdrawalAmount: null,
+                lastWithdrawalNetAmount: null,
+                lastWithdrawalStatus: null,
+                lastWithdrawalAt: null,
+            };
             const broughtUsersForProfessional = broughtUsersByProfessional.get(p.clerkId) || [];
             const shareClickCount = Number(act.shareClickCount || 0);
             const activationFunnel = getFunnelStage({
@@ -309,6 +356,12 @@ export async function GET(request: NextRequest) {
                     lastShareClickedAt: act.lastShareClickedAt || null,
                     lastConversationAt: metrics.lastConversationAt,
                     activeThresholdDays,
+                    balance: p.balance || 0,
+                    withdrawalsCount: withdrawalMetrics.withdrawalsCount,
+                    lastWithdrawalAmount: withdrawalMetrics.lastWithdrawalAmount,
+                    lastWithdrawalNetAmount: withdrawalMetrics.lastWithdrawalNetAmount,
+                    lastWithdrawalStatus: withdrawalMetrics.lastWithdrawalStatus,
+                    lastWithdrawalAt: withdrawalMetrics.lastWithdrawalAt,
                 },
                 isUnviewed,
             };

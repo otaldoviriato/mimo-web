@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
     Search, UserCheck, MessageSquare, CheckCircle2, Clock, 
-    ArrowRightLeft, Edit3, Send, RefreshCw, X, Share2, Users, Activity
+    ArrowRightLeft, Edit3, Send, RefreshCw, X, Activity,
+    Wallet, BanknoteArrowDown, CalendarDays, Radio
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useMyProfile } from '@/hooks/useQueries';
@@ -193,6 +194,36 @@ export default function ActivationPage() {
         } catch (e) {
             return 'N/A';
         }
+    };
+
+    const formatDateTime = (dateStr?: string | null) => {
+        if (!dateStr) return 'Sem registro';
+        try {
+            return new Date(dateStr).toLocaleString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+        } catch {
+            return 'Sem registro';
+        }
+    };
+
+    const formatCurrency = (amountInCents?: number | null) => {
+        return ((amountInCents || 0) / 100).toLocaleString('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+        });
+    };
+
+    const getWithdrawalStatusLabel = (status?: string | null) => {
+        if (status === 'concluido') return 'Pago';
+        if (status === 'processando') return 'Processando';
+        if (status === 'pendente') return 'Pendente';
+        if (status === 'rejeitado') return 'Rejeitado';
+        return 'Sem saque';
     };
 
     const getFunnelBadgeClass = (stageKey?: string) => {
@@ -441,33 +472,55 @@ export default function ActivationPage() {
                                                 </span>
                                             </div>
 
-                                            <div className="grid grid-cols-3 divide-x divide-slate-100 bg-white">
-                                                <div className="p-3 min-w-0">
-                                                    <p className="text-[10px] uppercase tracking-wide text-slate-400 font-bold">Compartilhar</p>
-                                                    <p className="mt-1 flex items-center gap-1.5 text-sm font-black text-slate-800">
-                                                        <Share2 size={13} className="text-amber-500" />
-                                                        {metrics.shareClickCount || 0}
-                                                    </p>
-                                                </div>
-                                                <div className="p-3 min-w-0">
-                                                    <p className="text-[10px] uppercase tracking-wide text-slate-400 font-bold">Trazidos</p>
-                                                    <p className="mt-1 flex items-center gap-1.5 text-sm font-black text-slate-800">
-                                                        <Users size={13} className="text-blue-500" />
-                                                        {metrics.broughtUsersCount || 0}
-                                                    </p>
-                                                </div>
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 divide-x divide-y divide-slate-100 bg-white">
                                                 <div className="p-3 min-w-0">
                                                     <p className="text-[10px] uppercase tracking-wide text-slate-400 font-bold">Conversas</p>
                                                     <p className="mt-1 flex items-center gap-1.5 text-sm font-black text-slate-800">
                                                         <MessageSquare size={13} className="text-emerald-500" />
-                                                        {metrics.activeConversationsCount || 0}
-                                                        <span className="text-[10px] font-semibold text-slate-400">ativas</span>
+                                                        {metrics.totalConversationsCount || 0}
+                                                    </p>
+                                                    <p className="mt-0.5 text-[10px] font-semibold text-slate-400">{metrics.activeConversationsCount || 0} ativas · sem equipe</p>
+                                                </div>
+                                                <div className="p-3 min-w-0">
+                                                    <p className="text-[10px] uppercase tracking-wide text-slate-400 font-bold">Saldo</p>
+                                                    <p className="mt-1 flex items-center gap-1.5 text-sm font-black text-slate-800">
+                                                        <Wallet size={13} className="text-violet-500" />
+                                                        {formatCurrency(metrics.balance)}
+                                                    </p>
+                                                </div>
+                                                <div className="p-3 min-w-0">
+                                                    <p className="text-[10px] uppercase tracking-wide text-slate-400 font-bold">Saques</p>
+                                                    <p className="mt-1 flex items-center gap-1.5 text-sm font-black text-slate-800">
+                                                        <BanknoteArrowDown size={13} className="text-blue-500" />
+                                                        {metrics.withdrawalsCount || 0}
+                                                    </p>
+                                                    <p className="mt-0.5 text-[10px] font-semibold text-slate-400">{getWithdrawalStatusLabel(metrics.lastWithdrawalStatus)}</p>
+                                                </div>
+                                                <div className="p-3 min-w-0">
+                                                    <p className="text-[10px] uppercase tracking-wide text-slate-400 font-bold">Último saque</p>
+                                                    <p className="mt-1 text-sm font-black text-slate-800">
+                                                        {metrics.lastWithdrawalAmount != null ? formatCurrency(metrics.lastWithdrawalAmount) : 'Sem saque'}
+                                                    </p>
+                                                    <p className="mt-0.5 text-[10px] font-semibold text-slate-400">{formatDateTime(metrics.lastWithdrawalAt)}</p>
+                                                </div>
+                                                <div className="p-3 min-w-0">
+                                                    <p className="text-[10px] uppercase tracking-wide text-slate-400 font-bold">Cadastro</p>
+                                                    <p className="mt-1 flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                                                        <CalendarDays size={13} className="text-slate-400" />
+                                                        {formatDateTime(prof.createdAt)}
+                                                    </p>
+                                                </div>
+                                                <div className="p-3 min-w-0">
+                                                    <p className="text-[10px] uppercase tracking-wide text-slate-400 font-bold">Última online</p>
+                                                    <p className="mt-1 flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                                                        <Radio size={13} className="text-slate-400" />
+                                                        {prof.isOnline ? 'Online agora' : formatDateTime(prof.lastSeen)}
                                                     </p>
                                                 </div>
                                             </div>
 
                                             <div className="px-3 py-2 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-500 font-medium">
-                                                {metrics.ownClientConversationsCount || 0} clientes próprios com conversa · {metrics.totalConversationsCount || 0} conversas totais
+                                                {metrics.ownClientConversationsCount || 0} clientes próprios com conversa · {metrics.broughtUsersCount || 0} usuários trazidos · {metrics.shareClickCount || 0} tentativas de compartilhar
                                             </div>
                                         </div>
 
