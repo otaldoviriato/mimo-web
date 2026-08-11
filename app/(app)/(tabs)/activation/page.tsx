@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
     Search, UserCheck, MessageSquare, CheckCircle2,
     Send, RefreshCw, X, Activity, Wallet, BanknoteArrowDown,
-    CalendarDays, Radio, ExternalLink, Users, MousePointerClick
+    CalendarDays, Radio, ExternalLink, Users, MousePointerClick, ChevronDown
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useMyProfile } from '@/hooks/useQueries';
@@ -91,6 +91,7 @@ export default function ActivationPage() {
     const [activeFilter, setActiveFilter] = useState<FilterStatus>('pending');
     const [unviewedCount, setUnviewedCount] = useState(0);
     const [totalCount, setTotalCount] = useState(0);
+    const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set());
 
     // Modal de Iniciar Conversa com Mensagem Pronta
     const [chatTargetItem, setChatTargetItem] = useState<ProfessionalActivationItem | null>(null);
@@ -238,14 +239,26 @@ export default function ActivationPage() {
         return 'bg-slate-50 text-slate-500 border-slate-200';
     };
 
-    const getActivityDotClass = (activityKey?: string, isOnline?: boolean) => {
-        if (isOnline || activityKey === 'active') return 'bg-emerald-500 ring-emerald-100';
-        if (activityKey === 'recent') return 'bg-sky-500 ring-sky-100';
-        return 'bg-slate-300 ring-slate-100';
-    };
-
     const getProfessionalDisplayName = (prof: ProfessionalActivationItem) => {
         return prof.name || prof.username || 'profissional';
+    };
+
+    const getLastAccessLabel = (prof: ProfessionalActivationItem) => {
+        if (prof.isOnline) return 'Online agora';
+        if (prof.lastSeen) return `Ultimo acesso ${formatRelativeTime(prof.lastSeen)}`;
+        return `Criada ${formatRelativeTime(prof.createdAt)}`;
+    };
+
+    const toggleDetails = (clerkId: string) => {
+        setExpandedDetails((current) => {
+            const next = new Set(current);
+            if (next.has(clerkId)) {
+                next.delete(clerkId);
+            } else {
+                next.add(clerkId);
+            }
+            return next;
+        });
     };
 
     const openChatModal = (prof: ProfessionalActivationItem) => {
@@ -392,6 +405,8 @@ export default function ActivationPage() {
                             const isAssignedToMe = act.assignedTeamMemberId === myProfile?.clerkId;
                             const statusMeta = getActivationStatusMeta(act.status);
                             const currentFunnelRank = Number(funnel.rank || 1);
+                            const hasAssignedMember = Boolean(act.assignedTeamMemberId);
+                            const isDetailsExpanded = expandedDetails.has(prof.clerkId);
                             
                             return (
                                 <div 
@@ -424,34 +439,52 @@ export default function ActivationPage() {
                                                         {prof.name ? prof.name.substring(0, 2).toUpperCase() : 'PR'}
                                                     </div>
                                                 )}
-                                                    <span className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ring-4 ${getActivityDotClass(activity.key, prof.isOnline)}`} />
-                                                    <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-slate-900/85 text-white border-2 border-white flex items-center justify-center shadow-xs opacity-95 group-hover:bg-purple-600 transition-all">
+                                                    {prof.isOnline && (
+                                                        <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white ring-4 ring-emerald-100" />
+                                                    )}
+                                                    <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-white text-purple-600 border border-purple-100 flex items-center justify-center shadow-xs opacity-95 group-hover:bg-purple-50 transition-all">
                                                         <ExternalLink size={10} />
                                                     </span>
                                                 </a>
                                                 <div className="min-w-0">
                                                     <h4 className="text-sm font-black text-slate-900 leading-tight flex items-center gap-1.5 min-w-0">
-                                                        <span className="truncate">{prof.name || prof.username}</span>
+                                                        <span className="truncate">{getProfessionalDisplayName(prof)}</span>
                                                         {prof.isUnviewed && (
                                                             <span className="shrink-0 w-2 h-2 rounded-full bg-rose-500" title="Novo" />
                                                         )}
                                                     </h4>
                                                     <p className="text-[11px] text-slate-400 font-semibold mt-0.5 truncate">
-                                                        @{prof.username} - {formatRelativeTime(prof.createdAt)}
+                                                        {getLastAccessLabel(prof)}
                                                     </p>
                                                 </div>
                                             </div>
 
                                             <button
-                                                onClick={() => openChatModal(prof)}
-                                                className="h-9 w-9 rounded-lg bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center shadow-sm transition-all cursor-pointer shrink-0"
-                                                title="Conversar"
+                                                onClick={() => {
+                                                    if (isAssignedToMe) {
+                                                        router.push(`/chat/${prof.clerkId}`);
+                                                        return;
+                                                    }
+                                                    if (!hasAssignedMember) {
+                                                        openChatModal(prof);
+                                                    }
+                                                }}
+                                                disabled={hasAssignedMember && !isAssignedToMe}
+                                                className={`h-10 px-3 rounded-lg text-xs font-black flex items-center justify-center gap-2 shadow-sm transition-all shrink-0 ${
+                                                    hasAssignedMember && !isAssignedToMe
+                                                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
+                                                        : 'bg-purple-600 hover:bg-purple-700 text-white cursor-pointer'
+                                                }`}
+                                                title={isAssignedToMe ? 'Ver conversa' : hasAssignedMember ? `Em atendimento por ${act.assignedTeamMemberName || 'outro membro'}` : 'Enviar mensagem'}
                                             >
                                                 <MessageSquare size={16} />
+                                                <span className="max-w-[112px] truncate">
+                                                    {isAssignedToMe ? 'Ver conversa' : hasAssignedMember ? (act.assignedTeamMemberName || 'Em atendimento') : 'Enviar mensagem'}
+                                                </span>
                                             </button>
                                         </div>
 
-                                        <div className="flex items-center gap-1.5 min-w-0">
+                                        <div className="hidden">
                                             <span className={`inline-flex items-center gap-1.5 h-6 px-2 rounded-md border text-[10px] font-black ${statusMeta.className}`}>
                                                 <span className={`w-1.5 h-1.5 rounded-full ${statusMeta.dot}`} />
                                                 {statusMeta.label}
@@ -507,37 +540,32 @@ export default function ActivationPage() {
                                         </div>
 
                                         {/* Observações & Estágio */}
-                                        <div className={`rounded-lg border p-3 ${getFunnelAccentClass(funnel.key)}`}>
-                                            <div className="flex items-center justify-between gap-3">
-                                                <div className="min-w-0">
-                                                    <p className="text-[10px] uppercase font-black text-slate-400">Etapa principal</p>
-                                                    <p className="mt-0.5 text-sm font-black truncate">{funnel.label || 'Profissional cadastrada'}</p>
-                                                </div>
-                                                <span className="shrink-0 text-[11px] font-black bg-white/75 border border-white/80 rounded-md px-2 py-1">
+                                        <div className="pt-1">
+                                            <div className="flex items-center justify-between gap-3 mb-2">
+                                                <p className="text-sm font-black text-slate-900">{funnel.label || 'Profissional cadastrada'}</p>
+                                                <span className="shrink-0 text-[11px] font-black text-purple-700 bg-purple-50 border border-purple-100 rounded-md px-2 py-1">
                                                     {currentFunnelRank}/5
                                                 </span>
                                             </div>
-                                            <div className="mt-3 grid grid-cols-5 gap-1.5">
+                                            <div className="space-y-0.5">
                                                 {FUNNEL_STEPS.map((step, index) => {
                                                     const stepNumber = index + 1;
                                                     const isDone = currentFunnelRank >= stepNumber;
                                                     const isCurrent = currentFunnelRank === stepNumber;
 
                                                     return (
-                                                        <div key={step.key} className="relative min-w-0">
-                                                            {index > 0 && (
-                                                                <span className={`absolute top-[7px] -left-1/2 h-0.5 w-full ${isDone ? 'bg-purple-500' : 'bg-slate-200'}`} />
+                                                        <div key={step.key} className="relative flex gap-2.5 min-h-[26px]">
+                                                            {index < FUNNEL_STEPS.length - 1 && (
+                                                                <span className={`absolute left-[6px] top-4 h-[calc(100%-8px)] w-0.5 ${currentFunnelRank > stepNumber ? 'bg-purple-500' : 'bg-slate-200'}`} />
                                                             )}
-                                                            <div className="relative flex flex-col items-center gap-1">
-                                                                <span className={`w-3.5 h-3.5 rounded-full border-2 ${
-                                                                    isDone
-                                                                        ? 'bg-purple-600 border-purple-600'
-                                                                        : 'bg-white border-slate-300'
-                                                                } ${isCurrent ? 'ring-4 ring-purple-100' : ''}`} />
-                                                                <span className={`text-[9px] leading-tight text-center font-bold truncate w-full ${isDone ? 'text-slate-700' : 'text-slate-400'}`}>
-                                                                    {step.label}
-                                                                </span>
-                                                            </div>
+                                                            <span className={`relative mt-1 w-3.5 h-3.5 rounded-full border-2 shrink-0 ${
+                                                                isDone
+                                                                    ? 'bg-purple-600 border-purple-600'
+                                                                    : 'bg-white border-slate-300'
+                                                            } ${isCurrent ? 'ring-4 ring-purple-100' : ''}`} />
+                                                            <span className={`text-[12px] leading-6 font-bold ${isDone ? 'text-slate-800' : 'text-slate-400'}`}>
+                                                                {step.label}
+                                                            </span>
                                                         </div>
                                                     );
                                                 })}
@@ -607,7 +635,15 @@ export default function ActivationPage() {
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-4 gap-1.5">
+                                        <button
+                                            onClick={() => toggleDetails(prof.clerkId)}
+                                            className="h-8 w-full flex items-center justify-center gap-1.5 text-[11px] font-black text-slate-500 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-all cursor-pointer"
+                                        >
+                                            {isDetailsExpanded ? 'Ver menos' : 'Ver mais'}
+                                            <ChevronDown size={14} className={`transition-transform ${isDetailsExpanded ? 'rotate-180' : ''}`} />
+                                        </button>
+
+                                        <div className={`${isDetailsExpanded ? 'grid' : 'hidden'} grid-cols-4 gap-1.5 border-t border-slate-100 pt-2`}>
                                             <div className="min-w-0 rounded-lg bg-slate-50 border border-slate-100 p-2" title={`${metrics.activeConversationsCount || 0} conversas ativas`}>
                                                 <MessageSquare size={13} className="text-emerald-500" />
                                                 <p className="mt-1 text-sm font-black text-slate-900">{metrics.totalConversationsCount || 0}</p>
@@ -632,7 +668,7 @@ export default function ActivationPage() {
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-1.5 text-[10px] font-bold text-slate-500">
+                                        <div className={`${isDetailsExpanded ? 'grid' : 'hidden'} grid-cols-2 gap-1.5 text-[10px] font-bold text-slate-500`}>
                                             <div className="min-w-0 flex items-center gap-1.5 rounded-lg border border-slate-100 px-2 py-1.5">
                                                 <CalendarDays size={12} className="text-slate-400 shrink-0" />
                                                 <span className="truncate">{formatDateTime(prof.createdAt)}</span>
@@ -643,7 +679,7 @@ export default function ActivationPage() {
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 min-w-0">
+                                        <div className={`${isDetailsExpanded ? 'flex' : 'hidden'} items-center gap-2 text-[10px] font-bold text-slate-500 min-w-0`}>
                                             <span className="inline-flex items-center gap-1 min-w-0">
                                                 <MessageSquare size={11} className="text-slate-400 shrink-0" />
                                                 <span className="truncate">{metrics.ownClientConversationsCount || 0} clientes proprios</span>
@@ -657,7 +693,7 @@ export default function ActivationPage() {
                                             </span>
                                         </div>
 
-                                        {(act.stage || act.notes) && (
+                                        {false && (act.stage || act.notes) && (
                                             <div className="min-h-[36px] bg-slate-50 border border-slate-100 px-2.5 py-2 rounded-lg space-y-0.5 text-[11px] text-slate-600">
                                                 {act.stage && (
                                                     <p className="font-semibold text-slate-700">
