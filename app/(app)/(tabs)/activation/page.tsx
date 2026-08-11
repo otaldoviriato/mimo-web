@@ -74,11 +74,11 @@ const QUICK_MESSAGES = [
 ];
 
 const FUNNEL_STEPS = [
-    { key: 'registered', label: 'Cadastro' },
-    { key: 'share_attempted', label: 'Compartilhou' },
-    { key: 'brought_user', label: 'Trouxe usuario' },
-    { key: 'first_client', label: '1o cliente' },
-    { key: 'frequent', label: 'Frequente' },
+    { key: 'registered', label: 'Cadastro', description: 'Perfil criado e pronto para o primeiro contato.' },
+    { key: 'share_attempted', label: 'Compartilhou', description: 'Tentou divulgar o proprio perfil.' },
+    { key: 'brought_user', label: 'Trouxe usuario', description: 'Conseguiu trazer alguem para a plataforma.' },
+    { key: 'first_client', label: '1o cliente', description: 'Ja iniciou conversa com cliente proprio.' },
+    { key: 'frequent', label: 'Frequente', description: 'Mantem atividade e recorrencia de conversas.' },
 ];
 
 export default function ActivationPage() {
@@ -241,6 +241,10 @@ export default function ActivationPage() {
 
     const getProfessionalDisplayName = (prof: ProfessionalActivationItem) => {
         return prof.name || prof.username || 'profissional';
+    };
+
+    const getCurrentFunnelStep = (rank: number) => {
+        return FUNNEL_STEPS[Math.min(Math.max(rank, 1), FUNNEL_STEPS.length) - 1] || FUNNEL_STEPS[0];
     };
 
     const getLastAccessLabel = (prof: ProfessionalActivationItem) => {
@@ -407,6 +411,7 @@ export default function ActivationPage() {
                             const currentFunnelRank = Number(funnel.rank || 1);
                             const hasAssignedMember = Boolean(act.assignedTeamMemberId);
                             const isDetailsExpanded = expandedDetails.has(prof.clerkId);
+                            const currentFunnelStep = getCurrentFunnelStep(currentFunnelRank);
                             
                             return (
                                 <div 
@@ -418,10 +423,13 @@ export default function ActivationPage() {
                                     <div className="space-y-3">
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="flex items-center gap-2.5 min-w-0">
-                                                <a
-                                                    href={`/${prof.username}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (prof.username) {
+                                                            router.push(`/${prof.username}`);
+                                                        }
+                                                    }}
                                                     className="relative shrink-0 group"
                                                     title="Abrir perfil"
                                                 >
@@ -445,7 +453,7 @@ export default function ActivationPage() {
                                                     <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-white text-purple-600 border border-purple-100 flex items-center justify-center shadow-xs opacity-95 group-hover:bg-purple-50 transition-all">
                                                         <ExternalLink size={10} />
                                                     </span>
-                                                </a>
+                                                </button>
                                                 <div className="min-w-0">
                                                     <h4 className="text-sm font-black text-slate-900 leading-tight flex items-center gap-1.5 min-w-0">
                                                         <span className="truncate">{getProfessionalDisplayName(prof)}</span>
@@ -540,12 +548,24 @@ export default function ActivationPage() {
                                         </div>
 
                                         {/* Observações & Estágio */}
-                                        <div className="pt-1">
-                                            <div className="flex items-center justify-between gap-3 mb-2">
-                                                <p className="text-sm font-black text-slate-900">{funnel.label || 'Profissional cadastrada'}</p>
-                                                <span className="shrink-0 text-[11px] font-black text-purple-700 bg-purple-50 border border-purple-100 rounded-md px-2 py-1">
+                                        <div className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2.5">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="min-w-0 flex items-center gap-2.5">
+                                                    <span className="w-3.5 h-3.5 rounded-full bg-purple-600 ring-4 ring-purple-100 shrink-0" />
+                                                    <p className="text-sm font-black text-slate-900 truncate">{currentFunnelStep.label}</p>
+                                                </div>
+                                                <span className="shrink-0 text-[11px] font-black text-purple-700 bg-white border border-purple-100 rounded-md px-2 py-1">
                                                     {currentFunnelRank}/5
                                                 </span>
+                                            </div>
+                                            <p className="mt-1.5 text-[11px] font-semibold text-slate-500 leading-snug">
+                                                {currentFunnelStep.description}
+                                            </p>
+                                        </div>
+
+                                        <div className={`${isDetailsExpanded ? 'block' : 'hidden'} pt-1`}>
+                                            <div className="flex items-center justify-between gap-3 mb-2">
+                                                <p className="text-[11px] uppercase font-black text-slate-400">Etapas da ativacao</p>
                                             </div>
                                             <div className="space-y-0.5">
                                                 {FUNNEL_STEPS.map((step, index) => {
@@ -563,8 +583,13 @@ export default function ActivationPage() {
                                                                     ? 'bg-purple-600 border-purple-600'
                                                                     : 'bg-white border-slate-300'
                                                             } ${isCurrent ? 'ring-4 ring-purple-100' : ''}`} />
-                                                            <span className={`text-[12px] leading-6 font-bold ${isDone ? 'text-slate-800' : 'text-slate-400'}`}>
-                                                                {step.label}
+                                                            <span className="min-w-0 pb-2">
+                                                                <span className={`block text-[12px] leading-5 font-bold ${isDone ? 'text-slate-800' : 'text-slate-400'}`}>
+                                                                    {step.label}
+                                                                </span>
+                                                                <span className="block text-[10px] leading-snug font-semibold text-slate-400">
+                                                                    {step.description}
+                                                                </span>
                                                             </span>
                                                         </div>
                                                     );
