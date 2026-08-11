@@ -51,6 +51,13 @@ export default function ProfilePage() {
         ]);
     }, [refetchProfile, refetchHistory, refetchSubscriptions]);
 
+    const onRefreshTeam = useCallback(async () => {
+        await Promise.all([
+            refetchProfile(),
+            refetchRooms(),
+        ]);
+    }, [refetchProfile, refetchRooms]);
+
     const [localPhotoUrl, setLocalPhotoUrl] = useState<string | undefined>(undefined);
     const [localCoverUrl, setLocalCoverUrl] = useState<string | undefined>(undefined);
     const [activeGalleryTab, setActiveGalleryTab] = useState<'public' | 'private'>('public');
@@ -327,6 +334,7 @@ export default function ProfilePage() {
     }
 
     const isProfessional = !!userData?.isProfessional;
+    const isTeam = !!userData?.isTeam;
     const publicItemsCount = galleryData?.publicItems?.length ?? galleryData?.items?.length ?? 0;
     const publicExclusiveCount = (galleryData?.publicItems ?? galleryData?.items ?? []).filter((item: any) => item.visibility === 'subscribers').length;
     
@@ -854,6 +862,14 @@ export default function ProfilePage() {
         type: tx.source === 'gift' ? 'gift' : tx.type === 'CC' ? 'card' : 'pix'
     }));
 
+    const teamMemberSince = userData?.createdAt
+        ? new Date(userData.createdAt).toLocaleDateString('pt-BR')
+        : 'Nao informado';
+    const teamLastViewed = userData?.activationLastViewedAt
+        ? new Date(userData.activationLastViewedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+        : 'Ainda nao acessada';
+    const teamConversationsCount = rooms.length;
+
     return (
         <div className="flex flex-col h-full bg-slate-50 relative overflow-hidden max-w-full">
             {/* Efeito de Fundo Aurora (Esferas Desfocadas Modernas) */}
@@ -873,7 +889,7 @@ export default function ProfilePage() {
 
 
 
-            <PullToRefresh onRefresh={onRefreshClient} className="px-4 pt-5 pb-24 max-w-md w-full mx-auto relative z-10" contentClassName="flex flex-col gap-4">
+            <PullToRefresh onRefresh={isTeam ? onRefreshTeam : onRefreshClient} className="px-4 pt-5 pb-24 max-w-md w-full mx-auto relative z-10" contentClassName="flex flex-col gap-4">
                 {/* Informações Básicas / Perfil */}
                 <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 flex items-center justify-between gap-3 shadow-xs">
                     <div className="flex items-center gap-3.5 min-w-0 flex-1">
@@ -917,7 +933,7 @@ export default function ProfilePage() {
                                 @{userData?.username || ''}
                             </p>
                             <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-                                Conta Ativa
+                                {isTeam ? (userData?.teamTitle || 'Equipe Mimo') : 'Conta Ativa'}
                             </p>
                         </div>
                     </div>
@@ -932,6 +948,66 @@ export default function ProfilePage() {
                     </button>
                 </div>
 
+                {isTeam ? (
+                    <>
+                        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs flex flex-col gap-4">
+                            <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-100 shrink-0">
+                                    <ShieldCheck className="w-5 h-5" />
+                                </div>
+                                <div className="min-w-0">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Funcao na equipe</span>
+                                    <h3 className="text-base font-black text-slate-900 leading-tight mt-0.5">
+                                        {userData?.teamTitle || 'Equipe Mimo'}
+                                    </h3>
+                                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                                        Perfil operacional com acesso a fila de ativacao e conversas oficiais.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Conversas</span>
+                                <span className="text-2xl font-black text-slate-900 tracking-tight mt-1 block">{teamConversationsCount}</span>
+                                <p className="text-[11px] text-slate-400 font-medium mt-1">salas acessiveis</p>
+                            </div>
+
+                            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Ativacao</span>
+                                <span className="text-sm font-black text-slate-900 tracking-tight mt-2 block">{teamLastViewed}</span>
+                                <p className="text-[11px] text-slate-400 font-medium mt-1">ultimo acesso</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs flex flex-col gap-3">
+                            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5">Dados da Conta</h3>
+                            <div className="flex items-center justify-between text-xs py-1">
+                                <span className="text-slate-500 font-semibold flex items-center gap-2">
+                                    <CalendarClock className="w-3.5 h-3.5 text-purple-600" />
+                                    Membro desde
+                                </span>
+                                <span className="font-bold text-slate-800">{teamMemberSince}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs py-1">
+                                <span className="text-slate-500 font-semibold flex items-center gap-2">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                    Status
+                                </span>
+                                <span className="font-bold text-emerald-700">Ativo na equipe</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs py-1">
+                                <span className="text-slate-500 font-semibold flex items-center gap-2">
+                                    <Info className="w-3.5 h-3.5 text-slate-500" />
+                                    Identificacao
+                                </span>
+                                <span className="font-bold text-slate-800 truncate ml-3">@{userData?.username || ''}</span>
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <>
                 {/* Card de Saldo */}
                 <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs flex flex-col gap-3">
                     <div className="flex justify-between items-start gap-2">
@@ -1001,9 +1077,11 @@ export default function ProfilePage() {
                         <p className="text-xs text-slate-400 font-medium text-center py-4">Nenhuma recarga efetuada ainda.</p>
                     )}
                 </div>
+                    </>
+                )}
 
                 {/* Card de Assinaturas Ativas */}
-                {(() => {
+                {!isTeam && (() => {
                     const mySubscriptions = subscriptionsData?.subscriptions ?? [];
                     if (mySubscriptions.length === 0) return null;
                     return (

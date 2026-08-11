@@ -743,6 +743,19 @@ export default function ChatsPage() {
                                     )}
                                 </button>
                             </div>
+                        ) : myProfile?.isTeam ? (
+                            <div className="flex flex-col items-center max-w-xs">
+                                <p className="text-xs text-slate-500 leading-relaxed mb-6">
+                                    As conversas oficiais iniciadas pela equipe aparecerão aqui.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => router.push('/activation')}
+                                    className="inline-flex items-center justify-center gap-2 rounded-full bg-purple-600 hover:bg-purple-700 active:scale-[0.98] transition-all text-white text-xs font-bold py-3 px-6 shadow-md shadow-purple-600/20 cursor-pointer"
+                                >
+                                    Abrir ativação
+                                </button>
+                            </div>
                         ) : (
                             <div className="flex flex-col items-center max-w-xs">
                                 <p className="text-xs text-slate-500 leading-relaxed mb-6">

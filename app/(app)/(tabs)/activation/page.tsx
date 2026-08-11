@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
     Search, UserCheck, MessageSquare, CheckCircle2, Clock, 
-    UserPlus, ArrowRightLeft, Edit3, Send, RefreshCw, X
+    ArrowRightLeft, Edit3, Send, RefreshCw, X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useMyProfile } from '@/hooks/useQueries';
@@ -37,7 +37,7 @@ export default function ActivationPage() {
     const [teamMembers, setTeamMembers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [activeFilter, setActiveFilter] = useState<FilterStatus>('all');
+    const [activeFilter, setActiveFilter] = useState<FilterStatus>('pending');
     const [unviewedCount, setUnviewedCount] = useState(0);
     const [totalCount, setTotalCount] = useState(0);
 
@@ -91,29 +91,6 @@ export default function ActivationPage() {
         }, searchQuery ? 300 : 0);
         return () => clearTimeout(timer);
     }, [searchQuery, activeFilter]);
-
-    // Ação: Assumir Profissional
-    const handleAssignToMe = async (prof: any) => {
-        try {
-            const res = await fetch(`/api/team/activation/professionals/${prof.clerkId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    assignedTeamMemberId: myProfile?.clerkId,
-                    action: 'Assumiu a responsabilidade da ativação'
-                })
-            });
-            if (res.ok) {
-                toast.success(`Você agora é responsável pela ativação de ${prof.name || '@' + prof.username}!`);
-                fetchActivationData(searchQuery, activeFilter);
-            } else {
-                toast.error('Erro ao assumir profissional.');
-            }
-        } catch (err) {
-            console.error('Erro:', err);
-            toast.error('Erro de conexão ao assumir.');
-        }
-    };
 
     // Ação: Salvar Transferência
     const handleSaveTransfer = async () => {
@@ -189,7 +166,7 @@ export default function ActivationPage() {
                 const data = await res.json();
                 toast.success('Conversa iniciada com sucesso!');
                 setChatTargetItem(null);
-                router.push(`/chat/${data.roomId}`);
+                router.push(`/chat/${data.professionalId || chatTargetItem.clerkId}`);
             } else {
                 const data = await res.json();
                 toast.error(data.error || 'Erro ao iniciar conversa.');
@@ -226,40 +203,38 @@ export default function ActivationPage() {
 
     return (
         <div className="flex-1 bg-slate-50 min-h-screen pb-24 md:pb-10 p-4 md:p-8">
-            <div className="max-w-6xl mx-auto space-y-6">
+            <div className="max-w-6xl mx-auto space-y-4">
                 
                 {/* Header Principal */}
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <span className="bg-purple-100 text-purple-700 p-2 rounded-xl">
-                                <UserCheck size={22} />
-                            </span>
-                            <div>
-                                <h1 className="text-xl font-bold text-slate-900 tracking-tight">Fila de Trabalho & Ativação</h1>
-                                <p className="text-xs text-slate-500 font-medium">
-                                    Contate e acompanhe as criadoras recém-cadastradas na plataforma Mimo.
-                                </p>
-                            </div>
+                <div className="bg-white border border-slate-200/80 rounded-xl px-3.5 py-3 shadow-sm flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <span className="bg-purple-100 text-purple-700 p-2 rounded-lg shrink-0">
+                            <UserCheck size={18} />
+                        </span>
+                        <div className="min-w-0">
+                            <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate">Fila de Ativação</h1>
+                            <p className="hidden sm:block text-xs text-slate-500 font-medium truncate">
+                                Acompanhe contatos e status das criadoras recentes.
+                            </p>
                         </div>
                     </div>
 
                     {/* Botão de Atualização Manual */}
                     <button
                         onClick={() => fetchActivationData(searchQuery, activeFilter)}
-                        className="flex items-center gap-2 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer self-start md:self-auto"
+                        className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-all cursor-pointer shrink-0"
                     >
                         <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                        Atualizar Fila
+                        Atualizar
                     </button>
                 </div>
 
                 {/* Filtros e Busca */}
-                <div className="flex flex-col gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
                         <button
                             onClick={() => setActiveFilter('all')}
-                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                                 activeFilter === 'all'
                                     ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
                                     : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -270,7 +245,7 @@ export default function ActivationPage() {
 
                         <button
                             onClick={() => setActiveFilter('unviewed')}
-                            className={`relative px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                            className={`relative shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                                 activeFilter === 'unviewed'
                                     ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
                                     : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -284,18 +259,18 @@ export default function ActivationPage() {
 
                         <button
                             onClick={() => setActiveFilter('pending')}
-                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                                 activeFilter === 'pending'
                                     ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
                                     : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
                             }`}
                         >
-                            Não Contactadas
+                            Não Contatadas
                         </button>
 
                         <button
                             onClick={() => setActiveFilter('contacted')}
-                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                                 activeFilter === 'contacted'
                                     ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
                                     : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -306,7 +281,7 @@ export default function ActivationPage() {
 
                         <button
                             onClick={() => setActiveFilter('activated')}
-                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                                 activeFilter === 'activated'
                                     ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
                                     : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -317,7 +292,7 @@ export default function ActivationPage() {
 
                         <button
                             onClick={() => setActiveFilter('my_assigned')}
-                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                                 activeFilter === 'my_assigned'
                                     ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
                                     : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -335,7 +310,7 @@ export default function ActivationPage() {
                             placeholder="Buscar profissional por nome, @username ou e-mail..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-800 placeholder-slate-400"
+                            className="w-full pl-10 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-800 placeholder-slate-400"
                         />
                     </div>
                 </div>
@@ -455,25 +430,13 @@ export default function ActivationPage() {
                                     </div>
 
                                     {/* Botões de Ação */}
-                                    <div className="pt-4 border-t border-slate-100 mt-4 flex items-center justify-between gap-2">
-                                        <div className="flex items-center gap-1.5">
-                                            {!isAssignedToMe && (
-                                                <button
-                                                    onClick={() => handleAssignToMe(prof)}
-                                                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-purple-100 text-slate-700 hover:text-purple-700 text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer"
-                                                    title="Assumir este atendimento"
-                                                >
-                                                    <UserPlus size={13} />
-                                                    Assumir
-                                                </button>
-                                            )}
-
+                                    <div className="pt-4 border-t border-slate-100 mt-4 grid grid-cols-3 gap-2">
                                             <button
                                                 onClick={() => {
                                                     setTransferringItem(prof);
                                                     setSelectedTargetMember(act.assignedTeamMemberId || '');
                                                 }}
-                                                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                                                className="min-w-0 px-2 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
                                                 title="Transferir para outro membro"
                                             >
                                                 <ArrowRightLeft size={13} />
@@ -488,20 +451,19 @@ export default function ActivationPage() {
                                                     setEditNotes(act.notes || '');
                                                     setEditNextSteps(act.nextSteps || '');
                                                 }}
-                                                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                                                className="min-w-0 px-2 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
                                                 title="Editar notas e estágio"
                                             >
                                                 <Edit3 size={13} />
                                                 Notas
                                             </button>
-                                        </div>
 
                                         <button
                                             onClick={() => openChatModal(prof)}
-                                            className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer ml-auto"
+                                            className="min-w-0 px-2 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
                                         >
                                             <MessageSquare size={13} />
-                                            Iniciar Conversa
+                                            Conversar
                                         </button>
                                     </div>
                                 </div>

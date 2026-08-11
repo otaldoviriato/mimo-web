@@ -424,6 +424,7 @@ export async function GET(request: NextRequest) {
                 clerkId: user.clerkId,
                 username: user.username,
                 name: user.name,
+                createdAt: user.createdAt,
                 onboardingStep: user.onboardingStep,
                 email: user.email,
                 phone: user.phone,

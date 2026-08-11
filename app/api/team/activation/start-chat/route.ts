@@ -126,6 +126,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
             success: true,
             roomId,
+            professionalId,
             message: 'Conversa iniciada com sucesso.',
         });
 
