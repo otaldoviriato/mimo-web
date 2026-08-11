@@ -16,6 +16,9 @@ export interface IProfessionalActivation extends Document {
     stage: string;
     notes?: string;
     nextSteps?: string;
+    shareClickCount?: number;
+    firstShareClickedAt?: Date | null;
+    lastShareClickedAt?: Date | null;
     contactedAt?: Date | null;
     activatedAt?: Date | null;
     history: IActivationHistoryItem[];
@@ -64,6 +67,19 @@ const ProfessionalActivationSchema = new Schema<IProfessionalActivation>({
     nextSteps: {
         type: String,
         default: '',
+    },
+    shareClickCount: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    firstShareClickedAt: {
+        type: Date,
+        default: null,
+    },
+    lastShareClickedAt: {
+        type: Date,
+        default: null,
     },
     contactedAt: {
         type: Date,

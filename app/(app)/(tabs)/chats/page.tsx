@@ -110,6 +110,8 @@ export default function ChatsPage() {
     const handleShareProfile = async () => {
         if (typeof window === 'undefined' || !myProfile?.username) return;
 
+        fetch('/api/professional-activation/share-click', { method: 'POST' }).catch(console.error);
+
         const profileUrl = buildProfileShareUrl(window.location.origin, myProfile.username, user?.id || myProfile.clerkId);
         const name = myProfile.name || `@${myProfile.username}`;
         const shareText = `Ei! Esse é meu perfil no MimoChat - ${name}. Me manda uma mensagem, adoro conversar!`;

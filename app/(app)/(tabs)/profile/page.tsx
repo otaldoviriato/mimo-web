@@ -152,6 +152,8 @@ export default function ProfilePage() {
     const handleShare = async () => {
         if (typeof window === 'undefined' || !userData?.username) return;
 
+        fetch('/api/professional-activation/share-click', { method: 'POST' }).catch(console.error);
+
         const profileUrl = buildProfileShareUrl(window.location.origin, userData.username, user?.id || userData.clerkId);
         const name       = userData.name || `@${userData.username}`;
         const shareText  = `Ei! Esse é meu perfil no MimoChat — ${name}. Me manda uma mensagem, adoro conversar! 💬`;

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
     Search, UserCheck, MessageSquare, CheckCircle2, Clock, 
-    ArrowRightLeft, Edit3, Send, RefreshCw, X
+    ArrowRightLeft, Edit3, Send, RefreshCw, X, Share2, Users, Activity
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useMyProfile } from '@/hooks/useQueries';
@@ -195,6 +195,20 @@ export default function ActivationPage() {
         }
     };
 
+    const getFunnelBadgeClass = (stageKey?: string) => {
+        if (stageKey === 'frequent') return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+        if (stageKey === 'first_client') return 'bg-violet-100 text-violet-800 border-violet-200';
+        if (stageKey === 'brought_user') return 'bg-blue-100 text-blue-800 border-blue-200';
+        if (stageKey === 'share_attempted') return 'bg-amber-100 text-amber-800 border-amber-200';
+        return 'bg-slate-100 text-slate-700 border-slate-200';
+    };
+
+    const getActivityBadgeClass = (activityKey?: string) => {
+        if (activityKey === 'active') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        if (activityKey === 'recent') return 'bg-sky-50 text-sky-700 border-sky-200';
+        return 'bg-slate-50 text-slate-500 border-slate-200';
+    };
+
     const openChatModal = (prof: any) => {
         setChatTargetItem(prof);
         const defaultMsg = QUICK_MESSAGES[0].text.replace('{nome}', prof.name || prof.username);
@@ -333,6 +347,9 @@ export default function ActivationPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {professionals.map((prof) => {
                             const act = prof.activation || {};
+                            const funnel = prof.activationFunnel || {};
+                            const metrics = prof.activationMetrics || {};
+                            const activity = prof.activityStatus || {};
                             const isAssignedToMe = act.assignedTeamMemberId === myProfile?.clerkId;
                             
                             return (
@@ -413,6 +430,47 @@ export default function ActivationPage() {
                                         </div>
 
                                         {/* Observações & Estágio */}
+                                        <div className="border border-slate-100 rounded-xl overflow-hidden">
+                                            <div className="px-3 py-2 bg-slate-50 flex items-center justify-between gap-2">
+                                                <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-md border ${getFunnelBadgeClass(funnel.key)}`}>
+                                                    <Activity size={12} />
+                                                    {funnel.label || 'Profissional cadastrada'}
+                                                </span>
+                                                <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-md border ${getActivityBadgeClass(activity.key)}`}>
+                                                    {activity.label || 'Ausente'}
+                                                </span>
+                                            </div>
+
+                                            <div className="grid grid-cols-3 divide-x divide-slate-100 bg-white">
+                                                <div className="p-3 min-w-0">
+                                                    <p className="text-[10px] uppercase tracking-wide text-slate-400 font-bold">Compartilhar</p>
+                                                    <p className="mt-1 flex items-center gap-1.5 text-sm font-black text-slate-800">
+                                                        <Share2 size={13} className="text-amber-500" />
+                                                        {metrics.shareClickCount || 0}
+                                                    </p>
+                                                </div>
+                                                <div className="p-3 min-w-0">
+                                                    <p className="text-[10px] uppercase tracking-wide text-slate-400 font-bold">Trazidos</p>
+                                                    <p className="mt-1 flex items-center gap-1.5 text-sm font-black text-slate-800">
+                                                        <Users size={13} className="text-blue-500" />
+                                                        {metrics.broughtUsersCount || 0}
+                                                    </p>
+                                                </div>
+                                                <div className="p-3 min-w-0">
+                                                    <p className="text-[10px] uppercase tracking-wide text-slate-400 font-bold">Conversas</p>
+                                                    <p className="mt-1 flex items-center gap-1.5 text-sm font-black text-slate-800">
+                                                        <MessageSquare size={13} className="text-emerald-500" />
+                                                        {metrics.activeConversationsCount || 0}
+                                                        <span className="text-[10px] font-semibold text-slate-400">ativas</span>
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="px-3 py-2 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-500 font-medium">
+                                                {metrics.ownClientConversationsCount || 0} clientes próprios com conversa · {metrics.totalConversationsCount || 0} conversas totais
+                                            </div>
+                                        </div>
+
                                         {(act.stage || act.notes) && (
                                             <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl space-y-1 text-xs text-slate-600">
                                                 {act.stage && (

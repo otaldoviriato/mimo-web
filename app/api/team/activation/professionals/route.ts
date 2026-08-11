@@ -4,11 +4,132 @@ import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { ProfessionalActivation } from '@/models/ProfessionalActivation';
 import { AppSettings } from '@/models/AppSettings';
+import { Room } from '@/models/Room';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
+
+const STAGE_REGISTERED = 'Profissional cadastrada';
+const STAGE_SHARE_ATTEMPTED = 'Tentou compartilhar o perfil';
+const STAGE_BROUGHT_USER = 'Trouxe um usuário';
+const STAGE_FIRST_CLIENT = 'Conseguiu o primeiro cliente';
+const STAGE_FREQUENT = 'Profissional frequente';
+
+type CurrentUserRow = {
+    clerkId: string;
+    isTeam?: boolean;
+    isProfessional?: boolean;
+    activationLastViewedAt?: Date | string | null;
+};
+
+type ProfessionalRow = {
+    clerkId: string;
+    username?: string;
+    name?: string;
+    email?: string;
+    photoUrl?: string;
+    phone?: string;
+    city?: string;
+    state?: string;
+    createdAt: Date | string;
+    onboardingStep?: string;
+    professionalStatus?: string | null;
+    identityStatus?: string | null;
+    isOnline?: boolean;
+    lastSeen?: Date | string | null;
+};
+
+type ActivationRow = {
+    professionalId: string;
+    assignedTeamMemberId?: string | null;
+    assignedTeamMemberName?: string | null;
+    status: 'pending' | 'contacted' | 'activated' | 'not_interested';
+    stage: string;
+    notes?: string;
+    nextSteps?: string;
+    shareClickCount?: number;
+    firstShareClickedAt?: Date | string | null;
+    lastShareClickedAt?: Date | string | null;
+    contactedAt?: Date | string | null;
+    activatedAt?: Date | string | null;
+    history: unknown[];
+};
+
+type BroughtUserRow = {
+    clerkId: string;
+    acquiredByProfessionalId?: string;
+    acquisitionSource?: string;
+    createdAt?: Date | string;
+};
+
+type RoomRow = {
+    participants?: string[];
+    lastMessageTime?: Date | string | null;
+    updatedAt?: Date | string | null;
+};
+
+type RoomUserRow = {
+    clerkId: string;
+    isProfessional?: boolean;
+    isTeam?: boolean;
+    acquiredByProfessionalId?: string;
+};
+
+type TeamMemberRow = {
+    clerkId: string;
+    name?: string;
+    username?: string;
+    photoUrl?: string;
+    teamTitle?: string;
+};
+
+type UserFilter = {
+    isProfessional: boolean;
+    $or?: Array<Record<string, { $regex: RegExp }>>;
+};
+
+type ActivationMetrics = {
+    totalConversationsCount: number;
+    activeConversationsCount: number;
+    ownClientConversationsCount: number;
+    activeOwnClientConversationsCount: number;
+    lastConversationAt: Date | null;
+};
+
+function getFunnelStage(params: {
+    shareClickCount: number;
+    broughtUsersCount: number;
+    ownClientConversationsCount: number;
+    activeConversationsCount: number;
+}) {
+    if (params.ownClientConversationsCount > 0 && params.activeConversationsCount >= 2) {
+        return { key: 'frequent', label: STAGE_FREQUENT, rank: 5 };
+    }
+    if (params.ownClientConversationsCount > 0) {
+        return { key: 'first_client', label: STAGE_FIRST_CLIENT, rank: 4 };
+    }
+    if (params.broughtUsersCount > 0) {
+        return { key: 'brought_user', label: STAGE_BROUGHT_USER, rank: 3 };
+    }
+    if (params.shareClickCount > 0) {
+        return { key: 'share_attempted', label: STAGE_SHARE_ATTEMPTED, rank: 2 };
+    }
+    return { key: 'registered', label: STAGE_REGISTERED, rank: 1 };
+}
+
+function getActivityStatus(params: { isOnline?: boolean; lastSeen?: Date | string | null; activeConversationsCount: number; activeSince: Date }) {
+    if (params.isOnline || params.activeConversationsCount > 0) {
+        return { key: 'active', label: 'Ativa agora' };
+    }
+
+    if (params.lastSeen && new Date(params.lastSeen) >= params.activeSince) {
+        return { key: 'recent', label: 'Ativa recentemente' };
+    }
+
+    return { key: 'absent', label: 'Ausente' };
+}
 
 export async function GET(request: NextRequest) {
     try {
@@ -19,7 +140,7 @@ export async function GET(request: NextRequest) {
 
         await connectToDatabase();
 
-        const currentUser = await User.findOne({ clerkId: userId }).select('clerkId isTeam isProfessional activationLastViewedAt').lean() as any;
+        const currentUser = await User.findOne({ clerkId: userId }).select('clerkId isTeam isProfessional activationLastViewedAt').lean() as CurrentUserRow | null;
         const settings = await AppSettings.findOne({ key: 'global' });
         const isAdmin = settings ? settings.adminClerkIds.includes(userId) || userId === FALLBACK_ADMIN : userId === FALLBACK_ADMIN;
 
@@ -32,7 +153,7 @@ export async function GET(request: NextRequest) {
         const filterStatus = searchParams.get('status') || 'all'; // all, unviewed, pending, contacted, activated, my_assigned
 
         // Buscar todos os profissionais ordenados do MAIS RECENTE para o MAIS ANTIGO
-        let userFilter: any = { isProfessional: true };
+        const userFilter: UserFilter = { isProfessional: true };
         if (query.trim().length > 0) {
             const cleanQuery = query.trim().replace('@', '');
             userFilter.$or = [
@@ -45,18 +166,85 @@ export async function GET(request: NextRequest) {
         const professionals = await User.find(userFilter)
             .select('clerkId username name email photoUrl phone city state createdAt onboardingStep professionalStatus identityStatus isOnline lastSeen')
             .sort({ createdAt: -1 })
-            .lean() as any[];
+            .lean() as ProfessionalRow[];
 
         const profIds = professionals.map(p => p.clerkId);
+        const activeThresholdDays = Math.max(1, Number(settings?.activeUserThresholdDays || 7));
+        const activeSince = new Date(Date.now() - activeThresholdDays * 24 * 60 * 60 * 1000);
 
         // Buscar dados de ativação
-        const activations = await ProfessionalActivation.find({ professionalId: { $in: profIds } }).lean() as any[];
+        const activations = await ProfessionalActivation.find({ professionalId: { $in: profIds } }).lean() as ActivationRow[];
         const activationMap = new Map(activations.map(a => [a.professionalId, a]));
+
+        const broughtUsers = await User.find({
+            acquiredByProfessionalId: { $in: profIds },
+            isProfessional: false,
+        }).select('clerkId acquiredByProfessionalId acquisitionSource createdAt').lean() as BroughtUserRow[];
+
+        const broughtUsersByProfessional = new Map<string, BroughtUserRow[]>();
+        for (const client of broughtUsers) {
+            const ownerId = client.acquiredByProfessionalId;
+            if (!ownerId) continue;
+            const list = broughtUsersByProfessional.get(ownerId) || [];
+            list.push(client);
+            broughtUsersByProfessional.set(ownerId, list);
+        }
+
+        const rooms = await Room.find({
+            participants: { $in: profIds },
+            lastMessageTime: { $exists: true, $ne: null },
+        }).select('participants lastMessageTime updatedAt').lean() as RoomRow[];
+
+        const participantIds = Array.from(new Set(
+            rooms.flatMap(room => Array.isArray(room.participants) ? room.participants : [])
+        ));
+        const roomUsers = await User.find({ clerkId: { $in: participantIds } })
+            .select('clerkId isProfessional isTeam acquiredByProfessionalId')
+            .lean() as RoomUserRow[];
+        const roomUserMap = new Map(roomUsers.map(u => [u.clerkId, u]));
+
+        const metricsByProfessional = new Map<string, ActivationMetrics>();
+
+        for (const profId of profIds) {
+            metricsByProfessional.set(profId, {
+                totalConversationsCount: 0,
+                activeConversationsCount: 0,
+                ownClientConversationsCount: 0,
+                activeOwnClientConversationsCount: 0,
+                lastConversationAt: null,
+            });
+        }
+
+        for (const room of rooms) {
+            const participants = Array.isArray(room.participants) ? room.participants : [];
+            const professionalIdsInRoom = participants.filter((participantId: string) => profIds.includes(participantId));
+
+            for (const profId of professionalIdsInRoom) {
+                const otherId = participants.find((participantId: string) => participantId !== profId);
+                const otherUser = otherId ? roomUserMap.get(otherId) : null;
+                if (!otherUser || otherUser.isProfessional || otherUser.isTeam) continue;
+
+                const metrics = metricsByProfessional.get(profId);
+                if (!metrics) continue;
+
+                const lastConversationAt = room.lastMessageTime ? new Date(room.lastMessageTime) : null;
+                const isActiveConversation = !!lastConversationAt && lastConversationAt >= activeSince;
+                const isOwnClient = otherUser.acquiredByProfessionalId === profId;
+
+                metrics.totalConversationsCount++;
+                if (isActiveConversation) metrics.activeConversationsCount++;
+                if (isOwnClient) metrics.ownClientConversationsCount++;
+                if (isOwnClient && isActiveConversation) metrics.activeOwnClientConversationsCount++;
+                if (lastConversationAt && (!metrics.lastConversationAt || lastConversationAt > metrics.lastConversationAt)) {
+                    metrics.lastConversationAt = lastConversationAt;
+                }
+            }
+        }
 
         // Buscar outros membros da equipe para lista de transferência
         const teamMembersList = await User.find({ isTeam: true })
             .select('clerkId name username photoUrl teamTitle')
-            .lean() as any[];
+            .lean() as TeamMemberRow[];
 
         const lastViewed = currentUser.activationLastViewedAt ? new Date(currentUser.activationLastViewedAt) : new Date(0);
 
@@ -71,10 +259,35 @@ export async function GET(request: NextRequest) {
                 stage: 'Aguardando 1º contato',
                 notes: '',
                 nextSteps: '',
+                shareClickCount: 0,
+                firstShareClickedAt: null,
+                lastShareClickedAt: null,
                 contactedAt: null,
                 activatedAt: null,
                 history: []
             };
+
+            const metrics = metricsByProfessional.get(p.clerkId) || {
+                totalConversationsCount: 0,
+                activeConversationsCount: 0,
+                ownClientConversationsCount: 0,
+                activeOwnClientConversationsCount: 0,
+                lastConversationAt: null,
+            };
+            const broughtUsersForProfessional = broughtUsersByProfessional.get(p.clerkId) || [];
+            const shareClickCount = Number(act.shareClickCount || 0);
+            const activationFunnel = getFunnelStage({
+                shareClickCount,
+                broughtUsersCount: broughtUsersForProfessional.length,
+                ownClientConversationsCount: metrics.ownClientConversationsCount,
+                activeConversationsCount: metrics.activeConversationsCount,
+            });
+            const activityStatus = getActivityStatus({
+                isOnline: p.isOnline,
+                lastSeen: p.lastSeen,
+                activeConversationsCount: metrics.activeConversationsCount,
+                activeSince,
+            });
 
             const isUnviewed = new Date(p.createdAt) > lastViewed;
             if (isUnviewed) {
@@ -84,6 +297,19 @@ export async function GET(request: NextRequest) {
             return {
                 ...p,
                 activation: act,
+                activationFunnel,
+                activityStatus,
+                activationMetrics: {
+                    broughtUsersCount: broughtUsersForProfessional.length,
+                    shareClickCount,
+                    totalConversationsCount: metrics.totalConversationsCount,
+                    activeConversationsCount: metrics.activeConversationsCount,
+                    ownClientConversationsCount: metrics.ownClientConversationsCount,
+                    activeOwnClientConversationsCount: metrics.activeOwnClientConversationsCount,
+                    lastShareClickedAt: act.lastShareClickedAt || null,
+                    lastConversationAt: metrics.lastConversationAt,
+                    activeThresholdDays,
+                },
                 isUnviewed,
             };
         });
@@ -115,8 +341,9 @@ export async function GET(request: NextRequest) {
             }))
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Erro na API de ativação de profissionais:', error);
-        return NextResponse.json({ error: error.message || 'Erro interno do servidor' }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Erro interno do servidor';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }
