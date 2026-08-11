@@ -9,7 +9,7 @@ import { useMyProfile, useUploadPhoto, useUploadCover, useMyGallery, useUploadTo
 import { ImageCropper } from '@/components/ImageCropper';
 import { usePayment } from '@/context/PaymentContext';
 import { PullToRefresh } from '@/components';
-import { Settings, Share2, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, ShieldAlert, Heart, Globe, Crown, Camera, Gift, CreditCard, QrCode, Star, Info, CheckCircle2, X, MoreVertical, ChevronLeft, ChevronRight, ExternalLink, CalendarClock, AlertCircle, Pencil } from 'lucide-react';
+import { Settings, Share2, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, ShieldAlert, Heart, Globe, Crown, Camera, Gift, CreditCard, QrCode, Star, X, MoreVertical, ChevronLeft, ChevronRight, ExternalLink, CalendarClock, AlertCircle, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { buildProfileShareUrl } from '@/lib/referral';
 
@@ -31,7 +31,7 @@ export default function ProfilePage() {
     const deleteGalleryMutation = useDeleteFromGallery();
     const updateGalleryItemVisibilityMutation = useUpdateGalleryItemVisibility();
     const { data: depositHistory, isLoading: loadingHistory, refetch: refetchHistory } = useDepositHistory();
-    const { data: rooms = [], refetch: refetchRooms } = useChatRooms();
+    const { refetch: refetchRooms } = useChatRooms();
     const { data: subscriptionsData, refetch: refetchSubscriptions } = useMySubscriptions();
     const cancelSubscriptionMutation = useCancelSubscription();
 
@@ -867,10 +867,6 @@ export default function ProfilePage() {
     const teamMemberSince = userData?.createdAt
         ? new Date(userData.createdAt).toLocaleDateString('pt-BR')
         : 'Nao informado';
-    const teamLastViewed = userData?.activationLastViewedAt
-        ? new Date(userData.activationLastViewedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
-        : 'Ainda nao acessada';
-    const teamConversationsCount = rooms.length;
 
     return (
         <div className="flex flex-col h-full bg-slate-50 relative overflow-hidden max-w-full">
@@ -951,63 +947,31 @@ export default function ProfilePage() {
                 </div>
 
                 {isTeam ? (
-                    <>
-                        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs flex flex-col gap-4">
-                            <div className="flex items-start gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-100 shrink-0">
-                                    <ShieldCheck className="w-5 h-5" />
-                                </div>
-                                <div className="min-w-0">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Funcao na equipe</span>
-                                    <h3 className="text-base font-black text-slate-900 leading-tight mt-0.5">
-                                        {userData?.teamTitle || 'Equipe Mimo'}
-                                    </h3>
-                                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                                        Perfil operacional com acesso a fila de ativacao e conversas oficiais.
-                                    </p>
-                                </div>
+                    <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs flex flex-col gap-3">
+                        <div className="flex items-start gap-3 border-b border-slate-100 pb-3">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-100 shrink-0">
+                                <ShieldCheck className="w-5 h-5" />
+                            </div>
+                            <div className="min-w-0">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Funcao na equipe</span>
+                                <h3 className="text-base font-black text-slate-900 leading-tight mt-0.5">
+                                    {userData?.teamTitle || 'Equipe Mimo'}
+                                </h3>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Conversas</span>
-                                <span className="text-2xl font-black text-slate-900 tracking-tight mt-1 block">{teamConversationsCount}</span>
-                                <p className="text-[11px] text-slate-400 font-medium mt-1">salas acessiveis</p>
-                            </div>
-
-                            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Ativacao</span>
-                                <span className="text-sm font-black text-slate-900 tracking-tight mt-2 block">{teamLastViewed}</span>
-                                <p className="text-[11px] text-slate-400 font-medium mt-1">ultimo acesso</p>
-                            </div>
+                        <div className="flex items-center justify-between text-xs py-1">
+                            <span className="text-slate-500 font-semibold flex items-center gap-2">
+                                <CalendarClock className="w-3.5 h-3.5 text-purple-600" />
+                                Membro desde
+                            </span>
+                            <span className="font-bold text-slate-800">{teamMemberSince}</span>
                         </div>
-
-                        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs flex flex-col gap-3">
-                            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5">Dados da Conta</h3>
-                            <div className="flex items-center justify-between text-xs py-1">
-                                <span className="text-slate-500 font-semibold flex items-center gap-2">
-                                    <CalendarClock className="w-3.5 h-3.5 text-purple-600" />
-                                    Membro desde
-                                </span>
-                                <span className="font-bold text-slate-800">{teamMemberSince}</span>
-                            </div>
-                            <div className="flex items-center justify-between text-xs py-1">
-                                <span className="text-slate-500 font-semibold flex items-center gap-2">
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                    Status
-                                </span>
-                                <span className="font-bold text-emerald-700">Ativo na equipe</span>
-                            </div>
-                            <div className="flex items-center justify-between text-xs py-1">
-                                <span className="text-slate-500 font-semibold flex items-center gap-2">
-                                    <Info className="w-3.5 h-3.5 text-slate-500" />
-                                    Identificacao
-                                </span>
-                                <span className="font-bold text-slate-800 truncate ml-3">@{userData?.username || ''}</span>
-                            </div>
+                        <div className="flex items-center justify-between text-xs py-1">
+                            <span className="text-slate-500 font-semibold">Identificacao</span>
+                            <span className="font-bold text-slate-800 truncate ml-3">@{userData?.username || ''}</span>
                         </div>
-                    </>
+                    </div>
                 ) : (
                     <>
                 {/* Card de Saldo */}
