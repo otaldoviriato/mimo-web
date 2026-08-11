@@ -8,9 +8,29 @@ import { Transaction } from '@/models/Transaction';
 import { Room } from '@/models/Room';
 import { Message } from '@/models/Message';
 import { Subscription } from '@/models/Subscription';
+import { ProfessionalActivation } from '@/models/ProfessionalActivation';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+type TeamActivationContact = {
+    assignedTeamMemberId: string;
+    assignedTeamMemberName: string | null;
+    status: string | null;
+    contactedAt: Date | string | null;
+    isAssignedToCurrentTeamMember: boolean;
+};
+
+type TeamViewerRow = {
+    isTeam?: boolean;
+};
+
+type ActivationContactRow = {
+    assignedTeamMemberId?: string | null;
+    assignedTeamMemberName?: string | null;
+    status?: string | null;
+    contactedAt?: Date | string | null;
+};
 
 // GET /api/users/username/[username] - Get user by exact username
 export async function GET(
@@ -66,6 +86,7 @@ export async function GET(
         }
         let relationshipStats = null;
         let shouldShowBalance = false;
+        let teamActivationContact: TeamActivationContact | null = null;
 
         if (viewerClerkId) {
             // Se o visualizador for o próprio usuário, ele pode ver seu próprio saldo
@@ -282,6 +303,25 @@ export async function GET(
             }
         }
 
+        if (viewerClerkId && user.isProfessional) {
+            const viewer = await User.findOne({ clerkId: viewerClerkId }).select('isTeam').lean() as TeamViewerRow | null;
+            if (viewer?.isTeam) {
+                const activation = await ProfessionalActivation.findOne({ professionalId: user.clerkId })
+                    .select('assignedTeamMemberId assignedTeamMemberName status contactedAt')
+                    .lean() as ActivationContactRow | null;
+
+                if (activation?.assignedTeamMemberId) {
+                    teamActivationContact = {
+                        assignedTeamMemberId: activation.assignedTeamMemberId,
+                        assignedTeamMemberName: activation.assignedTeamMemberName || null,
+                        status: activation.status || null,
+                        contactedAt: activation.contactedAt || null,
+                        isAssignedToCurrentTeamMember: activation.assignedTeamMemberId === viewerClerkId,
+                    };
+                }
+            }
+        }
+
         const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers').lean();
         const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
         const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
@@ -423,6 +463,7 @@ export async function GET(
                 conversationsLastWeekCount: user.isProfessional ? conversationsLastWeekCount : 0,
                 messagesLastWeekCount: user.isProfessional ? messagesLastWeekCount : 0,
                 mediaGiftsLastWeekCount: user.isProfessional ? mediaGiftsLastWeekCount : 0,
+                teamActivationContact,
             },
         });
     } catch (error: any) {

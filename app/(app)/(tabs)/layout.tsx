@@ -9,7 +9,7 @@ import { Avatar } from '@/components/Avatar';
 import { useUser } from '@clerk/nextjs';
 import { PWAPromoModal } from '@/components/PWAPromoModal';
 import { NotifPromoModal } from '@/components/NotifPromoModal';
-import { Settings, ShieldAlert, Search, Pencil, UserCheck, ShieldCheck } from 'lucide-react';
+import { BarChart3, Settings, ShieldAlert, Search, Pencil, UserCheck, ShieldCheck } from 'lucide-react';
 
 export default function TabsLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
@@ -213,6 +213,32 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                             >
                                 <Search className="w-5 h-5 text-white" />
                             </button>
+                        )}
+                        {pathname === '/activation' && (
+                            <>
+                                <button
+                                    onClick={() => {
+                                        if (typeof window !== 'undefined') {
+                                            window.dispatchEvent(new CustomEvent('mimo:activation-toggle-stats'));
+                                        }
+                                    }}
+                                    className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center cursor-pointer"
+                                    title="Estatisticas"
+                                >
+                                    <BarChart3 className="w-5 h-5 text-white" />
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        if (typeof window !== 'undefined') {
+                                            window.dispatchEvent(new CustomEvent('mimo:activation-toggle-search'));
+                                        }
+                                    }}
+                                    className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center cursor-pointer"
+                                    title="Buscar profissional"
+                                >
+                                    <Search className="w-5 h-5 text-white" />
+                                </button>
+                            </>
                         )}
                         {pathname === '/profile' && (
                             <button

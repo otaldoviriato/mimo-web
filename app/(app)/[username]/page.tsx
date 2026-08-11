@@ -8,6 +8,7 @@ import { Button } from '@/components/Button';
 import { SubscribeModal } from '@/components/SubscribeModal';
 import { useUserByUsername, usePublicGallery, useSubscribe, useMyProfile } from '@/hooks/useQueries';
 import { UserX, Camera, Lock, Eye, EyeOff, X, ChevronLeft, ChevronRight, ShieldCheck, Crown, Gift, Award, Medal, Star } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface UserProfilePageProps {
     params?: Promise<{ username: string }>;
@@ -34,6 +35,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
     const [viewerDragOffset, setViewerDragOffset] = useState(0);
     const [viewerIsDragging, setViewerIsDragging] = useState(false);
     const [viewerIsAnimating, setViewerIsAnimating] = useState(false);
+    const [startingTeamChat, setStartingTeamChat] = useState(false);
     const touchStartX = useRef(0);
     const touchEndX = useRef(0);
     const viewerTransitionTimeoutRef = useRef<number | null>(null);
@@ -74,7 +76,45 @@ export default function UserProfilePage({ params, username: propUsername, onBack
     // Profissionais só podem conversar com clientes se a conversa já tiver sido iniciada pelo cliente.
     const sameUserType = !!me && !!user && !me.isTeam && !user.isTeam && !!me.isProfessional === !!user.isProfessional;
     const canMessage = !isOwner && !sameUserType && (!me?.isProfessional || hasChat || me?.isTeam);
+    const teamActivationContact = user?.teamActivationContact;
+    const isBlockedByOtherTeamMember = Boolean(
+        me?.isTeam &&
+        user?.isProfessional &&
+        teamActivationContact?.assignedTeamMemberId &&
+        !teamActivationContact?.isAssignedToCurrentTeamMember
+    );
     const showSubscribeButton = user?.isProfessional && user?.isSubscriptionEnabled && !isSubscriber && !isOwner;
+
+    const handleMessageClick = async () => {
+        if (!user || isBlockedByOtherTeamMember) return;
+
+        if (me?.isTeam && user.isProfessional) {
+            setStartingTeamChat(true);
+            try {
+                const res = await fetch('/api/team/activation/start-chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ professionalId: user.clerkId }),
+                });
+
+                if (!res.ok) {
+                    const data = await res.json().catch(() => null);
+                    toast.error(data?.error || 'Erro ao abrir conversa.');
+                    return;
+                }
+
+                router.push(`/chat/${user.clerkId}`);
+            } catch (err) {
+                console.error('Erro ao abrir conversa de ativacao:', err);
+                toast.error('Falha de conexao.');
+            } finally {
+                setStartingTeamChat(false);
+            }
+            return;
+        }
+
+        router.push(`/chat/${user.clerkId}`);
+    };
 
     const currentGalleryItems = useMemo<PublicProfileGalleryItem[]>(() => {
         const items = activeGalleryTab === 'public'
@@ -705,15 +745,25 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                         )}
                         {canMessage && (
                             <button
-                                onClick={() => router.push(`/chat/${user.clerkId}`)}
-                                className={showSubscribeButton
-                                    ? "flex-[2] py-3.5 px-4 bg-white/95 hover:bg-gray-50 active:scale-[0.98] text-gray-800 border border-gray-200/80 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-black/5"
-                                    : "w-full py-3.5 px-4 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 active:scale-[0.98] text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-xl shadow-purple-600/30"}
+                                onClick={handleMessageClick}
+                                disabled={startingTeamChat || isBlockedByOtherTeamMember}
+                                title={isBlockedByOtherTeamMember ? `Em atendimento por ${teamActivationContact?.assignedTeamMemberName || 'outro membro da equipe'}` : undefined}
+                                className={isBlockedByOtherTeamMember
+                                    ? `${showSubscribeButton ? 'flex-[2]' : 'w-full'} py-3.5 px-4 bg-gray-100 text-gray-400 border border-gray-200 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-none cursor-not-allowed`
+                                    : showSubscribeButton
+                                        ? "flex-[2] py-3.5 px-4 bg-white/95 hover:bg-gray-50 active:scale-[0.98] text-gray-800 border border-gray-200/80 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-black/5"
+                                        : "w-full py-3.5 px-4 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 active:scale-[0.98] text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-xl shadow-purple-600/30"}
                             >
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                                 </svg>
-                                <span>{showSubscribeButton ? 'Mensagem' : 'Enviar Mensagem'}</span>
+                                <span>
+                                    {isBlockedByOtherTeamMember
+                                        ? 'Em atendimento'
+                                        : startingTeamChat
+                                            ? 'Abrindo...'
+                                            : showSubscribeButton ? 'Mensagem' : 'Enviar Mensagem'}
+                                </span>
                             </button>
                         )}
                     </div>

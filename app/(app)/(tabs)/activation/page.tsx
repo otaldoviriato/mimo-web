@@ -1,12 +1,23 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
-    Search, UserCheck, MessageSquare, CheckCircle2,
-    Send, RefreshCw, X, Activity, Wallet, BanknoteArrowDown,
-    CalendarDays, Radio, ExternalLink, Users, MousePointerClick, ChevronDown
+    Activity,
+    BanknoteArrowDown,
+    BarChart3,
+    CalendarDays,
+    ChevronDown,
+    ExternalLink,
+    MessageSquare,
+    MousePointerClick,
+    Radio,
+    Search,
+    UserCheck,
+    Users,
+    Wallet,
+    X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useMyProfile } from '@/hooks/useQueries';
@@ -14,7 +25,7 @@ import { useMyProfile } from '@/hooks/useQueries';
 type FilterStatus = 'all' | 'unviewed' | 'pending' | 'contacted' | 'activated' | 'my_assigned';
 type ActivationStatus = 'pending' | 'contacted' | 'activated' | 'not_interested';
 type FunnelKey = 'registered' | 'share_attempted' | 'brought_user' | 'first_client' | 'frequent';
-type ActivityKey = 'active' | 'recent' | 'absent';
+type EngagementStatusKey = 'recent' | 'active' | 'inactive';
 
 type ProfessionalActivationItem = {
     clerkId: string;
@@ -41,37 +52,23 @@ type ProfessionalActivationItem = {
         totalConversationsCount?: number;
         activeConversationsCount?: number;
         ownClientConversationsCount?: number;
+        activeOwnClientConversationsCount?: number;
         broughtUsersCount?: number;
         shareClickCount?: number;
         balance?: number;
         withdrawalsCount?: number;
         lastWithdrawalAmount?: number | null;
+        lastWithdrawalNetAmount?: number | null;
         lastWithdrawalStatus?: string | null;
         lastWithdrawalAt?: string | null;
+        lastConversationAt?: string | null;
+        activeThresholdDays?: number;
     };
-    activityStatus?: {
-        key?: ActivityKey;
+    engagementStatus?: {
+        key?: EngagementStatusKey;
         label?: string;
     };
 };
-
-const QUICK_MESSAGES = [
-    {
-        id: 'activ_1',
-        title: 'Mensagem de Boas-vindas Padrão',
-        text: 'Oi, {nome}! Vi que você acabou de criar seu perfil no MimoChat. Posso te ajudar a deixar tudo pronto e começar sua primeira conversa?'
-    },
-    {
-        id: 'activ_2',
-        title: 'Suporte de Onboarding & Perfil',
-        text: 'Olá, {nome}! Sou da Equipe Mimo. Tudo bem? Vi que seu perfil foi criado recentemente. Tem alguma dúvida sobre fotos, biografia ou como configurar suas taxas?'
-    },
-    {
-        id: 'activ_3',
-        title: 'Incentivo à Primeira Interação',
-        text: 'Oi, {nome}! Que bom ter você no Mimo! Se precisar de dicas para atrair mais assinantes ou ajuda nas configurações, estou por aqui!'
-    }
-];
 
 const FUNNEL_STEPS = [
     { key: 'registered', label: 'Cadastro', description: 'Perfil criado e pronto para o primeiro contato.' },
@@ -79,6 +76,15 @@ const FUNNEL_STEPS = [
     { key: 'brought_user', label: 'Trouxe usuario', description: 'Conseguiu trazer alguem para a plataforma.' },
     { key: 'first_client', label: '1o cliente', description: 'Ja iniciou conversa com cliente proprio.' },
     { key: 'frequent', label: 'Frequente', description: 'Mantem atividade e recorrencia de conversas.' },
+];
+
+const FILTERS: Array<{ key: FilterStatus; label: string }> = [
+    { key: 'all', label: 'Todas' },
+    { key: 'unviewed', label: 'Novas' },
+    { key: 'pending', label: 'Nao contatadas' },
+    { key: 'contacted', label: 'Em ativacao' },
+    { key: 'activated', label: 'Ativadas' },
+    { key: 'my_assigned', label: 'Meus atendimentos' },
 ];
 
 export default function ActivationPage() {
@@ -91,38 +97,44 @@ export default function ActivationPage() {
     const [activeFilter, setActiveFilter] = useState<FilterStatus>('pending');
     const [unviewedCount, setUnviewedCount] = useState(0);
     const [totalCount, setTotalCount] = useState(0);
+    const [activationStats, setActivationStats] = useState({ recent: 0, active: 0, inactive: 0 });
+    const [showSearch, setShowSearch] = useState(false);
+    const [viewMode, setViewMode] = useState<'list' | 'stats'>('list');
+    const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
     const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set());
-
-    // Modal de Iniciar Conversa com Mensagem Pronta
-    const [chatTargetItem, setChatTargetItem] = useState<ProfessionalActivationItem | null>(null);
-    const [customMessage, setCustomMessage] = useState('');
-    const [startingChat, setStartingChat] = useState(false);
 
     const fetchActivationData = useCallback(async (query: string = '', filter: FilterStatus = 'pending') => {
         setLoading(true);
         try {
             const res = await fetch(`/api/team/activation/professionals?q=${encodeURIComponent(query)}&status=${filter}`);
-            if (res.ok) {
-                const data: {
-                    professionals?: ProfessionalActivationItem[];
-                    unviewedCount?: number;
-                    totalProfessionals?: number;
-                } = await res.json();
-                setProfessionals(data.professionals || []);
-                setUnviewedCount(data.unviewedCount || 0);
-                setTotalCount(data.totalProfessionals || 0);
-            } else {
-                toast.error('Erro ao carregar fila de ativação.');
+            if (!res.ok) {
+                toast.error('Erro ao carregar fila de ativacao.');
+                return;
             }
+
+            const data: {
+                professionals?: ProfessionalActivationItem[];
+                unviewedCount?: number;
+                totalProfessionals?: number;
+                activationStats?: { recent?: number; active?: number; inactive?: number };
+            } = await res.json();
+
+            setProfessionals(data.professionals || []);
+            setUnviewedCount(data.unviewedCount || 0);
+            setTotalCount(data.totalProfessionals || 0);
+            setActivationStats({
+                recent: data.activationStats?.recent || 0,
+                active: data.activationStats?.active || 0,
+                inactive: data.activationStats?.inactive || 0,
+            });
         } catch (err) {
-            console.error('Erro ao carregar ativação:', err);
-            toast.error('Falha de conexão com o servidor.');
+            console.error('Erro ao carregar ativacao:', err);
+            toast.error('Falha de conexao com o servidor.');
         } finally {
             setLoading(false);
         }
     }, []);
 
-    // Marcar como visto ao entrar na aba
     useEffect(() => {
         fetch('/api/team/activation/view', { method: 'POST' }).catch(console.error);
     }, []);
@@ -134,35 +146,28 @@ export default function ActivationPage() {
         return () => clearTimeout(timer);
     }, [searchQuery, activeFilter, fetchActivationData]);
 
-    // Ação: Iniciar Conversa com Mensagem Pronta
-    const handleStartChat = async () => {
-        if (!chatTargetItem) return;
-        setStartingChat(true);
-        try {
-            const res = await fetch('/api/team/activation/start-chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    professionalId: chatTargetItem.clerkId,
-                    initialMessage: customMessage,
-                })
-            });
-            if (res.ok) {
-                const data = await res.json();
-                toast.success('Conversa iniciada com sucesso!');
-                setChatTargetItem(null);
-                router.push(`/chat/${data.professionalId || chatTargetItem.clerkId}`);
-            } else {
-                const data = await res.json();
-                toast.error(data.error || 'Erro ao iniciar conversa.');
+    useEffect(() => {
+        const toggleSearch = () => {
+            setShowSearch(current => !current);
+            setViewMode('list');
+        };
+        const showStats = () => {
+            if (viewMode === 'stats') {
+                setViewMode('list');
+                return;
             }
-        } catch (err) {
-            console.error('Erro ao iniciar chat:', err);
-            toast.error('Falha de conexão.');
-        } finally {
-            setStartingChat(false);
-        }
-    };
+
+            setActiveFilter('all');
+            setViewMode('stats');
+        };
+
+        window.addEventListener('mimo:activation-toggle-search', toggleSearch);
+        window.addEventListener('mimo:activation-toggle-stats', showStats);
+        return () => {
+            window.removeEventListener('mimo:activation-toggle-search', toggleSearch);
+            window.removeEventListener('mimo:activation-toggle-stats', showStats);
+        };
+    }, [viewMode]);
 
     const formatRelativeTime = (dateStr: string) => {
         try {
@@ -170,11 +175,10 @@ export default function ActivationPage() {
             const now = new Date();
             const diffMin = Math.floor((now.getTime() - date.getTime()) / 60000);
             if (diffMin < 1) return 'Agora mesmo';
-            if (diffMin < 60) return `há ${diffMin} min`;
+            if (diffMin < 60) return `ha ${diffMin} min`;
             const diffHours = Math.floor(diffMin / 60);
-            if (diffHours < 24) return `há ${diffHours} h`;
-            const diffDays = Math.floor(diffHours / 24);
-            return `há ${diffDays} dias`;
+            if (diffHours < 24) return `ha ${diffHours} h`;
+            return `ha ${Math.floor(diffHours / 24)} dias`;
         } catch {
             return 'N/A';
         }
@@ -202,43 +206,6 @@ export default function ActivationPage() {
         });
     };
 
-    const getWithdrawalStatusLabel = (status?: string | null) => {
-        if (status === 'concluido') return 'Pago';
-        if (status === 'processando') return 'Processando';
-        if (status === 'pendente') return 'Pendente';
-        if (status === 'rejeitado') return 'Rejeitado';
-        return 'Sem saque';
-    };
-
-    const getActivationStatusMeta = (status?: string) => {
-        if (status === 'activated') {
-            return { label: 'Ativada', className: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' };
-        }
-        if (status === 'contacted') {
-            return { label: 'Em ativacao', className: 'bg-blue-50 text-blue-700 border-blue-200', dot: 'bg-blue-500' };
-        }
-        if (status === 'not_interested') {
-            return { label: 'Sem interesse', className: 'bg-slate-50 text-slate-600 border-slate-200', dot: 'bg-slate-400' };
-        }
-        return { label: '1o contato', className: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' };
-    };
-
-    const getFunnelAccentClass = (stageKey?: string) => {
-        if (stageKey === 'frequent') return 'text-emerald-700 bg-emerald-50 border-emerald-200';
-        if (stageKey === 'first_client') return 'text-violet-700 bg-violet-50 border-violet-200';
-        if (stageKey === 'brought_user') return 'text-blue-700 bg-blue-50 border-blue-200';
-        if (stageKey === 'share_attempted') return 'text-amber-700 bg-amber-50 border-amber-200';
-        return 'text-slate-700 bg-slate-50 border-slate-200';
-    };
-
-    const getFunnelBadgeClass = getFunnelAccentClass;
-
-    const getActivityBadgeClass = (activityKey?: string) => {
-        if (activityKey === 'active') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-        if (activityKey === 'recent') return 'bg-sky-50 text-sky-700 border-sky-200';
-        return 'bg-slate-50 text-slate-500 border-slate-200';
-    };
-
     const getProfessionalDisplayName = (prof: ProfessionalActivationItem) => {
         return prof.name || prof.username || 'profissional';
     };
@@ -253,8 +220,29 @@ export default function ActivationPage() {
         return `Criada ${formatRelativeTime(prof.createdAt)}`;
     };
 
-    const toggleDetails = (clerkId: string) => {
-        setExpandedDetails((current) => {
+    const getWithdrawalStatusLabel = (status?: string | null) => {
+        if (status === 'concluido') return 'Pago';
+        if (status === 'processando') return 'Processando';
+        if (status === 'pendente') return 'Pendente';
+        if (status === 'rejeitado') return 'Rejeitado';
+        return 'Sem saque';
+    };
+
+    const getEngagementBadgeClass = (key?: EngagementStatusKey) => {
+        if (key === 'recent') return 'border-sky-200 bg-sky-50 text-sky-700';
+        if (key === 'active') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+        return 'border-slate-200 bg-slate-50 text-slate-500';
+    };
+
+    const getStatusBadge = (status?: ActivationStatus) => {
+        if (status === 'activated') return 'Ativada';
+        if (status === 'contacted') return 'Em ativacao';
+        if (status === 'not_interested') return 'Sem interesse';
+        return '1o contato';
+    };
+
+    const toggleSteps = (clerkId: string) => {
+        setExpandedSteps(current => {
             const next = new Set(current);
             if (next.has(clerkId)) {
                 next.delete(clerkId);
@@ -265,568 +253,335 @@ export default function ActivationPage() {
         });
     };
 
-    const openChatModal = (prof: ProfessionalActivationItem) => {
-        setChatTargetItem(prof);
-        const defaultMsg = QUICK_MESSAGES[0].text.replace('{nome}', getProfessionalDisplayName(prof));
-        setCustomMessage(defaultMsg);
+    const toggleDetails = (clerkId: string) => {
+        setExpandedDetails(current => {
+            const next = new Set(current);
+            if (next.has(clerkId)) {
+                next.delete(clerkId);
+            } else {
+                next.add(clerkId);
+            }
+            return next;
+        });
     };
 
+    const statsCards = useMemo(() => [
+        {
+            key: 'recent' as const,
+            title: 'Recentes',
+            value: activationStats.recent,
+            description: 'Cadastro nas ultimas 24 horas.',
+            className: 'border-sky-200 bg-sky-50/60 text-sky-700',
+        },
+        {
+            key: 'active' as const,
+            title: 'Ativas',
+            value: activationStats.active,
+            description: 'Mensagem com clientes nos ultimos 7 dias.',
+            className: 'border-emerald-200 bg-emerald-50/60 text-emerald-700',
+        },
+        {
+            key: 'inactive' as const,
+            title: 'Inativas',
+            value: activationStats.inactive,
+            description: 'Sem mensagem com clientes nos ultimos 7 dias.',
+            className: 'border-slate-200 bg-white text-slate-600',
+        },
+    ], [activationStats]);
+
+    const visibleByEngagement = useMemo(() => {
+        return {
+            recent: professionals.filter(prof => prof.engagementStatus?.key === 'recent'),
+            active: professionals.filter(prof => prof.engagementStatus?.key === 'active'),
+            inactive: professionals.filter(prof => prof.engagementStatus?.key === 'inactive'),
+        };
+    }, [professionals]);
+
     return (
-        <div className="flex-1 bg-slate-50 min-h-screen pb-24 md:pb-10 p-4 md:p-8">
-            <div className="max-w-6xl mx-auto space-y-4">
-                
-                {/* Header Principal */}
-                <div className="bg-white border border-slate-200/80 rounded-xl px-3.5 py-3 shadow-sm flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                        <span className="bg-purple-100 text-purple-700 p-2 rounded-lg shrink-0">
-                            <UserCheck size={18} />
-                        </span>
-                        <div className="min-w-0">
-                            <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate">Fila de Ativação</h1>
-                            <p className="hidden sm:block text-xs text-slate-500 font-medium truncate">
-                                Acompanhe contatos e status das criadoras recentes.
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Botão de Atualização Manual */}
-                    <button
-                        onClick={() => fetchActivationData(searchQuery, activeFilter)}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-all cursor-pointer shrink-0"
-                    >
-                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                        Atualizar
-                    </button>
-                </div>
-
-                {/* Filtros e Busca */}
+        <div className="flex-1 min-h-screen bg-slate-50 pb-24 md:pb-10 p-4 md:p-8">
+            <div className="mx-auto max-w-6xl space-y-4">
                 <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-                        <button
-                            onClick={() => setActiveFilter('all')}
-                            className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                                activeFilter === 'all'
-                                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
-                                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                            }`}
-                        >
-                            Todas Recentes ({totalCount})
-                        </button>
+                        {FILTERS.map(filter => (
+                            <button
+                                key={filter.key}
+                                onClick={() => {
+                                    setActiveFilter(filter.key);
+                                    setViewMode('list');
+                                }}
+                                className={`shrink-0 rounded-lg px-3 py-1.5 text-[11px] font-bold transition-all cursor-pointer ${
+                                    activeFilter === filter.key
+                                        ? 'bg-slate-900 text-white shadow-sm'
+                                        : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                }`}
+                            >
+                                {filter.label}
+                                {filter.key === 'unviewed' && unviewedCount > 0 ? ` (${unviewedCount})` : ''}
+                                {filter.key === 'all' ? ` (${totalCount})` : ''}
+                            </button>
+                        ))}
+                    </div>
 
-                        <button
-                            onClick={() => setActiveFilter('unviewed')}
-                            className={`relative shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                                activeFilter === 'unviewed'
-                                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
-                                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                            }`}
-                        >
-                            Novas (Não Visualizadas)
-                            {unviewedCount > 0 && (
-                                <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                    {showSearch && (
+                        <div className="relative">
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                            <input
+                                autoFocus
+                                type="text"
+                                placeholder="Buscar por nome, @username ou e-mail..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-10 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                    title="Limpar busca"
+                                >
+                                    <X size={14} />
+                                </button>
                             )}
-                        </button>
-
-                        <button
-                            onClick={() => setActiveFilter('pending')}
-                            className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                                activeFilter === 'pending'
-                                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
-                                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                            }`}
-                        >
-                            Não Contatadas
-                        </button>
-
-                        <button
-                            onClick={() => setActiveFilter('contacted')}
-                            className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                                activeFilter === 'contacted'
-                                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
-                                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                            }`}
-                        >
-                            Em Ativação
-                        </button>
-
-                        <button
-                            onClick={() => setActiveFilter('activated')}
-                            className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                                activeFilter === 'activated'
-                                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
-                                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                            }`}
-                        >
-                            Ativadas ✓
-                        </button>
-
-                        <button
-                            onClick={() => setActiveFilter('my_assigned')}
-                            className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                                activeFilter === 'my_assigned'
-                                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
-                                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                            }`}
-                        >
-                            Meus Atendimentos
-                        </button>
-                    </div>
-
-                    {/* Barra de Pesquisa */}
-                    <div className="relative w-full">
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                        <input
-                            type="text"
-                            placeholder="Buscar profissional por nome, @username ou e-mail..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-800 placeholder-slate-400"
-                        />
-                    </div>
+                        </div>
+                    )}
                 </div>
 
-                {/* Listagem de Profissionais */}
-                {loading ? (
-                    <div className="py-20 bg-white border border-slate-200/80 rounded-2xl flex flex-col items-center justify-center gap-3">
-                        <div className="animate-spin h-8 w-8 text-purple-600 rounded-full border-4 border-slate-200 border-t-purple-600" />
-                        <span className="text-sm font-semibold text-slate-500">Carregando profissionais mais recentes...</span>
+                {viewMode === 'stats' ? (
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                            {statsCards.map(card => (
+                                <div key={card.key} className={`rounded-xl border p-4 ${card.className}`}>
+                                    <p className="text-xs font-bold uppercase tracking-wide opacity-80">{card.title}</p>
+                                    <p className="mt-2 text-3xl font-black text-slate-900">{card.value}</p>
+                                    <p className="mt-1 text-xs font-semibold opacity-80">{card.description}</p>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                            {statsCards.map(card => (
+                                <section key={card.key} className="rounded-xl border border-slate-200 bg-white p-3">
+                                    <div className="mb-2 flex items-center justify-between">
+                                        <h2 className="text-sm font-black text-slate-900">{card.title}</h2>
+                                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${getEngagementBadgeClass(card.key)}`}>
+                                            {card.value}
+                                        </span>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {visibleByEngagement[card.key].slice(0, 8).map(prof => (
+                                            <button
+                                                key={prof.clerkId}
+                                                onClick={() => prof.username && router.push(`/${prof.username}`)}
+                                                className="flex w-full items-center gap-2 rounded-lg px-1.5 py-1.5 text-left hover:bg-slate-50"
+                                            >
+                                                <AvatarImage prof={prof} size="sm" />
+                                                <span className="min-w-0">
+                                                    <span className="block truncate text-xs font-bold text-slate-800">{getProfessionalDisplayName(prof)}</span>
+                                                    <span className="block truncate text-[10px] font-semibold text-slate-400">@{prof.username || 'sem-username'}</span>
+                                                </span>
+                                            </button>
+                                        ))}
+                                        {visibleByEngagement[card.key].length === 0 && (
+                                            <p className="py-6 text-center text-xs font-semibold text-slate-400">Nenhuma profissional nesta categoria.</p>
+                                        )}
+                                    </div>
+                                </section>
+                            ))}
+                        </div>
+                    </div>
+                ) : loading ? (
+                    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-slate-200/80 bg-white py-20">
+                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-700" />
+                        <span className="text-sm font-semibold text-slate-500">Carregando profissionais...</span>
                     </div>
                 ) : professionals.length === 0 ? (
-                    <div className="py-16 bg-white border border-slate-200/80 rounded-2xl flex flex-col items-center justify-center text-center p-6 space-y-3">
-                        <UserCheck className="w-12 h-12 text-slate-300" />
+                    <div className="flex flex-col items-center justify-center space-y-3 rounded-2xl border border-slate-200/80 bg-white p-6 py-16 text-center">
+                        <UserCheck className="h-12 w-12 text-slate-300" />
                         <h3 className="text-base font-bold text-slate-800">Nenhuma profissional encontrada</h3>
-                        <p className="text-xs text-slate-400 max-w-md">
-                            Não há profissionais cadastradas correspondentes aos filtros selecionados.
-                        </p>
+                        <p className="max-w-md text-xs text-slate-400">Nao ha profissionais correspondentes aos filtros selecionados.</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         {professionals.map((prof) => {
                             const act = prof.activation || {};
                             const funnel = prof.activationFunnel || {};
                             const metrics = prof.activationMetrics || {};
-                            const activity = prof.activityStatus || {};
+                            const engagement = prof.engagementStatus || {};
                             const isAssignedToMe = act.assignedTeamMemberId === myProfile?.clerkId;
-                            const statusMeta = getActivationStatusMeta(act.status);
                             const currentFunnelRank = Number(funnel.rank || 1);
-                            const hasAssignedMember = Boolean(act.assignedTeamMemberId);
-                            const isDetailsExpanded = expandedDetails.has(prof.clerkId);
                             const currentFunnelStep = getCurrentFunnelStep(currentFunnelRank);
-                            
+                            const isStepsExpanded = expandedSteps.has(prof.clerkId);
+                            const isDetailsExpanded = expandedDetails.has(prof.clerkId);
+
                             return (
-                                <div 
+                                <article
                                     key={prof.clerkId}
-                                    className={`bg-white border rounded-xl p-3.5 shadow-xs transition-all relative flex flex-col gap-3 ${
-                                        prof.isUnviewed ? 'border-purple-300 ring-2 ring-purple-500/10' : 'border-slate-200/80 hover:border-purple-200'
+                                    className={`rounded-xl border bg-white p-3.5 shadow-xs transition-colors ${
+                                        prof.isUnviewed ? 'border-slate-300 ring-1 ring-slate-200' : 'border-slate-200/80 hover:border-slate-300'
                                     }`}
                                 >
-                                    <div className="space-y-3">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="flex items-center gap-2.5 min-w-0">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        if (prof.username) {
-                                                            router.push(`/${prof.username}`);
-                                                        }
-                                                    }}
-                                                    className="relative shrink-0 group"
-                                                    title="Abrir perfil"
-                                                >
-                                                {prof.photoUrl ? (
-                                                    <Image
-                                                        src={prof.photoUrl}
-                                                        alt={prof.name || prof.username || 'Profissional'}
-                                                        width={48}
-                                                        height={48}
-                                                        unoptimized
-                                                        className="w-12 h-12 rounded-lg object-cover border border-slate-100 shadow-sm"
-                                                    />
-                                                ) : (
-                                                    <div className="w-12 h-12 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm border border-purple-200">
-                                                        {prof.name ? prof.name.substring(0, 2).toUpperCase() : 'PR'}
-                                                    </div>
-                                                )}
-                                                    {prof.isOnline && (
-                                                        <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white ring-4 ring-emerald-100" />
-                                                    )}
-                                                    <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-white text-purple-600 border border-purple-100 flex items-center justify-center shadow-xs opacity-95 group-hover:bg-purple-50 transition-all">
-                                                        <ExternalLink size={10} />
-                                                    </span>
-                                                </button>
-                                                <div className="min-w-0">
-                                                    <h4 className="text-sm font-black text-slate-900 leading-tight flex items-center gap-1.5 min-w-0">
-                                                        <span className="truncate">{getProfessionalDisplayName(prof)}</span>
-                                                        {prof.isUnviewed && (
-                                                            <span className="shrink-0 w-2 h-2 rounded-full bg-rose-500" title="Novo" />
-                                                        )}
-                                                    </h4>
-                                                    <p className="text-[11px] text-slate-400 font-semibold mt-0.5 truncate">
-                                                        {getLastAccessLabel(prof)}
-                                                    </p>
-                                                </div>
-                                            </div>
-
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex min-w-0 items-center gap-2.5">
                                             <button
-                                                onClick={() => {
-                                                    if (isAssignedToMe) {
-                                                        router.push(`/chat/${prof.clerkId}`);
-                                                        return;
-                                                    }
-                                                    if (!hasAssignedMember) {
-                                                        openChatModal(prof);
-                                                    }
-                                                }}
-                                                disabled={hasAssignedMember && !isAssignedToMe}
-                                                className={`h-10 px-3 rounded-lg text-xs font-black flex items-center justify-center gap-2 shadow-sm transition-all shrink-0 ${
-                                                    hasAssignedMember && !isAssignedToMe
-                                                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
-                                                        : 'bg-purple-600 hover:bg-purple-700 text-white cursor-pointer'
-                                                }`}
-                                                title={isAssignedToMe ? 'Ver conversa' : hasAssignedMember ? `Em atendimento por ${act.assignedTeamMemberName || 'outro membro'}` : 'Enviar mensagem'}
+                                                type="button"
+                                                onClick={() => prof.username && router.push(`/${prof.username}`)}
+                                                className="relative shrink-0 group"
+                                                title="Abrir perfil"
                                             >
-                                                <MessageSquare size={16} />
-                                                <span className="max-w-[112px] truncate">
-                                                    {isAssignedToMe ? 'Ver conversa' : hasAssignedMember ? (act.assignedTeamMemberName || 'Em atendimento') : 'Enviar mensagem'}
-                                                </span>
+                                                <AvatarImage prof={prof} />
+                                                {prof.isOnline && (
+                                                    <span className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500" />
+                                                )}
                                             </button>
-                                        </div>
-
-                                        <div className="hidden">
-                                            <span className={`inline-flex items-center gap-1.5 h-6 px-2 rounded-md border text-[10px] font-black ${statusMeta.className}`}>
-                                                <span className={`w-1.5 h-1.5 rounded-full ${statusMeta.dot}`} />
-                                                {statusMeta.label}
-                                            </span>
-                                            <span className={`inline-flex items-center h-6 px-2 rounded-md border text-[10px] font-bold truncate ${
-                                                isAssignedToMe
-                                                    ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                                    : 'bg-slate-50 text-slate-500 border-slate-200'
-                                            }`}>
-                                                {act.assignedTeamMemberName || 'Sem responsavel'}
-                                            </span>
-                                            <span className={`ml-auto inline-flex items-center h-6 px-2 rounded-md border text-[10px] font-bold ${getActivityBadgeClass(activity.key)}`}>
-                                                {activity.label || 'Ausente'}
-                                            </span>
-                                        </div>
-
-                                        {/* Status & Responsável Badges */}
-                                        <div className="hidden">
-                                            {/* Badge de Status da Ativação */}
-                                            {act.status === 'activated' ? (
-                                                <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-md">
-                                                    <CheckCircle2 size={12} />
-                                                    Ativada ✓
-                                                </span>
-                                            ) : act.status === 'contacted' ? (
-                                                <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-md">
-                                                    Em Ativação
-                                                </span>
-                                            ) : act.status === 'not_interested' ? (
-                                                <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-md">
-                                                    Sem Interesse
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-md">
-                                                    Aguardando 1º Contato
-                                                </span>
-                                            )}
-
-                                            {/* Badge de Responsável */}
-                                            {act.assignedTeamMemberName ? (
-                                                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-md border ${
-                                                    isAssignedToMe
-                                                        ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                                        : 'bg-slate-100 text-slate-600 border-slate-200'
-                                                }`}>
-                                                    Responsável: {act.assignedTeamMemberName}
-                                                </span>
-                                            ) : (
-                                                <span className="text-[11px] font-medium text-slate-400 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md">
-                                                    Sem responsável
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        {/* Observações & Estágio */}
-                                        <div className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2.5">
-                                            <div className="flex items-center justify-between gap-3">
-                                                <div className="min-w-0 flex items-center gap-2.5">
-                                                    <span className="w-3.5 h-3.5 rounded-full bg-purple-600 ring-4 ring-purple-100 shrink-0" />
-                                                    <p className="text-sm font-black text-slate-900 truncate">{currentFunnelStep.label}</p>
-                                                </div>
-                                                <span className="shrink-0 text-[11px] font-black text-purple-700 bg-white border border-purple-100 rounded-md px-2 py-1">
-                                                    {currentFunnelRank}/5
-                                                </span>
+                                            <div className="min-w-0">
+                                                <h2 className="flex min-w-0 items-center gap-1.5 text-sm font-black leading-tight text-slate-900">
+                                                    <span className="truncate">{getProfessionalDisplayName(prof)}</span>
+                                                    {prof.isUnviewed && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500" title="Novo" />}
+                                                </h2>
+                                                <p className="mt-0.5 truncate text-[11px] font-semibold text-slate-400">@{prof.username || 'sem-username'} · {getLastAccessLabel(prof)}</p>
                                             </div>
-                                            <p className="mt-1.5 text-[11px] font-semibold text-slate-500 leading-snug">
-                                                {currentFunnelStep.description}
-                                            </p>
                                         </div>
 
-                                        <div className={`${isDetailsExpanded ? 'block' : 'hidden'} pt-1`}>
-                                            <div className="flex items-center justify-between gap-3 mb-2">
-                                                <p className="text-[11px] uppercase font-black text-slate-400">Etapas da ativacao</p>
-                                            </div>
-                                            <div className="space-y-0.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => prof.username && router.push(`/${prof.username}`)}
+                                            className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                                            title="Abrir perfil"
+                                        >
+                                            <ExternalLink size={15} />
+                                        </button>
+                                    </div>
+
+                                    <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${getEngagementBadgeClass(engagement.key)}`}>
+                                            {engagement.label || 'Inativa'}
+                                        </span>
+                                        <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                                            {getStatusBadge(act.status)}
+                                        </span>
+                                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+                                            isAssignedToMe ? 'border-purple-200 bg-purple-50 text-purple-700' : 'border-slate-200 bg-slate-50 text-slate-500'
+                                        }`}>
+                                            {act.assignedTeamMemberName || 'Sem responsavel'}
+                                        </span>
+                                    </div>
+
+                                    <div className="mt-3 grid grid-cols-3 gap-2 border-y border-slate-100 py-3">
+                                        <Metric icon={<Activity size={13} />} label="Etapa" value={currentFunnelStep.label} />
+                                        <Metric icon={<MessageSquare size={13} />} label="Conversas" value={String(metrics.totalConversationsCount || 0)} detail={`${metrics.activeConversationsCount || 0} ativas`} />
+                                        <Metric icon={<Wallet size={13} />} label="Saldo" value={formatCurrency(metrics.balance)} />
+                                    </div>
+
+                                    <div className="mt-2 space-y-2">
+                                        <button
+                                            onClick={() => toggleSteps(prof.clerkId)}
+                                            className="flex h-8 w-full items-center justify-between rounded-lg px-1 text-[11px] font-black text-slate-600 hover:bg-slate-50"
+                                        >
+                                            <span>Etapas</span>
+                                            <span className="flex items-center gap-1 text-slate-400">
+                                                {currentFunnelRank}/5
+                                                <ChevronDown size={14} className={`transition-transform ${isStepsExpanded ? 'rotate-180' : ''}`} />
+                                            </span>
+                                        </button>
+
+                                        {isStepsExpanded && (
+                                            <div className="space-y-1.5 border-t border-slate-100 pt-2">
                                                 {FUNNEL_STEPS.map((step, index) => {
                                                     const stepNumber = index + 1;
                                                     const isDone = currentFunnelRank >= stepNumber;
-                                                    const isCurrent = currentFunnelRank === stepNumber;
-
                                                     return (
-                                                        <div key={step.key} className="relative flex gap-2.5 min-h-[26px]">
-                                                            {index < FUNNEL_STEPS.length - 1 && (
-                                                                <span className={`absolute left-[6px] top-4 h-[calc(100%-8px)] w-0.5 ${currentFunnelRank > stepNumber ? 'bg-purple-500' : 'bg-slate-200'}`} />
-                                                            )}
-                                                            <span className={`relative mt-1 w-3.5 h-3.5 rounded-full border-2 shrink-0 ${
-                                                                isDone
-                                                                    ? 'bg-purple-600 border-purple-600'
-                                                                    : 'bg-white border-slate-300'
-                                                            } ${isCurrent ? 'ring-4 ring-purple-100' : ''}`} />
-                                                            <span className="min-w-0 pb-2">
-                                                                <span className={`block text-[12px] leading-5 font-bold ${isDone ? 'text-slate-800' : 'text-slate-400'}`}>
-                                                                    {step.label}
-                                                                </span>
-                                                                <span className="block text-[10px] leading-snug font-semibold text-slate-400">
-                                                                    {step.description}
-                                                                </span>
+                                                        <div key={step.key} className="flex gap-2.5">
+                                                            <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${isDone ? 'bg-slate-700' : 'bg-slate-200'}`} />
+                                                            <span className="min-w-0 pb-1">
+                                                                <span className={`block text-[12px] font-bold leading-5 ${isDone ? 'text-slate-800' : 'text-slate-400'}`}>{step.label}</span>
+                                                                <span className="block text-[10px] font-semibold leading-snug text-slate-400">{step.description}</span>
                                                             </span>
                                                         </div>
                                                     );
                                                 })}
                                             </div>
-                                        </div>
-
-                                        <div className="hidden">
-                                            <div className="px-3 py-2 bg-slate-50 flex items-center justify-between gap-2">
-                                                <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-md border ${getFunnelBadgeClass(funnel.key)}`}>
-                                                    <Activity size={12} />
-                                                    {funnel.label || 'Profissional cadastrada'}
-                                                </span>
-                                                <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-md border ${getActivityBadgeClass(activity.key)}`}>
-                                                    {activity.label || 'Ausente'}
-                                                </span>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 sm:grid-cols-3 divide-x divide-y divide-slate-100 bg-white">
-                                                <div className="p-3 min-w-0">
-                                                    <p className="text-[10px] uppercase tracking-wide text-slate-400 font-bold">Conversas</p>
-                                                    <p className="mt-1 flex items-center gap-1.5 text-sm font-black text-slate-800">
-                                                        <MessageSquare size={13} className="text-emerald-500" />
-                                                        {metrics.totalConversationsCount || 0}
-                                                    </p>
-                                                    <p className="mt-0.5 text-[10px] font-semibold text-slate-400">{metrics.activeConversationsCount || 0} ativas · sem equipe</p>
-                                                </div>
-                                                <div className="p-3 min-w-0">
-                                                    <p className="text-[10px] uppercase tracking-wide text-slate-400 font-bold">Saldo</p>
-                                                    <p className="mt-1 flex items-center gap-1.5 text-sm font-black text-slate-800">
-                                                        <Wallet size={13} className="text-violet-500" />
-                                                        {formatCurrency(metrics.balance)}
-                                                    </p>
-                                                </div>
-                                                <div className="p-3 min-w-0">
-                                                    <p className="text-[10px] uppercase tracking-wide text-slate-400 font-bold">Saques</p>
-                                                    <p className="mt-1 flex items-center gap-1.5 text-sm font-black text-slate-800">
-                                                        <BanknoteArrowDown size={13} className="text-blue-500" />
-                                                        {metrics.withdrawalsCount || 0}
-                                                    </p>
-                                                    <p className="mt-0.5 text-[10px] font-semibold text-slate-400">{getWithdrawalStatusLabel(metrics.lastWithdrawalStatus)}</p>
-                                                </div>
-                                                <div className="p-3 min-w-0">
-                                                    <p className="text-[10px] uppercase tracking-wide text-slate-400 font-bold">Último saque</p>
-                                                    <p className="mt-1 text-sm font-black text-slate-800">
-                                                        {metrics.lastWithdrawalAmount != null ? formatCurrency(metrics.lastWithdrawalAmount) : 'Sem saque'}
-                                                    </p>
-                                                    <p className="mt-0.5 text-[10px] font-semibold text-slate-400">{formatDateTime(metrics.lastWithdrawalAt)}</p>
-                                                </div>
-                                                <div className="p-3 min-w-0">
-                                                    <p className="text-[10px] uppercase tracking-wide text-slate-400 font-bold">Cadastro</p>
-                                                    <p className="mt-1 flex items-center gap-1.5 text-xs font-bold text-slate-700">
-                                                        <CalendarDays size={13} className="text-slate-400" />
-                                                        {formatDateTime(prof.createdAt)}
-                                                    </p>
-                                                </div>
-                                                <div className="p-3 min-w-0">
-                                                    <p className="text-[10px] uppercase tracking-wide text-slate-400 font-bold">Última online</p>
-                                                    <p className="mt-1 flex items-center gap-1.5 text-xs font-bold text-slate-700">
-                                                        <Radio size={13} className="text-slate-400" />
-                                                        {prof.isOnline ? 'Online agora' : formatDateTime(prof.lastSeen)}
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            <div className="px-3 py-2 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-500 font-medium">
-                                                {metrics.ownClientConversationsCount || 0} clientes próprios com conversa · {metrics.broughtUsersCount || 0} usuários trazidos · {metrics.shareClickCount || 0} tentativas de compartilhar
-                                            </div>
-                                        </div>
+                                        )}
 
                                         <button
                                             onClick={() => toggleDetails(prof.clerkId)}
-                                            className="h-8 w-full flex items-center justify-center gap-1.5 text-[11px] font-black text-slate-500 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-all cursor-pointer"
+                                            className="flex h-8 w-full items-center justify-between rounded-lg px-1 text-[11px] font-black text-slate-600 hover:bg-slate-50"
                                         >
-                                            {isDetailsExpanded ? 'Ver menos' : 'Ver mais'}
-                                            <ChevronDown size={14} className={`transition-transform ${isDetailsExpanded ? 'rotate-180' : ''}`} />
+                                            <span>Ver mais</span>
+                                            <span className="flex items-center gap-2 text-slate-400">
+                                                {formatCurrency(metrics.balance)} · {metrics.withdrawalsCount || 0} saques
+                                                <ChevronDown size={14} className={`transition-transform ${isDetailsExpanded ? 'rotate-180' : ''}`} />
+                                            </span>
                                         </button>
 
-                                        <div className={`${isDetailsExpanded ? 'grid' : 'hidden'} grid-cols-4 gap-1.5 border-t border-slate-100 pt-2`}>
-                                            <div className="min-w-0 rounded-lg bg-slate-50 border border-slate-100 p-2" title={`${metrics.activeConversationsCount || 0} conversas ativas`}>
-                                                <MessageSquare size={13} className="text-emerald-500" />
-                                                <p className="mt-1 text-sm font-black text-slate-900">{metrics.totalConversationsCount || 0}</p>
-                                                <p className="text-[9px] font-bold text-slate-400 truncate">{metrics.activeConversationsCount || 0} ativas</p>
-                                            </div>
-                                            <div className="min-w-0 rounded-lg bg-slate-50 border border-slate-100 p-2" title="Saldo">
-                                                <Wallet size={13} className="text-violet-500" />
-                                                <p className="mt-1 text-[12px] font-black text-slate-900 truncate">{formatCurrency(metrics.balance)}</p>
-                                                <p className="text-[9px] font-bold text-slate-400 truncate">saldo</p>
-                                            </div>
-                                            <div className="min-w-0 rounded-lg bg-slate-50 border border-slate-100 p-2" title={getWithdrawalStatusLabel(metrics.lastWithdrawalStatus)}>
-                                                <BanknoteArrowDown size={13} className="text-blue-500" />
-                                                <p className="mt-1 text-sm font-black text-slate-900">{metrics.withdrawalsCount || 0}</p>
-                                                <p className="text-[9px] font-bold text-slate-400 truncate">
-                                                    {metrics.lastWithdrawalAmount != null ? formatCurrency(metrics.lastWithdrawalAmount) : getWithdrawalStatusLabel(metrics.lastWithdrawalStatus)}
-                                                </p>
-                                            </div>
-                                            <div className="min-w-0 rounded-lg bg-slate-50 border border-slate-100 p-2" title="Usuarios trazidos e compartilhamentos">
-                                                <Users size={13} className="text-cyan-600" />
-                                                <p className="mt-1 text-sm font-black text-slate-900">{metrics.broughtUsersCount || 0}</p>
-                                                <p className="text-[9px] font-bold text-slate-400 truncate">{metrics.shareClickCount || 0} shares</p>
-                                            </div>
-                                        </div>
-
-                                        <div className={`${isDetailsExpanded ? 'grid' : 'hidden'} grid-cols-2 gap-1.5 text-[10px] font-bold text-slate-500`}>
-                                            <div className="min-w-0 flex items-center gap-1.5 rounded-lg border border-slate-100 px-2 py-1.5">
-                                                <CalendarDays size={12} className="text-slate-400 shrink-0" />
-                                                <span className="truncate">{formatDateTime(prof.createdAt)}</span>
-                                            </div>
-                                            <div className="min-w-0 flex items-center gap-1.5 rounded-lg border border-slate-100 px-2 py-1.5">
-                                                <Radio size={12} className="text-slate-400 shrink-0" />
-                                                <span className="truncate">{prof.isOnline ? 'Online agora' : formatDateTime(prof.lastSeen)}</span>
-                                            </div>
-                                        </div>
-
-                                        <div className={`${isDetailsExpanded ? 'flex' : 'hidden'} items-center gap-2 text-[10px] font-bold text-slate-500 min-w-0`}>
-                                            <span className="inline-flex items-center gap-1 min-w-0">
-                                                <MessageSquare size={11} className="text-slate-400 shrink-0" />
-                                                <span className="truncate">{metrics.ownClientConversationsCount || 0} clientes proprios</span>
-                                            </span>
-                                            <span className="inline-flex items-center gap-1 shrink-0">
-                                                <MousePointerClick size={11} className="text-slate-400" />
-                                                {metrics.shareClickCount || 0}
-                                            </span>
-                                            <span className="ml-auto shrink-0 text-slate-400" title="Ultimo saque">
-                                                {metrics.lastWithdrawalAt ? formatDateTime(metrics.lastWithdrawalAt) : 'Sem saque'}
-                                            </span>
-                                        </div>
-
-                                        {false && (act.stage || act.notes) && (
-                                            <div className="min-h-[36px] bg-slate-50 border border-slate-100 px-2.5 py-2 rounded-lg space-y-0.5 text-[11px] text-slate-600">
-                                                {act.stage && (
-                                                    <p className="font-semibold text-slate-700">
-                                                        📌 <span className="font-normal">{act.stage}</span>
-                                                    </p>
-                                                )}
-                                                {act.notes && (
-                                                    <p className="text-slate-500 italic truncate">
-                                                        💬 &quot;{act.notes}&quot;
-                                                    </p>
-                                                )}
+                                        {isDetailsExpanded && (
+                                            <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-2 text-[10px] font-bold text-slate-500">
+                                                <Detail icon={<MessageSquare size={12} />} label="Conversas totais" value={String(metrics.totalConversationsCount || 0)} />
+                                                <Detail icon={<Users size={12} />} label="Clientes proprios" value={String(metrics.ownClientConversationsCount || 0)} />
+                                                <Detail icon={<BanknoteArrowDown size={12} />} label="Saques" value={`${metrics.withdrawalsCount || 0} · ${getWithdrawalStatusLabel(metrics.lastWithdrawalStatus)}`} />
+                                                <Detail icon={<BanknoteArrowDown size={12} />} label="Ultimo saque" value={metrics.lastWithdrawalAmount != null ? formatCurrency(metrics.lastWithdrawalAmount) : 'Sem saque'} />
+                                                <Detail icon={<MousePointerClick size={12} />} label="Compartilhamentos" value={String(metrics.shareClickCount || 0)} />
+                                                <Detail icon={<CalendarDays size={12} />} label="Cadastro" value={formatDateTime(prof.createdAt)} />
+                                                <Detail icon={<Radio size={12} />} label="Ultima online" value={prof.isOnline ? 'Online agora' : formatDateTime(prof.lastSeen)} />
+                                                <Detail icon={<BarChart3 size={12} />} label="Ultima conversa" value={formatDateTime(metrics.lastConversationAt)} />
                                             </div>
                                         )}
                                     </div>
-
-                                    {/* Botões de Ação */}
-                                    <div className="hidden">
-                                        <a
-                                            href={`/${prof.username}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="min-w-0 h-11 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5"
-                                        >
-                                            <ExternalLink size={14} />
-                                            Ver perfil
-                                        </a>
-
-                                        <button
-                                            onClick={() => openChatModal(prof)}
-                                            className="min-w-0 h-11 px-4 bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold rounded-lg transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
-                                        >
-                                            <MessageSquare size={15} />
-                                            Conversar / ver conversa
-                                        </button>
-                                    </div>
-                                </div>
+                                </article>
                             );
                         })}
                     </div>
                 )}
             </div>
+        </div>
+    );
+}
 
-            {/* MODAL: Iniciar Conversa com Mensagem Pronta */}
-            {chatTargetItem && (
-                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl relative animate-fade-in-up">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                            <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
-                                <MessageSquare size={18} className="text-purple-600" />
-                                Iniciar Conversa Oficial
-                            </h3>
-                            <button onClick={() => setChatTargetItem(null)} className="text-slate-400 hover:text-slate-600">
-                                <X size={18} />
-                            </button>
-                        </div>
+function AvatarImage({ prof, size = 'md' }: { prof: ProfessionalActivationItem; size?: 'sm' | 'md' }) {
+    const className = size === 'sm'
+        ? 'h-8 w-8 rounded-lg object-cover border border-slate-100'
+        : 'h-12 w-12 rounded-lg object-cover border border-slate-100';
 
-                        <p className="text-xs text-slate-500 font-medium">
-                            Enviando mensagem para <strong className="text-slate-800">{getProfessionalDisplayName(chatTargetItem)}</strong> como <span className="text-purple-600 font-bold">Equipe Mimo ✓</span> (Atendimento Isento de Cobrança).
-                        </p>
+    if (prof.photoUrl) {
+        return (
+            <Image
+                src={prof.photoUrl}
+                alt={prof.name || prof.username || 'Profissional'}
+                width={size === 'sm' ? 32 : 48}
+                height={size === 'sm' ? 32 : 48}
+                unoptimized
+                className={className}
+            />
+        );
+    }
 
-                        {/* Seletor de Mensagens Prontas */}
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-700 block">Selecione um modelo de mensagem pronta:</label>
-                            <div className="grid grid-cols-1 gap-2">
-                                {QUICK_MESSAGES.map(msg => (
-                                    <button
-                                        key={msg.id}
-                                        onClick={() => setCustomMessage(msg.text.replace('{nome}', getProfessionalDisplayName(chatTargetItem)))}
-                                        className="text-left p-3 rounded-xl border border-slate-200 hover:border-purple-500 hover:bg-purple-50/50 transition-all text-xs text-slate-700 cursor-pointer space-y-1"
-                                    >
-                                        <p className="font-bold text-purple-700">{msg.title}</p>
-                                        <p className="text-slate-500 line-clamp-2">{msg.text.replace('{nome}', getProfessionalDisplayName(chatTargetItem))}</p>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+    return (
+        <div className={`${className} flex items-center justify-center bg-slate-100 text-xs font-bold text-slate-500`}>
+            {prof.name ? prof.name.substring(0, 2).toUpperCase() : 'PR'}
+        </div>
+    );
+}
 
-                        {/* Caixa de Texto Personalizável */}
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-slate-700 block">Mensagem a enviar (personalizável):</label>
-                            <textarea
-                                rows={4}
-                                value={customMessage}
-                                onChange={(e) => setCustomMessage(e.target.value)}
-                                className="w-full p-3 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-800"
-                            />
-                        </div>
+function Metric({ icon, label, value, detail }: { icon: React.ReactNode; label: string; value: string; detail?: string }) {
+    return (
+        <div className="min-w-0">
+            <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                {icon}
+                <span className="truncate">{label}</span>
+            </p>
+            <p className="mt-1 truncate text-xs font-black text-slate-900">{value}</p>
+            {detail && <p className="truncate text-[10px] font-semibold text-slate-400">{detail}</p>}
+        </div>
+    );
+}
 
-                        <div className="flex items-center justify-end gap-3 pt-2">
-                            <button
-                                onClick={() => setChatTargetItem(null)}
-                                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleStartChat}
-                                disabled={startingChat || !customMessage.trim()}
-                                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
-                            >
-                                <Send size={14} />
-                                {startingChat ? 'Iniciando...' : 'Enviar & Abrir Chat'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
+function Detail({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+    return (
+        <div className="min-w-0 rounded-lg border border-slate-100 px-2 py-1.5">
+            <p className="flex items-center gap-1 text-slate-400">
+                {icon}
+                <span className="truncate">{label}</span>
+            </p>
+            <p className="mt-0.5 truncate text-[11px] text-slate-700">{value}</p>
         </div>
     );
 }

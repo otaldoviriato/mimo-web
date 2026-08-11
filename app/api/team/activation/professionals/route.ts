@@ -112,6 +112,8 @@ type ActivationMetrics = {
     lastConversationAt: Date | null;
 };
 
+type EngagementStatusKey = 'recent' | 'active' | 'inactive';
+
 function getFunnelStage(params: {
     shareClickCount: number;
     broughtUsersCount: number;
@@ -143,6 +145,18 @@ function getActivityStatus(params: { isOnline?: boolean; lastSeen?: Date | strin
     }
 
     return { key: 'absent', label: 'Ausente' };
+}
+
+function getEngagementStatus(params: { createdAt: Date | string; activeConversationsCount: number; recentSince: Date }): { key: EngagementStatusKey; label: string } {
+    if (new Date(params.createdAt) >= params.recentSince) {
+        return { key: 'recent', label: 'Recente' };
+    }
+
+    if (params.activeConversationsCount > 0) {
+        return { key: 'active', label: 'Ativa' };
+    }
+
+    return { key: 'inactive', label: 'Inativa' };
 }
 
 export async function GET(request: NextRequest) {
@@ -191,6 +205,7 @@ export async function GET(request: NextRequest) {
         );
         const activeThresholdDays = Math.max(1, Number(settings?.activeUserThresholdDays || 7));
         const activeSince = new Date(Date.now() - activeThresholdDays * 24 * 60 * 60 * 1000);
+        const recentSince = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
         // Buscar dados de ativação
         const activations = await ProfessionalActivation.find({ professionalId: { $in: profIds } }).lean() as ActivationRow[];
@@ -308,6 +323,11 @@ export async function GET(request: NextRequest) {
         const lastViewed = currentUser.activationLastViewedAt ? new Date(currentUser.activationLastViewedAt) : new Date(0);
 
         let unviewedCount = 0;
+        const activationStats = {
+            recent: 0,
+            active: 0,
+            inactive: 0,
+        };
 
         const resultList = professionals.map(p => {
             const act = activationMap.get(p.clerkId) || {
@@ -354,6 +374,12 @@ export async function GET(request: NextRequest) {
                 activeConversationsCount: metrics.activeConversationsCount,
                 activeSince,
             });
+            const engagementStatus = getEngagementStatus({
+                createdAt: p.createdAt,
+                activeConversationsCount: metrics.activeConversationsCount,
+                recentSince,
+            });
+            activationStats[engagementStatus.key]++;
 
             const isUnviewed = new Date(p.createdAt) > lastViewed;
             if (isUnviewed) {
@@ -365,6 +391,7 @@ export async function GET(request: NextRequest) {
                 activation: act,
                 activationFunnel,
                 activityStatus,
+                engagementStatus,
                 activationMetrics: {
                     broughtUsersCount: broughtUsersForProfessional.length,
                     shareClickCount,
@@ -404,6 +431,7 @@ export async function GET(request: NextRequest) {
             professionals: filteredList,
             totalProfessionals: resultList.length,
             unviewedCount,
+            activationStats,
             teamMembers: teamMembersList.map(tm => ({
                 clerkId: tm.clerkId,
                 name: tm.name || tm.username,
