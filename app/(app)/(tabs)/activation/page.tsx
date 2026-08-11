@@ -1,16 +1,59 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { 
-    Search, UserCheck, MessageSquare, CheckCircle2, Clock, 
-    Send, RefreshCw, X, Activity, Wallet, BanknoteArrowDown, 
-    CalendarDays, Radio, ExternalLink
+import {
+    Search, UserCheck, MessageSquare, CheckCircle2,
+    Send, RefreshCw, X, Activity, Wallet, BanknoteArrowDown,
+    CalendarDays, Radio, ExternalLink, Users, MousePointerClick
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useMyProfile } from '@/hooks/useQueries';
 
 type FilterStatus = 'all' | 'unviewed' | 'pending' | 'contacted' | 'activated' | 'my_assigned';
+type ActivationStatus = 'pending' | 'contacted' | 'activated' | 'not_interested';
+type FunnelKey = 'registered' | 'share_attempted' | 'brought_user' | 'first_client' | 'frequent';
+type ActivityKey = 'active' | 'recent' | 'absent';
+
+type ProfessionalActivationItem = {
+    clerkId: string;
+    username?: string;
+    name?: string;
+    photoUrl?: string;
+    createdAt: string;
+    isOnline?: boolean;
+    lastSeen?: string | null;
+    isUnviewed?: boolean;
+    activation?: {
+        assignedTeamMemberId?: string | null;
+        assignedTeamMemberName?: string | null;
+        status?: ActivationStatus;
+        stage?: string;
+        notes?: string;
+    };
+    activationFunnel?: {
+        key?: FunnelKey;
+        label?: string;
+        rank?: number;
+    };
+    activationMetrics?: {
+        totalConversationsCount?: number;
+        activeConversationsCount?: number;
+        ownClientConversationsCount?: number;
+        broughtUsersCount?: number;
+        shareClickCount?: number;
+        balance?: number;
+        withdrawalsCount?: number;
+        lastWithdrawalAmount?: number | null;
+        lastWithdrawalStatus?: string | null;
+        lastWithdrawalAt?: string | null;
+    };
+    activityStatus?: {
+        key?: ActivityKey;
+        label?: string;
+    };
+};
 
 const QUICK_MESSAGES = [
     {
@@ -30,11 +73,19 @@ const QUICK_MESSAGES = [
     }
 ];
 
+const FUNNEL_STEPS = [
+    { key: 'registered', label: 'Cadastro' },
+    { key: 'share_attempted', label: 'Compartilhou' },
+    { key: 'brought_user', label: 'Trouxe usuario' },
+    { key: 'first_client', label: '1o cliente' },
+    { key: 'frequent', label: 'Frequente' },
+];
+
 export default function ActivationPage() {
     const router = useRouter();
     const { data: myProfile } = useMyProfile();
 
-    const [professionals, setProfessionals] = useState<any[]>([]);
+    const [professionals, setProfessionals] = useState<ProfessionalActivationItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState<FilterStatus>('pending');
@@ -42,16 +93,20 @@ export default function ActivationPage() {
     const [totalCount, setTotalCount] = useState(0);
 
     // Modal de Iniciar Conversa com Mensagem Pronta
-    const [chatTargetItem, setChatTargetItem] = useState<any | null>(null);
+    const [chatTargetItem, setChatTargetItem] = useState<ProfessionalActivationItem | null>(null);
     const [customMessage, setCustomMessage] = useState('');
     const [startingChat, setStartingChat] = useState(false);
 
-    const fetchActivationData = async (query: string = '', filter: FilterStatus = activeFilter) => {
+    const fetchActivationData = useCallback(async (query: string = '', filter: FilterStatus = 'pending') => {
         setLoading(true);
         try {
             const res = await fetch(`/api/team/activation/professionals?q=${encodeURIComponent(query)}&status=${filter}`);
             if (res.ok) {
-                const data = await res.json();
+                const data: {
+                    professionals?: ProfessionalActivationItem[];
+                    unviewedCount?: number;
+                    totalProfessionals?: number;
+                } = await res.json();
                 setProfessionals(data.professionals || []);
                 setUnviewedCount(data.unviewedCount || 0);
                 setTotalCount(data.totalProfessionals || 0);
@@ -64,7 +119,7 @@ export default function ActivationPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     // Marcar como visto ao entrar na aba
     useEffect(() => {
@@ -76,7 +131,7 @@ export default function ActivationPage() {
             fetchActivationData(searchQuery, activeFilter);
         }, searchQuery ? 300 : 0);
         return () => clearTimeout(timer);
-    }, [searchQuery, activeFilter]);
+    }, [searchQuery, activeFilter, fetchActivationData]);
 
     // Ação: Iniciar Conversa com Mensagem Pronta
     const handleStartChat = async () => {
@@ -154,13 +209,28 @@ export default function ActivationPage() {
         return 'Sem saque';
     };
 
-    const getFunnelBadgeClass = (stageKey?: string) => {
-        if (stageKey === 'frequent') return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-        if (stageKey === 'first_client') return 'bg-violet-100 text-violet-800 border-violet-200';
-        if (stageKey === 'brought_user') return 'bg-blue-100 text-blue-800 border-blue-200';
-        if (stageKey === 'share_attempted') return 'bg-amber-100 text-amber-800 border-amber-200';
-        return 'bg-slate-100 text-slate-700 border-slate-200';
+    const getActivationStatusMeta = (status?: string) => {
+        if (status === 'activated') {
+            return { label: 'Ativada', className: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' };
+        }
+        if (status === 'contacted') {
+            return { label: 'Em ativacao', className: 'bg-blue-50 text-blue-700 border-blue-200', dot: 'bg-blue-500' };
+        }
+        if (status === 'not_interested') {
+            return { label: 'Sem interesse', className: 'bg-slate-50 text-slate-600 border-slate-200', dot: 'bg-slate-400' };
+        }
+        return { label: '1o contato', className: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' };
     };
+
+    const getFunnelAccentClass = (stageKey?: string) => {
+        if (stageKey === 'frequent') return 'text-emerald-700 bg-emerald-50 border-emerald-200';
+        if (stageKey === 'first_client') return 'text-violet-700 bg-violet-50 border-violet-200';
+        if (stageKey === 'brought_user') return 'text-blue-700 bg-blue-50 border-blue-200';
+        if (stageKey === 'share_attempted') return 'text-amber-700 bg-amber-50 border-amber-200';
+        return 'text-slate-700 bg-slate-50 border-slate-200';
+    };
+
+    const getFunnelBadgeClass = getFunnelAccentClass;
 
     const getActivityBadgeClass = (activityKey?: string) => {
         if (activityKey === 'active') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
@@ -168,9 +238,19 @@ export default function ActivationPage() {
         return 'bg-slate-50 text-slate-500 border-slate-200';
     };
 
-    const openChatModal = (prof: any) => {
+    const getActivityDotClass = (activityKey?: string, isOnline?: boolean) => {
+        if (isOnline || activityKey === 'active') return 'bg-emerald-500 ring-emerald-100';
+        if (activityKey === 'recent') return 'bg-sky-500 ring-sky-100';
+        return 'bg-slate-300 ring-slate-100';
+    };
+
+    const getProfessionalDisplayName = (prof: ProfessionalActivationItem) => {
+        return prof.name || prof.username || 'profissional';
+    };
+
+    const openChatModal = (prof: ProfessionalActivationItem) => {
         setChatTargetItem(prof);
-        const defaultMsg = QUICK_MESSAGES[0].text.replace('{nome}', prof.name || prof.username);
+        const defaultMsg = QUICK_MESSAGES[0].text.replace('{nome}', getProfessionalDisplayName(prof));
         setCustomMessage(defaultMsg);
     };
 
@@ -310,48 +390,86 @@ export default function ActivationPage() {
                             const metrics = prof.activationMetrics || {};
                             const activity = prof.activityStatus || {};
                             const isAssignedToMe = act.assignedTeamMemberId === myProfile?.clerkId;
+                            const statusMeta = getActivationStatusMeta(act.status);
+                            const currentFunnelRank = Number(funnel.rank || 1);
                             
                             return (
                                 <div 
                                     key={prof.clerkId}
-                                    className={`bg-white border rounded-2xl p-5 shadow-xs transition-all relative flex flex-col justify-between ${
+                                    className={`bg-white border rounded-xl p-3.5 shadow-xs transition-all relative flex flex-col gap-3 ${
                                         prof.isUnviewed ? 'border-purple-300 ring-2 ring-purple-500/10' : 'border-slate-200/80 hover:border-purple-200'
                                     }`}
                                 >
-                                    {/* Topo do Card */}
                                     <div className="space-y-3">
                                         <div className="flex items-start justify-between gap-3">
-                                            <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <a
+                                                    href={`/${prof.username}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="relative shrink-0 group"
+                                                    title="Abrir perfil"
+                                                >
                                                 {prof.photoUrl ? (
-                                                    <img src={prof.photoUrl} alt={prof.name} className="w-12 h-12 rounded-xl object-cover border border-slate-100 shadow-sm" />
+                                                    <Image
+                                                        src={prof.photoUrl}
+                                                        alt={prof.name || prof.username || 'Profissional'}
+                                                        width={48}
+                                                        height={48}
+                                                        unoptimized
+                                                        className="w-12 h-12 rounded-lg object-cover border border-slate-100 shadow-sm"
+                                                    />
                                                 ) : (
-                                                    <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm border border-purple-200">
+                                                    <div className="w-12 h-12 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm border border-purple-200">
                                                         {prof.name ? prof.name.substring(0, 2).toUpperCase() : 'PR'}
                                                     </div>
                                                 )}
-                                                <div>
-                                                    <h4 className="text-base font-bold text-slate-900 leading-tight flex items-center gap-1.5">
-                                                        {prof.name || prof.username}
+                                                    <span className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ring-4 ${getActivityDotClass(activity.key, prof.isOnline)}`} />
+                                                    <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-slate-900/85 text-white border-2 border-white flex items-center justify-center shadow-xs opacity-95 group-hover:bg-purple-600 transition-all">
+                                                        <ExternalLink size={10} />
+                                                    </span>
+                                                </a>
+                                                <div className="min-w-0">
+                                                    <h4 className="text-sm font-black text-slate-900 leading-tight flex items-center gap-1.5 min-w-0">
+                                                        <span className="truncate">{prof.name || prof.username}</span>
                                                         {prof.isUnviewed && (
-                                                            <span className="text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full border border-rose-200">
-                                                                Novo
-                                                            </span>
+                                                            <span className="shrink-0 w-2 h-2 rounded-full bg-rose-500" title="Novo" />
                                                         )}
                                                     </h4>
-                                                    <p className="text-xs text-slate-400 font-medium mt-0.5">
-                                                        @{prof.username}
+                                                    <p className="text-[11px] text-slate-400 font-semibold mt-0.5 truncate">
+                                                        @{prof.username} - {formatRelativeTime(prof.createdAt)}
                                                     </p>
                                                 </div>
                                             </div>
 
-                                            <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1 bg-slate-100 px-2.5 py-1 rounded-lg">
-                                                <Clock size={12} />
-                                                {formatRelativeTime(prof.createdAt)}
+                                            <button
+                                                onClick={() => openChatModal(prof)}
+                                                className="h-9 w-9 rounded-lg bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center shadow-sm transition-all cursor-pointer shrink-0"
+                                                title="Conversar"
+                                            >
+                                                <MessageSquare size={16} />
+                                            </button>
+                                        </div>
+
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <span className={`inline-flex items-center gap-1.5 h-6 px-2 rounded-md border text-[10px] font-black ${statusMeta.className}`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${statusMeta.dot}`} />
+                                                {statusMeta.label}
+                                            </span>
+                                            <span className={`inline-flex items-center h-6 px-2 rounded-md border text-[10px] font-bold truncate ${
+                                                isAssignedToMe
+                                                    ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                                    : 'bg-slate-50 text-slate-500 border-slate-200'
+                                            }`}>
+                                                {act.assignedTeamMemberName || 'Sem responsavel'}
+                                            </span>
+                                            <span className={`ml-auto inline-flex items-center h-6 px-2 rounded-md border text-[10px] font-bold ${getActivityBadgeClass(activity.key)}`}>
+                                                {activity.label || 'Ausente'}
                                             </span>
                                         </div>
 
                                         {/* Status & Responsável Badges */}
-                                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                                        <div className="hidden">
                                             {/* Badge de Status da Ativação */}
                                             {act.status === 'activated' ? (
                                                 <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-md">
@@ -389,7 +507,44 @@ export default function ActivationPage() {
                                         </div>
 
                                         {/* Observações & Estágio */}
-                                        <div className="border border-slate-100 rounded-xl overflow-hidden">
+                                        <div className={`rounded-lg border p-3 ${getFunnelAccentClass(funnel.key)}`}>
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <p className="text-[10px] uppercase font-black text-slate-400">Etapa principal</p>
+                                                    <p className="mt-0.5 text-sm font-black truncate">{funnel.label || 'Profissional cadastrada'}</p>
+                                                </div>
+                                                <span className="shrink-0 text-[11px] font-black bg-white/75 border border-white/80 rounded-md px-2 py-1">
+                                                    {currentFunnelRank}/5
+                                                </span>
+                                            </div>
+                                            <div className="mt-3 grid grid-cols-5 gap-1.5">
+                                                {FUNNEL_STEPS.map((step, index) => {
+                                                    const stepNumber = index + 1;
+                                                    const isDone = currentFunnelRank >= stepNumber;
+                                                    const isCurrent = currentFunnelRank === stepNumber;
+
+                                                    return (
+                                                        <div key={step.key} className="relative min-w-0">
+                                                            {index > 0 && (
+                                                                <span className={`absolute top-[7px] -left-1/2 h-0.5 w-full ${isDone ? 'bg-purple-500' : 'bg-slate-200'}`} />
+                                                            )}
+                                                            <div className="relative flex flex-col items-center gap-1">
+                                                                <span className={`w-3.5 h-3.5 rounded-full border-2 ${
+                                                                    isDone
+                                                                        ? 'bg-purple-600 border-purple-600'
+                                                                        : 'bg-white border-slate-300'
+                                                                } ${isCurrent ? 'ring-4 ring-purple-100' : ''}`} />
+                                                                <span className={`text-[9px] leading-tight text-center font-bold truncate w-full ${isDone ? 'text-slate-700' : 'text-slate-400'}`}>
+                                                                    {step.label}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        <div className="hidden">
                                             <div className="px-3 py-2 bg-slate-50 flex items-center justify-between gap-2">
                                                 <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-md border ${getFunnelBadgeClass(funnel.key)}`}>
                                                     <Activity size={12} />
@@ -452,8 +607,58 @@ export default function ActivationPage() {
                                             </div>
                                         </div>
 
+                                        <div className="grid grid-cols-4 gap-1.5">
+                                            <div className="min-w-0 rounded-lg bg-slate-50 border border-slate-100 p-2" title={`${metrics.activeConversationsCount || 0} conversas ativas`}>
+                                                <MessageSquare size={13} className="text-emerald-500" />
+                                                <p className="mt-1 text-sm font-black text-slate-900">{metrics.totalConversationsCount || 0}</p>
+                                                <p className="text-[9px] font-bold text-slate-400 truncate">{metrics.activeConversationsCount || 0} ativas</p>
+                                            </div>
+                                            <div className="min-w-0 rounded-lg bg-slate-50 border border-slate-100 p-2" title="Saldo">
+                                                <Wallet size={13} className="text-violet-500" />
+                                                <p className="mt-1 text-[12px] font-black text-slate-900 truncate">{formatCurrency(metrics.balance)}</p>
+                                                <p className="text-[9px] font-bold text-slate-400 truncate">saldo</p>
+                                            </div>
+                                            <div className="min-w-0 rounded-lg bg-slate-50 border border-slate-100 p-2" title={getWithdrawalStatusLabel(metrics.lastWithdrawalStatus)}>
+                                                <BanknoteArrowDown size={13} className="text-blue-500" />
+                                                <p className="mt-1 text-sm font-black text-slate-900">{metrics.withdrawalsCount || 0}</p>
+                                                <p className="text-[9px] font-bold text-slate-400 truncate">
+                                                    {metrics.lastWithdrawalAmount != null ? formatCurrency(metrics.lastWithdrawalAmount) : getWithdrawalStatusLabel(metrics.lastWithdrawalStatus)}
+                                                </p>
+                                            </div>
+                                            <div className="min-w-0 rounded-lg bg-slate-50 border border-slate-100 p-2" title="Usuarios trazidos e compartilhamentos">
+                                                <Users size={13} className="text-cyan-600" />
+                                                <p className="mt-1 text-sm font-black text-slate-900">{metrics.broughtUsersCount || 0}</p>
+                                                <p className="text-[9px] font-bold text-slate-400 truncate">{metrics.shareClickCount || 0} shares</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-1.5 text-[10px] font-bold text-slate-500">
+                                            <div className="min-w-0 flex items-center gap-1.5 rounded-lg border border-slate-100 px-2 py-1.5">
+                                                <CalendarDays size={12} className="text-slate-400 shrink-0" />
+                                                <span className="truncate">{formatDateTime(prof.createdAt)}</span>
+                                            </div>
+                                            <div className="min-w-0 flex items-center gap-1.5 rounded-lg border border-slate-100 px-2 py-1.5">
+                                                <Radio size={12} className="text-slate-400 shrink-0" />
+                                                <span className="truncate">{prof.isOnline ? 'Online agora' : formatDateTime(prof.lastSeen)}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 min-w-0">
+                                            <span className="inline-flex items-center gap-1 min-w-0">
+                                                <MessageSquare size={11} className="text-slate-400 shrink-0" />
+                                                <span className="truncate">{metrics.ownClientConversationsCount || 0} clientes proprios</span>
+                                            </span>
+                                            <span className="inline-flex items-center gap-1 shrink-0">
+                                                <MousePointerClick size={11} className="text-slate-400" />
+                                                {metrics.shareClickCount || 0}
+                                            </span>
+                                            <span className="ml-auto shrink-0 text-slate-400" title="Ultimo saque">
+                                                {metrics.lastWithdrawalAt ? formatDateTime(metrics.lastWithdrawalAt) : 'Sem saque'}
+                                            </span>
+                                        </div>
+
                                         {(act.stage || act.notes) && (
-                                            <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl space-y-1 text-xs text-slate-600">
+                                            <div className="min-h-[36px] bg-slate-50 border border-slate-100 px-2.5 py-2 rounded-lg space-y-0.5 text-[11px] text-slate-600">
                                                 {act.stage && (
                                                     <p className="font-semibold text-slate-700">
                                                         📌 <span className="font-normal">{act.stage}</span>
@@ -469,7 +674,7 @@ export default function ActivationPage() {
                                     </div>
 
                                     {/* Botões de Ação */}
-                                    <div className="pt-4 border-t border-slate-100 mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-2">
+                                    <div className="hidden">
                                         <a
                                             href={`/${prof.username}`}
                                             target="_blank"
@@ -510,7 +715,7 @@ export default function ActivationPage() {
                         </div>
 
                         <p className="text-xs text-slate-500 font-medium">
-                            Enviando mensagem para <strong className="text-slate-800">{chatTargetItem.name || '@' + chatTargetItem.username}</strong> como <span className="text-purple-600 font-bold">Equipe Mimo ✓</span> (Atendimento Isento de Cobrança).
+                            Enviando mensagem para <strong className="text-slate-800">{getProfessionalDisplayName(chatTargetItem)}</strong> como <span className="text-purple-600 font-bold">Equipe Mimo ✓</span> (Atendimento Isento de Cobrança).
                         </p>
 
                         {/* Seletor de Mensagens Prontas */}
@@ -520,11 +725,11 @@ export default function ActivationPage() {
                                 {QUICK_MESSAGES.map(msg => (
                                     <button
                                         key={msg.id}
-                                        onClick={() => setCustomMessage(msg.text.replace('{nome}', chatTargetItem.name || chatTargetItem.username))}
+                                        onClick={() => setCustomMessage(msg.text.replace('{nome}', getProfessionalDisplayName(chatTargetItem)))}
                                         className="text-left p-3 rounded-xl border border-slate-200 hover:border-purple-500 hover:bg-purple-50/50 transition-all text-xs text-slate-700 cursor-pointer space-y-1"
                                     >
                                         <p className="font-bold text-purple-700">{msg.title}</p>
-                                        <p className="text-slate-500 line-clamp-2">{msg.text.replace('{nome}', chatTargetItem.name || chatTargetItem.username)}</p>
+                                        <p className="text-slate-500 line-clamp-2">{msg.text.replace('{nome}', getProfessionalDisplayName(chatTargetItem))}</p>
                                     </button>
                                 ))}
                             </div>

@@ -9,7 +9,7 @@ const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 // PATCH /api/admin/users/[id]/team-status - Define ou remove status de equipe de um usuário
 export async function PATCH(
     request: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
+    { params }: { params: Promise<{ clerkId: string }> }
 ) {
     try {
         const { userId } = await auth();
@@ -25,7 +25,7 @@ export async function PATCH(
             return NextResponse.json({ error: 'Acesso proibido. Apenas administradores.' }, { status: 403 });
         }
 
-        const { id: targetClerkId } = await params;
+        const { clerkId: targetClerkId } = await params;
         const body = await request.json();
         const { isTeam, teamTitle } = body;
 
@@ -62,8 +62,9 @@ export async function PATCH(
                 teamTitle: targetUser.teamTitle,
             }
         });
-    } catch (error: any) {
+    } catch (error) {
         console.error('Erro ao atualizar status de equipe:', error);
-        return NextResponse.json({ error: error.message || 'Erro interno ao atualizar status de equipe' }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Erro interno ao atualizar status de equipe';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }
