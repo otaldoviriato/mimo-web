@@ -4,8 +4,9 @@ import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { Room } from '@/models/Room';
 import { Message } from '@/models/Message';
+import { MicroTransaction } from '@/models/MicroTransaction';
 import { AppSettings } from '@/models/AppSettings';
-import { groupEventsIntoSessions, RawEventInput } from '@/lib/sessionGrouping';
+import { buildEarningsSessions } from '@/lib/earningsSessions';
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
@@ -31,7 +32,8 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Acesso proibido. Apenas administradores.' }, { status: 403 });
         }
 
-        const timeoutMinutes = settings?.chatSessionTimeoutMinutes ?? 30;
+        const timeoutMinutes = settings?.earningsSessionInactivityMinutes ?? 120;
+        const minimumEarningsCents = settings?.earningsSessionMinimumCents ?? 1000;
 
         const { searchParams } = new URL(request.url);
         const filterUserId = searchParams.get('userId');
@@ -119,43 +121,48 @@ export async function GET(request: NextRequest) {
         }));
 
         // 4. Buscar e agrupar mensagens para a lista de Sessões de Conversa
-        let messageQuery: any = {};
-        if (filterUserId) {
-            messageQuery.$or = [
-                { senderId: filterUserId },
-                { receiverId: filterUserId }
-            ];
-        }
-
-        const rawMessages = await Message.find(messageQuery)
-            .sort({ timestamp: 1 })
-            .select('_id roomId senderId receiverId cost receiverEarnings content isGift isLockedImage timestamp')
-            .lean();
-
-        const rawEvents: RawEventInput[] = rawMessages.map((msg: any) => ({
-            id: msg._id.toString(),
-            relatedUserId: filterUserId
-                ? (msg.senderId === filterUserId ? msg.receiverId : msg.senderId)
-                : msg.senderId,
-            roomId: msg.roomId,
-            type: msg.isGift ? 'gift' : msg.isLockedImage ? 'image_unlock' : 'message',
-            amount: msg.cost || 0, // valor pago pelo cliente em centavos
-            timestamp: msg.timestamp || msg.createdAt,
-            senderId: msg.senderId,
-            receiverId: msg.receiverId,
-            description: msg.content
-        }));
-
-        const groupedSessions = groupEventsIntoSessions(rawEvents, timeoutMinutes);
+        const groupedSessions = filterUserId ? buildEarningsSessions(
+            filterUserId,
+            (await Message.find({
+                isSystem: { $ne: true },
+                $or: [{ senderId: filterUserId }, { receiverId: filterUserId }]
+            })
+                .sort({ timestamp: 1 })
+                .select('_id roomId senderId receiverId isGift isLockedImage isVideo timestamp createdAt')
+                .lean() as any[]).map(message => ({
+                    id: message._id.toString(),
+                    roomId: message.roomId,
+                    senderId: message.senderId,
+                    receiverId: message.receiverId,
+                    timestamp: message.timestamp || message.createdAt,
+                    isGift: message.isGift,
+                    isLockedImage: message.isLockedImage,
+                    isVideo: message.isVideo,
+                })),
+            (await MicroTransaction.find({
+                userId: filterUserId,
+                type: 'credit',
+                source: { $in: ['message', 'image_unlock', 'gift'] }
+            })
+                .sort({ timestamp: 1 })
+                .select('_id amount source relatedUserId messageId metadata timestamp createdAt')
+                .lean() as any[]).map(transaction => ({
+                    id: transaction._id.toString(),
+                    amount: transaction.amount,
+                    source: transaction.source,
+                    relatedUserId: transaction.relatedUserId,
+                    timestamp: transaction.timestamp || transaction.createdAt,
+                    messageId: transaction.messageId?.toString()
+                        || transaction.metadata?.messageId?.toString(),
+                })),
+            timeoutMinutes,
+            minimumEarningsCents,
+        ) : [];
 
         // Enriquecer sessões com dados dos participantes A e B
         const enrichedSessions = groupedSessions.map((session) => {
-            let clerkIdA = filterUserId || session.items[0]?.senderId || 'user_a';
-            let clerkIdB = session.relatedUserId;
-
-            if (!clerkIdB || clerkIdB === clerkIdA) {
-                clerkIdB = session.items[0]?.receiverId || 'user_b';
-            }
+            const clerkIdA = filterUserId!;
+            const clerkIdB = session.relatedUserId;
 
             const userAObj = usersList.find(u => u.clerkId === clerkIdA);
             const userBObj = usersList.find(u => u.clerkId === clerkIdB);
@@ -188,17 +195,23 @@ export async function GET(request: NextRequest) {
                 timeRangeLabel: `${dateStr} às ${startStr} - ${endStr}`,
                 durationMinutes: session.durationMinutes,
                 messagesCount: session.messagesCount,
+                professionalMessages: session.professionalMessages,
+                clientMessages: session.clientMessages,
                 mediaCount: session.mediaCount,
                 giftCount: session.giftCount,
                 totalRevenue: session.totalEarnings / 100, // em Reais
-                itemsCount: session.items.length
+                messageRevenue: session.messageEarnings / 100,
+                mediaRevenue: session.mediaEarnings / 100,
+                giftRevenue: session.giftEarnings / 100,
+                itemsCount: session.transactionIds.length
             };
         });
 
         return NextResponse.json({
             rooms: enrichedRooms,
             sessions: enrichedSessions,
-            timeoutMinutes
+            timeoutMinutes,
+            minimumEarningsCents
         });
 
     } catch (error: any) {

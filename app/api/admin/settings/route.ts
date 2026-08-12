@@ -27,6 +27,8 @@ async function getOrCreateSettings() {
             minExclusivePhotos: 2,
             maxExclusivePhotos: 4,
             lowBalanceThresholdInCents: 1000,
+            earningsSessionInactivityMinutes: 120,
+            earningsSessionMinimumCents: 1000,
             defaultPricePerCharSubscribers: 0.002,
             defaultPricePerCharNonSubscribers: 0.005,
             audioPriceMultiplier: 5,
@@ -48,6 +50,8 @@ async function getOrCreateSettings() {
         if (settings.creditCardEnabled === undefined) { settings.creditCardEnabled = true; updated = true; }
         if (settings.couponsEnabled === undefined) { settings.couponsEnabled = true; updated = true; }
         if (settings.chatSessionTimeoutMinutes === undefined) { settings.chatSessionTimeoutMinutes = 30; updated = true; }
+        if (settings.earningsSessionInactivityMinutes === undefined) { settings.earningsSessionInactivityMinutes = 120; updated = true; }
+        if (settings.earningsSessionMinimumCents === undefined) { settings.earningsSessionMinimumCents = 1000; updated = true; }
         if (settings.lowBalanceThresholdInCents === undefined) { settings.lowBalanceThresholdInCents = 1000; updated = true; }
         if (settings.minSubscriptionPrice === undefined) { settings.minSubscriptionPrice = 10; updated = true; }
         if (settings.institutionalEmails === undefined) { settings.institutionalEmails = ['viriatoceo@mimochat.com.br']; updated = true; }
@@ -179,6 +183,8 @@ export async function PUT(request: NextRequest) {
             creditCardEnabled,
             couponsEnabled,
             chatSessionTimeoutMinutes,
+            earningsSessionInactivityMinutes,
+            earningsSessionMinimumCents,
             lowBalanceThresholdInCents,
             defaultPricePerCharSubscribers,
             defaultPricePerCharNonSubscribers,
@@ -330,6 +336,22 @@ export async function PUT(request: NextRequest) {
                 return NextResponse.json({ error: 'Tempo de sessão deve ser de pelo menos 1 minuto' }, { status: 400 });
             }
             settings.chatSessionTimeoutMinutes = timeout;
+        }
+
+        if (earningsSessionInactivityMinutes !== undefined) {
+            const inactivity = Number(earningsSessionInactivityMinutes);
+            if (isNaN(inactivity) || inactivity < 1 || inactivity > 1440) {
+                return NextResponse.json({ error: 'Inatividade do extrato deve ser entre 1 e 1440 minutos' }, { status: 400 });
+            }
+            settings.earningsSessionInactivityMinutes = Math.round(inactivity);
+        }
+
+        if (earningsSessionMinimumCents !== undefined) {
+            const minimum = Number(earningsSessionMinimumCents);
+            if (isNaN(minimum) || minimum < 0) {
+                return NextResponse.json({ error: 'Ganho mínimo da sessão não pode ser negativo' }, { status: 400 });
+            }
+            settings.earningsSessionMinimumCents = Math.round(minimum);
         }
 
         if (lowBalanceThresholdInCents !== undefined) {

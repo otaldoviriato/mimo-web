@@ -19,6 +19,8 @@ export interface SettingsData {
     creditCardEnabled: boolean;
     couponsEnabled: boolean;
     chatSessionTimeoutMinutes: number;
+    earningsSessionInactivityMinutes?: number;
+    earningsSessionMinimumCents?: number;
     lowBalanceThresholdInCents?: number;
     onlineDelayMinutes?: number;
     defaultPricePerCharSubscribers: number;

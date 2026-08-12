@@ -107,9 +107,14 @@ interface ChatSession {
     timeRangeLabel: string;
     durationMinutes: number;
     messagesCount: number;
+    professionalMessages: number;
+    clientMessages: number;
     mediaCount: number;
     giftCount: number;
     totalRevenue: number;
+    messageRevenue: number;
+    mediaRevenue: number;
+    giftRevenue: number;
     itemsCount: number;
 }
 
@@ -160,7 +165,8 @@ export default function UserDetailPage() {
     const [rooms, setRooms] = useState<ChatRoom[]>([]);
     const [sessions, setSessions] = useState<ChatSession[]>([]);
     const [chatSubTab, setChatSubTab] = useState<'relationships' | 'sessions'>('relationships');
-    const [timeoutMinutes, setTimeoutMinutes] = useState<number>(30);
+    const [timeoutMinutes, setTimeoutMinutes] = useState<number>(120);
+    const [minimumEarningsCents, setMinimumEarningsCents] = useState<number>(1000);
     const [loadingRooms, setLoadingRooms] = useState(true);
     const [selectedAuditChat, setSelectedAuditChat] = useState<ChatRoom | null>(null);
     const [auditLoadingMore, setAuditLoadingMore] = useState(false);
@@ -199,6 +205,7 @@ export default function UserDetailPage() {
                 setRooms(data.rooms || []);
                 setSessions(data.sessions || []);
                 if (data.timeoutMinutes) setTimeoutMinutes(data.timeoutMinutes);
+                if (typeof data.minimumEarningsCents === 'number') setMinimumEarningsCents(data.minimumEarningsCents);
             } else {
                 toast.error('Erro ao buscar salas de chat.');
             }
@@ -1383,7 +1390,7 @@ export default function UserDetailPage() {
                                     Salas de Chat e Auditoria
                                 </h3>
                                 <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-                                    Visualize as conversas por relacionamentos globais ou por sessões de troca contínua (intervalo máximo de 30 min).
+                                    Visualize relacionamentos ou sessões com pelo menos {(minimumEarningsCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}, separadas após {timeoutMinutes} min sem mensagens.
                                 </p>
                             </div>
 
@@ -1574,7 +1581,7 @@ export default function UserDetailPage() {
                                                             <div className="flex items-center gap-1 flex-wrap">
                                                                 {session.messagesCount > 0 && (
                                                                     <span className="text-[9.5px] bg-purple-50 text-purple-700 border border-purple-100 px-2 py-0.5 rounded-md font-bold">
-                                                                        {session.messagesCount} msgs
+                                                                        {session.messagesCount} msgs ({session.professionalMessages} prof. / {session.clientMessages} cliente)
                                                                     </span>
                                                                 )}
                                                                 {session.mediaCount > 0 && (
@@ -1590,9 +1597,16 @@ export default function UserDetailPage() {
                                                             </div>
                                                         </td>
                                                         <td className="py-4 px-6">
-                                                            <span className="text-xs font-black text-emerald-600 flex items-center gap-1">
-                                                                + {session.totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                                            </span>
+                                                            <div className="flex flex-col gap-0.5">
+                                                                <span className="text-xs font-black text-emerald-600 flex items-center gap-1">
+                                                                    + {session.totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                                </span>
+                                                                <span className="text-[9.5px] text-slate-400 font-semibold">
+                                                                    Mensagens {session.messageRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                                    {session.mediaRevenue > 0 ? ` · Mídias ${session.mediaRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : ''}
+                                                                    {session.giftRevenue > 0 ? ` · Presentes ${session.giftRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : ''}
+                                                                </span>
+                                                            </div>
                                                         </td>
                                                         <td className="py-4 px-6 text-center" onClick={(e) => e.stopPropagation()}>
                                                             <button

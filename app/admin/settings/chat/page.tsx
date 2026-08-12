@@ -11,6 +11,10 @@ export default function AdminSettingsChatPage() {
         <SettingsChatPage
             chatSessionTimeoutMinutes={settings.chatSessionTimeoutMinutes}
             setChatSessionTimeoutMinutes={settings.setChatSessionTimeoutMinutes}
+            earningsSessionInactivityMinutes={settings.earningsSessionInactivityMinutes}
+            setEarningsSessionInactivityMinutes={settings.setEarningsSessionInactivityMinutes}
+            earningsSessionMinimumCents={settings.earningsSessionMinimumCents}
+            setEarningsSessionMinimumCents={settings.setEarningsSessionMinimumCents}
             lowBalanceThresholdInCents={settings.lowBalanceThresholdInCents}
             setLowBalanceThresholdInCents={settings.setLowBalanceThresholdInCents}
             onlineDelayMinutes={settings.onlineDelayMinutes}

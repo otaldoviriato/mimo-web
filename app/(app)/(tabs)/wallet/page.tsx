@@ -7,6 +7,7 @@ import { useMyProfile, useRequestWithdraw, usePendingWithdrawal, useUpdateProfil
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Input } from '@/components/Input';
 import { Avatar } from '@/components/Avatar';
+import { WalletStatement, type WalletStatementData } from '@/components/wallet/WalletStatement';
 import { 
     Wallet2, 
     ArrowUpRight, 
@@ -239,14 +240,15 @@ export default function WalletPage() {
     });
 
     // Query de Extrato de Conversas (Sessões de 30 min)
-    const { data: sessionsData, isLoading: loadingSessions } = useQuery<WalletSessionsData>({
+    const { data: sessionsData, isLoading: loadingSessions, refetch: refetchStatement } = useQuery<WalletStatementData>({
         queryKey: ['wallet', 'sessions'],
         queryFn: async () => {
             const res = await fetch('/api/users/me/wallet-sessions');
             if (!res.ok) throw new Error('Falha ao buscar extrato de conversas por sessão');
             return res.json();
         },
-        staleTime: 60 * 1000,
+        staleTime: 30 * 1000,
+        refetchInterval: 30 * 1000,
     });
 
     const handleRequestWithdraw = async () => {
@@ -260,6 +262,7 @@ export default function WalletPage() {
                 refetchPendingWithdrawal(),
                 refetchDashboard(),
                 refetchWithdrawals(),
+                refetchStatement(),
             ]);
             if (response?.withdrawRequest?.status) {
                 setLastSeenWithdrawalStatus(response.withdrawRequest.status);
@@ -334,6 +337,7 @@ export default function WalletPage() {
             refetchDashboard();
             refetchProfile();
             refetchPendingWithdrawal();
+            refetchStatement();
         }
 
         if (latestWithdrawal.status === 'rejeitado') {
@@ -342,8 +346,9 @@ export default function WalletPage() {
             refetchDashboard();
             refetchProfile();
             refetchPendingWithdrawal();
+            refetchStatement();
         }
-    }, [latestWithdrawal, lastSeenWithdrawalStatus, refetchDashboard, refetchPendingWithdrawal, refetchProfile]);
+    }, [latestWithdrawal, lastSeenWithdrawalStatus, refetchDashboard, refetchPendingWithdrawal, refetchProfile, refetchStatement]);
 
     // Cálculos para o gráfico de barras mensal
     const points = data.earningsEvolution || [];
@@ -584,6 +589,8 @@ export default function WalletPage() {
                         </div>
                     )}
                 </div>
+
+                <WalletStatement data={sessionsData} isLoading={loadingSessions} showValues={showValues} />
 
                 {/* ── BENTO BLOCK: EXTRATO DE GANHOS (SESSÕES + MENSAGENS AVULSAS) (OCULTO TEMPORARIAMENTE) ── */}
                 {/* 

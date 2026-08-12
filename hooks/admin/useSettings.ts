@@ -18,6 +18,8 @@ interface SettingsSnapshot {
     creditCardEnabled: boolean;
     couponsEnabled: boolean;
     chatSessionTimeoutMinutes: number;
+    earningsSessionInactivityMinutes: number;
+    earningsSessionMinimumCents: number;
     lowBalanceThresholdInCents: number;
     onlineDelayMinutes: number;
     activeUserThresholdDays: number;
@@ -63,6 +65,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     const [creditCardEnabled, setCreditCardEnabled] = useState(true);
     const [couponsEnabled, setCouponsEnabled] = useState(true);
     const [chatSessionTimeoutMinutes, setChatSessionTimeoutMinutes] = useState(30);
+    const [earningsSessionInactivityMinutes, setEarningsSessionInactivityMinutes] = useState(120);
+    const [earningsSessionMinimumCents, setEarningsSessionMinimumCents] = useState(1000);
     const [lowBalanceThresholdInCents, setLowBalanceThresholdInCents] = useState(1000);
     const [onlineDelayMinutes, setOnlineDelayMinutes] = useState(2);
     const [activeUserThresholdDays, setActiveUserThresholdDays] = useState(7);
@@ -108,6 +112,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         creditCardEnabled: s.creditCardEnabled ?? true,
         couponsEnabled: s.couponsEnabled ?? true,
         chatSessionTimeoutMinutes: s.chatSessionTimeoutMinutes ?? 30,
+        earningsSessionInactivityMinutes: s.earningsSessionInactivityMinutes ?? 120,
+        earningsSessionMinimumCents: s.earningsSessionMinimumCents ?? 1000,
         lowBalanceThresholdInCents: s.lowBalanceThresholdInCents ?? 1000,
         onlineDelayMinutes: s.onlineDelayMinutes ?? 2,
         activeUserThresholdDays: s.activeUserThresholdDays ?? 7,
@@ -163,6 +169,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     setCreditCardEnabled(s.creditCardEnabled ?? true);
                     setCouponsEnabled(s.couponsEnabled ?? true);
                     setChatSessionTimeoutMinutes(s.chatSessionTimeoutMinutes ?? 30);
+                    setEarningsSessionInactivityMinutes(s.earningsSessionInactivityMinutes ?? 120);
+                    setEarningsSessionMinimumCents(s.earningsSessionMinimumCents ?? 1000);
                     setLowBalanceThresholdInCents(s.lowBalanceThresholdInCents ?? 1000);
                     setOnlineDelayMinutes(s.onlineDelayMinutes ?? 2);
                     setActiveUserThresholdDays(s.activeUserThresholdDays ?? 7);
@@ -260,6 +268,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     creditCardEnabled,
                     couponsEnabled,
                     chatSessionTimeoutMinutes,
+                    earningsSessionInactivityMinutes,
+                    earningsSessionMinimumCents,
                     lowBalanceThresholdInCents,
                     onlineDelayMinutes,
                     activeUserThresholdDays,
@@ -292,6 +302,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                 // Sync state com valores retornados
                 const s = data.settings;
                 setLowBalanceThresholdInCents(s.lowBalanceThresholdInCents ?? 1000);
+                setEarningsSessionInactivityMinutes(s.earningsSessionInactivityMinutes ?? 120);
+                setEarningsSessionMinimumCents(s.earningsSessionMinimumCents ?? 1000);
                 setMaxPricePerChar(s.maxPricePerChar);
                 setMaxSubscriptionPrice(s.maxSubscriptionPrice);
                 setMinSubscriptionPrice(s.minSubscriptionPrice ?? 10);
@@ -357,6 +369,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     );
     const isDirtyChat = savedSnapshot !== null && (
         chatSessionTimeoutMinutes !== savedSnapshot.chatSessionTimeoutMinutes ||
+        earningsSessionInactivityMinutes !== savedSnapshot.earningsSessionInactivityMinutes ||
+        earningsSessionMinimumCents !== savedSnapshot.earningsSessionMinimumCents ||
         lowBalanceThresholdInCents !== savedSnapshot.lowBalanceThresholdInCents ||
         onlineDelayMinutes !== savedSnapshot.onlineDelayMinutes ||
         activeUserThresholdDays !== savedSnapshot.activeUserThresholdDays
@@ -434,6 +448,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         creditCardEnabled, setCreditCardEnabled,
         couponsEnabled, setCouponsEnabled,
         chatSessionTimeoutMinutes, setChatSessionTimeoutMinutes,
+        earningsSessionInactivityMinutes, setEarningsSessionInactivityMinutes,
+        earningsSessionMinimumCents, setEarningsSessionMinimumCents,
         lowBalanceThresholdInCents, setLowBalanceThresholdInCents,
         onlineDelayMinutes, setOnlineDelayMinutes,
         activeUserThresholdDays, setActiveUserThresholdDays,

@@ -1,277 +1,290 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
-import { User } from '@/models/User';
-import { MicroTransaction } from '@/models/MicroTransaction';
-import { Message } from '@/models/Message';
+import { buildEarningsSessionBlocks } from '@/lib/earningsSessions';
 import { AppSettings } from '@/models/AppSettings';
+import { Message } from '@/models/Message';
+import { MicroTransaction } from '@/models/MicroTransaction';
+import { Transaction } from '@/models/Transaction';
+import { User } from '@/models/User';
+import { WithdrawRequest } from '@/models/WithdrawRequest';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest) {
-    try {
-        const { userId: clerkId } = await auth();
+type StatementEntry = {
+    id: string;
+    kind: 'conversation' | 'other_earnings' | 'media_unlock' | 'gift' | 'subscription' | 'adjustment';
+    title: string;
+    description: string;
+    amount: number;
+    timestamp: Date;
+    status: 'open' | 'closed';
+    relatedUserId?: string;
+    clientName?: string;
+    clientUsername?: string;
+    clientPhotoUrl?: string | null;
+    details?: Record<string, number>;
+};
 
-        if (!clerkId) {
-            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-        }
+const shortDate = (date: Date) => date.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: 'America/Sao_Paulo',
+});
+
+export async function GET() {
+    try {
+        const { userId } = await auth();
+        if (!userId) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
 
         await connectToDatabase();
 
-        const user = await User.findOne({ clerkId });
-        if (!user) {
-            return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
-        }
+        const [user, settings, withdrawals] = await Promise.all([
+            User.findOne({ clerkId: userId }).select('balance').lean(),
+            AppSettings.findOne({ key: 'global' }).lean(),
+            WithdrawRequest.find({ userId })
+                .sort({ createdAt: -1 })
+                .limit(50)
+                .lean(),
+        ]);
 
-        // 1. Obter parâmetro de timeout global (default 180 min se não definido)
-        const settings = await AppSettings.findOne({ key: 'global' }).lean();
-        const timeoutMinutes = settings?.chatSessionTimeoutMinutes ?? 180;
+        if (!user) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
 
-        // 2. Buscar TODAS as microtransações de crédito da criadora (FONTE ABSOLUTA DA VERDADE DO DINHEIRO)
-        const microTxs = await MicroTransaction.find({
-            userId: clerkId,
-            type: 'credit',
-            source: { $in: ['message', 'image_unlock', 'gift'] }
-        })
-        .sort({ timestamp: 1 })
-        .lean();
+        const timeoutMinutes = settings?.earningsSessionInactivityMinutes ?? 120;
+        const minimumEarningsCents = settings?.earningsSessionMinimumCents ?? 1000;
+        const [microTransactions, subscriptionTransactions, messages] = await Promise.all([
+            MicroTransaction.find({
+                userId,
+                type: 'credit',
+                source: { $in: ['message', 'image_unlock', 'gift'] },
+            }).sort({ timestamp: 1 }).lean(),
+            Transaction.find({
+                userId,
+                type: 'credit',
+                source: 'subscription',
+                status: 'COMPLETED',
+            }).sort({ timestamp: 1 }).lean(),
+            Message.find({
+                isSystem: { $ne: true },
+                $or: [{ senderId: userId }, { receiverId: userId }],
+            })
+                .select('_id roomId senderId receiverId isGift isLockedImage isVideo timestamp createdAt')
+                .sort({ timestamp: 1 })
+                .lean(),
+        ]);
 
-        if (!microTxs || microTxs.length === 0) {
-            return NextResponse.json({
-                sessions: [],
-                standaloneItems: [],
-                standaloneGroups: [],
-                totalSessionsEarnings: 0,
-                totalStandaloneEarnings: 0,
-                timeoutMinutes
-            });
-        }
-
-        // 3. Mapear os clientes envolvidos e buscar mensagens das salas
-        const relatedUserIds = Array.from(new Set(microTxs.map((t: any) => t.relatedUserId).filter(Boolean))) as string[];
-        const roomIds = relatedUserIds.map(clientClerkId => [clerkId, clientClerkId].sort().join('_'));
-
-        const roomMessages = await Message.find({ roomId: { $in: roomIds } })
-            .select('_id roomId senderId receiverId content cost receiverEarnings isGift isLockedImage timestamp createdAt')
-            .sort({ timestamp: 1 })
-            .lean();
-
-        // 4. Buscar dados dos clientes para fotos e nomes
+        const relatedUserIds = Array.from(new Set([
+            ...microTransactions.map(transaction => transaction.relatedUserId).filter(Boolean),
+            ...subscriptionTransactions.map(transaction => transaction.relatedUserId).filter(Boolean),
+        ])) as string[];
         const clients = await User.find({ clerkId: { $in: relatedUserIds } })
             .select('clerkId name username photoUrl')
             .lean();
+        const clientMap = new Map(clients.map(client => [client.clerkId, {
+            name: client.name || client.username || 'Cliente Mimo',
+            username: client.username || 'cliente',
+            photoUrl: client.photoUrl || null,
+        }]));
 
-        const clientMap = new Map<string, { name: string; username: string; photoUrl: string | null }>();
-        clients.forEach(c => {
-            clientMap.set(c.clerkId, {
-                name: c.name || c.username || 'Cliente',
-                username: c.username || 'cliente',
-                photoUrl: c.photoUrl || null
-            });
-        });
+        const normalizedMicro = microTransactions.map(transaction => ({
+            id: transaction._id.toString(),
+            amount: Number(transaction.amount) || 0,
+            source: transaction.source as 'message' | 'image_unlock' | 'gift',
+            relatedUserId: transaction.relatedUserId,
+            timestamp: transaction.timestamp || transaction.createdAt,
+            messageId: transaction.messageId?.toString() || transaction.metadata?.messageId?.toString(),
+        }));
+        const microById = new Map(normalizedMicro.map(transaction => [transaction.id, transaction]));
+        const blocks = buildEarningsSessionBlocks(
+            userId,
+            messages.map(message => ({
+                id: message._id.toString(),
+                roomId: message.roomId,
+                senderId: message.senderId,
+                receiverId: message.receiverId,
+                timestamp: message.timestamp || (message as typeof message & { createdAt: Date }).createdAt,
+                isGift: message.isGift,
+                isLockedImage: message.isLockedImage,
+                isVideo: message.isVideo,
+            })),
+            normalizedMicro,
+            timeoutMinutes,
+            false,
+        );
 
-        // 5. Agrupar microtransações e mensagens por sala (roomId)
-        const txsByRoom = new Map<string, any[]>();
-        microTxs.forEach((tx: any) => {
-            const rId = [clerkId, tx.relatedUserId || 'desconhecido'].sort().join('_');
-            if (!txsByRoom.has(rId)) txsByRoom.set(rId, []);
-            txsByRoom.get(rId)!.push(tx);
-        });
+        const now = new Date();
+        const consumedTransactionIds = new Set<string>();
+        const entries: StatementEntry[] = [];
+        const smallEarnings: Array<{ id: string; amount: number; timestamp: Date }> = [];
 
-        const msgsByRoom = new Map<string, any[]>();
-        roomMessages.forEach((m: any) => {
-            const rId = m.roomId || [m.senderId, m.receiverId].sort().join('_');
-            if (!msgsByRoom.has(rId)) msgsByRoom.set(rId, []);
-            msgsByRoom.get(rId)!.push(m);
-        });
+        for (const block of blocks) {
+            if (block.totalEarnings <= 0) continue;
+            const closesAt = new Date(block.endTime.getTime() + timeoutMinutes * 60_000);
+            const isOpen = now < closesAt;
+            const qualifies = block.totalEarnings >= minimumEarningsCents;
 
-        const sessionsMap = new Map<string, any>();
-        const standaloneItems: any[] = [];
+            if (isOpen || qualifies) {
+                block.transactionIds.forEach(id => consumedTransactionIds.add(id));
+                const client = clientMap.get(block.relatedUserId);
+                entries.push({
+                    id: block.sessionId,
+                    kind: 'conversation',
+                    title: `Conversa com ${client?.name || 'Cliente Mimo'}`,
+                    description: isOpen
+                        ? 'O valor pode aumentar enquanto a conversa continuar.'
+                        : `${block.messagesCount} mensagens nesta conversa.`,
+                    amount: block.totalEarnings,
+                    timestamp: block.endTime,
+                    status: isOpen ? 'open' : 'closed',
+                    relatedUserId: block.relatedUserId,
+                    clientName: client?.name,
+                    clientUsername: client?.username,
+                    clientPhotoUrl: client?.photoUrl,
+                    details: {
+                        messages: block.messagesCount,
+                        professionalMessages: block.professionalMessages,
+                        clientMessages: block.clientMessages,
+                        media: block.mediaCount,
+                        gifts: block.giftCount,
+                    },
+                });
+                continue;
+            }
 
-        // 6. Processar sala por sala com validação rígida de sessões bi-direcionais
-        txsByRoom.forEach((txs, rId) => {
-            const msgs = msgsByRoom.get(rId) || [];
-            const creatorMsgs = msgs.filter((m: any) => m.senderId === clerkId);
+            for (const transactionId of block.transactionIds) {
+                const transaction = microById.get(transactionId);
+                if (!transaction) continue;
+                consumedTransactionIds.add(transactionId);
+                smallEarnings.push({ id: transactionId, amount: transaction.amount, timestamp: block.endTime });
+            }
+        }
 
-            if (creatorMsgs.length === 0) {
-                // Se a criadora nunca enviou nenhuma mensagem na sala -> 100% das transações são Avulsas
-                txs.forEach((tx: any) => {
-                    const clientClerkId = tx.relatedUserId || 'desconhecido';
-                    const clientInfo = clientMap.get(clientClerkId);
-                    standaloneItems.push({
-                        id: tx._id.toString(),
-                        type: tx.source || 'message',
-                        amount: tx.amount || 0,
-                        timestamp: tx.timestamp || tx.createdAt,
-                        description: tx.source === 'gift' ? 'Presente recebido' : tx.source === 'image_unlock' ? 'Mídia privada desbloqueada' : 'Mensagem recebida',
-                        relatedUserId: clientClerkId,
-                        clientName: clientInfo?.name || 'Cliente Mimo',
-                        clientUsername: clientInfo?.username || 'cliente',
-                        clientPhotoUrl: clientInfo?.photoUrl || null
-                    });
+        for (const transaction of normalizedMicro) {
+            if (consumedTransactionIds.has(transaction.id)) continue;
+            const timestamp = new Date(transaction.timestamp);
+            const client = transaction.relatedUserId ? clientMap.get(transaction.relatedUserId) : undefined;
+
+            if (transaction.source === 'image_unlock' || transaction.source === 'gift') {
+                entries.push({
+                    id: transaction.id,
+                    kind: transaction.source === 'gift' ? 'gift' : 'media_unlock',
+                    title: transaction.source === 'gift'
+                        ? `${client?.name || 'Um cliente'} enviou um presente`
+                        : `${client?.name || 'Um cliente'} desbloqueou um Mimo seu`,
+                    description: transaction.source === 'gift' ? 'Presente recebido' : 'Desbloqueio realizado após a conversa.',
+                    amount: transaction.amount,
+                    timestamp,
+                    status: 'closed',
+                    relatedUserId: transaction.relatedUserId,
+                    clientName: client?.name,
+                    clientUsername: client?.username,
+                    clientPhotoUrl: client?.photoUrl,
                 });
             } else {
-                // Mapear sessões válidas na sala (janela de inatividade, bi-direcionalidade e >= 2 mensagens)
-                const sortedMsgs = msgs.slice().sort((a, b) => new Date(a.timestamp || a.createdAt).getTime() - new Date(b.timestamp || b.createdAt).getTime());
-                let currentSession: any = null;
-                const validSessions: any[] = [];
-
-                sortedMsgs.forEach((m: any) => {
-                    const mTs = new Date(m.timestamp || m.createdAt);
-                    if (!currentSession) {
-                        currentSession = {
-                            senders: new Set([m.senderId]),
-                            startTime: mTs,
-                            endTime: mTs,
-                            messages: [m]
-                        };
-                    } else {
-                        const diffMin = (mTs.getTime() - currentSession.endTime.getTime()) / (1000 * 60);
-                        if (diffMin <= timeoutMinutes) {
-                            currentSession.endTime = mTs;
-                            currentSession.senders.add(m.senderId);
-                            currentSession.messages.push(m);
-                        } else {
-                            if (currentSession.senders.size >= 2 && currentSession.messages.length >= 2) {
-                                validSessions.push(currentSession);
-                            }
-                            currentSession = {
-                                senders: new Set([m.senderId]),
-                                startTime: mTs,
-                                endTime: mTs,
-                                messages: [m]
-                            };
-                        }
-                    }
-                });
-                if (currentSession && currentSession.senders.size >= 2 && currentSession.messages.length >= 2) {
-                    validSessions.push(currentSession);
-                }
-
-                // Atribuir cada transação de crédito (mensagem, desbloqueio de mídia ou presente) à sessão bi-direcional correspondente
-                txs.forEach((tx: any) => {
-                    const txTs = new Date(tx.timestamp || tx.createdAt).getTime();
-                    const clientClerkId = tx.relatedUserId || 'desconhecido';
-                    const clientInfo = clientMap.get(clientClerkId);
-
-                    const txItem = {
-                        id: tx._id.toString(),
-                        type: tx.source || 'message',
-                        amount: tx.amount || 0,
-                        timestamp: tx.timestamp || tx.createdAt,
-                        description: tx.source === 'gift' ? 'Presente recebido' : tx.source === 'image_unlock' ? 'Mídia privada desbloqueada' : 'Mensagem recebida',
-                        relatedUserId: clientClerkId,
-                        clientName: clientInfo?.name || 'Cliente Mimo',
-                        clientUsername: clientInfo?.username || 'cliente',
-                        clientPhotoUrl: clientInfo?.photoUrl || null
-                    };
-
-                    if (validSessions.length === 0) {
-                        standaloneItems.push(txItem);
-                        return;
-                    }
-
-                    // Encontrar a sessão bi-direcional mais próxima no tempo daquela sala
-                    let closestSession: any = null;
-                    let minDiffMs = Infinity;
-
-                    validSessions.forEach(s => {
-                        let diffMs = 0;
-                        if (txTs < s.startTime.getTime()) diffMs = s.startTime.getTime() - txTs;
-                        else if (txTs > s.endTime.getTime()) diffMs = txTs - s.endTime.getTime();
-
-                        if (diffMs < minDiffMs) {
-                            minDiffMs = diffMs;
-                            closestSession = s;
-                        }
-                    });
-
-                    // Janela de 24 horas para desbloqueio de mídias/mensagens no mesmo ciclo de conversa daquela sala
-                    if (closestSession && minDiffMs <= 24 * 60 * 60 * 1000) {
-                        const sessionKey = `${rId}_${closestSession.startTime.getTime()}`;
-
-                        if (!sessionsMap.has(sessionKey)) {
-                            sessionsMap.set(sessionKey, {
-                                sessionId: sessionKey,
-                                relatedUserId: clientClerkId,
-                                clientName: clientInfo?.name || 'Cliente Mimo',
-                                clientUsername: clientInfo?.username || 'cliente',
-                                clientPhotoUrl: clientInfo?.photoUrl || null,
-                                startTime: closestSession.startTime,
-                                endTime: closestSession.endTime,
-                                durationMinutes: Math.max(1, Math.round((closestSession.endTime.getTime() - closestSession.startTime.getTime()) / (1000 * 60))),
-                                messagesCount: closestSession.messages.filter((m: any) => !m.isLockedImage && !m.isGift).length,
-                                mediaCount: closestSession.messages.filter((m: any) => m.isLockedImage).length,
-                                giftCount: closestSession.messages.filter((m: any) => m.isGift).length,
-                                totalEarnings: 0,
-                                items: []
-                            });
-                        }
-
-                        const sObj = sessionsMap.get(sessionKey);
-                        sObj.totalEarnings += (tx.amount || 0);
-                        sObj.items.push(txItem);
-
-                        if (new Date(txItem.timestamp) < new Date(sObj.startTime)) sObj.startTime = txItem.timestamp;
-                        if (new Date(txItem.timestamp) > new Date(sObj.endTime)) sObj.endTime = txItem.timestamp;
-                        sObj.durationMinutes = Math.max(1, Math.round((new Date(sObj.endTime).getTime() - new Date(sObj.startTime).getTime()) / (1000 * 60)));
-
-                    } else {
-                        standaloneItems.push(txItem);
-                    }
-                });
+                smallEarnings.push({ id: transaction.id, amount: transaction.amount, timestamp });
             }
-        });
+        }
 
-        const enrichedSessions = Array.from(sessionsMap.values()).filter(s => s.totalEarnings > 0);
-        enrichedSessions.sort((a, b) => new Date(b.endTime).getTime() - new Date(a.endTime).getTime());
+        smallEarnings.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+        const otherBatches: Array<{ amount: number; items: typeof smallEarnings; isOpen: boolean }> = [];
+        let currentBatch: typeof smallEarnings = [];
+        let currentAmount = 0;
 
-        standaloneItems.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-        // 7. Consolidação Visual das Mensagens Avulsas POR CLIENTE
-        const standaloneByClient = new Map<string, any>();
-
-        standaloneItems.forEach(item => {
-            const clientId = item.relatedUserId;
-            if (!standaloneByClient.has(clientId)) {
-                standaloneByClient.set(clientId, {
-                    clientId,
-                    clientName: item.clientName,
-                    clientUsername: item.clientUsername,
-                    clientPhotoUrl: item.clientPhotoUrl,
-                    totalAmount: 0,
-                    itemsCount: 0,
-                    lastTimestamp: item.timestamp,
-                    items: []
-                });
+        for (const earning of smallEarnings) {
+            currentBatch.push(earning);
+            currentAmount += earning.amount;
+            if (currentAmount >= minimumEarningsCents) {
+                otherBatches.push({ amount: currentAmount, items: currentBatch, isOpen: false });
+                currentBatch = [];
+                currentAmount = 0;
             }
+        }
+        if (currentBatch.length > 0) {
+            otherBatches.push({ amount: currentAmount, items: currentBatch, isOpen: true });
+        }
 
-            const group = standaloneByClient.get(clientId);
-            group.totalAmount += item.amount;
-            group.itemsCount += 1;
-            group.items.push(item);
-            if (new Date(item.timestamp) > new Date(group.lastTimestamp)) {
-                group.lastTimestamp = item.timestamp;
-            }
-        });
+        for (const batch of otherBatches) {
+            const first = batch.items[0];
+            const last = batch.items[batch.items.length - 1];
+            const startLabel = shortDate(first.timestamp);
+            const endLabel = shortDate(last.timestamp);
+            const rangeLabel = startLabel === endLabel ? startLabel : `${startLabel} a ${endLabel}`;
+            entries.push({
+                id: `other_${first.id}_${last.id}`,
+                kind: 'other_earnings',
+                title: `Outros ganhos de ${rangeLabel}`,
+                description: batch.isOpen
+                    ? `${batch.items.length} ${batch.items.length === 1 ? 'crédito acumulado' : 'créditos acumulados'} até atingir ${minimumEarningsCents / 100} reais.`
+                    : `${batch.items.length} ${batch.items.length === 1 ? 'crédito de pequena conversa' : 'créditos de pequenas conversas'}`,
+                amount: batch.amount,
+                timestamp: last.timestamp,
+                status: batch.isOpen ? 'open' : 'closed',
+                details: { credits: batch.items.length },
+            });
+        }
 
-        const standaloneGroups = Array.from(standaloneByClient.values());
-        standaloneGroups.sort((a, b) => new Date(b.lastTimestamp).getTime() - new Date(a.lastTimestamp).getTime());
+        for (const transaction of subscriptionTransactions) {
+            const client = transaction.relatedUserId ? clientMap.get(transaction.relatedUserId) : undefined;
+            entries.push({
+                id: transaction._id.toString(),
+                kind: 'subscription',
+                title: `${client?.name || 'Um cliente'} assinou seu perfil`,
+                description: 'Crédito de assinatura',
+                amount: Number(transaction.amount) || 0,
+                timestamp: new Date(transaction.timestamp || transaction.createdAt),
+                status: 'closed',
+                relatedUserId: transaction.relatedUserId,
+                clientName: client?.name,
+                clientUsername: client?.username,
+                clientPhotoUrl: client?.photoUrl,
+            });
+        }
 
-        const totalSessionsEarnings = enrichedSessions.reduce((sum, s) => sum + s.totalEarnings, 0);
-        const totalStandaloneEarnings = standaloneItems.reduce((sum, item) => sum + item.amount, 0);
+        const explainedEarnings = entries.reduce((sum, entry) => sum + entry.amount, 0);
+        const balance = Number(user.balance) || 0;
+        const totalWithdrawn = withdrawals
+            .filter(withdrawal => withdrawal.status === 'concluido')
+            .reduce((sum, withdrawal) => sum + (Number(withdrawal.amount) || 0), 0);
+        const reconciliationDifference = balance + totalWithdrawn - explainedEarnings;
+        if (reconciliationDifference !== 0) {
+            entries.push({
+                id: 'historical_balance_adjustment',
+                kind: 'adjustment',
+                title: reconciliationDifference > 0 ? 'Outros créditos e ajustes' : 'Ajustes de saldo',
+                description: 'Diferença conciliatória de operações que não possuem vínculo com uma conversa.',
+                amount: reconciliationDifference,
+                timestamp: now,
+                status: 'closed',
+            });
+        }
+
+        entries.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+        const openEarnings = entries.filter(entry => entry.status === 'open').reduce((sum, entry) => sum + entry.amount, 0);
+        const closedEarnings = entries.filter(entry => entry.status === 'closed').reduce((sum, entry) => sum + entry.amount, 0);
+        const totalEarnings = openEarnings + closedEarnings;
 
         return NextResponse.json({
-            sessions: enrichedSessions,
-            standaloneItems,
-            standaloneGroups,
-            totalSessionsEarnings,
-            totalStandaloneEarnings,
-            timeoutMinutes
+            balance,
+            totalWithdrawn,
+            entries,
+            openEarnings,
+            closedEarnings,
+            totalEarnings,
+            explainedBalance: totalEarnings - totalWithdrawn,
+            reconciliationDifference: balance - (totalEarnings - totalWithdrawn),
+            timeoutMinutes,
+            minimumEarningsCents,
+            withdrawals: withdrawals.map(withdrawal => ({
+                id: withdrawal._id.toString(),
+                amount: Number(withdrawal.amount) || 0,
+                fee: Number(withdrawal.fee) || 0,
+                netAmount: Number(withdrawal.netAmount ?? withdrawal.amount) || 0,
+                status: withdrawal.status,
+                timestamp: withdrawal.createdAt,
+            })),
         });
-
-    } catch (error: any) {
-        console.error('Erro ao gerar extrato de sessões da carteira:', error);
+    } catch (error) {
+        console.error('Erro ao gerar extrato conciliável da carteira:', error);
         return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
     }
 }

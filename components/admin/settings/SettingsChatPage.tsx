@@ -7,6 +7,8 @@ import type { UseSettingsReturn } from '@/hooks/admin/useSettings';
 
 type Props = Pick<UseSettingsReturn,
     | 'chatSessionTimeoutMinutes' | 'setChatSessionTimeoutMinutes'
+    | 'earningsSessionInactivityMinutes' | 'setEarningsSessionInactivityMinutes'
+    | 'earningsSessionMinimumCents' | 'setEarningsSessionMinimumCents'
     | 'lowBalanceThresholdInCents' | 'setLowBalanceThresholdInCents'
     | 'onlineDelayMinutes' | 'setOnlineDelayMinutes'
     | 'activeUserThresholdDays' | 'setActiveUserThresholdDays'
@@ -15,6 +17,8 @@ type Props = Pick<UseSettingsReturn,
 
 export function SettingsChatPage({
     chatSessionTimeoutMinutes, setChatSessionTimeoutMinutes,
+    earningsSessionInactivityMinutes, setEarningsSessionInactivityMinutes,
+    earningsSessionMinimumCents, setEarningsSessionMinimumCents,
     lowBalanceThresholdInCents, setLowBalanceThresholdInCents,
     onlineDelayMinutes, setOnlineDelayMinutes,
     activeUserThresholdDays, setActiveUserThresholdDays,
@@ -63,11 +67,75 @@ export function SettingsChatPage({
                                     max={1440}
                                     className={inputCls}
                                 />
-                                <span className="text-sm font-bold text-slate-505">min</span>
+                                <span className="text-sm font-bold text-slate-500">min</span>
                             </div>
                             <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
                                 <p className="text-[11px] text-blue-700 font-semibold">
                                     Configuração atual: mensagens com intervalo ≥ <strong>{chatSessionTimeoutMinutes} minutos</strong> iniciam uma nova sessão e disparam notificação ao profissional.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="border-t border-slate-100 my-6" />
+
+                <div className="py-6 space-y-8">
+                    <div>
+                        <h3 className="text-base font-bold text-slate-800">Sessões motivacionais do extrato</h3>
+                        <p className="mt-1 text-xs font-medium leading-relaxed text-slate-500">
+                            Estes parâmetros controlam apenas os blocos exibidos no BackOffice. Eles não alteram saldo,
+                            saques nem o livro financeiro. Desbloqueios posteriores são atribuídos à conversa original.
+                        </p>
+                    </div>
+
+                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-8">
+                        <div className="space-y-1 md:w-1/2">
+                            <h4 className="text-sm font-bold text-slate-800">Inatividade entre sessões</h4>
+                            <p className="text-xs font-medium leading-relaxed text-slate-500">
+                                Uma nova sessão começa quando o intervalo entre duas mensagens do mesmo cliente ultrapassa este tempo.
+                            </p>
+                        </div>
+                        <div className="space-y-3 md:w-1/2">
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="number"
+                                    value={earningsSessionInactivityMinutes}
+                                    onChange={(event) => setEarningsSessionInactivityMinutes(Number(event.target.value))}
+                                    min={1}
+                                    max={1440}
+                                    className={inputCls}
+                                />
+                                <span className="text-sm font-bold text-slate-505">min</span>
+                            </div>
+                            <p className="text-[11px] font-semibold text-purple-700">
+                                Recomendado: 120 minutos.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-8">
+                        <div className="space-y-1 md:w-1/2">
+                            <h4 className="text-sm font-bold text-slate-800">Ganho mínimo para exibir a sessão</h4>
+                            <p className="text-xs font-medium leading-relaxed text-slate-500">
+                                Blocos abaixo deste valor ficam fora dos destaques. O valor pode promover uma conversa curta ou unilateral.
+                            </p>
+                        </div>
+                        <div className="space-y-3 md:w-1/2">
+                            <div className="flex items-center gap-3">
+                                <span className="text-sm font-bold text-slate-500">R$</span>
+                                <input
+                                    type="number"
+                                    value={(earningsSessionMinimumCents / 100).toString()}
+                                    onChange={(event) => setEarningsSessionMinimumCents(Math.round(Number(event.target.value || 0) * 100))}
+                                    min={0}
+                                    step={0.01}
+                                    className={inputCls}
+                                />
+                            </div>
+                            <div className="rounded-xl border border-purple-100 bg-purple-50 px-4 py-3">
+                                <p className="text-[11px] font-semibold text-purple-700">
+                                    Sessões com pelo menos <strong>{(earningsSessionMinimumCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong> serão exibidas.
                                 </p>
                             </div>
                         </div>
