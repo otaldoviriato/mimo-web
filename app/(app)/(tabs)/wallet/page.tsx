@@ -7,7 +7,6 @@ import { useMyProfile, useRequestWithdraw, usePendingWithdrawal, useUpdateProfil
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Input } from '@/components/Input';
 import { Avatar } from '@/components/Avatar';
-import { WalletStatement, type WalletStatementData } from '@/components/wallet/WalletStatement';
 import { 
     Wallet2, 
     ArrowUpRight, 
@@ -239,18 +238,6 @@ export default function WalletPage() {
         refetchInterval: 30 * 1000
     });
 
-    // Query de Extrato de Conversas (Sessões de 30 min)
-    const { data: sessionsData, isLoading: loadingSessions, refetch: refetchStatement } = useQuery<WalletStatementData>({
-        queryKey: ['wallet', 'sessions'],
-        queryFn: async () => {
-            const res = await fetch('/api/users/me/wallet-sessions');
-            if (!res.ok) throw new Error('Falha ao buscar extrato de conversas por sessão');
-            return res.json();
-        },
-        staleTime: 30 * 1000,
-        refetchInterval: 30 * 1000,
-    });
-
     const handleRequestWithdraw = async () => {
         try {
             const response = await requestWithdrawMutation.mutateAsync();
@@ -262,7 +249,6 @@ export default function WalletPage() {
                 refetchPendingWithdrawal(),
                 refetchDashboard(),
                 refetchWithdrawals(),
-                refetchStatement(),
             ]);
             if (response?.withdrawRequest?.status) {
                 setLastSeenWithdrawalStatus(response.withdrawRequest.status);
@@ -337,7 +323,6 @@ export default function WalletPage() {
             refetchDashboard();
             refetchProfile();
             refetchPendingWithdrawal();
-            refetchStatement();
         }
 
         if (latestWithdrawal.status === 'rejeitado') {
@@ -346,9 +331,8 @@ export default function WalletPage() {
             refetchDashboard();
             refetchProfile();
             refetchPendingWithdrawal();
-            refetchStatement();
         }
-    }, [latestWithdrawal, lastSeenWithdrawalStatus, refetchDashboard, refetchPendingWithdrawal, refetchProfile, refetchStatement]);
+    }, [latestWithdrawal, lastSeenWithdrawalStatus, refetchDashboard, refetchPendingWithdrawal, refetchProfile]);
 
     // Cálculos para o gráfico de barras mensal
     const points = data.earningsEvolution || [];
@@ -404,9 +388,19 @@ export default function WalletPage() {
                                     {showValues ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
                                 </button>
                             </div>
-                            <h2 className="text-3xl font-black text-slate-800 tracking-tight mt-1">
-                                {renderValue(animatedBalance)}
-                            </h2>
+                            <button
+                                type="button"
+                                onClick={() => router.push('/wallet/statement')}
+                                className="mt-1 rounded-lg text-left transition-opacity hover:opacity-75 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
+                                aria-label="Abrir extrato do saldo"
+                            >
+                                <span className="block text-3xl font-black text-slate-800 tracking-tight">
+                                    {renderValue(animatedBalance)}
+                                </span>
+                                <span className="mt-0.5 block text-[10px] font-bold text-purple-500">
+                                    Toque para ver o extrato
+                                </span>
+                            </button>
                         </div>
                         <span className="text-[10.5px] bg-slate-200/60 border border-slate-300/40 text-slate-600 font-bold px-2 py-0.5 rounded-lg uppercase tracking-wider backdrop-blur-sm">
                             Real (BRL)
@@ -490,7 +484,7 @@ export default function WalletPage() {
                     </div>
                 )}
 
-                <div className="bg-white border border-purple-100/60 rounded-2xl p-5 shadow-[0_4px_20px_rgb(0,0,0,0.012)] flex flex-col gap-4">
+                {false && <div className="bg-white border border-purple-100/60 rounded-2xl p-5 shadow-[0_4px_20px_rgb(0,0,0,0.012)] flex flex-col gap-4">
                     <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                         <div className="flex items-center gap-2">
                             <div className="w-6.5 h-6.5 rounded-lg bg-slate-50 flex items-center justify-center text-slate-500 border border-slate-200/50 shrink-0">
@@ -516,13 +510,13 @@ export default function WalletPage() {
                             <div className="h-10 bg-slate-50 rounded-xl" />
                             <div className="h-10 bg-slate-50 rounded-xl" />
                         </div>
-                    ) : (withdrawalsData.withdrawals || []).length === 0 ? (
+                    ) : (withdrawalsData?.withdrawals || []).length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-8 gap-2 bg-slate-50/50 rounded-xl">
                             <p className="text-xs text-gray-400">Nenhum saque realizado ainda.</p>
                         </div>
                     ) : (
                         <div className="flex flex-col gap-2.5">
-                            {((withdrawalsData.withdrawals || []).slice(0, isExpanded ? undefined : 5)).map((w: { id: string; amount: number; status: string; createdAt: string }) => {
+                            {((withdrawalsData?.withdrawals || []).slice(0, isExpanded ? undefined : 5)).map((w: { id: string; amount: number; status: string; createdAt: string }) => {
                                 const statusStyles = (() => {
                                     switch (w.status) {
                                         case 'concluido':
@@ -578,7 +572,7 @@ export default function WalletPage() {
                                 );
                             })}
                             
-                            {(withdrawalsData.withdrawals || []).length > 5 && (
+                            {(withdrawalsData?.withdrawals || []).length > 5 && (
                                 <button
                                     onClick={() => setIsExpanded(!isExpanded)}
                                     className="text-[11px] font-extrabold text-purple-600 hover:text-purple-700 self-center py-1.5 px-3 rounded-lg bg-purple-50 hover:bg-purple-100/80 transition-all active:scale-[0.98] mt-1 border border-purple-100/30"
@@ -588,9 +582,7 @@ export default function WalletPage() {
                             )}
                         </div>
                     )}
-                </div>
-
-                <WalletStatement data={sessionsData} isLoading={loadingSessions} showValues={showValues} />
+                </div>}
 
                 {/* ── BENTO BLOCK: EXTRATO DE GANHOS (SESSÕES + MENSAGENS AVULSAS) (OCULTO TEMPORARIAMENTE) ── */}
                 {/* 
