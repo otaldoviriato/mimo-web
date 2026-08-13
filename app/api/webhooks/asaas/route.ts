@@ -6,6 +6,7 @@ import { sendPushNotification } from '@/lib/push';
 import { Transaction } from '@/models/Transaction';
 import { User } from '@/models/User';
 import { WithdrawRequest } from '@/models/WithdrawRequest';
+import { recordAcquisitionEvent } from '@/lib/acquisitionAnalytics';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
 
@@ -225,6 +226,18 @@ export async function POST(request: NextRequest) {
             console.error('Asaas transaction user not found:', transaction.userId);
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
+
+        await recordAcquisitionEvent({
+            eventType: 'first_recharge',
+            dedupeKey: `first_recharge:${transaction.userId}`,
+            actorId: transaction.userId,
+            clientId: transaction.userId,
+            professionalId: user.acquiredByProfessionalId,
+            origin: user.acquisitionSource || 'unknown',
+            amountCents: Math.round((transaction.amount || 0) * 100),
+            occurredAt: transaction.timestamp || new Date(),
+            metadata: { provider: 'asaas', transactionId: transaction._id.toString() },
+        });
 
         const amountInReais = (transaction.amount || 0).toLocaleString('pt-BR', {
             style: 'currency',

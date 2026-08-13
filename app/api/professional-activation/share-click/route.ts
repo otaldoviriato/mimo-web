@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { ProfessionalActivation } from '@/models/ProfessionalActivation';
+import { recordAcquisitionEvent } from '@/lib/acquisitionAnalytics';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -19,7 +20,7 @@ type ShareActivationRow = {
     lastShareClickedAt?: Date | string | null;
 };
 
-export async function POST() {
+export async function POST(request: Request) {
     try {
         const { userId } = await auth();
         if (!userId) {
@@ -37,6 +38,10 @@ export async function POST() {
         }
 
         const now = new Date();
+        const body = await request.json().catch(() => ({})) as { channel?: string; eventId?: string };
+        const channel = ['native_share', 'clipboard', 'copy_button'].includes(body.channel || '')
+            ? body.channel
+            : 'unknown';
 
         const activation = await ProfessionalActivation.findOneAndUpdate(
             { professionalId: userId },
@@ -60,6 +65,19 @@ export async function POST() {
             },
             { upsert: true, new: true }
         ).lean() as ShareActivationRow | null;
+
+        const eventId = typeof body.eventId === 'string' && /^[a-zA-Z0-9-]{8,80}$/.test(body.eventId)
+            ? body.eventId
+            : `${userId}:${now.getTime()}`;
+        await recordAcquisitionEvent({
+            eventType: 'link_shared',
+            dedupeKey: `link_shared:${eventId}`,
+            actorId: userId,
+            professionalId: userId,
+            origin: 'profile_share',
+            occurredAt: now,
+            metadata: { channel },
+        });
 
         return NextResponse.json({
             success: true,

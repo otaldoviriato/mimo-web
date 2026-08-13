@@ -10,6 +10,7 @@ import { useSocket } from '@/hooks/useSocket';
 import { CheckCircle2, X, WalletCards, Clock, AlertCircle, ChevronRight, MessageCircle, Trash2, ShieldCheck, Share2, Star } from 'lucide-react';
 import { Drawer } from 'vaul';
 import { buildProfileShareUrl } from '@/lib/referral';
+import { recordLinkShared } from '@/lib/clientAcquisitionAnalytics';
 
 interface Room {
     _id: string;
@@ -110,8 +111,6 @@ export default function ChatsPage() {
     const handleShareProfile = async () => {
         if (typeof window === 'undefined' || !myProfile?.username) return;
 
-        fetch('/api/professional-activation/share-click', { method: 'POST' }).catch(console.error);
-
         const profileUrl = buildProfileShareUrl(window.location.origin, myProfile.username, user?.id || myProfile.clerkId);
         const name = myProfile.name || `@${myProfile.username}`;
         const shareText = `Ei! Esse é meu perfil no MimoChat - ${name}. Me manda uma mensagem, adoro conversar!`;
@@ -123,6 +122,7 @@ export default function ChatsPage() {
                     text: shareText,
                     url: profileUrl,
                 });
+                recordLinkShared('native_share');
                 return;
             } catch (err: any) {
                 if (err?.name === 'AbortError') return;
@@ -131,6 +131,7 @@ export default function ChatsPage() {
 
         try {
             await navigator.clipboard.writeText(`${shareText}\n\n${profileUrl}`);
+            recordLinkShared('clipboard');
             setCopiedProfileLink(true);
             setTimeout(() => setCopiedProfileLink(false), 2500);
         } catch {}

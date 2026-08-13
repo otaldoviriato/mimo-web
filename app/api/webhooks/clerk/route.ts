@@ -8,6 +8,7 @@ import { Resend } from 'resend';
 import { getCreatorLandingProfileRole } from '@/lib/profileRole';
 import { grantWelcomeCredit } from '@/lib/creditCampaign';
 import { getReferralFromUnsafeMetadata, type ReferralMetadata } from '@/lib/referral';
+import { recordAcquisitionEvent } from '@/lib/acquisitionAnalytics';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
 const webhookSecret = process.env.CLERK_WEBHOOK_SECRET || '';
@@ -112,6 +113,18 @@ export async function POST(req: Request) {
             },
             { upsert: true, new: true }
         );
+
+        if (updateSet.acquiredByProfessionalId) {
+            await recordAcquisitionEvent({
+                eventType: 'signup_attributed',
+                dedupeKey: `signup_attributed:${id}`,
+                actorId: id,
+                clientId: id,
+                professionalId: updateSet.acquiredByProfessionalId,
+                origin: 'profile_share',
+                occurredAt: updateSet.acquiredAt,
+            });
+        }
 
         console.log(`✅ Clerk Webhook: User created: ${generatedUsername} (Professional: ${isProfessional}, Status: ${professionalStatus})`);
 

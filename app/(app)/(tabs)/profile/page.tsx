@@ -12,6 +12,7 @@ import { PullToRefresh } from '@/components';
 import { Settings, Share2, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, ShieldAlert, Heart, Globe, Crown, Camera, Gift, CreditCard, QrCode, Star, X, MoreVertical, ChevronLeft, ChevronRight, ExternalLink, CalendarClock, AlertCircle, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { buildProfileShareUrl } from '@/lib/referral';
+import { recordLinkShared } from '@/lib/clientAcquisitionAnalytics';
 
 export default function ProfilePage() {
     const { user } = useUser();
@@ -152,8 +153,6 @@ export default function ProfilePage() {
     const handleShare = async () => {
         if (typeof window === 'undefined' || !userData?.username) return;
 
-        fetch('/api/professional-activation/share-click', { method: 'POST' }).catch(console.error);
-
         const profileUrl = buildProfileShareUrl(window.location.origin, userData.username, user?.id || userData.clerkId);
         const name       = userData.name || `@${userData.username}`;
         const shareText  = `Ei! Esse é meu perfil no MimoChat — ${name}. Me manda uma mensagem, adoro conversar! 💬`;
@@ -166,6 +165,7 @@ export default function ProfilePage() {
                     text: shareText,
                     url: profileUrl,
                 });
+                recordLinkShared('native_share');
                 return;
             } catch (err: any) {
                 // AbortError = usuário fechou o sheet sem compartilhar — comportamento normal
@@ -177,6 +177,7 @@ export default function ProfilePage() {
         // Fallback: copia o link para a área de transferência e mostra feedback
         try {
             await navigator.clipboard.writeText(`${shareText}\n\n${profileUrl}`);
+            recordLinkShared('clipboard');
             toast.success('Link copiado! Cole no WhatsApp, e-mail ou onde preferir.');
         } catch {
             // sem permissão de clipboard — ignora silenciosamente

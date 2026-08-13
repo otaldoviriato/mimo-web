@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { userApi } from '@/services/api';
 import { useMyProfile, useFeaturedUsers } from '@/hooks/useQueries';
 import { ShieldAlert, ShieldCheck, Search, X, MapPin, MessageCircle, MessageSquare, CheckCheck } from 'lucide-react';
+import { trackAcquisitionEvent } from '@/lib/clientAcquisitionAnalytics';
 
 const calculateAge = (birthDateString?: string | Date) => {
     if (!birthDateString) return null;
@@ -168,6 +169,14 @@ export default function SearchPage() {
         router.push(`/chat/${clerkId}`);
     };
 
+    const handleExploreProfile = (user: any) => {
+        trackAcquisitionEvent({
+            eventType: 'explore_profile_viewed',
+            professionalId: user.clerkId,
+        });
+        router.push(`/${user.username}?source=explore`);
+    };
+
     useEffect(() => {
         const timer = setTimeout(() => {
             if (username.trim()) {
@@ -193,7 +202,7 @@ export default function SearchPage() {
         return (
             <div
                 key={user.clerkId}
-                onClick={() => router.push(`/${user.username}`)}
+                onClick={() => handleExploreProfile(user)}
                 className="relative aspect-[3/4] rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer active:scale-[0.98] border border-slate-100/50 bg-slate-100 animate-in fade-in zoom-in-95 duration-300 group"
             >
                 {/* Imagem de fundo */}

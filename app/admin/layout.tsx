@@ -9,6 +9,7 @@ import { Sliders, Lock, ArrowLeft } from 'lucide-react';
 
 const PATH_TITLES: Record<string, string> = {
     '/admin': 'Painel Geral',
+    '/admin/acquisition': 'Aquisição & Retenção',
     '/admin/clients': 'Gerenciamento de Clientes',
     '/admin/professionals': 'Gerenciamento de Profissionais',
     '/admin/team': 'Gerenciamento de Equipe',

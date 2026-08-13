@@ -9,6 +9,7 @@ import { SubscribeModal } from '@/components/SubscribeModal';
 import { useUserByUsername, usePublicGallery, useSubscribe, useMyProfile } from '@/hooks/useQueries';
 import { UserX, Camera, Lock, Eye, EyeOff, X, ChevronLeft, ChevronRight, ShieldCheck, Crown, Gift, Award, Medal, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { trackAcquisitionEvent } from '@/lib/clientAcquisitionAnalytics';
 
 interface UserProfilePageProps {
     params?: Promise<{ username: string }>;
@@ -84,6 +85,22 @@ export default function UserProfilePage({ params, username: propUsername, onBack
         !teamActivationContact?.isAssignedToCurrentTeamMember
     );
     const showSubscribeButton = user?.isProfessional && user?.isSubscriptionEnabled && !isSubscriber && !isOwner;
+
+    useEffect(() => {
+        if (!user?.clerkId || typeof window === 'undefined') return;
+        const search = new URLSearchParams(window.location.search);
+        if (search.get('ref') !== user.clerkId) return;
+
+        trackAcquisitionEvent({
+            eventType: 'link_viewed',
+            professionalId: user.clerkId,
+            metadata: {
+                utmSource: search.get('utm_source') || '',
+                utmMedium: search.get('utm_medium') || '',
+                utmCampaign: search.get('utm_campaign') || '',
+            },
+        });
+    }, [user?.clerkId]);
 
     const handleMessageClick = async () => {
         if (!user || isBlockedByOtherTeamMember) return;

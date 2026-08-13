@@ -3,6 +3,7 @@ import { connectToDatabase } from '@/lib/db';
 import { Transaction } from '@/models/Transaction';
 import { User } from '@/models/User';
 import { sendPushNotification } from '@/lib/push';
+import { recordAcquisitionEvent } from '@/lib/acquisitionAnalytics';
 
 export async function POST(req: NextRequest) {
     try {
@@ -85,6 +86,18 @@ export async function POST(req: NextRequest) {
             console.error('Usuário da transação não encontrado:', transaction.userId);
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
+
+        await recordAcquisitionEvent({
+            eventType: 'first_recharge',
+            dedupeKey: `first_recharge:${transaction.userId}`,
+            actorId: transaction.userId,
+            clientId: transaction.userId,
+            professionalId: user.acquiredByProfessionalId,
+            origin: user.acquisitionSource || 'unknown',
+            amountCents: amountInCents,
+            occurredAt: transaction.timestamp || new Date(),
+            metadata: { provider: 'abacatepay', transactionId: transaction._id.toString() },
+        });
 
         console.log(`[SUCESSO] Saldo creditado para ${user.username} via webhook.`);
 

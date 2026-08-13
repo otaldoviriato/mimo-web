@@ -14,6 +14,7 @@ import { ImageCropper } from '@/components/ImageCropper';
 import { useQueryClient } from '@tanstack/react-query';
 import { clearMimoClientSession } from '@/lib/clientSession';
 import { buildProfileShareUrl } from '@/lib/referral';
+import { recordLinkShared } from '@/lib/clientAcquisitionAnalytics';
 import { calculateOnboardingStep } from '@/lib/onboarding';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -106,6 +107,7 @@ export default function OnboardingPage() {
                 document.execCommand('copy');
                 document.body.removeChild(textArea);
             }
+            recordLinkShared('copy_button');
         } catch (err) {
             console.error('Erro ao copiar link do perfil:', err);
         }
@@ -126,6 +128,7 @@ export default function OnboardingPage() {
         if (navigator.share) {
             try {
                 await navigator.share(shareData);
+                recordLinkShared('native_share');
                 return;
             } catch (err: unknown) {
                 if (err instanceof DOMException && err.name === 'AbortError') return;
