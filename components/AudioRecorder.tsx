@@ -5,18 +5,139 @@ import React, { useState, useEffect, useRef } from 'react';
 interface AudioRecorderProps {
     onSendAudio: (blob: Blob, durationInSeconds: number) => void;
     connected: boolean;
-    onStatusChange?: (status: 'idle' | 'recording' | 'locked') => void;
+    onStatusChange?: (status: AudioRecorderStatus) => void;
     /** Duração máxima (em segundos) que o saldo atual do usuário consegue pagar. `undefined` = sem limite (mensagem gratuita). */
     maxDurationSeconds?: number;
     /** Chamado quando o usuário tenta gravar sem ter saldo para nem 1 segundo de áudio. */
     onInsufficientBalance?: () => void;
+    /** Mantém o áudio no compositor para revisão antes do envio. */
+    confirmBeforeSend?: boolean;
+    /** Custo estimado de um segundo de áudio, em centavos. */
+    costPerSecondInCents?: number;
 }
 
-export function AudioRecorder({ onSendAudio, connected, onStatusChange, maxDurationSeconds, onInsufficientBalance }: AudioRecorderProps) {
-    const [status, setStatus] = useState<'idle' | 'recording' | 'locked'>('idle');
+export type AudioRecorderStatus = 'idle' | 'recording' | 'locked' | 'preview';
+
+interface AudioPreviewComposerProps {
+    audioUrl: string;
+    duration: number;
+    costPerSecondInCents: number;
+    connected: boolean;
+    onCancel: () => void;
+    onSend: () => void;
+}
+
+export function AudioPreviewComposer({
+    audioUrl,
+    duration,
+    costPerSecondInCents,
+    connected,
+    onCancel,
+    onSend,
+}: AudioPreviewComposerProps) {
+    const [isPlaying, setIsPlaying] = useState(false);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const estimatedCostInCents = costPerSecondInCents > 0
+        ? Math.max(1, Math.ceil(costPerSecondInCents * duration))
+        : 0;
+    const formattedCost = estimatedCostInCents > 0
+        ? `R$ ${(estimatedCostInCents / 100).toFixed(2).replace('.', ',')}`
+        : 'Grátis';
+    const formattedDuration = `${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}`;
+
+    const togglePlayback = async () => {
+        const audio = audioRef.current;
+        if (!audio) return;
+        if (audio.paused) {
+            try {
+                await audio.play();
+                setIsPlaying(true);
+            } catch (error) {
+                console.error('Erro ao reproduzir prévia de áudio:', error);
+            }
+        } else {
+            audio.pause();
+            setIsPlaying(false);
+        }
+    };
+
+    return (
+        <div className="flex min-w-0 flex-1 items-center gap-2 animate-in fade-in duration-200">
+            <div className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-2xl border border-purple-100 bg-purple-50/80 px-2">
+                <audio ref={audioRef} src={audioUrl} preload="metadata" onEnded={() => setIsPlaying(false)} />
+                <button
+                    type="button"
+                    onClick={togglePlayback}
+                    aria-label={isPlaying ? 'Pausar prévia do áudio' : 'Ouvir prévia do áudio'}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-purple-600 shadow-sm transition active:scale-95"
+                >
+                    {isPlaying ? (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <rect x="6" y="4" width="4" height="16" rx="1" />
+                            <rect x="14" y="4" width="4" height="16" rx="1" />
+                        </svg>
+                    ) : (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="M8 5v14l11-7z" />
+                        </svg>
+                    )}
+                </button>
+
+                <div className="min-w-0 flex-1">
+                    <p className="truncate text-[11px] font-semibold leading-tight text-slate-700">Áudio pronto</p>
+                    <p className="text-[10px] leading-tight text-slate-400">{formattedDuration}</p>
+                </div>
+
+                <div className="shrink-0 text-right" aria-live="polite">
+                    <p className="text-[9px] font-medium leading-tight text-slate-400">Custo</p>
+                    <p className="whitespace-nowrap text-[11px] font-bold leading-tight text-purple-700">{formattedCost}</p>
+                </div>
+
+                <button
+                    type="button"
+                    onClick={onCancel}
+                    aria-label="Cancelar áudio"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-white hover:text-red-500 active:scale-95"
+                >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                        <path d="M10 11v6M14 11v6" />
+                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                    </svg>
+                </button>
+            </div>
+
+            <button
+                type="button"
+                onClick={onSend}
+                disabled={!connected}
+                aria-label={`Enviar áudio por ${formattedCost}`}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-purple-600 text-white shadow-sm transition hover:bg-purple-700 active:scale-90 disabled:opacity-50"
+            >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M22 2L11 13" />
+                    <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+                </svg>
+            </button>
+        </div>
+    );
+}
+
+export function AudioRecorder({
+    onSendAudio,
+    connected,
+    onStatusChange,
+    maxDurationSeconds,
+    onInsufficientBalance,
+    confirmBeforeSend = false,
+    costPerSecondInCents = 0,
+}: AudioRecorderProps) {
+    const [status, setStatus] = useState<AudioRecorderStatus>('idle');
     const [duration, setDuration] = useState(0);
     const [swipeOffset, setSwipeOffset] = useState({ x: 0, y: 0 });
     const [showTrashAnim, setShowTrashAnim] = useState(false);
+    const [preview, setPreview] = useState<{ blob: Blob; duration: number; url: string } | null>(null);
 
     useEffect(() => {
         if (onStatusChange) onStatusChange(status);
@@ -26,6 +147,7 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange, maxDurat
     const audioChunksRef = useRef<Blob[]>([]);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
+    const previewUrlRef = useRef<string | null>(null);
 
     // Refs para a Web Audio API
     const audioContextRef = useRef<AudioContext | null>(null);
@@ -65,7 +187,12 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange, maxDurat
         isRecordingInitiatedRef.current = false;
     };
 
-    useEffect(() => { return () => cleanup(); }, []);
+    useEffect(() => {
+        return () => {
+            cleanup();
+            if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+        };
+    }, []);
 
     // ─── Timer ────────────────────────────────────────────────
     const startTimer = () => {
@@ -168,17 +295,45 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange, maxDurat
         const recordingDuration = duration;
         recorder.onstop = () => {
             const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+            cleanup();
+            setSwipeOffset({ x: 0, y: 0 });
             if (recordingDuration >= 1 && blob.size > 100) {
+                if (confirmBeforeSend) {
+                    const url = URL.createObjectURL(blob);
+                    previewUrlRef.current = url;
+                    setPreview({ blob, duration: recordingDuration, url });
+                    setStatus('preview');
+                    return;
+                }
                 onSendAudio(blob, recordingDuration);
             }
-            cleanup();
             setStatus('idle');
         };
         recorder.stop();
     };
 
+    const clearPreview = () => {
+        if (previewUrlRef.current) {
+            URL.revokeObjectURL(previewUrlRef.current);
+            previewUrlRef.current = null;
+        }
+        setPreview(null);
+        setDuration(0);
+        setStatus('idle');
+    };
+
+    const sendPreview = () => {
+        if (!preview) return;
+        onSendAudio(preview.blob, preview.duration);
+        clearPreview();
+    };
+
     // ─── Cancelar (com animação de lixeira) ────────────────────────────────────────────────
     const cancelRecording = () => {
+        if (status === 'preview') {
+            clearPreview();
+            return;
+        }
         const recorder = mediaRecorderRef.current;
         if (recorder && recorder.state !== 'inactive') {
             recorder.onstop = () => { cleanup(); setStatus('idle'); };
@@ -309,6 +464,19 @@ export function AudioRecorder({ onSendAudio, connected, onStatusChange, maxDurat
     // O cadeado flutua sempre 68px acima do botão e desce junto com ele no eixo Y
     const lockVisible = status === 'recording' && swipeDirectionRef.current === 'vertical';
     const cancelHintVisible = status === 'recording' && swipeDirectionRef.current === 'horizontal';
+
+    if (status === 'preview' && preview) {
+        return (
+            <AudioPreviewComposer
+                audioUrl={preview.url}
+                duration={preview.duration}
+                costPerSecondInCents={costPerSecondInCents}
+                connected={connected}
+                onCancel={clearPreview}
+                onSend={sendPreview}
+            />
+        );
+    }
 
     return (
         <>
