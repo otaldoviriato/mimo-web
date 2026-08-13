@@ -10,7 +10,7 @@ import { useSocket } from '@/hooks/useSocket';
 import { useChatPricing, useUserById, useMyProfile, QueryKeys } from '@/hooks/useQueries';
 import { usePayment } from '@/context/PaymentContext';
 import { Drawer } from 'vaul';
-import { AudioRecorder } from '@/components/AudioRecorder';
+import { AudioRecorder, type AudioRecorderStatus } from '@/components/AudioRecorder';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { MediaComposerSheet } from '@/components/MediaComposerSheet';
 import { AlertTriangle, ShieldCheck, Wallet } from 'lucide-react';
@@ -514,7 +514,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const [messageText, setMessageText] = useState('');
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
     const [monetizationDisabled, setMonetizationDisabled] = useState(false);
-    const [audioRecordingStatus, setAudioRecordingStatus] = useState<'idle' | 'recording' | 'locked'>('idle');
+    const [audioRecordingStatus, setAudioRecordingStatus] = useState<AudioRecorderStatus>('idle');
 
     // Refs para o gesto de swipe para responder
     const swipingMessage = useRef<Message | null>(null);
@@ -3451,10 +3451,12 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                         </button>
                     ) : (
                         <AudioRecorder
-                            connected={connected}
+                            connected={connected && userData !== undefined}
                             onSendAudio={handleSendAudio}
                             onStatusChange={setAudioRecordingStatus}
                             maxDurationSeconds={maxAudioDurationSeconds}
+                            confirmBeforeSend={userData?.isProfessional === false}
+                            costPerSecondInCents={audioCostPerSecondInCents}
                             onInsufficientBalance={() =>
                                 openRechargeModal(
                                     userData?.hasWelcomeCreditEnded
