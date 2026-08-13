@@ -40,8 +40,35 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ users: [] });
         }
 
+        // A busca faz parte do Explorar e segue a mesma regra de elegibilidade:
+        // conversa com o cliente atual ou ao menos um cliente adquirido diretamente.
+        const [userRooms, professionalsWithAcquiredClients] = await Promise.all([
+            Room.find({ participants: userId }).select('participants').lean<Array<{ participants: string[] }>>().exec(),
+            User.distinct<string>('acquiredByProfessionalId', {
+                isProfessional: false,
+                acquiredByProfessionalId: { $type: 'string', $ne: '' }
+            }).exec()
+        ]);
+        const talkedUserIds = new Set<string>();
+        userRooms.forEach((room) => {
+            if (Array.isArray(room.participants)) {
+                room.participants.forEach((participantId: string) => {
+                    if (participantId !== userId) talkedUserIds.add(participantId);
+                });
+            }
+        });
+        const eligibleProfessionalIds = Array.from(new Set([
+            ...talkedUserIds,
+            ...professionalsWithAcquiredClients
+        ]));
+
+        if (eligibleProfessionalIds.length === 0) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        }
+
         queryFilter.isProfessional = true;
         queryFilter.professionalStatus = 'approved';
+        queryFilter.clerkId = { $ne: userId, $in: eligibleProfessionalIds };
 
         const foundUsers = await User.find({
             $or: [
@@ -129,17 +156,6 @@ export async function GET(request: NextRequest) {
             }
             return { name: 'Novo', color: '#64748B', icon: 'Medal' };
         };
-
-        // Buscar salas do usuário logado para identificar com quem ele já possui conversa
-        const userRooms = await Room.find({ participants: userId }).select('participants').lean() as any[];
-        const talkedUserIds = new Set<string>();
-        userRooms.forEach((r: any) => {
-            if (Array.isArray(r.participants)) {
-                r.participants.forEach((p: string) => {
-                    if (p !== userId) talkedUserIds.add(p);
-                });
-            }
-        });
 
         // Mapear usuários e calcular scores
         const usersWithScores = foundUsers.map(u => {

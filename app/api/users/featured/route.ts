@@ -39,9 +39,36 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ users: [] });
         }
 
+        // No Explorar de clientes, uma profissional so e elegivel quando ja conversa
+        // com o cliente atual ou quando trouxe ao menos um cliente pelo proprio link.
+        const [userRooms, professionalsWithAcquiredClients] = await Promise.all([
+            Room.find({ participants: userId }).select('participants').lean<Array<{ participants: string[] }>>().exec(),
+            User.distinct<string>('acquiredByProfessionalId', {
+                isProfessional: false,
+                acquiredByProfessionalId: { $type: 'string', $ne: '' }
+            }).exec()
+        ]);
+        const talkedUserIds = new Set<string>();
+        userRooms.forEach((room) => {
+            if (Array.isArray(room.participants)) {
+                room.participants.forEach((participantId: string) => {
+                    if (participantId !== userId) talkedUserIds.add(participantId);
+                });
+            }
+        });
+        const eligibleProfessionalIds = Array.from(new Set([
+            ...talkedUserIds,
+            ...professionalsWithAcquiredClients
+        ]));
+
+        if (eligibleProfessionalIds.length === 0) {
+            return NextResponse.json({ users: [] });
+        }
+
         queryFilter.isProfessional = true;
         queryFilter.professionalStatus = 'approved';
         queryFilter.hideFromExplore = { $ne: true };
+        queryFilter.clerkId = { $ne: userId, $in: eligibleProfessionalIds };
 
         // Encontrar criadores/clientes em destaque
         const featuredUsers = await User.find(queryFilter)
@@ -212,17 +239,6 @@ export async function GET(request: NextRequest) {
             }
             return { name: 'Novo', color: '#64748B', icon: 'Medal' };
         };
-
-        // Buscar salas do usuário logado para identificar com quem ele já possui conversa
-        const userRooms = await Room.find({ participants: userId }).select('participants').lean() as any[];
-        const talkedUserIds = new Set<string>();
-        userRooms.forEach((r: any) => {
-            if (Array.isArray(r.participants)) {
-                r.participants.forEach((p: string) => {
-                    if (p !== userId) talkedUserIds.add(p);
-                });
-            }
-        });
 
         // Mapear usuários, calcular a completude do perfil e anexar até 4 fotos públicas
         const usersWithPhotos = featuredUsers.map(u => {
