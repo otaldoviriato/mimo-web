@@ -3,7 +3,7 @@
 const VISITOR_KEY = 'mimo_analytics_visitor_id';
 
 type PublicEvent = {
-    eventType: 'link_viewed' | 'explore_profile_viewed';
+    eventType: 'link_viewed' | 'explore_profile_impression' | 'explore_profile_viewed';
     professionalId: string;
     metadata?: Record<string, string>;
 };

@@ -6,6 +6,7 @@ export const ACQUISITION_EVENT_TYPES = [
     'signup_attributed',
     'first_recharge',
     'first_paid_message',
+    'explore_profile_impression',
     'explore_profile_viewed',
     'professional_consumed',
     'gmv_recorded',

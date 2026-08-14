@@ -1,14 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User, GalleryItem, Room, Message, Transaction } from '@/models';
+import { AcquisitionEvent } from '@/models/AcquisitionEvent';
 import { AppSettings } from '@/models/AppSettings';
+import { EXPLORE_DISCOVERY_IMPRESSIONS, rankExploreUsers } from '@/lib/exploreRanking';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 // GET /api/users/featured
-export async function GET(request: NextRequest) {
+export async function GET() {
     try {
         const { userId } = await auth();
 
@@ -39,15 +41,12 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ users: [] });
         }
 
-        // No Explorar de clientes, uma profissional so e elegivel quando ja conversa
-        // com o cliente atual ou quando trouxe ao menos um cliente pelo proprio link.
-        const [userRooms, professionalsWithAcquiredClients] = await Promise.all([
-            Room.find({ participants: userId }).select('participants').lean<Array<{ participants: string[] }>>().exec(),
-            User.distinct<string>('acquiredByProfessionalId', {
-                isProfessional: false,
-                acquiredByProfessionalId: { $type: 'string', $ne: '' }
-            }).exec()
-        ]);
+        // O histórico com o cliente serve apenas para informar o card. Ele não
+        // limita mais quem pode aparecer no Explorar.
+        const userRooms = await Room.find({ participants: userId })
+            .select('participants')
+            .lean<Array<{ participants: string[] }>>()
+            .exec();
         const talkedUserIds = new Set<string>();
         userRooms.forEach((room) => {
             if (Array.isArray(room.participants)) {
@@ -56,24 +55,13 @@ export async function GET(request: NextRequest) {
                 });
             }
         });
-        const eligibleProfessionalIds = Array.from(new Set([
-            ...talkedUserIds,
-            ...professionalsWithAcquiredClients
-        ]));
-
-        if (eligibleProfessionalIds.length === 0) {
-            return NextResponse.json({ users: [] });
-        }
-
         queryFilter.isProfessional = true;
         queryFilter.professionalStatus = 'approved';
         queryFilter.hideFromExplore = { $ne: true };
-        queryFilter.clerkId = { $ne: userId, $in: eligibleProfessionalIds };
 
         // Encontrar criadores/clientes em destaque
         const featuredUsers = await User.find(queryFilter)
         .select('clerkId username name email photoUrl coverUrl isProfessional identityStatus subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers bio createdAt avgResponseTimeMinutes isOnline lastSeen birthDate city state isHighSpender')
-        .limit(200)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .lean() as any[];
 
@@ -83,6 +71,71 @@ export async function GET(request: NextRequest) {
 
         // Buscar fotos públicas livres da galeria para estes usuários
         const clerkIds = featuredUsers.map(u => u.clerkId);
+
+        const [exploreEvents, qualifiedConversations] = await Promise.all([
+            AcquisitionEvent.aggregate([
+                {
+                    $match: {
+                        professionalId: { $in: clerkIds },
+                        eventType: { $in: ['explore_profile_impression', 'explore_profile_viewed'] }
+                    }
+                },
+                {
+                    $group: {
+                        _id: { professionalId: '$professionalId', eventType: '$eventType' },
+                        count: { $sum: 1 }
+                    }
+                }
+            ]),
+            Message.aggregate([
+                {
+                    $match: {
+                        isSystem: { $ne: true },
+                        $or: [
+                            { senderId: { $in: clerkIds } },
+                            { receiverId: { $in: clerkIds } }
+                        ]
+                    }
+                },
+                {
+                    $project: {
+                        roomId: 1,
+                        senderId: 1,
+                        paid: { $gt: [{ $ifNull: ['$cost', 0] }, 0] },
+                        professionals: {
+                            $filter: {
+                                input: ['$senderId', '$receiverId'],
+                                as: 'participantId',
+                                cond: { $in: ['$$participantId', clerkIds] }
+                            }
+                        }
+                    }
+                },
+                { $unwind: '$professionals' },
+                {
+                    $group: {
+                        _id: { professionalId: '$professionals', roomId: '$roomId' },
+                        senders: { $addToSet: '$senderId' },
+                        paidMessages: { $sum: { $cond: ['$paid', 1, 0] } }
+                    }
+                },
+                { $match: { 'senders.1': { $exists: true }, paidMessages: { $gt: 0 } } },
+                { $group: { _id: '$_id.professionalId', count: { $sum: 1 } } }
+            ])
+        ]);
+
+        const exploreImpressionsMap = new Map<string, number>();
+        const exploreProfileViewsMap = new Map<string, number>();
+        for (const event of exploreEvents) {
+            const target = event._id.eventType === 'explore_profile_impression'
+                ? exploreImpressionsMap
+                : exploreProfileViewsMap;
+            target.set(event._id.professionalId, event.count);
+        }
+        const qualifiedConversationsMap = new Map<string, number>();
+        for (const conversation of qualifiedConversations) {
+            qualifiedConversationsMap.set(conversation._id, conversation.count);
+        }
         const galleryItems = await GalleryItem.find({
             ownerId: { $in: clerkIds },
             galleryType: 'public',
@@ -102,14 +155,12 @@ export async function GET(request: NextRequest) {
             return acc;
         }, {});
 
-        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers newProfileDaysThreshold newClientHoursThreshold activeRechargedClientDaysThreshold activeUnrechargedClientHoursThreshold exploreSortingCriteria clientLevels').lean() as any;
+        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers newClientHoursThreshold activeRechargedClientDaysThreshold activeUnrechargedClientHoursThreshold clientLevels').lean() as any;
         const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
         const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
-        const thresholdDays = settings?.newProfileDaysThreshold ?? 15;
         const newClientHoursThreshold = settings?.newClientHoursThreshold ?? 24;
         const activeRechargedClientDaysThreshold = settings?.activeRechargedClientDaysThreshold ?? 30;
         const activeUnrechargedClientHoursThreshold = settings?.activeUnrechargedClientHoursThreshold ?? 24;
-        const exploreSortingCriteria = settings?.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'];
 
         const activeLimit = new Date(Date.now() - 48 * 60 * 60 * 1000);
         const oneWeekAgo = new Date();
@@ -276,9 +327,9 @@ export async function GET(request: NextRequest) {
 
             const activeConversationsCount = activeRoomsMap.get(u.clerkId) || 0;
             const messagesLastWeekCount = messagesLastWeekMap.get(u.clerkId) || 0;
-
-            const cutoffDatePro = new Date();
-            cutoffDatePro.setDate(cutoffDatePro.getDate() - thresholdDays);
+            const exploreImpressionsCount = exploreImpressionsMap.get(u.clerkId) || 0;
+            const exploreProfileViewsCount = exploreProfileViewsMap.get(u.clerkId) || 0;
+            const qualifiedConversationsCount = qualifiedConversationsMap.get(u.clerkId) || 0;
 
             const cutoffDateClient = new Date(Date.now() - newClientHoursThreshold * 60 * 60 * 1000);
             const rechargedClientActiveCutoff = new Date(Date.now() - activeRechargedClientDaysThreshold * 24 * 60 * 60 * 1000);
@@ -308,7 +359,7 @@ export async function GET(request: NextRequest) {
             }
 
             const isNew = u.isProfessional
-                ? (u.createdAt ? new Date(u.createdAt) >= cutoffDatePro : false)
+                ? exploreImpressionsCount < EXPLORE_DISCOVERY_IMPRESSIONS
                 : (u.createdAt ? new Date(u.createdAt) >= cutoffDateClient : false);
 
             return {
@@ -338,6 +389,9 @@ export async function GET(request: NextRequest) {
                 state: u.state ?? '',
                 activeConversationsCount,
                 messagesLastWeekCount,
+                exploreImpressionsCount,
+                exploreProfileViewsCount,
+                qualifiedConversationsCount,
                 clientLevel: getClientLevel(clientRechargesMap.get(u.clerkId) || 0),
                 hasChat: talkedUserIds.has(u.clerkId),
                 hasRecharge,
@@ -346,45 +400,8 @@ export async function GET(request: NextRequest) {
             };
         });
 
-        // Ordenar dinamicamente:
-        // 1. Por Tier (1: Com recarga ativa -> 2: Novos/Ativos sem recarga -> 3: Inativos)
-        // 2. Por Histórico de Conversa (Sem conversa primeiro)
-        // 3. Por critérios adicionais (Online, Acesso Recente, Completude)
-        const sorted = usersWithPhotos
-            .sort((a, b) => {
-                if (a.tier !== b.tier) {
-                    return a.tier - b.tier;
-                }
-                if (a.hasChat !== b.hasChat) {
-                    return a.hasChat ? 1 : -1;
-                }
-                for (const criterion of exploreSortingCriteria) {
-                    if (criterion === 'activeConversations') {
-                        const diff = (b.activeConversationsCount || 0) - (a.activeConversationsCount || 0);
-                        if (diff !== 0) return diff;
-                    }
-                    else if (criterion === 'messagesLastWeek') {
-                        const diff = (b.messagesLastWeekCount || 0) - (a.messagesLastWeekCount || 0);
-                        if (diff !== 0) return diff;
-                    }
-                    else if (criterion === 'online') {
-                        const valA = a.isOnline ? 1 : 0;
-                        const valB = b.isOnline ? 1 : 0;
-                        const diff = valB - valA;
-                        if (diff !== 0) return diff;
-                    }
-                    else if (criterion === 'recentAccess') {
-                        const diff = (b.lastActiveTime || 0) - (a.lastActiveTime || 0);
-                        if (diff !== 0) return diff;
-                    }
-                    else if (criterion === 'completeness') {
-                        const diff = (b.completeness || 0) - (a.completeness || 0);
-                        if (diff !== 0) return diff;
-                    }
-                }
-                return 0;
-            })
-            .slice(0, currentUser?.isProfessional ? 60 : 30);
+        // Mistura vagas de descoberta com os perfis de melhor histórico.
+        const sorted = rankExploreUsers(usersWithPhotos);
 
         return NextResponse.json({ users: sorted });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

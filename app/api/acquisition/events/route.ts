@@ -8,7 +8,7 @@ import { User } from '@/models/User';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const PUBLIC_EVENTS = new Set(['link_viewed', 'explore_profile_viewed']);
+const PUBLIC_EVENTS = new Set(['link_viewed', 'explore_profile_impression', 'explore_profile_viewed']);
 
 function cleanMetadata(value: unknown) {
     if (!value || typeof value !== 'object') return undefined;
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
         }
 
         const { userId } = await auth();
-        if (eventType === 'explore_profile_viewed' && !userId) {
+        if (eventType.startsWith('explore_') && !userId) {
             return NextResponse.json({ error: 'Nao autorizado.' }, { status: 401 });
         }
 
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
         const day = new Date().toISOString().slice(0, 10);
         const actorKey = userId || visitorId;
         await recordAcquisitionEvent({
-            eventType: eventType as 'link_viewed' | 'explore_profile_viewed',
+            eventType: eventType as 'link_viewed' | 'explore_profile_impression' | 'explore_profile_viewed',
             dedupeKey: `${eventType}:${actorKey}:${professionalId}:${day}`,
             actorId: userId || undefined,
             clientId: userId || undefined,

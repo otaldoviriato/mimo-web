@@ -1,15 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User, GalleryItem, Room, Message } from '@/models';
 import { AppSettings } from '@/models/AppSettings';
+import { AcquisitionEvent } from '@/models/AcquisitionEvent';
+import { EXPLORE_DISCOVERY_IMPRESSIONS, rankExploreUsers } from '@/lib/exploreRanking';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
     try {
         const { userId } = await auth();
 
@@ -29,24 +31,19 @@ export async function GET(request: NextRequest) {
         }
 
         // Ler critérios passados por query params ou pegar do banco
-        const { searchParams } = new URL(request.url);
-        const criteriaParam = searchParams.get('criteria');
-        let exploreSortingCriteria: string[];
+        const activeLimitDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-        if (criteriaParam) {
-            exploreSortingCriteria = criteriaParam.split(',').filter(Boolean);
-        } else {
-            exploreSortingCriteria = settings?.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'];
-        }
-
-        const thresholdDays = settings?.newProfileDaysThreshold ?? 15;
-
-        // Buscar todos os profissionais reais ativos e aprovados
+        // Buscar profissionais aprovadas e com atividade nos últimos 30 dias.
         const queryFilter: any = {
             isProfessional: true,
             professionalStatus: 'approved',
             isSuspended: { $ne: true },
-            hideFromExplore: { $ne: true }
+            hideFromExplore: { $ne: true },
+            $or: [
+                { lastSeen: { $gte: activeLimitDate } },
+                { isOnline: true },
+                { createdAt: { $gte: activeLimitDate } },
+            ],
         };
 
         const professionals = await User.find(queryFilter)
@@ -58,6 +55,71 @@ export async function GET(request: NextRequest) {
         }
 
         const clerkIds = professionals.map(u => u.clerkId);
+
+        const [exploreEvents, qualifiedConversations] = await Promise.all([
+            AcquisitionEvent.aggregate([
+                {
+                    $match: {
+                        professionalId: { $in: clerkIds },
+                        eventType: { $in: ['explore_profile_impression', 'explore_profile_viewed'] }
+                    }
+                },
+                {
+                    $group: {
+                        _id: { professionalId: '$professionalId', eventType: '$eventType' },
+                        count: { $sum: 1 }
+                    }
+                }
+            ]),
+            Message.aggregate([
+                {
+                    $match: {
+                        isSystem: { $ne: true },
+                        $or: [
+                            { senderId: { $in: clerkIds } },
+                            { receiverId: { $in: clerkIds } }
+                        ]
+                    }
+                },
+                {
+                    $project: {
+                        roomId: 1,
+                        senderId: 1,
+                        paid: { $gt: [{ $ifNull: ['$cost', 0] }, 0] },
+                        professionals: {
+                            $filter: {
+                                input: ['$senderId', '$receiverId'],
+                                as: 'participantId',
+                                cond: { $in: ['$$participantId', clerkIds] }
+                            }
+                        }
+                    }
+                },
+                { $unwind: '$professionals' },
+                {
+                    $group: {
+                        _id: { professionalId: '$professionals', roomId: '$roomId' },
+                        senders: { $addToSet: '$senderId' },
+                        paidMessages: { $sum: { $cond: ['$paid', 1, 0] } }
+                    }
+                },
+                { $match: { 'senders.1': { $exists: true }, paidMessages: { $gt: 0 } } },
+                { $group: { _id: '$_id.professionalId', count: { $sum: 1 } } }
+            ])
+        ]);
+
+        const exploreImpressionsMap = new Map<string, number>();
+        const exploreProfileViewsMap = new Map<string, number>();
+        for (const event of exploreEvents) {
+            const target = event._id.eventType === 'explore_profile_impression'
+                ? exploreImpressionsMap
+                : exploreProfileViewsMap;
+            target.set(event._id.professionalId, event.count);
+        }
+        const qualifiedConversationsMap = new Map<string, number>();
+        for (const conversation of qualifiedConversations) {
+            qualifiedConversationsMap.set(conversation._id, conversation.count);
+        }
 
         // Buscar fotos públicas livres da galeria
         const galleryItems = await GalleryItem.find({
@@ -157,9 +219,6 @@ export async function GET(request: NextRequest) {
         const messagesLastWeekMap = new Map<string, number>();
         messagesGroup.forEach((g: any) => messagesLastWeekMap.set(g._id, g.count));
 
-        const cutoffDate = new Date();
-        cutoffDate.setDate(cutoffDate.getDate() - thresholdDays);
-
         const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
         const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
 
@@ -191,6 +250,9 @@ export async function GET(request: NextRequest) {
 
             const activeConversationsCount = activeRoomsMap.get(u.clerkId) || 0;
             const messagesLastWeekCount = messagesLastWeekMap.get(u.clerkId) || 0;
+            const exploreImpressionsCount = exploreImpressionsMap.get(u.clerkId) || 0;
+            const exploreProfileViewsCount = exploreProfileViewsMap.get(u.clerkId) || 0;
+            const qualifiedConversationsCount = qualifiedConversationsMap.get(u.clerkId) || 0;
 
             return {
                 id: u._id,
@@ -205,7 +267,7 @@ export async function GET(request: NextRequest) {
                 chargePerCharSubscribers: defaultSub,
                 chargePerCharNonSubscribers: defaultNonSub,
                 bio: u.bio || '',
-                isNew: u.createdAt ? new Date(u.createdAt) >= cutoffDate : false,
+                isNew: exploreImpressionsCount < EXPLORE_DISCOVERY_IMPRESSIONS,
                 publicPhotos: publicPhotos.slice(0, 4),
                 avgResponseTimeMinutes: u.avgResponseTimeMinutes ?? null,
                 score: completeness,
@@ -219,37 +281,14 @@ export async function GET(request: NextRequest) {
                 state: u.state ?? '',
                 activeConversationsCount,
                 messagesLastWeekCount,
+                exploreImpressionsCount,
+                exploreProfileViewsCount,
+                qualifiedConversationsCount,
             };
         });
 
         // Ordenar dinamicamente:
-        const sorted = usersWithMetrics.sort((a, b) => {
-            for (const criterion of exploreSortingCriteria) {
-                if (criterion === 'activeConversations') {
-                    const diff = (b.activeConversationsCount || 0) - (a.activeConversationsCount || 0);
-                    if (diff !== 0) return diff;
-                }
-                else if (criterion === 'messagesLastWeek') {
-                    const diff = (b.messagesLastWeekCount || 0) - (a.messagesLastWeekCount || 0);
-                    if (diff !== 0) return diff;
-                }
-                else if (criterion === 'online') {
-                    const valA = a.isOnline ? 1 : 0;
-                    const valB = b.isOnline ? 1 : 0;
-                    const diff = valB - valA;
-                    if (diff !== 0) return diff;
-                }
-                else if (criterion === 'recentAccess') {
-                    const diff = (b.lastActiveTime || 0) - (a.lastActiveTime || 0);
-                    if (diff !== 0) return diff;
-                }
-                else if (criterion === 'completeness') {
-                    const diff = (b.completeness || 0) - (a.completeness || 0);
-                    if (diff !== 0) return diff;
-                }
-            }
-            return 0;
-        });
+        const sorted = rankExploreUsers(usersWithMetrics);
 
         return NextResponse.json({ users: sorted });
     } catch (error: any) {

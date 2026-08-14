@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { userApi } from '@/services/api';
 import { useMyProfile, useFeaturedUsers } from '@/hooks/useQueries';
@@ -33,6 +33,7 @@ export default function SearchPage() {
     const { data: featuredUsers = [], isLoading: loadingFeatured } = useFeaturedUsers();
     const [error, setError] = useState('');
     const [lightbox, setLightbox] = useState<{ photos: string[]; index: number } | null>(null);
+    const exposedProfiles = useRef(new Set<string>());
 
     const [activeFilter, setActiveFilter] = useState<'online' | 'novos' | 'todos'>('online');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -88,21 +89,8 @@ export default function SearchPage() {
             });
         }
 
-        // Visão do cliente masculino buscando criadoras femininas:
-        // Exibe todas as criadoras sem filtro, priorizando online primeiro, depois com conversa ativa
-        return [...sourceList].sort((a, b) => {
-            const aOnline = !!a.isOnline;
-            const bOnline = !!b.isOnline;
-            if (aOnline !== bOnline) {
-                return aOnline ? -1 : 1;
-            }
-            const aChat = !!a.hasChat;
-            const bChat = !!b.hasChat;
-            if (aChat !== bChat) {
-                return aChat ? -1 : 1;
-            }
-            return 0;
-        });
+        // A ordem já vem pronta da regra de descoberta e qualidade do servidor.
+        return sourceList;
     };
 
     const openLightbox = (e: React.MouseEvent, photos: string[], index: number) => {
@@ -133,6 +121,29 @@ export default function SearchPage() {
         window.addEventListener('mimo:toggle-search', handleToggle);
         return () => window.removeEventListener('mimo:toggle-search', handleToggle);
     }, []);
+
+    useEffect(() => {
+        if (userData?.isProfessional || username.trim() || loadingFeatured) return;
+
+        const observer = new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+                if (!entry.isIntersecting || entry.intersectionRatio < 0.5) continue;
+                const professionalId = (entry.target as HTMLElement).dataset.exploreProfessionalId;
+                if (!professionalId || exposedProfiles.current.has(professionalId)) continue;
+
+                exposedProfiles.current.add(professionalId);
+                trackAcquisitionEvent({
+                    eventType: 'explore_profile_impression',
+                    professionalId,
+                });
+                observer.unobserve(entry.target);
+            }
+        }, { threshold: 0.5 });
+
+        const cards = document.querySelectorAll<HTMLElement>('[data-explore-professional-id]');
+        cards.forEach((card) => observer.observe(card));
+        return () => observer.disconnect();
+    }, [featuredUsers, loadingFeatured, userData?.isProfessional, username]);
 
 
 
@@ -202,6 +213,7 @@ export default function SearchPage() {
         return (
             <div
                 key={user.clerkId}
+                data-explore-professional-id={!username.trim() ? user.clerkId : undefined}
                 onClick={() => handleExploreProfile(user)}
                 className="relative aspect-[3/4] rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer active:scale-[0.98] border border-slate-100/50 bg-slate-100 animate-in fade-in zoom-in-95 duration-300 group"
             >
@@ -218,7 +230,7 @@ export default function SearchPage() {
                 {/* Badge Já Conversou ou Badge Novo (top left) */}
                 {user.isNew ? (
                     <div className="absolute top-2.5 left-2.5 bg-purple-600 text-white text-[8px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-full shadow-md z-10">
-                        Novo
+                        Novidade
                     </div>
                 ) : null}
 
