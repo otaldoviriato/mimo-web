@@ -1,5 +1,5 @@
 export type ProfileRole = 'client' | 'professional';
-export type ProfileRoleSource = 'profile_selection' | 'creator_landing';
+export type ProfileRoleSource = 'profile_selection' | 'creator_landing' | 'client_migration';
 
 export function getExplicitProfileRole(unsafeMetadata: unknown): ProfileRole | undefined {
     if (!unsafeMetadata || typeof unsafeMetadata !== 'object') {
@@ -21,11 +21,11 @@ export function getExplicitProfileRole(unsafeMetadata: unknown): ProfileRole | u
     return undefined;
 }
 
-export function buildProfileRoleMetadata(role: ProfileRole) {
+export function buildProfileRoleMetadata(role: ProfileRole, source: ProfileRoleSource = 'profile_selection') {
     return {
         role,
         profileSelectedAt: new Date().toISOString(),
-        profileRoleSource: 'profile_selection' satisfies ProfileRoleSource,
+        profileRoleSource: source,
     };
 }
 

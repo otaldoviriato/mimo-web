@@ -19,11 +19,15 @@ export function calculateOnboardingStep(user: OnboardingUser | null | undefined)
         return 'welcome';
     }
 
-    if (!hasValue(user.taxId)) {
+    if (user.isProfessional && (!hasValue(user.taxId) || !user.birthDate)) {
         return 'identity';
     }
 
-    if (!hasValue(user.name) || !hasValue(user.username) || !hasValue(user.photoUrl)) {
+    const hasRequiredProfile = hasValue(user.name)
+        && hasValue(user.username)
+        && (!user.isProfessional || hasValue(user.photoUrl));
+
+    if (!hasRequiredProfile || user.onboardingStep !== 'completed') {
         return 'profile';
     }
 

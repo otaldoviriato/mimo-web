@@ -16,6 +16,7 @@ import { clearMimoClientSession } from '@/lib/clientSession';
 import { buildProfileShareUrl } from '@/lib/referral';
 import { recordLinkShared } from '@/lib/clientAcquisitionAnalytics';
 import { calculateOnboardingStep } from '@/lib/onboarding';
+import { consumePostAuthRedirect } from '@/lib/postAuthRedirect';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -23,11 +24,8 @@ type Step = 'welcome' | 'identity' | 'profile' | 'done';
 type Dir  = 'forward' | 'backward';
 
 // Steps do fluxo de onboarding
-const ONBOARDING_STEPS: Step[] = ['welcome', 'identity', 'profile'];
-
 // Mapa de step → step anterior para interceptação do gesto de voltar
 const PREV_ONBOARD: Partial<Record<Step, Step>> = {
-    identity: 'welcome',
     profile:  'identity',
 };
 
@@ -254,8 +252,15 @@ export default function OnboardingPage() {
         if (saved === 'identity' || saved === 'profile') {
             localStorage.removeItem(STEP_KEY);
         }
-        setInitialStepResolved(true);
-        setStep('welcome');
+        fetch('/api/users/me', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ isProfessional: false }),
+        }).then(() => refetch()).catch(() => {
+            initialized.current = false;
+            setRoleError('Não foi possível preparar sua conta. Tente novamente.');
+            setInitialStepResolved(true);
+        });
     }, [userData]);
 
     // ── Navegação entre steps com animação ──────────────────────────────────
@@ -303,7 +308,13 @@ export default function OnboardingPage() {
 
         const handlePopState = () => {
             const current = stepRef.current;
-            const prev    = PREV_ONBOARD[current];
+            if (current === 'profile' && userData?.isProfessional !== true) {
+                window.history.pushState({ onboardingGuard: true, step: current }, '', window.location.pathname);
+                setShowLogoutModal(true);
+                return;
+            }
+
+            const prev = PREV_ONBOARD[current];
 
             if (prev !== undefined) {
                 // Volta para o step anterior dentro do onboarding
@@ -323,17 +334,18 @@ export default function OnboardingPage() {
 
         window.addEventListener('popstate', handlePopState);
         return () => window.removeEventListener('popstate', handlePopState);
-    }, []);
+    }, [userData?.isProfessional]);
 
     // ── Saída do onboarding ──────────────────────────────────────────────────
 
     // Anima o onboarding subindo para fora da tela (como se saísse da pilha)
     // e depois navega para /chats — evita que /chats entre pela direita como tela nova.
     const navigateToApp = () => {
+        const destination = consumePostAuthRedirect('/chats');
         setIsDismissing(true);
         setTimeout(() => {
             localStorage.removeItem(STEP_KEY);
-            router.replace('/chats');
+            router.replace(destination);
         }, 300);
     };
 
@@ -468,7 +480,7 @@ export default function OnboardingPage() {
     const handleProfileSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!displayName.trim()) { setProfError('Informe seu nome para continuar.'); return; }
-        if (!photoPreview) { setProfError('Adicione uma foto de perfil para continuar.'); return; }
+        if (userData?.isProfessional && !photoPreview) { setProfError('Adicione uma foto de perfil para continuar.'); return; }
         if (!username.trim()) { setProfError('Informe um nome de usuário.'); return; }
         if (!/^[a-z0-9._-]+$/.test(username)) {
             setProfError('Use apenas letras minúsculas, números, pontos, traços ou sublinhados.');
@@ -503,7 +515,7 @@ export default function OnboardingPage() {
             const r2 = await fetch('/api/users/me', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: displayName, username, photoUrl: finalPhotoUrl, coverUrl: finalCoverUrl }),
+                body: JSON.stringify({ name: displayName, username, photoUrl: finalPhotoUrl, coverUrl: finalCoverUrl, completeProfile: true }),
             });
             const d2 = await r2.json();
             if (!r2.ok) throw new Error(d2.error || 'Erro ao atualizar o perfil');
@@ -530,7 +542,8 @@ export default function OnboardingPage() {
     };
 
     const renderHeader = (forStep: Step, onBack?: () => void) => {
-        const idx = ONBOARDING_STEPS.indexOf(forStep);
+        const onboardingSteps: Step[] = userData?.isProfessional ? ['identity', 'profile'] : ['profile'];
+        const idx = onboardingSteps.indexOf(forStep);
         return (
             <div className="shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between z-10 sticky top-0 shadow-md">
                 <div className="flex items-center gap-3">
@@ -557,7 +570,7 @@ export default function OnboardingPage() {
                 {/* Indicador de progresso nos steps do onboarding */}
                 {idx >= 0 && (
                     <div className="flex items-center gap-1.5">
-                        {ONBOARDING_STEPS.map((_, i) => (
+                        {onboardingSteps.map((_, i) => (
                             <div
                                 key={i}
                                 className={`h-[5px] rounded-full bg-white transition-all duration-300 ${
@@ -711,7 +724,7 @@ export default function OnboardingPage() {
 
         return (
             <div className="flex flex-col h-full bg-slate-50">
-                {renderHeader('identity', () => go('welcome', 'backward'))}
+                {renderHeader('identity', () => setShowLogoutModal(true))}
 
                 <div className="flex-1 overflow-y-auto no-scrollbar">
                     <div className="px-5 py-6 flex flex-col gap-5 max-w-md mx-auto w-full">
@@ -871,7 +884,7 @@ export default function OnboardingPage() {
             )}
 
             <form onSubmit={handleProfileSubmit} className="flex flex-col h-full bg-slate-50">
-                {renderHeader('profile', () => go('identity', 'backward'))}
+                {renderHeader('profile', userData?.isProfessional ? () => go('identity', 'backward') : () => setShowLogoutModal(true))}
 
                 <div className="flex-1 overflow-y-auto no-scrollbar">
                     <div className="px-5 py-6 flex flex-col gap-5 max-w-md mx-auto w-full">
@@ -885,7 +898,7 @@ export default function OnboardingPage() {
                         {/* Foto de perfil — centralizada, sem capa */}
                         <div className="flex flex-col items-center gap-2">
                             <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-                                Foto de Perfil
+                                Foto de Perfil {userData?.isProfessional ? '' : '(opcional)'}
                             </span>
                             <input
                                 ref={photoInputRef}

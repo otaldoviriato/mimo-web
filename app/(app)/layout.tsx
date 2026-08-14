@@ -18,6 +18,7 @@ import UserProfilePage from './[username]/page';
 import SettingsPage from './settings/page';
 import { REFERRAL_STORAGE_KEY, getReferralFromSearchParams } from '@/lib/referral';
 import { calculateOnboardingStep } from '@/lib/onboarding';
+import { consumePostAuthRedirect, storePostAuthRedirect } from '@/lib/postAuthRedirect';
 
 
 const isTabRoute = (path: string) => {
@@ -240,7 +241,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
     // Inicialização de roteamento para Deep Links no carregamento inicial da sessão
     useEffect(() => {
-        if (!isLoaded || !isSignedIn) return;
+        if (!isLoaded || !isSignedIn || !isFullyCompleted || pathname === '/onboarding') return;
 
         const initDeepLinkRoute = async () => {
             if (typeof window === 'undefined') return;
@@ -249,18 +250,18 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             // Usamos localStorage em vez de sessionStorage para sobreviver a redirects OAuth no PWA.
             const pendingRedirect = localStorage.getItem('mimo_redirect_after_login');
             if (pendingRedirect) {
-                localStorage.removeItem('mimo_redirect_after_login');
+                const safePendingRedirect = consumePostAuthRedirect();
                 
                 // Se o redirecionamento pendente for para configurações, ignoramos para evitar
                 // o redirecionamento incorreto e o bug do botão de voltar para o Google OAuth.
-                if (pendingRedirect === '/settings' || pendingRedirect.startsWith('/settings?')) {
+                if (safePendingRedirect === '/settings' || safePendingRedirect.startsWith('/settings?')) {
                     setIsNavInitialized(true);
                     return;
                 }
 
                 // Se o redirecionamento pendente corresponder exatamente à rota atual, não navegamos novamente para evitar travamentos
                 const currentPath = window.location.pathname;
-                if (pendingRedirect === currentPath || (pendingRedirect === '/chats' && currentPath === '/chats')) {
+                if (safePendingRedirect === currentPath || (safePendingRedirect === '/chats' && currentPath === '/chats')) {
                     setIsNavInitialized(true);
                     return;
                 }
@@ -269,7 +270,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                 // depois que o router.replace levar para a nova página (ex: /juaccioli/chat)
                 (window as any).__mimo_handled_pending_redirect = true;
                 (window as any).__mimo_nav_initialized = true;
-                router.replace(pendingRedirect);
+                router.replace(safePendingRedirect);
                 // A página [username]/chat tem sua própria tela de loading enquanto resolve o username.
                 // Não precisamos de splash screen extra — inicializamos imediatamente.
                 setIsNavInitialized(true);
@@ -441,12 +442,12 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                     window.location.pathname !== '/' &&
                     window.location.pathname !== '/settings'
                 ) {
-                    localStorage.setItem('mimo_redirect_after_login', currentPath);
+                    storePostAuthRedirect(currentPath);
                 }
             }
             router.replace('/login');
         }
-    }, [isLoaded, isSignedIn]);
+    }, [isLoaded, isSignedIn, isFullyCompleted, pathname]);
 
     useEffect(() => {
         if (isSignedIn && user) {

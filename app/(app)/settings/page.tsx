@@ -8,7 +8,7 @@ import { usePWA } from '@/context/PWAContext';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { formatCPF, formatPhone } from '@/components/RechargeModal';
 import Link from 'next/link';
-import { ShieldCheck, RefreshCw, AlertCircle, Lock, Pencil, ChevronRight } from 'lucide-react';
+import { ShieldCheck, RefreshCw, AlertCircle, Lock, Pencil, ChevronRight, CircleDollarSign, Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { clearMimoClientSession } from '@/lib/clientSession';
 
@@ -97,7 +97,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const { isInstallable, promptInstall, mounted, isStandalone } = usePWA();
     const { permission: notificationPermission, handleRequestPermission } = usePushNotifications();
 
-    const { data: userData, isLoading: loadingProfile } = useMyProfile();
+    const { data: userData, isLoading: loadingProfile, refetch: refetchProfile } = useMyProfile();
     const updateProfileMutation = useUpdateProfile();
 
     const [username, setUsername] = useState('');
@@ -127,6 +127,16 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const [accountAction, setAccountAction] = useState<'suspend' | 'delete' | null>(null);
     const [accountActionLoading, setAccountActionLoading] = useState(false);
     const [accountActionError, setAccountActionError] = useState('');
+    const [showMigrationModal, setShowMigrationModal] = useState(false);
+    const [migrationLoading, setMigrationLoading] = useState(false);
+    const [migrationSubmitting, setMigrationSubmitting] = useState(false);
+    const [migrationConfirmed, setMigrationConfirmed] = useState(false);
+    const [migrationError, setMigrationError] = useState('');
+    const [migrationEligibility, setMigrationEligibility] = useState<{
+        eligible: boolean;
+        message?: string;
+        conversationCount: number;
+    } | null>(null);
 
     const [birthDate, setBirthDate] = useState('');
     const [state, setState] = useState('');
@@ -383,6 +393,50 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             setAccountActionError(error.message || 'Não foi possível concluir a ação.');
         } finally {
             setAccountActionLoading(false);
+        }
+    };
+
+    const openMigrationModal = async () => {
+        setShowMigrationModal(true);
+        setMigrationLoading(true);
+        setMigrationConfirmed(false);
+        setMigrationError('');
+        setMigrationEligibility(null);
+
+        try {
+            const response = await fetch('/api/users/me/professional-migration', { cache: 'no-store' });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.error || 'Não foi possível verificar sua conta.');
+            setMigrationEligibility(data);
+        } catch (error: any) {
+            setMigrationError(error.message || 'Não foi possível verificar sua conta.');
+        } finally {
+            setMigrationLoading(false);
+        }
+    };
+
+    const handleMigrationConfirm = async () => {
+        if (!migrationEligibility?.eligible || !migrationConfirmed) return;
+
+        setMigrationSubmitting(true);
+        setMigrationError('');
+        try {
+            const response = await fetch('/api/users/me/professional-migration', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ confirmConversationRemoval: true }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.message || data.error || 'Não foi possível migrar sua conta.');
+
+            localStorage.removeItem('mimo_profile');
+            await queryClient.invalidateQueries({ queryKey: ['user', 'me'] });
+            await refetchProfile();
+            router.replace('/onboarding');
+        } catch (error: any) {
+            setMigrationError(error.message || 'Não foi possível migrar sua conta.');
+        } finally {
+            setMigrationSubmitting(false);
         }
     };
 
@@ -866,6 +920,30 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                         )}
 
                         {/* ── SEÇÃO: SOBRE O APP ── */}
+                        {!profileIsProfessional && (
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Ganhe com o Mimo</p>
+                                <button
+                                    type="button"
+                                    onClick={openMigrationModal}
+                                    className="w-full rounded-2xl border border-purple-100 bg-gradient-to-br from-white to-purple-50/70 p-4 text-left shadow-sm transition-all hover:border-purple-200 active:scale-[0.99]"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-600 text-white shadow-sm shadow-purple-200">
+                                            <CircleDollarSign className="h-5 w-5" />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <h3 className="text-sm font-bold text-gray-900">Quer ganhar dinheiro conversando?</h3>
+                                            <p className="mt-0.5 text-xs leading-relaxed text-gray-500">
+                                                Se você entrou como cliente por engano, veja se esta conta pode ser transformada em um perfil para ganhar.
+                                            </p>
+                                        </div>
+                                        <ChevronRight className="h-5 w-5 shrink-0 text-purple-400" />
+                                    </div>
+                                </button>
+                            </div>
+                        )}
+
                         <div>
                             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Mais Informações</p>
                             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -1063,6 +1141,77 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                     </>
                 )}
             </div>
+            {showMigrationModal && (
+                <div className="fixed inset-0 z-[85] flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm">
+                    <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl">
+                        <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-purple-50 text-purple-600">
+                            <CircleDollarSign className="h-5 w-5" />
+                        </div>
+                        <h2 className="text-center text-lg font-bold text-gray-900">Ganhe conversando no Mimo</h2>
+                        <p className="mt-2 text-center text-xs leading-relaxed text-gray-500">
+                            Esta opção é para quem criou uma conta de cliente por engano e quer receber por suas conversas.
+                        </p>
+
+                        {migrationLoading ? (
+                            <div className="flex items-center justify-center gap-2 py-8 text-sm font-medium text-purple-600">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Verificando sua conta...
+                            </div>
+                        ) : migrationEligibility?.eligible ? (
+                            <div className="mt-5 space-y-3">
+                                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs leading-relaxed text-emerald-800">
+                                    Seu saldo e seu histórico financeiro permitem a migração.
+                                </div>
+                                <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-gray-200 p-3.5">
+                                    <input
+                                        type="checkbox"
+                                        checked={migrationConfirmed}
+                                        onChange={(event) => setMigrationConfirmed(event.target.checked)}
+                                        className="mt-0.5 h-4 w-4 accent-purple-600"
+                                    />
+                                    <span className="text-xs leading-relaxed text-gray-600">
+                                        Entendo que {migrationEligibility.conversationCount === 1
+                                            ? 'minha conversa atual será removida'
+                                            : `minhas ${migrationEligibility.conversationCount} conversas atuais serão removidas`} e que passarei pelo cadastro de identidade com CPF e data de nascimento.
+                                    </span>
+                                </label>
+                            </div>
+                        ) : migrationEligibility ? (
+                            <div className="mt-5 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-800">
+                                {migrationEligibility.message || 'Esta conta não pode ser migrada.'}
+                            </div>
+                        ) : null}
+
+                        {migrationError && (
+                            <p className="mt-3 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-medium text-red-600">
+                                {migrationError}
+                            </p>
+                        )}
+
+                        <div className="mt-5 flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => !migrationSubmitting && setShowMigrationModal(false)}
+                                disabled={migrationSubmitting}
+                                className="h-11 flex-1 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 disabled:opacity-60"
+                            >
+                                Fechar
+                            </button>
+                            {migrationEligibility?.eligible && (
+                                <button
+                                    type="button"
+                                    onClick={handleMigrationConfirm}
+                                    disabled={!migrationConfirmed || migrationSubmitting}
+                                    className="h-11 flex-[1.35] rounded-xl bg-purple-600 px-3 text-xs font-bold text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    {migrationSubmitting ? 'Migrando...' : 'Migrar minha conta'}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {accountAction && (
                 <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm">
                     <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">

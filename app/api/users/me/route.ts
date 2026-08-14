@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
                 const roleMetadata = getCreatorLandingProfileRole(clerkUser.unsafeMetadata);
                 const pendingReferral = getReferralFromUnsafeMetadata(clerkUser.unsafeMetadata)
                     || getReferralFromRequestHeaders(request.headers);
-                const isProfessional = roleMetadata === 'professional' ? true : (roleMetadata === 'client' ? false : undefined);
+                const isProfessional = roleMetadata === 'professional';
                 const professionalStatus = null; 
 
                 const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
@@ -122,9 +122,7 @@ export async function GET(request: NextRequest) {
                     chargePerCharSubscribers: defaultSub,
                     chargePerCharNonSubscribers: defaultNonSub,
                 };
-                if (isProfessional !== undefined) {
-                    userFields.isProfessional = isProfessional;
-                }
+                userFields.isProfessional = isProfessional;
 
                 user = await User.create(userFields);
                 user = await applyReferralAttribution(user, pendingReferral);
@@ -139,31 +137,20 @@ export async function GET(request: NextRequest) {
             }
         } else {
             if (user.isProfessional === undefined) {
-                const isOldAccount = user.createdAt ? (Date.now() - new Date(user.createdAt).getTime() > 600000) : true;
-                if (isOldAccount) {
-                    user.isProfessional = false;
-                    try {
-                        await user.save();
-                    } catch (saveProfessionalErr: any) {
-                        console.error('[GET /api/users/me] Erro ao salvar isProfessional default:', saveProfessionalErr);
-                        throw new Error(`Erro ao salvar isProfessional default no MongoDB: ${saveProfessionalErr.message || saveProfessionalErr}`);
-                    }
+                user.isProfessional = false;
+                try {
+                    await user.save();
+                } catch (saveProfessionalErr: any) {
+                    console.error('[GET /api/users/me] Erro ao salvar isProfessional default:', saveProfessionalErr);
+                    throw new Error(`Erro ao salvar isProfessional default no MongoDB: ${saveProfessionalErr.message || saveProfessionalErr}`);
                 }
             }
 
             try {
                 const client = await clerkClient();
                 const clerkUser = await client.users.getUser(userId);
-                const explicitRole = getCreatorLandingProfileRole(clerkUser.unsafeMetadata);
                 const pendingReferral = getReferralFromUnsafeMetadata(clerkUser.unsafeMetadata)
                     || getReferralFromRequestHeaders(request.headers);
-                const isProfessionalClerk = explicitRole === 'professional';
-
-                if (isProfessionalClerk && !user.isProfessional) {
-                    user.isProfessional = true;
-                    user.professionalStatus = null;
-                    await user.save();
-                }
                 user = await applyReferralAttribution(user, pendingReferral);
             } catch (syncErr: any) {
                 console.warn('[GET /api/users/me] Falha ao sincronizar metadados do Clerk:', syncErr);
@@ -504,7 +491,7 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, subscriptionPrice, isSubscriptionEnabled, bio, emailNotificationsEnabled, newUserNotificationsEnabled, hideFromExplore, subscriberDiscountPercentage, birthDate, city, state } = body;
+        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, completeProfile, subscriptionPrice, isSubscriptionEnabled, bio, emailNotificationsEnabled, newUserNotificationsEnabled, hideFromExplore, subscriberDiscountPercentage, birthDate, city, state } = body;
 
         await connectToDatabase();
 
@@ -517,18 +504,20 @@ export async function PATCH(request: NextRequest) {
         const currentUser = await User.findOne({ clerkId: userId });
 
         // Valida mudança de isProfessional (mesma lógica que era do chargeMode)
-        if (isProfessional !== undefined && currentUser && isProfessional !== currentUser.isProfessional) {
-            if (currentUser.balance > 0) {
-                return NextResponse.json(
-                    { error: 'Você só pode alterar o status profissional com saldo zerado' },
-                    { status: 400 }
-                );
-            }
+        if (
+            isProfessional !== undefined
+            && currentUser?.isProfessional !== undefined
+            && isProfessional !== currentUser.isProfessional
+        ) {
+            return NextResponse.json(
+                { error: 'Use o fluxo de migração de conta nas configurações.' },
+                { status: 400 }
+            );
         }
 
         const isProfessionalChanging =
             isProfessional !== undefined &&
-            currentUser &&
+            currentUser?.isProfessional !== undefined &&
             isProfessional !== currentUser.isProfessional;
 
         const updateData: any = {};
@@ -560,6 +549,8 @@ export async function PATCH(request: NextRequest) {
             username: nextUsername,
             taxId: nextTaxId,
             isProfessional: nextIsProfessional,
+            birthDate: birthDate !== undefined ? birthDate : currentUser?.birthDate,
+            onboardingStep: completeProfile === true ? 'completed' : currentUser?.onboardingStep,
         });
         
         if (isSubscriptionEnabled !== undefined) {

@@ -127,6 +127,7 @@ const UserSchema = new Schema<IUser>({
     },
     isProfessional: {
         type: Boolean,
+        default: false,
     },
     onboardingStep: {
         type: String,

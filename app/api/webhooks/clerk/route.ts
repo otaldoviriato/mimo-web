@@ -80,7 +80,7 @@ export async function POST(req: Request) {
 
         const roleMetadata = getCreatorLandingProfileRole(unsafe_metadata);
         const referralMetadata = getReferralFromUnsafeMetadata(unsafe_metadata);
-        const isProfessional = roleMetadata === 'professional' ? true : (roleMetadata === 'client' ? false : undefined);
+        const isProfessional = roleMetadata === 'professional';
         const professionalStatus = null; // Inicializa como null (verificação de identidade pendente de envio)
 
         const updateSet: any = {
@@ -90,9 +90,7 @@ export async function POST(req: Request) {
             professionalStatus,
             ...(image_url ? { photoUrl: image_url } : {}),
         };
-        if (isProfessional !== undefined) {
-            updateSet.isProfessional = isProfessional;
-        }
+        updateSet.isProfessional = isProfessional;
         if (isProfessional === false) {
             Object.assign(updateSet, await buildReferralAttribution(id, referralMetadata));
         }
@@ -143,12 +141,9 @@ export async function POST(req: Request) {
     }
 
     if (eventType === 'user.updated') {
-        const { id, email_addresses, username, first_name, last_name, image_url, unsafe_metadata } = evt.data;
+        const { id, email_addresses, username, first_name, last_name, image_url } = evt.data;
 
         const name = [first_name, last_name].filter(Boolean).join(' ') || undefined;
-        const explicitRole = getCreatorLandingProfileRole(unsafe_metadata);
-        const isProfessional = explicitRole === 'professional';
-
         const updateData: any = {
             email: email_addresses[0]?.email_address,
             username: username,
@@ -156,23 +151,12 @@ export async function POST(req: Request) {
             ...(image_url ? { photoUrl: image_url } : {}),
         };
 
-        const currentUser = await User.findOne({ clerkId: id });
-        if (currentUser) {
-
-            if (isProfessional && !currentUser.isProfessional) {
-                updateData.isProfessional = true;
-                updateData.professionalStatus = null;
-
-                // Envio de e-mail de notificação para o admin desativado conforme solicitado
-            }
-        }
-
         await User.findOneAndUpdate(
             { clerkId: id },
             { $set: updateData }
         );
 
-        console.log(`✅ Clerk Webhook: User updated: ${id} (Professional: ${isProfessional})`);
+        console.log(`✅ Clerk Webhook: User updated: ${id}`);
     }
 
     if (eventType === 'user.deleted') {

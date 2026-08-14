@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { clearMimoClientSession } from '@/lib/clientSession';
 import { REFERRAL_STORAGE_KEY, getReferralFromSearchParams, type ReferralMetadata } from '@/lib/referral';
+import { getPendingPostAuthRedirect, POST_AUTH_REDIRECT_STORAGE_KEY } from '@/lib/postAuthRedirect';
 
 function GiftCapture() {
     const searchParams = useSearchParams();
@@ -304,12 +305,16 @@ export default function LoginPage() {
         const executeGoogleAuth = async () => {
             const pendingGift = typeof window !== 'undefined' ? localStorage.getItem('mimo_pending_gift') : null;
             const pendingReferral = getPendingReferral();
+            const pendingRedirect = getPendingPostAuthRedirect();
             clearMimoClientSession(queryClient);
             if (pendingGift && typeof window !== 'undefined') {
                 localStorage.setItem('mimo_pending_gift', pendingGift);
             }
             if (pendingReferral && typeof window !== 'undefined') {
                 localStorage.setItem(REFERRAL_STORAGE_KEY, JSON.stringify(pendingReferral));
+            }
+            if (pendingRedirect && typeof window !== 'undefined') {
+                localStorage.setItem(POST_AUTH_REDIRECT_STORAGE_KEY, pendingRedirect);
             }
 
             const oauthParams = {
