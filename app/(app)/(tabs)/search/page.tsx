@@ -30,10 +30,17 @@ export default function SearchPage() {
     const [username, setUsername] = useState('');
     const [loading, setLoading] = useState(false);
     const [foundUsers, setFoundUsers] = useState<any[]>([]);
-    const { data: featuredUsers = [], isLoading: loadingFeatured } = useFeaturedUsers();
+    const {
+        data: featuredUsers = [],
+        isLoading: loadingFeatured,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+    } = useFeaturedUsers();
     const [error, setError] = useState('');
     const [lightbox, setLightbox] = useState<{ photos: string[]; index: number } | null>(null);
     const exposedProfiles = useRef(new Set<string>());
+    const loadMoreRef = useRef<HTMLDivElement>(null);
 
     const [activeFilter, setActiveFilter] = useState<'online' | 'novos' | 'todos'>('online');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -100,6 +107,13 @@ export default function SearchPage() {
 
     const closeLightbox = () => setLightbox(null);
 
+    const clearSearch = () => {
+        setUsername('');
+        setFoundUsers([]);
+        setError('');
+        setLoading(false);
+    };
+
     const lightboxPrev = (e: React.MouseEvent) => {
         e.stopPropagation();
         setLightbox(prev => prev ? { ...prev, index: (prev.index - 1 + prev.photos.length) % prev.photos.length } : null);
@@ -145,60 +159,66 @@ export default function SearchPage() {
         return () => observer.disconnect();
     }, [featuredUsers, loadingFeatured, userData?.isProfessional, username]);
 
+    useEffect(() => {
+        const target = loadMoreRef.current;
+        if (!target || username.trim() || !hasNextPage) return;
 
-
-    const handleSearch = async () => {
-        if (!username.trim()) {
-            setError('Digite um username para buscar');
-            return;
-        }
-
-        setLoading(true);
-        setFoundUsers([]);
-        setError('');
-
-        try {
-            const data = await userApi.searchByUsername(username.trim());
-            setFoundUsers(data.users || []);
-        } catch (err: any) {
-            if (err.response?.status === 404) {
-                const code = err.response?.data?.error;
-                if (code === 'incompatible_professional_status') {
-                    setError('Este usuário tem o mesmo modo que você. Só é possível conversar entre quem cobra e quem não cobra.');
-                } else {
-                    setError('Usuário não encontrado');
-                }
-            } else {
-                setError('Erro ao buscar usuário');
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0]?.isIntersecting && !isFetchingNextPage) {
+                void fetchNextPage();
             }
-        } finally {
-            setLoading(false);
-        }
-    };
+        }, { rootMargin: '300px 0px' });
+
+        observer.observe(target);
+        return () => observer.disconnect();
+    }, [fetchNextPage, hasNextPage, isFetchingNextPage, username]);
+
+
 
     const handleStartChat = (clerkId: string) => {
         router.push(`/chat/${clerkId}`);
     };
 
     const handleExploreProfile = (user: any) => {
-        trackAcquisitionEvent({
-            eventType: 'explore_profile_viewed',
-            professionalId: user.clerkId,
-        });
-        router.push(`/${user.username}?source=explore`);
+        const isDirectSearch = Boolean(username.trim());
+        if (!isDirectSearch) {
+            trackAcquisitionEvent({
+                eventType: 'explore_profile_viewed',
+                professionalId: user.clerkId,
+            });
+        }
+        router.push(`/${user.username}?source=${isDirectSearch ? 'search' : 'explore'}`);
     };
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            if (username.trim()) {
-                handleSearch();
-            } else {
-                setFoundUsers([]);
-                setError('');
-            }
-        }, 600); // 600ms debounce
+        const searchQuery = username.trim();
+        if (!searchQuery) return;
 
-        return () => clearTimeout(timer);
+        let cancelled = false;
+        const timer = setTimeout(async () => {
+            setLoading(true);
+            setFoundUsers([]);
+            setError('');
+
+            try {
+                const data = await userApi.searchByUsername(searchQuery);
+                if (!cancelled) setFoundUsers(data.users || []);
+            } catch (err: any) {
+                if (cancelled) return;
+                if (err.response?.status === 404) {
+                    setError('Nenhum perfil encontrado');
+                } else {
+                    setError('Não foi possível buscar agora');
+                }
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        }, 600);
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
     }, [username]);
 
     // Renderiza Card de Criadora em Grid 3:4 (Exibido para Clientes / Homens)
@@ -453,16 +473,24 @@ export default function SearchPage() {
                         </div>
                         <input
                             className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-600/10 transition-all font-medium"
-                            placeholder="Digite o @username..."
+                            placeholder="Nome ou @usuário..."
                             value={username}
-                            onChange={(e) => setUsername(e.target.value)}
+                            onChange={(e) => {
+                                const nextValue = e.target.value;
+                                setUsername(nextValue);
+                                if (!nextValue.trim()) {
+                                    setFoundUsers([]);
+                                    setError('');
+                                    setLoading(false);
+                                }
+                            }}
                             autoCapitalize="none"
                             autoCorrect="off"
                             autoFocus
                         />
                         {username.length > 0 && !loading && (
                             <button 
-                                onClick={() => setUsername('')}
+                                onClick={clearSearch}
                                 className="absolute inset-y-0 right-3.5 flex items-center text-gray-400 hover:text-gray-600 appearance-none"
                             >
                                 <X className="w-4.5 h-4.5" />
@@ -480,7 +508,7 @@ export default function SearchPage() {
                     <button
                         onClick={() => {
                             setIsSearchOpen(false);
-                            setUsername('');
+                            clearSearch();
                         }}
                         className="text-xs font-bold text-slate-500 hover:text-purple-600 px-2 py-2 transition-colors cursor-pointer"
                     >
@@ -577,6 +605,14 @@ export default function SearchPage() {
                                         <p>{getEmptyStateMessage()}</p>
                                     </div>
                                 )}
+                                <div ref={loadMoreRef} className="flex min-h-12 items-center justify-center py-3" aria-live="polite">
+                                    {isFetchingNextPage ? (
+                                        <span className="flex items-center gap-2 text-xs font-semibold text-slate-400">
+                                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-purple-600" />
+                                            Carregando mais perfis...
+                                        </span>
+                                    ) : null}
+                                </div>
                             </>
                         )}
                     </div>
@@ -588,9 +624,9 @@ export default function SearchPage() {
                         <div className={userData?.isProfessional ? "flex flex-col gap-2.5 max-w-2xl mx-auto w-full" : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"}>
                             {foundUsers.map((user) => renderUserItem(user))}
                         </div>
-                        {foundUsers.length === 0 && !loading && (
+                        {foundUsers.length === 0 && !loading && !error && (
                             <div className="text-center py-12 text-gray-400 text-xs">
-                                Nenhum perfil encontrado para "@ {username}".
+                                Nenhum perfil encontrado para {username}.
                             </div>
                         )}
                     </div>

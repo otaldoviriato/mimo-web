@@ -8,8 +8,8 @@
  * e valida/atualiza em background — sem skeleton na troca de abas.
  */
 
-import { useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo } from 'react';
+import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@clerk/nextjs';
 import { userApi } from '@/services/api';
 import { REFERRAL_STORAGE_KEY } from '@/lib/referral';
@@ -424,15 +424,33 @@ export function useUserByUsername(username: string | undefined) {
 
 // ─── Hook: usuários em destaque (Explorar) ──────────────────────────────────
 export function useFeaturedUsers() {
-    return useQuery({
+    const query = useInfiniteQuery({
         queryKey: ['users', 'featured'],
-        queryFn: async () => {
-            const data = await userApi.getFeaturedUsers();
-            return (data.users || []) as any[];
+        initialPageParam: [] as string[],
+        queryFn: async ({ pageParam }) => {
+            const data = await userApi.getFeaturedUsers(pageParam);
+            return {
+                users: (data.users || []) as any[],
+                hasMore: Boolean(data.hasMore),
+            };
         },
+        getNextPageParam: (lastPage, allPages) => lastPage.hasMore
+            ? allPages.flatMap((page) => page.users.map((user) => user.clerkId))
+            : undefined,
         staleTime: 3 * 60 * 1000,
         gcTime: 10 * 60 * 1000,
     });
+
+    const users = useMemo(() => {
+        const seen = new Set<string>();
+        return query.data?.pages.flatMap((page) => page.users).filter((user) => {
+            if (seen.has(user.clerkId)) return false;
+            seen.add(user.clerkId);
+            return true;
+        }) ?? [];
+    }, [query.data?.pages]);
+
+    return { ...query, data: users };
 }
 
 // ─── Galeria ─────────────────────────────────────────────────────────────

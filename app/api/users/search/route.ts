@@ -23,58 +23,52 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Search query required' }, { status: 400 });
         }
 
-        const cleanQuery = query.replace('@', '');
+        const cleanQuery = query.trim().replace(/^@/, '');
+        const searchTerms = cleanQuery
+            .split(/\s+/)
+            .map((term) => term.replace(/^@/, '').slice(0, 40))
+            .filter(Boolean)
+            .slice(0, 5);
+
+        if (searchTerms.length === 0) {
+            return NextResponse.json({ error: 'Search query required' }, { status: 400 });
+        }
+
+        const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
         await connectToDatabase();
 
-        const currentUser = await User.findOne({ clerkId: userId }).select('isProfessional').lean();
+        const [currentUser, userRooms] = await Promise.all([
+            User.findOne({ clerkId: userId }).select('isProfessional').lean(),
+            Room.find({ participants: userId }).select('participants').lean<Array<{ participants: string[] }>>().exec(),
+        ]);
+        const talkedUserIds = new Set(
+            userRooms.flatMap((room) => room.participants).filter((participantId) => participantId !== userId),
+        );
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const queryFilter: any = {
             clerkId: { $ne: userId },
-            isSuspended: { $ne: true },
-            photoUrl: { $exists: true, $ne: '' }
+            isSuspended: { $ne: true }
         };
 
         if (currentUser?.isProfessional) {
             return NextResponse.json({ users: [] });
         }
 
-        // A busca faz parte do Explorar e segue a mesma regra de elegibilidade:
-        // conversa com o cliente atual ou ao menos um cliente adquirido diretamente.
-        const [userRooms, professionalsWithAcquiredClients] = await Promise.all([
-            Room.find({ participants: userId }).select('participants').lean<Array<{ participants: string[] }>>().exec(),
-            User.distinct<string>('acquiredByProfessionalId', {
-                isProfessional: false,
-                acquiredByProfessionalId: { $type: 'string', $ne: '' }
-            }).exec()
-        ]);
-        const talkedUserIds = new Set<string>();
-        userRooms.forEach((room) => {
-            if (Array.isArray(room.participants)) {
-                room.participants.forEach((participantId: string) => {
-                    if (participantId !== userId) talkedUserIds.add(participantId);
-                });
-            }
-        });
-        const eligibleProfessionalIds = Array.from(new Set([
-            ...talkedUserIds,
-            ...professionalsWithAcquiredClients
-        ]));
-
-        if (eligibleProfessionalIds.length === 0) {
-            return NextResponse.json({ error: 'User not found' }, { status: 404 });
-        }
-
         queryFilter.isProfessional = true;
         queryFilter.professionalStatus = 'approved';
-        queryFilter.clerkId = { $ne: userId, $in: eligibleProfessionalIds };
 
         const foundUsers = await User.find({
-            $or: [
-                { username: { $regex: new RegExp(cleanQuery, 'i') } },
-                { name: { $regex: new RegExp(cleanQuery, 'i') } }
-            ],
+            $and: searchTerms.map((term) => {
+                const regex = new RegExp(escapeRegex(term), 'i');
+                return {
+                    $or: [
+                        { username: { $regex: regex } },
+                        { name: { $regex: regex } },
+                    ],
+                };
+            }),
             ...queryFilter
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }).select('clerkId username name email photoUrl coverUrl isProfessional identityStatus subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers bio createdAt avgResponseTimeMinutes isOnline lastSeen birthDate city state').limit(40).lean() as any[];

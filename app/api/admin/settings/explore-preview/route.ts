@@ -5,6 +5,7 @@ import { User, GalleryItem, Room, Message } from '@/models';
 import { AppSettings } from '@/models/AppSettings';
 import { AcquisitionEvent } from '@/models/AcquisitionEvent';
 import { EXPLORE_DISCOVERY_IMPRESSIONS, rankExploreUsers } from '@/lib/exploreRanking';
+import { getQualifiedConversationCounts } from '@/lib/exploreMetrics';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -71,41 +72,11 @@ export async function GET() {
                     }
                 }
             ]),
-            Message.aggregate([
-                {
-                    $match: {
-                        isSystem: { $ne: true },
-                        $or: [
-                            { senderId: { $in: clerkIds } },
-                            { receiverId: { $in: clerkIds } }
-                        ]
-                    }
-                },
-                {
-                    $project: {
-                        roomId: 1,
-                        senderId: 1,
-                        paid: { $gt: [{ $ifNull: ['$cost', 0] }, 0] },
-                        professionals: {
-                            $filter: {
-                                input: ['$senderId', '$receiverId'],
-                                as: 'participantId',
-                                cond: { $in: ['$$participantId', clerkIds] }
-                            }
-                        }
-                    }
-                },
-                { $unwind: '$professionals' },
-                {
-                    $group: {
-                        _id: { professionalId: '$professionals', roomId: '$roomId' },
-                        senders: { $addToSet: '$senderId' },
-                        paidMessages: { $sum: { $cond: ['$paid', 1, 0] } }
-                    }
-                },
-                { $match: { 'senders.1': { $exists: true }, paidMessages: { $gt: 0 } } },
-                { $group: { _id: '$_id.professionalId', count: { $sum: 1 } } }
-            ])
+            getQualifiedConversationCounts(
+                clerkIds,
+                settings?.earningsSessionInactivityMinutes ?? 120,
+                settings?.earningsSessionMinimumCents ?? 1000,
+            ),
         ]);
 
         const exploreImpressionsMap = new Map<string, number>();
@@ -116,10 +87,7 @@ export async function GET() {
                 : exploreProfileViewsMap;
             target.set(event._id.professionalId, event.count);
         }
-        const qualifiedConversationsMap = new Map<string, number>();
-        for (const conversation of qualifiedConversations) {
-            qualifiedConversationsMap.set(conversation._id, conversation.count);
-        }
+        const qualifiedConversationsMap = qualifiedConversations;
 
         // Buscar fotos públicas livres da galeria
         const galleryItems = await GalleryItem.find({

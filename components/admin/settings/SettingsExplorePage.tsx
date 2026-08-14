@@ -29,7 +29,7 @@ interface PreviewUser {
 const RULES = [
     {
         title: 'Dar uma chance para quem apareceu pouco',
-        description: 'Oito das 30 vagas ficam reservadas para perfis com menos de 100 aparições no Explorar.',
+        description: 'As quatro primeiras posições mostram qualidade comprovada. Depois, uma vaga a cada cinco dá chance a quem apareceu pouco.',
         icon: Sparkles,
         style: 'bg-purple-50 border-purple-100 text-purple-600',
     },

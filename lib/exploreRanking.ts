@@ -1,6 +1,6 @@
-export const EXPLORE_DISCOVERY_SLOTS = 8;
 export const EXPLORE_RESULT_LIMIT = 30;
 export const EXPLORE_DISCOVERY_IMPRESSIONS = 100;
+export const EXPLORE_DISCOVERY_INTERVAL = 5;
 
 export type ExploreRankable = {
     clerkId: string;
@@ -34,25 +34,42 @@ function compareQuality(a: ExploreRankable, b: ExploreRankable) {
 
 /** Reserva parte da vitrine para perfis pouco exibidos e o restante para qualidade comprovada. */
 export function rankExploreUsers<T extends ExploreRankable>(users: T[], limit = EXPLORE_RESULT_LIMIT): T[] {
-    const discovery = users
-        .filter((user) => user.exploreImpressionsCount < EXPLORE_DISCOVERY_IMPRESSIONS)
-        .sort(compareDiscovery)
-        .slice(0, Math.min(EXPLORE_DISCOVERY_SLOTS, limit));
-
-    const selected = new Set(discovery.map((user) => user.clerkId));
     const quality = users
-        .filter((user) => !selected.has(user.clerkId))
-        .sort(compareQuality)
-        .slice(0, Math.max(0, limit - discovery.length));
+        .filter((user) => user.qualifiedConversationsCount > 0)
+        .sort(compareQuality);
+    const discovery = users
+        .filter((user) => (
+            user.qualifiedConversationsCount === 0
+            && user.exploreImpressionsCount < EXPLORE_DISCOVERY_IMPRESSIONS
+        ))
+        .sort(compareDiscovery);
+    const remaining = users
+        .filter((user) => (
+            user.qualifiedConversationsCount === 0
+            && user.exploreImpressionsCount >= EXPLORE_DISCOVERY_IMPRESSIONS
+        ))
+        .sort(compareDiscovery);
 
-    // A cada dois destaques entra uma descoberta, misturando os dois grupos na vitrine.
+    // As quatro primeiras posições sempre refletem qualidade comprovada.
+    // Depois, uma vaga em cada cinco dá oportunidade a quem ainda apareceu pouco.
     const ranked: T[] = [];
-    const discoveryQueue = [...discovery];
     const qualityQueue = [...quality];
-    while (ranked.length < limit && (discoveryQueue.length || qualityQueue.length)) {
-        if (qualityQueue.length) ranked.push(qualityQueue.shift()!);
-        if (qualityQueue.length) ranked.push(qualityQueue.shift()!);
-        if (discoveryQueue.length) ranked.push(discoveryQueue.shift()!);
+    const discoveryQueue = [...discovery];
+    const remainingQueue = [...remaining];
+
+    while (ranked.length < limit && (qualityQueue.length || discoveryQueue.length || remainingQueue.length)) {
+        const position = ranked.length + 1;
+        const isDiscoveryPosition = position % EXPLORE_DISCOVERY_INTERVAL === 0;
+
+        if (isDiscoveryPosition && discoveryQueue.length) {
+            ranked.push(discoveryQueue.shift()!);
+        } else if (qualityQueue.length) {
+            ranked.push(qualityQueue.shift()!);
+        } else if (discoveryQueue.length) {
+            ranked.push(discoveryQueue.shift()!);
+        } else if (remainingQueue.length) {
+            ranked.push(remainingQueue.shift()!);
+        }
     }
     return ranked.slice(0, limit);
 }

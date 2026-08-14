@@ -1,16 +1,17 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User, GalleryItem, Room, Message, Transaction } from '@/models';
 import { AcquisitionEvent } from '@/models/AcquisitionEvent';
 import { AppSettings } from '@/models/AppSettings';
 import { EXPLORE_DISCOVERY_IMPRESSIONS, rankExploreUsers } from '@/lib/exploreRanking';
+import { getQualifiedConversationCounts } from '@/lib/exploreMetrics';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 // GET /api/users/featured
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
         const { userId } = await auth();
 
@@ -19,6 +20,12 @@ export async function GET() {
         }
 
         await connectToDatabase();
+
+        const excludedIds = new URL(request.url).searchParams
+            .get('exclude')
+            ?.split(',')
+            .filter((value) => /^user_[A-Za-z0-9]+$/.test(value))
+            .slice(0, 500) ?? [];
 
         // Limite de inatividade de 30 dias para exibição no explorar
         const activeLimitDate = new Date();
@@ -58,6 +65,7 @@ export async function GET() {
         queryFilter.isProfessional = true;
         queryFilter.professionalStatus = 'approved';
         queryFilter.hideFromExplore = { $ne: true };
+        queryFilter.clerkId = { $ne: userId, $nin: excludedIds };
 
         // Encontrar criadores/clientes em destaque
         const featuredUsers = await User.find(queryFilter)
@@ -71,6 +79,7 @@ export async function GET() {
 
         // Buscar fotos públicas livres da galeria para estes usuários
         const clerkIds = featuredUsers.map(u => u.clerkId);
+        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers newClientHoursThreshold activeRechargedClientDaysThreshold activeUnrechargedClientHoursThreshold earningsSessionInactivityMinutes earningsSessionMinimumCents clientLevels').lean() as any;
 
         const [exploreEvents, qualifiedConversations] = await Promise.all([
             AcquisitionEvent.aggregate([
@@ -87,41 +96,11 @@ export async function GET() {
                     }
                 }
             ]),
-            Message.aggregate([
-                {
-                    $match: {
-                        isSystem: { $ne: true },
-                        $or: [
-                            { senderId: { $in: clerkIds } },
-                            { receiverId: { $in: clerkIds } }
-                        ]
-                    }
-                },
-                {
-                    $project: {
-                        roomId: 1,
-                        senderId: 1,
-                        paid: { $gt: [{ $ifNull: ['$cost', 0] }, 0] },
-                        professionals: {
-                            $filter: {
-                                input: ['$senderId', '$receiverId'],
-                                as: 'participantId',
-                                cond: { $in: ['$$participantId', clerkIds] }
-                            }
-                        }
-                    }
-                },
-                { $unwind: '$professionals' },
-                {
-                    $group: {
-                        _id: { professionalId: '$professionals', roomId: '$roomId' },
-                        senders: { $addToSet: '$senderId' },
-                        paidMessages: { $sum: { $cond: ['$paid', 1, 0] } }
-                    }
-                },
-                { $match: { 'senders.1': { $exists: true }, paidMessages: { $gt: 0 } } },
-                { $group: { _id: '$_id.professionalId', count: { $sum: 1 } } }
-            ])
+            getQualifiedConversationCounts(
+                clerkIds,
+                settings?.earningsSessionInactivityMinutes ?? 120,
+                settings?.earningsSessionMinimumCents ?? 1000,
+            ),
         ]);
 
         const exploreImpressionsMap = new Map<string, number>();
@@ -132,10 +111,7 @@ export async function GET() {
                 : exploreProfileViewsMap;
             target.set(event._id.professionalId, event.count);
         }
-        const qualifiedConversationsMap = new Map<string, number>();
-        for (const conversation of qualifiedConversations) {
-            qualifiedConversationsMap.set(conversation._id, conversation.count);
-        }
+        const qualifiedConversationsMap = qualifiedConversations;
         const galleryItems = await GalleryItem.find({
             ownerId: { $in: clerkIds },
             galleryType: 'public',
@@ -155,7 +131,6 @@ export async function GET() {
             return acc;
         }, {});
 
-        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers newClientHoursThreshold activeRechargedClientDaysThreshold activeUnrechargedClientHoursThreshold clientLevels').lean() as any;
         const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
         const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
         const newClientHoursThreshold = settings?.newClientHoursThreshold ?? 24;
@@ -403,7 +378,10 @@ export async function GET() {
         // Mistura vagas de descoberta com os perfis de melhor histórico.
         const sorted = rankExploreUsers(usersWithPhotos);
 
-        return NextResponse.json({ users: sorted });
+        return NextResponse.json({
+            users: sorted,
+            hasMore: featuredUsers.length > sorted.length,
+        });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
         console.error('Error fetching featured users:', error);

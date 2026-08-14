@@ -112,8 +112,11 @@ export const userApi = {
         return response.data;
     },
 
-    getFeaturedUsers: async () => {
-        const response = await api.get('/api/users/featured');
+    getFeaturedUsers: async (excludeIds: string[] = []) => {
+        const exclude = excludeIds.length
+            ? `?exclude=${encodeURIComponent(excludeIds.join(','))}`
+            : '';
+        const response = await api.get(`/api/users/featured${exclude}`);
         return response.data;
     },
 
