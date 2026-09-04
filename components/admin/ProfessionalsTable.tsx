@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, MoreVertical, ShieldCheck, Mail, Calendar, Coins, Edit, Trash2, X, UserCheck, TrendingUp, Activity, MessageCircle } from 'lucide-react';
+import { Search, MoreVertical, ShieldCheck, Mail, Calendar, Coins, Edit, Trash2, X, UserCheck, TrendingUp, Activity, MessageCircle, Copy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { SortableColumnHeader } from './SortableColumnHeader';
@@ -166,15 +166,29 @@ export function ProfessionalsTable() {
 
                 <div className="flex flex-col sm:flex-row items-center gap-3">
                     {/* Barra de Busca */}
-                    <div className="relative w-full sm:w-64">
+                    <div className="relative w-full sm:w-80">
                         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                         <input
                             type="text"
-                            placeholder="Buscar nome, username ou e-mail..."
+                            placeholder="Buscar por ID, nome, @user ou e-mail..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 transition-all font-medium placeholder-slate-400 text-slate-700"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && sortedUsers.length === 1) {
+                                    router.push(`/admin/users/${sortedUsers[0].clerkId}`);
+                                }
+                            }}
+                            className="w-full pl-10 pr-8 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 transition-all font-medium placeholder-slate-400 text-slate-700"
                         />
+                        {searchQuery && (
+                            <button
+                                onClick={() => setSearchQuery('')}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                                title="Limpar busca"
+                            >
+                                <X size={14} />
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -230,14 +244,41 @@ export function ProfessionalsTable() {
                                                         {getInitials(user.name)}
                                                     </div>
                                                 )}
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm font-bold text-slate-800 group-hover:text-purple-600 transition-colors">
-                                                        {user.name}
-                                                    </span>
+                                                <div className="flex flex-col min-w-0">
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <span className="text-sm font-bold text-slate-800 group-hover:text-purple-600 transition-colors">
+                                                            {user.name}
+                                                        </span>
+                                                        {user.username && (
+                                                            <span className="text-xs text-purple-600 font-semibold">
+                                                                @{user.username}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <span className="text-xs text-slate-400 font-medium flex items-center gap-1 mt-0.5">
                                                         <Mail size={12} />
                                                         {user.email}
                                                     </span>
+                                                    <div className="flex items-center gap-1.5 mt-1">
+                                                        <span 
+                                                            className="font-mono text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200/80 truncate max-w-[170px]" 
+                                                            title={user.clerkId}
+                                                        >
+                                                            {user.clerkId}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                navigator.clipboard.writeText(user.clerkId);
+                                                                toast.success('ID copiado!');
+                                                            }}
+                                                            className="text-slate-400 hover:text-purple-600 p-0.5 rounded transition-colors cursor-pointer"
+                                                            title="Copiar ID"
+                                                        >
+                                                            <Copy size={11} />
+                                                        </button>
+                                                    </div>
                                                     <span className="text-[10px] font-semibold flex items-center gap-1.5 mt-1 select-none text-slate-400">
                                                         {user.isOnline ? (
                                                             <>

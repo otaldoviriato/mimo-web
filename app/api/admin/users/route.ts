@@ -67,13 +67,30 @@ export async function GET(request: NextRequest) {
         }
 
         if (query.trim().length > 0) {
-            const cleanQuery = query.trim().replace('@', '');
+            const rawQuery = query.trim();
+            const cleanQuery = rawQuery.replace('@', '');
+
+            // Suporte para ID do Clerk direto ou múltiplos IDs (ex: virtualRoomId "user_A_user_B")
+            const clerkTokens = rawQuery.match(/user_[A-Za-z0-9]+/g);
+
+            const searchOrConditions: any[] = [
+                { username: { $regex: new RegExp(cleanQuery, 'i') } },
+                { name: { $regex: new RegExp(cleanQuery, 'i') } },
+                { email: { $regex: new RegExp(cleanQuery, 'i') } },
+                { clerkId: { $regex: new RegExp(cleanQuery, 'i') } }
+            ];
+
+            if (clerkTokens && clerkTokens.length > 0) {
+                searchOrConditions.push({ clerkId: { $in: clerkTokens } });
+            }
+
+            // Se for ObjectId válido do MongoDB (24 caracteres hex)
+            if (/^[0-9a-fA-F]{24}$/.test(cleanQuery)) {
+                searchOrConditions.push({ _id: cleanQuery });
+            }
+
             const searchFilter = {
-                $or: [
-                    { username: { $regex: new RegExp(cleanQuery, 'i') } },
-                    { name: { $regex: new RegExp(cleanQuery, 'i') } },
-                    { email: { $regex: new RegExp(cleanQuery, 'i') } }
-                ]
+                $or: searchOrConditions
             };
             
             if (filter.$or) {
