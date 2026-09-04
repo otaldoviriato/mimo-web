@@ -27,6 +27,20 @@ export interface IMessage extends Document {
     replyToId?: string | null;
     replyToContent?: string | null;
     replyToSenderId?: string | null;
+    isDelivered?: boolean;
+    isAudio?: boolean;
+    audioUrl?: string;
+    audioDuration?: number;
+    billingEngineVersion?: 'marketplace_v2';
+    idempotencyKey?: string;
+    textGraphemeCount?: number;
+    audioBillableSeconds?: number;
+    equivalentCharCount?: number;
+    cashFundedCents?: number;
+    promoFundedCents?: number;
+    qualificationAttemptId?: mongoose.Types.ObjectId;
+    qualifiedConversationId?: mongoose.Types.ObjectId;
+    pricingSnapshot?: Record<string, unknown>;
 }
 
 const MessageSchema = new Schema<IMessage>({
@@ -74,6 +88,10 @@ const MessageSchema = new Schema<IMessage>({
         type: Boolean,
         default: false,
     },
+    isDelivered: {
+        type: Boolean,
+        default: false,
+    },
     isLockedImage: {
         type: Boolean,
         default: false,
@@ -106,6 +124,18 @@ const MessageSchema = new Schema<IMessage>({
         type: Boolean,
         default: false,
     },
+    isAudio: {
+        type: Boolean,
+        default: false,
+    },
+    audioUrl: {
+        type: String,
+        default: null,
+    },
+    audioDuration: {
+        type: Number,
+        default: null,
+    },
     isSystem: {
         type: Boolean,
         default: false,
@@ -137,6 +167,50 @@ const MessageSchema = new Schema<IMessage>({
     replyToSenderId: {
         type: String,
         default: null,
+    },
+    billingEngineVersion: {
+        type: String,
+        enum: ['marketplace_v2'],
+        index: true,
+    },
+    idempotencyKey: {
+        type: String,
+        unique: true,
+        sparse: true,
+        index: true,
+    },
+    textGraphemeCount: {
+        type: Number,
+        min: 0,
+    },
+    audioBillableSeconds: {
+        type: Number,
+        min: 0,
+    },
+    equivalentCharCount: {
+        type: Number,
+        min: 0,
+    },
+    cashFundedCents: {
+        type: Number,
+        min: 0,
+    },
+    promoFundedCents: {
+        type: Number,
+        min: 0,
+    },
+    qualificationAttemptId: {
+        type: Schema.Types.ObjectId,
+        ref: 'QualificationAttempt',
+        index: true,
+    },
+    qualifiedConversationId: {
+        type: Schema.Types.ObjectId,
+        ref: 'QualifiedConversation',
+        index: true,
+    },
+    pricingSnapshot: {
+        type: Schema.Types.Mixed,
     },
 });
 

@@ -88,6 +88,9 @@ export async function PATCH(
                 return NextResponse.json({ error: 'Status inválido.' }, { status: 400 });
             }
             update.professionalStatus = body.status === 'pending_documents' ? null : body.status;
+            if (body.status === 'approved') {
+                (update as any).isProfessional = true;
+            }
         }
 
         if (body.notes !== undefined) {
@@ -119,6 +122,15 @@ export async function PATCH(
         }
 
         if (update.professionalStatus === 'approved' && oldStatus !== 'approved') {
+            try {
+                const client = await clerkClient();
+                await client.users.updateUserMetadata(u.clerkId, {
+                    unsafeMetadata: { profileRole: 'professional' },
+                });
+            } catch (clerkErr) {
+                console.error('[backoffice/creator-applications] Erro ao sincronizar Clerk metadata:', clerkErr);
+            }
+
             try {
                 const appUrl = process.env.NEXT_PUBLIC_API_URL || 'https://www.mimochat.com.br';
                 await resend.emails.send({
@@ -212,22 +224,16 @@ export async function DELETE(
             return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 });
         }
 
-        const clerkId = user.clerkId;
+        await User.findByIdAndUpdate(id, {
+            $set: {
+                isSuspended: true,
+                suspendedAt: new Date(),
+                professionalStatus: 'rejected',
+            },
+        });
+        console.log(`[DELETE creator-application] Usuário ${id} suspenso e retido para auditoria.`);
 
-        // 1. Deleta do Clerk
-        try {
-            const client = await clerkClient();
-            await client.users.deleteUser(clerkId);
-            console.log(`[DELETE creator-application] Usuário ${clerkId} excluído do Clerk.`);
-        } catch (clerkErr) {
-            console.error('[DELETE creator-application] Erro ao deletar no Clerk (continuando com Mongo):', clerkErr);
-        }
-
-        // 2. Deleta do MongoDB
-        await User.findByIdAndDelete(id);
-        console.log(`[DELETE creator-application] Usuário ${id} excluído do MongoDB.`);
-
-        return NextResponse.json({ success: true, message: 'Inscrição excluída com sucesso do banco e do Clerk.' });
+        return NextResponse.json({ success: true, message: 'Inscrição desativada e retida para auditoria.' });
     } catch (error) {
         console.error('Erro ao excluir inscrição:', error);
         return NextResponse.json({ error: 'Erro interno do servidor.' }, { status: 500 });

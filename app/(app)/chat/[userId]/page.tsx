@@ -14,6 +14,7 @@ import { AudioRecorder, type AudioRecorderStatus } from '@/components/AudioRecor
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { MediaComposerSheet } from '@/components/MediaComposerSheet';
 import { AlertTriangle, ShieldCheck, Wallet } from 'lucide-react';
+import { QualificationProgressBar, type QualificationProgressInfo } from '@/components/QualificationProgressBar';
 
 interface Message {
     _id: string;
@@ -212,51 +213,8 @@ interface EarningsIndicatorProps {
 }
 
 function EarningsIndicator({ messageId, receiverEarnings, cost, isSelected, isNew }: EarningsIndicatorProps) {
-    const [active, setActive] = useState(false);
-    const [shouldRender, setShouldRender] = useState(false);
-
-    useEffect(() => {
-        if (isSelected) {
-            setActive(true);
-            setShouldRender(true);
-        } else {
-            setActive(false);
-        }
-    }, [isSelected]);
-
-    useEffect(() => {
-        if (isNew) {
-            setActive(true);
-            setShouldRender(true);
-            
-            const timer = setTimeout(() => {
-                setActive(false);
-            }, 3000);
-            
-            return () => clearTimeout(timer);
-        }
-    }, [isNew]);
-
-    useEffect(() => {
-        if (active) {
-            setShouldRender(true);
-        } else {
-            const timer = setTimeout(() => {
-                setShouldRender(false);
-            }, 350);
-            return () => clearTimeout(timer);
-        }
-    }, [active]);
-
-    if (!shouldRender) return null;
-
-    const amount = (((receiverEarnings ?? cost * 0.9)) / 100).toFixed(2);
-
-    return (
-        <span className={`relative z-0 ${active ? 'animate-earnings-in' : 'animate-earnings-out'} text-[9px] font-semibold text-emerald-500/90 ml-1.5 select-none whitespace-nowrap`}>
-            + R$ {amount}
-        </span>
-    );
+    // No marketplace-first, ganhos não são por mensagem avulsa; popup "+ R$" desativado
+    return null;
 }
 
 interface MediaEarningsIndicatorProps {
@@ -268,51 +226,8 @@ interface MediaEarningsIndicatorProps {
 }
 
 function MediaEarningsIndicator({ messageId, receiverEarnings, cost, isSelected, isNew }: MediaEarningsIndicatorProps) {
-    const [active, setActive] = useState(false);
-    const [shouldRender, setShouldRender] = useState(false);
-
-    useEffect(() => {
-        if (isSelected) {
-            setActive(true);
-            setShouldRender(true);
-        } else {
-            setActive(false);
-        }
-    }, [isSelected]);
-
-    useEffect(() => {
-        if (isNew) {
-            setActive(true);
-            setShouldRender(true);
-            
-            const timer = setTimeout(() => {
-                setActive(false);
-            }, 3000);
-            
-            return () => clearTimeout(timer);
-        }
-    }, [isNew]);
-
-    useEffect(() => {
-        if (active) {
-            setShouldRender(true);
-        } else {
-            const timer = setTimeout(() => {
-                setShouldRender(false);
-            }, 350);
-            return () => clearTimeout(timer);
-        }
-    }, [active]);
-
-    if (!shouldRender) return null;
-
-    const amount = (((receiverEarnings || cost)) / 100).toFixed(2);
-
-    return (
-        <span className={`relative z-0 ${active ? 'animate-media-earnings-in' : 'animate-media-earnings-out'} text-[9px] font-semibold text-emerald-500/90 mr-1.5 select-none whitespace-nowrap align-bottom self-end mb-[32px]`}>
-            + R$ {amount}
-        </span>
-    );
+    // No marketplace-first, ganhos não são por mídia avulsa; popup "+ R$" desativado
+    return null;
 }
 
 
@@ -560,7 +475,20 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const [useNativeTransition, setUseNativeTransition] = useState(false);
     const [viewportStyle, setViewportStyle] = useState<React.CSSProperties>({});
     const [lowBalanceThresholdInCents, setLowBalanceThresholdInCents] = useState(1000);
+    const [qualificationProgress, setQualificationProgress] = useState<QualificationProgressInfo | null>(null);
     const chatRootRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!otherUserId) return;
+        fetch(`/api/chats/qualification-progress?otherUserId=${otherUserId}`)
+            .then((r) => r.json())
+            .then((data) => {
+                if (data && !data.error) {
+                    setQualificationProgress(data);
+                }
+            })
+            .catch(console.error);
+    }, [otherUserId]);
 
     const isViewerOpen = fullscreenIndex !== null || fullscreenLockedMessage !== null;
 
@@ -1214,6 +1142,28 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     return r;
                 });
             });
+        });
+
+        socket.on('qualification_progress_updated', (data: any) => {
+            if (data) {
+                setQualificationProgress(data);
+            }
+        });
+
+        socket.on('conversation_status_updated', (data: any) => {
+            if (data?.progress) {
+                setQualificationProgress(data.progress);
+            } else {
+                fetch(`/api/chats/qualification-progress?otherUserId=${otherUserId}`)
+                    .then((r) => r.json())
+                    .then((res) => res && !res.error && setQualificationProgress(res))
+                    .catch(console.error);
+            }
+        });
+
+        socket.on('professional_wallet_updated', () => {
+            queryClient.invalidateQueries({ queryKey: ['wallet', 'dashboard'] });
+            queryClient.invalidateQueries({ queryKey: QueryKeys.me });
         });
 
         socket.on('balance_update', (data: { balance: number }) => {
@@ -2616,6 +2566,8 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     </span>
                 </button>
             )}
+
+            <QualificationProgressBar progress={qualificationProgress} isProfessional={userData?.isProfessional} />
 
             {/* Messages Container Wrapper */}
             <div className="flex-1 relative overflow-hidden flex flex-col">

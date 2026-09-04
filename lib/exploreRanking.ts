@@ -10,24 +10,30 @@ export type ExploreRankable = {
     isOnline: boolean;
     lastActiveTime: number;
     completeness: number;
+    identityStatus?: string | null;
 };
+
+function isVerified(user: ExploreRankable): number {
+    return user.identityStatus === 'approved' ? 1 : 0;
+}
 
 function compareDiscovery(a: ExploreRankable, b: ExploreRankable) {
     return a.exploreImpressionsCount - b.exploreImpressionsCount
-        || a.exploreProfileViewsCount - b.exploreProfileViewsCount
+        || isVerified(b) - isVerified(a)
         || b.qualifiedConversationsCount - a.qualifiedConversationsCount
         || Number(b.isOnline) - Number(a.isOnline)
-        || b.lastActiveTime - a.lastActiveTime
         || b.completeness - a.completeness
+        || b.lastActiveTime - a.lastActiveTime
         || a.clerkId.localeCompare(b.clerkId);
 }
 
 function compareQuality(a: ExploreRankable, b: ExploreRankable) {
     return b.qualifiedConversationsCount - a.qualifiedConversationsCount
+        || isVerified(b) - isVerified(a)
         || Number(b.isOnline) - Number(a.isOnline)
+        || b.completeness - a.completeness
         || b.exploreProfileViewsCount - a.exploreProfileViewsCount
         || b.lastActiveTime - a.lastActiveTime
-        || b.completeness - a.completeness
         || a.exploreImpressionsCount - b.exploreImpressionsCount
         || a.clerkId.localeCompare(b.clerkId);
 }
@@ -35,17 +41,19 @@ function compareQuality(a: ExploreRankable, b: ExploreRankable) {
 /** Reserva parte da vitrine para perfis pouco exibidos e o restante para qualidade comprovada. */
 export function rankExploreUsers<T extends ExploreRankable>(users: T[], limit = EXPLORE_RESULT_LIMIT): T[] {
     const quality = users
-        .filter((user) => user.qualifiedConversationsCount > 0)
+        .filter((user) => user.qualifiedConversationsCount > 0 || isVerified(user) === 1)
         .sort(compareQuality);
     const discovery = users
         .filter((user) => (
             user.qualifiedConversationsCount === 0
+            && isVerified(user) === 0
             && user.exploreImpressionsCount < EXPLORE_DISCOVERY_IMPRESSIONS
         ))
         .sort(compareDiscovery);
     const remaining = users
         .filter((user) => (
             user.qualifiedConversationsCount === 0
+            && isVerified(user) === 0
             && user.exploreImpressionsCount >= EXPLORE_DISCOVERY_IMPRESSIONS
         ))
         .sort(compareDiscovery);

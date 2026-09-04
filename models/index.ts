@@ -46,3 +46,21 @@ export type { ICreditUsage } from './CreditUsage';
 
 export { ProfessionalActivation } from './ProfessionalActivation';
 export type { IProfessionalActivation } from './ProfessionalActivation';
+
+export { QualificationAttempt } from './QualificationAttempt';
+export type { IQualificationAttempt } from './QualificationAttempt';
+
+export { QualifiedConversation } from './QualifiedConversation';
+export type { IQualifiedConversation } from './QualifiedConversation';
+
+export { FinancialLedgerEntry } from './FinancialLedgerEntry';
+export type { IFinancialLedgerEntry } from './FinancialLedgerEntry';
+
+export { ModerationReview } from './ModerationReview';
+export type { IModerationReview } from './ModerationReview';
+
+export { Campaign } from './Campaign';
+export type { ICampaign } from './Campaign';
+
+export { CampaignVisit } from './CampaignVisit';
+export type { ICampaignVisit } from './CampaignVisit';

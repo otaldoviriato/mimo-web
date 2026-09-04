@@ -37,6 +37,14 @@ export interface IAppSettings extends Document {
     defaultPricePerCharSubscribers: number;
     defaultPricePerCharNonSubscribers: number;
     audioPriceMultiplier: number;
+    conversationPricePerEquivalentCharCents: number;
+    audioEquivalentCharsPerSecond: number;
+    quickReplyBonusEnabled: boolean;
+    quickReplyBonusPercentagePoints: number;
+    engagementBonusEnabled: boolean;
+    engagementBonusPercentagePoints: number;
+    deepConversationBonusEnabled: boolean;
+    deepConversationBonusPercentagePoints: number;
     pwaShowAgainIntervalDays: number;
     identityVerificationPromptIntervalDays: number;
     newProfileDaysThreshold: number;
@@ -219,6 +227,54 @@ const AppSettingsSchema = new Schema<IAppSettings>({
         required: true,
         default: 5,
         min: 0,
+    },
+    conversationPricePerEquivalentCharCents: {
+        type: Number,
+        required: true,
+        default: 5,
+        min: 1,
+    },
+    audioEquivalentCharsPerSecond: {
+        type: Number,
+        required: true,
+        default: 5,
+        min: 1,
+    },
+    quickReplyBonusEnabled: {
+        type: Boolean,
+        required: true,
+        default: true,
+    },
+    quickReplyBonusPercentagePoints: {
+        type: Number,
+        required: true,
+        default: 10,
+        min: 0,
+        max: 40,
+    },
+    engagementBonusEnabled: {
+        type: Boolean,
+        required: true,
+        default: true,
+    },
+    engagementBonusPercentagePoints: {
+        type: Number,
+        required: true,
+        default: 15,
+        min: 0,
+        max: 40,
+    },
+    deepConversationBonusEnabled: {
+        type: Boolean,
+        required: true,
+        default: true,
+    },
+    deepConversationBonusPercentagePoints: {
+        type: Number,
+        required: true,
+        default: 15,
+        min: 0,
+        max: 40,
     },
     pwaShowAgainIntervalDays: {
         type: Number,

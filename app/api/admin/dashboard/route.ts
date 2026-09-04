@@ -6,6 +6,7 @@ import { Message } from '@/models/Message';
 import { Transaction } from '@/models/Transaction';
 import { MicroTransaction } from '@/models/MicroTransaction';
 import { AppSettings } from '@/models/AppSettings';
+import { QualifiedConversation } from '@/models/QualifiedConversation';
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
@@ -281,6 +282,38 @@ export async function GET(request: NextRequest) {
             };
         });
 
+        // --- CONVERSAS QUALIFICADAS RECENTES (FEED DO MARKETPLACE) ---
+        const recentQualifiedConversationsDocs = await QualifiedConversation.find()
+            .sort({ updatedAt: -1 })
+            .limit(10)
+            .lean() as any[];
+
+        const participantIds = new Set<string>();
+        recentQualifiedConversationsDocs.forEach(c => {
+            if (c.clientId) participantIds.add(c.clientId);
+            if (c.professionalId) participantIds.add(c.professionalId);
+        });
+
+        const participantsMap = new Map(
+            (await User.find({ clerkId: { $in: Array.from(participantIds) } }).select('clerkId name username photoUrl').lean())
+                .map(u => [u.clerkId, u])
+        );
+
+        const recentQualifiedConversations = recentQualifiedConversationsDocs.map(c => ({
+            id: c._id.toString(),
+            roomId: c.roomId,
+            client: participantsMap.get(c.clientId) || { clerkId: c.clientId, name: 'Cliente' },
+            professional: participantsMap.get(c.professionalId) || { clerkId: c.professionalId, name: 'Profissional' },
+            status: c.status,
+            equivalentChars: c.clientEquivalentChars,
+            grossChargedCents: c.grossChargedCents,
+            payoutCents: c.professionalPayoutCents || 0,
+            marginCents: c.platformMarginCents || 0,
+            unlockedBonuses: c.unlockedBonuses || [],
+            moderationStatus: c.moderationStatus,
+            updatedAt: c.updatedAt,
+        }));
+
         // 3. Responder
         return NextResponse.json({
             metrics: {
@@ -292,6 +325,7 @@ export async function GET(request: NextRequest) {
             activeAndAbsentProfessionals,
             inactiveProfessionals,
             recentTransactions: mappedTransactions,
+            recentQualifiedConversations,
         });
 
     } catch (error: any) {

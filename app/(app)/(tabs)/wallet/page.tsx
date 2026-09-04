@@ -100,6 +100,7 @@ interface SubscriberInfo {
 
 interface WalletDashboardData {
     balance: number;
+    pendingBalance?: number;
     totalWithdrawn: number;
     pendingWithdrawal: unknown;
     projectedMonthlyRecurring: number;
@@ -371,7 +372,7 @@ export default function WalletPage() {
 
                 {/* ── BENTO BLOCK 1: CARD DE SALDO PRINCIPAL ── */}
                 <div className="bg-gradient-to-br from-purple-50/90 to-indigo-50/50 rounded-2xl p-5 flex flex-col justify-between min-h-[150px] relative overflow-hidden shadow-[0_8px_30px_rgb(124,58,237,0.02)] text-slate-800 border border-purple-100/80">
-                    <div className="flex justify-between items-start gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                         <div className="flex flex-col">
                             <div className="flex items-center gap-1.5">
                                 <span className="text-[11.5px] text-purple-650 font-extrabold uppercase tracking-widest flex items-center gap-1.5">
@@ -402,9 +403,20 @@ export default function WalletPage() {
                                 </span>
                             </button>
                         </div>
-                        <span className="text-[10.5px] bg-slate-200/60 border border-slate-300/40 text-slate-600 font-bold px-2 py-0.5 rounded-lg uppercase tracking-wider backdrop-blur-sm">
-                            Real (BRL)
-                        </span>
+
+                        {userData?.isProfessional && (
+                            <div className="flex flex-col items-start sm:items-end bg-white/70 border border-purple-200/60 p-2.5 rounded-xl shadow-xs">
+                                <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wider">
+                                    Pendente (Conversas Abertas)
+                                </span>
+                                <span className="text-lg font-black text-amber-600">
+                                    {renderValue(dashboardData?.pendingBalance || 0)}
+                                </span>
+                                <span className="text-[9px] text-slate-400 font-medium">
+                                    Liberado após fechamento das conversas
+                                </span>
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4 pt-4 border-t border-purple-100/50">

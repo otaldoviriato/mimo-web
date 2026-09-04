@@ -184,7 +184,7 @@ export default function OnboardingPage() {
     // Controla a animação de dismiss (saída do onboarding para cima, revelando o app base)
     const [isDismissing, setIsDismissing] = useState(false);
 
-    const [role,        setRole]        = useState<'client' | 'professional' | null>(null);
+    const [role, setRole] = useState<'client' | 'professional' | null>('client');
     const [roleLoading, setRoleLoading] = useState(false);
     const [roleError,   setRoleError]   = useState('');
 
@@ -409,15 +409,13 @@ export default function OnboardingPage() {
     // ── Handlers ─────────────────────────────────────────────────────────────
 
     const handleRoleConfirm = async () => {
-        if (!role) return;
         setRoleLoading(true);
         setRoleError('');
         try {
-            const isProfessional = role === 'professional';
             const res = await fetch('/api/users/me', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ isProfessional }),
+                body: JSON.stringify({ isProfessional: false }),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Erro ao definir perfil');
@@ -624,7 +622,7 @@ export default function OnboardingPage() {
                     Bem-vindo ao<br />MimoChat 👋
                 </h1>
                 <p className="text-sm text-gray-400 mt-2 leading-relaxed">
-                    Escolha como você quer usar o aplicativo para continuar.
+                    Conheça pessoas reais e converse no seu ritmo.
                 </p>
 
                 {roleError && (
@@ -666,8 +664,9 @@ export default function OnboardingPage() {
                         </div>
                     </button>
 
-                    {/* Profissional */}
+                    {/* Candidaturas profissionais acontecem fora do cadastro comum. */}
                     <button
+                        hidden
                         type="button"
                         onClick={() => setRole('professional')}
                         disabled={roleLoading}
@@ -703,7 +702,7 @@ export default function OnboardingPage() {
             <div className="px-5 pt-3 pb-8 shrink-0">
                 <PrimaryButton
                     onClick={handleRoleConfirm}
-                    disabled={!role || roleLoading}
+                    disabled={roleLoading}
                 >
                     {roleLoading
                         ? <><Loader2 className="w-4 h-4 animate-spin" /> Processando...</>

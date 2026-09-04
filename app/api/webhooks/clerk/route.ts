@@ -3,34 +3,11 @@ import { Webhook } from 'svix';
 import { headers } from 'next/headers';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
-import { AppSettings } from '@/models/AppSettings';
 import { Resend } from 'resend';
-import { getCreatorLandingProfileRole } from '@/lib/profileRole';
 import { grantWelcomeCredit } from '@/lib/creditCampaign';
-import { getReferralFromUnsafeMetadata, type ReferralMetadata } from '@/lib/referral';
-import { recordAcquisitionEvent } from '@/lib/acquisitionAnalytics';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
 const webhookSecret = process.env.CLERK_WEBHOOK_SECRET || '';
-
-async function buildReferralAttribution(id: string, referral?: ReferralMetadata) {
-    if (!referral || referral.professionalId === id) return {};
-
-    const professional = await User.findOne({
-        clerkId: referral.professionalId,
-        isProfessional: true,
-    }).select('clerkId username').lean() as any;
-
-    if (!professional) return {};
-
-    const capturedAt = new Date(referral.capturedAt);
-    return {
-        acquiredByProfessionalId: professional.clerkId,
-        acquiredByProfessionalUsername: professional.username || referral.professionalUsername,
-        acquisitionSource: 'profile_share',
-        acquiredAt: Number.isNaN(capturedAt.getTime()) ? new Date() : capturedAt,
-    };
-}
 
 export async function POST(req: Request) {
     // Verificar assinatura do webhook do Clerk
@@ -72,15 +49,13 @@ export async function POST(req: Request) {
 
     // Processar eventos: user.created, user.updated, user.deleted
     if (eventType === 'user.created') {
-        const { id, email_addresses, username, first_name, last_name, image_url, unsafe_metadata } = evt.data;
+        const { id, email_addresses, username, first_name, last_name, image_url } = evt.data;
 
         const generatedUsername = username || email_addresses[0]?.email_address.split('@')[0];
         const name = [first_name, last_name].filter(Boolean).join(' ') || generatedUsername;
         const email = email_addresses[0]?.email_address?.toLowerCase()?.trim();
 
-        const roleMetadata = getCreatorLandingProfileRole(unsafe_metadata);
-        const referralMetadata = getReferralFromUnsafeMetadata(unsafe_metadata);
-        const isProfessional = roleMetadata === 'professional';
+        const isProfessional = false;
         const professionalStatus = null; // Inicializa como null (verificação de identidade pendente de envio)
 
         const updateSet: any = {
@@ -91,38 +66,23 @@ export async function POST(req: Request) {
             ...(image_url ? { photoUrl: image_url } : {}),
         };
         updateSet.isProfessional = isProfessional;
-        if (isProfessional === false) {
-            Object.assign(updateSet, await buildReferralAttribution(id, referralMetadata));
-        }
-
-        const settings = await AppSettings.findOne({ key: 'global' });
-        const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
-        const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
-
         await User.findOneAndUpdate(
             { clerkId: id },
             {
                 $set: updateSet,
                 $setOnInsert: {
-                    balance: 0, 
-                    chargePerCharSubscribers: defaultSub,
-                    chargePerCharNonSubscribers: defaultNonSub,
+                    balance: 0,
+                    promotionalBalance: 0,
+                    customerCashAvailableCents: 0,
+                    customerPromoAvailableCents: 0,
+                    professionalPendingCents: 0,
+                    professionalAvailableCents: 0,
+                    professionalReservedForWithdrawalCents: 0,
+                    marketplaceWalletMigratedAt: new Date(),
                 }
             },
             { upsert: true, new: true }
         );
-
-        if (updateSet.acquiredByProfessionalId) {
-            await recordAcquisitionEvent({
-                eventType: 'signup_attributed',
-                dedupeKey: `signup_attributed:${id}`,
-                actorId: id,
-                clientId: id,
-                professionalId: updateSet.acquiredByProfessionalId,
-                origin: 'profile_share',
-                occurredAt: updateSet.acquiredAt,
-            });
-        }
 
         console.log(`✅ Clerk Webhook: User created: ${generatedUsername} (Professional: ${isProfessional}, Status: ${professionalStatus})`);
 
@@ -161,8 +121,19 @@ export async function POST(req: Request) {
 
     if (eventType === 'user.deleted') {
         const { id } = evt.data;
-        await User.findOneAndDelete({ clerkId: id });
-        console.log(`✅ Clerk Webhook: User deleted: ${id}`);
+        await User.findOneAndUpdate(
+            { clerkId: id },
+            {
+                $set: {
+                    isSuspended: true,
+                    suspendedAt: new Date(),
+                    isOnline: false,
+                    fcmToken: '',
+                    fcmTokens: [],
+                },
+            },
+        );
+        console.log(`✅ Clerk Webhook: User deactivated and retained for audit: ${id}`);
     }
 
     return NextResponse.json({ message: 'Webhook processed' }, { status: 200 });

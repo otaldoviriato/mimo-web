@@ -80,100 +80,15 @@ async function getEligibility(userId: string, session?: ClientSession): Promise<
 }
 
 export async function GET() {
-    const { userId } = await auth();
-    if (!userId) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-
-    try {
-        await connectToDatabase();
-        return NextResponse.json(await getEligibility(userId));
-    } catch (error) {
-        if (error instanceof Error && error.message === 'USER_NOT_FOUND') {
-            return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
-        }
-        console.error('[professional-migration] Erro ao verificar elegibilidade:', error);
-        return NextResponse.json({ error: 'Não foi possível verificar sua conta.' }, { status: 500 });
-    }
+    return NextResponse.json(
+        { error: 'A migração self-service para conta profissional foi desativada.' },
+        { status: 403 }
+    );
 }
 
-export async function POST(request: Request) {
-    const { userId } = await auth();
-    if (!userId) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-
-    const body = await request.json().catch(() => ({}));
-    if (body.confirmConversationRemoval !== true) {
-        return NextResponse.json(
-            { error: 'Confirme a remoção das conversas para continuar.' },
-            { status: 400 },
-        );
-    }
-
-    await connectToDatabase();
-    const session = await mongoose.startSession();
-
-    try {
-        let result: MigrationEligibility | undefined;
-
-        await session.withTransaction(async () => {
-            const eligibility = await getEligibility(userId, session);
-            result = eligibility;
-            if (!eligibility.eligible) return;
-
-            const rooms = await Room.find({ participants: userId }).select('_id').session(session).lean();
-            const roomIds = rooms.map((room) => String(room._id));
-
-            const [, , userUpdate] = await Promise.all([
-                Room.updateMany(
-                    { participants: userId },
-                    { $addToSet: { deletedBy: userId } },
-                    { session },
-                ),
-                roomIds.length > 0
-                    ? Message.updateMany(
-                        { roomId: { $in: roomIds } },
-                        { $addToSet: { deletedFor: userId } },
-                        { session },
-                    )
-                    : Promise.resolve(),
-                User.updateOne(
-                    { clerkId: userId, isProfessional: false, balance: 0 },
-                    {
-                        $set: {
-                            isProfessional: true,
-                            professionalStatus: null,
-                            onboardingStep: 'identity',
-                        },
-                    },
-                    { session },
-                ),
-            ]);
-
-            if (userUpdate.modifiedCount !== 1) {
-                throw new Error('MIGRATION_CONFLICT');
-            }
-        });
-
-        if (!result?.eligible) {
-            return NextResponse.json(result, { status: 409 });
-        }
-
-        try {
-            const client = await clerkClient();
-            await client.users.updateUserMetadata(userId, {
-                unsafeMetadata: buildProfileRoleMetadata('professional', 'client_migration'),
-            });
-        } catch (error) {
-            console.error('[professional-migration] Perfil migrado, mas a metadata do Clerk não foi sincronizada:', error);
-        }
-
-        return NextResponse.json({
-            success: true,
-            next: '/onboarding',
-            removedConversationCount: result.conversationCount,
-        });
-    } catch (error) {
-        console.error('[professional-migration] Erro ao migrar conta:', error);
-        return NextResponse.json({ error: 'Não foi possível migrar sua conta.' }, { status: 500 });
-    } finally {
-        await session.endSession();
-    }
+export async function POST() {
+    return NextResponse.json(
+        { error: 'A migração self-service para conta profissional foi desativada.' },
+        { status: 403 }
+    );
 }

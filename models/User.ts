@@ -28,6 +28,12 @@ export interface IUser extends Document {
     coverUrl?: string;
     balance: number;
     promotionalBalance?: number;
+    customerCashAvailableCents?: number;
+    customerPromoAvailableCents?: number;
+    professionalPendingCents?: number;
+    professionalAvailableCents?: number;
+    professionalReservedForWithdrawalCents?: number;
+    marketplaceWalletMigratedAt?: Date | null;
     isProfessional?: boolean;
     professionalStatus?: 'pending' | 'approved' | 'rejected' | null;
     notes?: string;
@@ -124,6 +130,35 @@ const UserSchema = new Schema<IUser>({
         type: Number,
         default: 0,
         min: 0,
+    },
+    customerCashAvailableCents: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    customerPromoAvailableCents: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    professionalPendingCents: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    professionalAvailableCents: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    professionalReservedForWithdrawalCents: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    marketplaceWalletMigratedAt: {
+        type: Date,
+        default: null,
     },
     isProfessional: {
         type: Boolean,

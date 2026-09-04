@@ -31,8 +31,12 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'CPF não cadastrado. É necessário ter um CPF verificado para realizar saques.' }, { status: 400 });
         }
 
-        if (user.balance <= 0) {
-            return NextResponse.json({ error: 'Saldo insuficiente' }, { status: 400 });
+        const availableCents = user.isProfessional
+            ? (user.professionalAvailableCents ?? user.balance)
+            : user.balance;
+
+        if (availableCents <= 0) {
+            return NextResponse.json({ error: 'Saldo disponível insuficiente para saque' }, { status: 400 });
         }
 
         // 1. Contabiliza a quantidade de saques do mês corrente (não rejeitados)
@@ -50,7 +54,7 @@ export async function POST(request: NextRequest) {
             fee = 200; // R$ 2,00 em centavos
         }
 
-        const amountToWithdraw = user.balance; // Valor bruto a debitar
+        const amountToWithdraw = availableCents; // Valor bruto a debitar
 
         // 3. Validação do saldo suficiente para cobrir a taxa
         if (fee > 0 && amountToWithdraw <= fee) {
@@ -95,8 +99,14 @@ export async function POST(request: NextRequest) {
             asaasTransferId,
         });
 
-        // 6. Zera o saldo na carteira
-        user.balance = 0;
+        // 6. Zera o saldo disponível na carteira (preservando o saldo pendente em conversas abertas)
+        if (user.isProfessional) {
+            user.professionalAvailableCents = 0;
+            user.balance = 0;
+        } else {
+            user.customerCashAvailableCents = 0;
+            user.balance = 0;
+        }
         await user.save();
 
         // 7. Envia e-mail de notificação para viriatoceo@gmail.com com detalhes da taxa

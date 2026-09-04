@@ -57,8 +57,13 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        // 1. Saldo disponível
-        const balance = user.balance; // em centavos
+        // 1. Saldo disponível e saldo pendente (Marketplace V2)
+        const balance = user.isProfessional
+            ? (user.professionalAvailableCents ?? user.balance ?? 0)
+            : (user.balance ?? 0);
+        const pendingBalance = user.isProfessional
+            ? (user.professionalPendingCents ?? 0)
+            : 0;
 
         // 2. Saque pendente
         const pendingWithdrawal = await WithdrawRequest.findOne({
@@ -293,6 +298,7 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json({
             balance,
+            pendingBalance,
             totalWithdrawn,
             pendingWithdrawal,
             projectedMonthlyRecurring,
