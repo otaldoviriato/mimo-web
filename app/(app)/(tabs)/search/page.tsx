@@ -47,25 +47,20 @@ const formatOnlineStatus = (
 
     const diffMinutes = Math.floor((now - timestamp) / (1000 * 60));
 
-    // Menos de 1 hora -> ex: "Há 15 min"
     if (diffMinutes < 60) {
-        return { isOnline: false, label: `Há ${diffMinutes} min` };
+        return { isOnline: false, label: `Online há ${diffMinutes} min` };
     }
 
     const diffHours = Math.floor(diffMinutes / 60);
-
-    // Até 12 horas -> ex: "Há 3h"
-    if (diffHours <= 12) {
-        return { isOnline: false, label: `Há ${diffHours}h` };
-    }
-
-    // Entre 12h e 24h -> "Ativa hoje" (positivo, sem parecer quase offline)
     if (diffHours < 24) {
-        return { isOnline: false, label: 'Ativa hoje' };
+        return { isOnline: false, label: `Online há ${diffHours}h` };
     }
 
-    // Acima de 24h: não polui a foto com etiqueta negativa de ausência
-    return { isOnline: false, label: '' };
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) {
+        return { isOnline: false, label: 'Online ontem' };
+    }
+    return { isOnline: false, label: `Online há ${diffDays} dias` };
 };
 
 export default function SearchPage() {
@@ -218,20 +213,22 @@ export default function SearchPage() {
                 {/* Overlay gradiente escuro suave na parte inferior */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
 
-                {/* Badge Online / Recência (topo direito) - Tema claro da paleta Mimo */}
+                {/* Badge Online / Recência (topo direito) - Paleta oficial Mimo (Branco & Roxo) */}
                 {status.label && (
-                    <div className={`absolute top-2.5 right-2.5 backdrop-blur-md text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-xs flex items-center gap-1.5 z-10 border transition-all ${
+                    <div className={`absolute top-2.5 right-2.5 backdrop-blur-md text-[10.5px] font-semibold px-2.5 py-0.5 rounded-full shadow-sm flex items-center gap-1.5 z-10 border transition-all ${
                         status.isOnline
-                            ? 'bg-white/95 text-emerald-700 border-emerald-300/60 shadow-emerald-500/10'
-                            : 'bg-white/90 text-slate-700 border-slate-200/80 shadow-black/5'
+                            ? 'bg-white/95 text-emerald-600 border-emerald-200/90 shadow-emerald-500/10'
+                            : 'bg-white/95 text-purple-700 border-purple-200/80 shadow-purple-900/5'
                     }`}>
-                        <span className="relative flex h-1.5 w-1.5">
+                        <span className="relative flex h-1.5 w-1.5 shrink-0">
                             {status.isOnline && (
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                             )}
-                            <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${status.isOnline ? 'bg-emerald-500' : 'bg-purple-500'}`}></span>
+                            <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${
+                                status.isOnline ? 'bg-emerald-500' : 'bg-purple-600'
+                            }`}></span>
                         </span>
-                        <span className="leading-none">{status.label}</span>
+                        <span className="leading-none whitespace-nowrap">{status.label}</span>
                     </div>
                 )}
 
