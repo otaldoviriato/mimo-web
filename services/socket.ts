@@ -108,12 +108,6 @@ class SocketService {
 
         this.socket.on('connect', () => {
             console.log('[SocketService] Socket conectado! Autenticando como', this._currentUserId);
-            // Compatibilidade apenas para implantação gradual: o servidor legado
-            // esperava este evento. O servidor novo autentica exclusivamente pelo
-            // token do Clerk enviado no handshake e ignora este evento.
-            if (this._currentUserId) {
-                this.socket?.emit('authenticate', { userId: this._currentUserId });
-            }
             this._onSocketConnected();
         });
 
