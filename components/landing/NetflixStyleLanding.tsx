@@ -204,69 +204,70 @@ export function NetflixStyleLanding({
                     </div>
                 </div>
 
-                {/* ─── OVERLAY GRADIENTE DIRECIONAL (Fundo translúcido na esquerda para leitura, aberto na direita) ─── */}
-                <div className="absolute inset-0 bg-gradient-to-b sm:bg-gradient-to-r from-white/95 via-white/80 to-white/25 backdrop-blur-[1px]" />
+                {/* ─── OVERLAY GRADIENTE: Proteção de leitura sólida no mobile, aberta à direita no desktop ─── */}
+                <div className="absolute inset-0 bg-white/88 sm:bg-transparent sm:bg-gradient-to-r sm:from-white/95 sm:via-white/80 sm:to-white/25 backdrop-blur-[2px] sm:backdrop-blur-[1px]" />
             </div>
 
             {/* ─── HEADER MINIMALISTA ─── */}
-            <header className="relative z-20 w-full max-w-7xl mx-auto px-6 sm:px-12 lg:px-16 py-5 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <Link href="/" className="flex items-center">
+            <header className="relative z-20 w-full max-w-7xl mx-auto px-5 sm:px-12 lg:px-16 py-3.5 sm:py-5 flex items-center justify-between">
+                <Link href="/" className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-600 to-purple-700 flex items-center justify-center shadow-xs">
                         <Image
                             src="/Logo.svg"
-                            alt="MimoChat"
-                            width={135}
-                            height={36}
+                            alt="Mimo"
+                            width={18}
+                            height={18}
                             priority
-                            className="h-8 w-auto object-contain"
+                            className="w-4.5 h-4.5 object-contain"
                         />
-                    </Link>
-                </div>
+                    </div>
+                    <span className="font-black text-lg sm:text-xl tracking-tight text-slate-900">MimoChat</span>
+                </Link>
 
                 <Link
                     href={destinationUrl}
                     {...ctaProps}
-                    className="h-10 px-5 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-sm shadow-purple-600/20 flex items-center gap-1.5"
+                    className="h-9 sm:h-10 px-4 sm:px-5 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-sm shadow-purple-600/20 flex items-center gap-1.5"
                 >
                     <span>Entrar</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
             </header>
 
-            {/* ─── CONTEÚDO ALINHADO À ESQUERDA: ULTRA DIRETO E ENXUTO ─── */}
-            <main className="relative z-20 flex-1 flex flex-col justify-center px-6 sm:px-12 lg:px-16 max-w-7xl mx-auto w-full my-auto py-8 sm:py-12">
-                <div className="max-w-xl text-left space-y-6">
+            {/* ─── CONTEÚDO: ULTRA DIRETO, ENXUTO E 100% RESPONSIVO ─── */}
+            <main className="relative z-20 flex-1 flex flex-col justify-center px-5 sm:px-12 lg:px-16 max-w-7xl mx-auto w-full my-auto py-4 sm:py-12">
+                <div className="max-w-xl text-left space-y-4 sm:space-y-6">
                     {/* Badge Sutil e Alinhado ao Banner */}
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-100/90 border border-purple-200 text-purple-700 text-xs font-bold uppercase tracking-wider shadow-xs">
-                        <MessageCircle className="w-3.5 h-3.5 text-purple-600" />
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-100/90 border border-purple-200 text-purple-700 text-[11px] sm:text-xs font-bold uppercase tracking-wider shadow-xs">
+                        <MessageCircle className="w-3.5 h-3.5 text-purple-600 shrink-0" />
                         <span>Primeiro App de Chat com Garantia</span>
                     </div>
 
-                    {/* Título Principal de Impacto */}
-                    <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.1]">
+                    {/* Título Principal de Impacto: Escala Perfeita em Telas Pequenas */}
+                    <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.15] sm:leading-[1.1]">
                         Conversas Privadas.{' '}
                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-600 block sm:inline">
                             Mulheres Reais.
                         </span>
                     </h1>
 
-                    {/* Subtítulo de Garantia Incondicional */}
-                    <p className="text-base sm:text-lg text-slate-600 font-semibold">
+                    {/* Subtítulo de Garantia */}
+                    <p className="text-sm sm:text-base lg:text-lg text-slate-600 font-semibold leading-relaxed">
                         Respostas em até 24h ou seu dinheiro de volta.
                     </p>
 
                     {/* Botão de Chamada para Ação */}
-                    <div className="pt-2 max-w-sm space-y-2.5 text-left">
+                    <div className="pt-1 sm:pt-2 max-w-sm space-y-2.5 text-left">
                         <Link
                             href={destinationUrl}
                             {...ctaProps}
-                            className="w-full sm:w-auto h-14 sm:h-16 px-8 sm:px-10 rounded-2xl bg-purple-600 hover:bg-purple-700 active:scale-[0.98] text-white font-black text-base sm:text-lg uppercase tracking-wider shadow-xl shadow-purple-600/30 transition-all flex items-center justify-center gap-2.5 group"
+                            className="w-full sm:w-auto h-13 sm:h-16 px-7 sm:px-10 rounded-2xl bg-purple-600 hover:bg-purple-700 active:scale-[0.98] text-white font-black text-base sm:text-lg uppercase tracking-wider shadow-lg shadow-purple-600/25 transition-all flex items-center justify-center gap-2.5 group"
                         >
                             <span>Ver Mulheres no App</span>
                             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                         </Link>
 
-                        <p className="text-xs text-slate-500 font-medium">
+                        <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
                             100% discreto • Sem mensalidade • +18
                         </p>
                     </div>
@@ -274,8 +275,8 @@ export function NetflixStyleLanding({
             </main>
 
             {/* ─── RODAPÉ MINIMALISTA ─── */}
-            <footer className="relative z-20 w-full py-4 px-6 sm:px-12 lg:px-16 text-xs text-slate-500 border-t border-slate-200/60 bg-white/40 backdrop-blur-xs">
-                <div className="max-w-7xl mx-auto flex items-center justify-start gap-4 font-medium">
+            <footer className="relative z-20 w-full py-3 sm:py-4 px-5 sm:px-12 lg:px-16 text-[11px] sm:text-xs text-slate-500 border-t border-slate-200/60 bg-white/60 backdrop-blur-xs">
+                <div className="max-w-7xl mx-auto flex items-center justify-center sm:justify-start gap-4 font-medium">
                     <Link href="/termos-de-uso" className="hover:text-slate-900 transition-colors">Termos</Link>
                     <span>•</span>
                     <Link href="/politica-de-privacidade" className="hover:text-slate-900 transition-colors">Privacidade</Link>
