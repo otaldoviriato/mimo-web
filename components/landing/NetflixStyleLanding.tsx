@@ -236,23 +236,23 @@ export function NetflixStyleLanding({
             {/* ─── CONTEÚDO ALINHADO À ESQUERDA: ULTRA DIRETO E ENXUTO ─── */}
             <main className="relative z-20 flex-1 flex flex-col justify-center px-6 sm:px-12 lg:px-16 max-w-7xl mx-auto w-full my-auto py-8 sm:py-12">
                 <div className="max-w-xl text-left space-y-6">
-                    {/* Badge Sutil */}
+                    {/* Badge Sutil e Alinhado ao Banner */}
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-100/90 border border-purple-200 text-purple-700 text-xs font-bold uppercase tracking-wider shadow-xs">
                         <MessageCircle className="w-3.5 h-3.5 text-purple-600" />
-                        <span>Novo App de Conversa</span>
+                        <span>Primeiro App de Chat com Garantia</span>
                     </div>
 
-                    {/* Título Principal de Impacto: A Proposta Central do Mimo */}
+                    {/* Título Principal de Impacto */}
                     <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.1]">
-                        O app onde você{' '}
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-600">
-                            nunca toma vácuo
-                        </span>.
+                        Conversas Privadas.{' '}
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-600 block sm:inline">
+                            Mulheres Reais.
+                        </span>
                     </h1>
 
-                    {/* Subtítulo super conciso */}
-                    <p className="text-base sm:text-lg text-slate-600 font-medium">
-                        Converse no privado com mulheres reais com resposta garantida.
+                    {/* Subtítulo de Garantia Incondicional */}
+                    <p className="text-base sm:text-lg text-slate-600 font-semibold">
+                        Respostas em até 24h ou seu dinheiro de volta.
                     </p>
 
                     {/* Botão de Chamada para Ação */}
