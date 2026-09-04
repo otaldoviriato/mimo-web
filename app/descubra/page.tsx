@@ -1,5 +1,5 @@
 import React from 'react';
-import { SimulationLanding } from '@/components/landing/SimulationLanding';
+import { NetflixStyleLanding } from '@/components/landing/NetflixStyleLanding';
 import { CampaignVisitTracker } from '@/components/CampaignVisitTracker';
 
 interface DescubraPageProps {
@@ -7,8 +7,8 @@ interface DescubraPageProps {
 }
 
 export const metadata = {
-    title: 'MimoChat | Conversas Privadas com Criadoras Reais',
-    description: 'Converse diretamente com criadoras verificadas. Mensagens, fotos e áudios exclusivos com total discrição no Pix.',
+    title: 'MimoChat | Conversas Privadas com Mulheres Reais',
+    description: 'Fotos exclusivas e mensagens diretas no privado. Sem mensalidade fixa.',
 };
 
 export default async function DescubraPage({ searchParams }: DescubraPageProps) {
@@ -36,7 +36,7 @@ export default async function DescubraPage({ searchParams }: DescubraPageProps) 
                 variation={variation}
                 utm={utm}
             />
-            <SimulationLanding
+            <NetflixStyleLanding
                 authRedirectUrl="/login"
                 ctaTrackingAttr={true}
             />
