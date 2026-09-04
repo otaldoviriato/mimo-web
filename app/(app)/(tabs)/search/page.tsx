@@ -24,29 +24,43 @@ const calculateAge = (birthDateString?: string | Date) => {
     }
 };
 
-const formatLastSeen = (lastSeen?: string | Date | number): string => {
-    if (!lastSeen) return '';
-    try {
-        const date = new Date(lastSeen);
-        if (isNaN(date.getTime())) return '';
-        const now = Date.now();
-        const diffMinutes = Math.floor((now - date.getTime()) / (1000 * 60));
+const formatOnlineStatus = (
+    lastSeen?: string | Date | number,
+    isOnline?: boolean
+): { isOnline: boolean; label: string } => {
+    const now = Date.now();
+    let timestamp = 0;
 
-        if (diffMinutes < 1) return 'Entrou agora há pouco';
-        if (diffMinutes < 60) return `Entrou há ${diffMinutes} min`;
-
-        const diffHours = Math.floor(diffMinutes / 60);
-        if (diffHours < 24) {
-            return `Entrou há ${diffHours} ${diffHours === 1 ? 'hora' : 'horas'}`;
-        }
-
-        const diffDays = Math.floor(diffHours / 24);
-        if (diffDays === 1) return 'Entrou ontem';
-        if (diffDays < 7) return `Entrou há ${diffDays} dias`;
-        return 'Entrou recentemente';
-    } catch {
-        return '';
+    if (lastSeen) {
+        const d = new Date(lastSeen).getTime();
+        if (!isNaN(d)) timestamp = d;
     }
+
+    // Se o socket indicar online ou se a última atividade foi há menos de 10 minutos -> Online
+    if (isOnline || (timestamp > 0 && (now - timestamp) < 10 * 60 * 1000)) {
+        return { isOnline: true, label: 'Online' };
+    }
+
+    if (!timestamp) {
+        return { isOnline: false, label: '' };
+    }
+
+    const diffMinutes = Math.floor((now - timestamp) / (1000 * 60));
+
+    if (diffMinutes < 60) {
+        return { isOnline: false, label: `Online há ${diffMinutes} min` };
+    }
+
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) {
+        return { isOnline: false, label: `Online há ${diffHours} ${diffHours === 1 ? 'hora' : 'horas'}` };
+    }
+
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) {
+        return { isOnline: false, label: 'Online ontem' };
+    }
+    return { isOnline: false, label: `Online há ${diffDays} dias` };
 };
 
 export default function SearchPage() {
@@ -138,7 +152,7 @@ export default function SearchPage() {
                 professionalId: user.clerkId,
             });
         }
-        // Ao clicar, direciona imediatamente para a sala de conversa com a criadora
+        // Ao clicar, leva imediatamente para o chat com a criadora
         router.push(`/chat/${user.clerkId}`);
     };
 
@@ -173,15 +187,14 @@ export default function SearchPage() {
         };
     }, [username]);
 
-    // Renderiza Card da Criadora em Grid 3:4 com foco total na foto, nome, idade e visto por último
+    // Renderiza Card da Criadora em Grid 3:4 com foco total na foto, nome, idade e badge de atividade
     const renderCreatorCard = (user: any) => {
         const age = calculateAge(user.birthDate);
         const displayName = age !== null 
             ? `${user.name || `@${user.username}`}, ${age}` 
             : (user.name || `@${user.username}`);
         const mainPhoto = user.photoUrl || (user.publicPhotos && user.publicPhotos[0]) || '/Logo.svg';
-        const isAvailable = user.isAvailable !== false;
-        const lastSeenText = formatLastSeen(user.lastSeen || user.lastActiveTime);
+        const status = formatOnlineStatus(user.lastSeen || user.lastActiveTime, user.isOnline);
 
         return (
             <div
@@ -200,27 +213,28 @@ export default function SearchPage() {
                 {/* Overlay gradiente escuro suave na parte inferior */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
 
-                {/* Badge de Disponibilidade (topo direito) */}
-                {isAvailable && (
-                    <div className="absolute top-2.5 right-2.5 bg-black/40 backdrop-blur-md text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1.5 z-10 border border-emerald-500/20">
+                {/* Badge Online / Recência (topo direito) */}
+                {status.label && (
+                    <div className={`absolute top-2.5 right-2.5 backdrop-blur-md text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1.5 z-10 border ${
+                        status.isOnline
+                            ? 'bg-black/50 text-emerald-400 border-emerald-500/25'
+                            : 'bg-black/55 text-slate-200 border-white/10'
+                    }`}>
                         <span className="relative flex h-1.5 w-1.5">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                            {status.isOnline && (
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            )}
+                            <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${status.isOnline ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
                         </span>
-                        <span>Disponível</span>
+                        <span>{status.label}</span>
                     </div>
                 )}
 
-                {/* Conteúdo inferior com Nome, Idade e Visto por último */}
+                {/* Conteúdo inferior com Nome e Idade */}
                 <div className="absolute bottom-0 inset-x-0 p-3 text-white flex flex-col gap-0.5 z-10">
                     <h3 className="text-sm sm:text-base font-black tracking-tight leading-tight truncate drop-shadow-sm">
                         {displayName}
                     </h3>
-                    {lastSeenText && (
-                        <p className="text-[11px] text-slate-300 font-medium tracking-tight drop-shadow-xs">
-                            {lastSeenText}
-                        </p>
-                    )}
                 </div>
             </div>
         );
@@ -326,7 +340,7 @@ export default function SearchPage() {
                                     </div>
                                 ) : (
                                     <div className="flex-1 min-h-[50vh] flex items-center justify-center text-center text-slate-400 text-xs sm:text-sm font-medium py-12 px-4 animate-in fade-in duration-300">
-                                        <p>Nenhuma criadora disponível no momento.</p>
+                                        <p>Nenhuma criadora ativa no momento.</p>
                                     </div>
                                 )}
                                 <div ref={loadMoreRef} className="flex min-h-12 items-center justify-center py-3" aria-live="polite">

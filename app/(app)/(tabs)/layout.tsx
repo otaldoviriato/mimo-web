@@ -9,13 +9,12 @@ import { Avatar } from '@/components/Avatar';
 import { useUser } from '@clerk/nextjs';
 import { PWAPromoModal } from '@/components/PWAPromoModal';
 import { NotifPromoModal } from '@/components/NotifPromoModal';
-import toast from 'react-hot-toast';
 import { Settings, ShieldAlert, Search, Pencil, UserCheck, ShieldCheck } from 'lucide-react';
 
 export default function TabsLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
-    const { data: userData, refetch: refetchProfile } = useMyProfile();
+    const { data: userData } = useMyProfile();
     const { user } = useUser();
     const balance = userData?.balance ?? 0;
 
@@ -35,32 +34,6 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                 .catch(console.error);
         }
     }, [isTeam, pathname]);
-
-        const [isTogglingAvailability, setIsTogglingAvailability] = useState(false);
-    const isAvailable = userData?.isAvailable !== false;
-
-    const handleToggleAvailability = async () => {
-        if (isTogglingAvailability) return;
-        setIsTogglingAvailability(true);
-        const nextState = !isAvailable;
-        try {
-            const res = await fetch('/api/users/me', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ isAvailable: nextState }),
-            });
-            if (res.ok) {
-                await refetchProfile();
-                toast.success(nextState ? 'Você está disponível para responder!' : 'Status definido como indisponível.');
-            } else {
-                toast.error('Erro ao atualizar status de disponibilidade.');
-            }
-        } catch {
-            toast.error('Erro ao atualizar status.');
-        } finally {
-            setIsTogglingAvailability(false);
-        }
-    };
 
     const currentTabLabel = 
         pathname === '/activation' ? 'Ativação' :
@@ -228,27 +201,6 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                        {isProfessional && (
-                            <button
-                                onClick={handleToggleAvailability}
-                                disabled={isTogglingAvailability}
-                                className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
-                                    isAvailable
-                                        ? 'bg-emerald-500/25 border-emerald-400/40 text-emerald-100 hover:bg-emerald-500/35 shadow-xs'
-                                        : 'bg-white/10 border-white/20 text-white/70 hover:bg-white/20'
-                                }`}
-                                title={isAvailable ? 'Você está destacada como Disponível no Explorar' : 'Você está marcada como Indisponível'}
-                            >
-                                <span className="relative flex h-2 w-2">
-                                    {isAvailable && (
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                    )}
-                                    <span className={`relative inline-flex rounded-full h-2 w-2 ${isAvailable ? 'bg-emerald-400' : 'bg-slate-300'}`}></span>
-                                </span>
-                                <span>{isAvailable ? 'Disponível' : 'Indisponível'}</span>
-                            </button>
-                        )}
-
                         {pathname === '/search' && (
                             <button
                                 onClick={() => {

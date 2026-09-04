@@ -77,32 +77,6 @@ export default function ProfilePage() {
         return () => setMounted(false);
     }, []);
 
-        const [isTogglingAvailability, setIsTogglingAvailability] = useState(false);
-    const isAvailable = userData?.isAvailable !== false;
-
-    const handleToggleAvailability = async () => {
-        if (isTogglingAvailability) return;
-        setIsTogglingAvailability(true);
-        const nextState = !isAvailable;
-        try {
-            const res = await fetch('/api/users/me', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ isAvailable: nextState }),
-            });
-            if (res.ok) {
-                await refetchProfile();
-                toast.success(nextState ? 'Você está disponível para responder!' : 'Status definido como indisponível.');
-            } else {
-                toast.error('Erro ao atualizar status de disponibilidade.');
-            }
-        } catch {
-            toast.error('Erro ao atualizar status.');
-        } finally {
-            setIsTogglingAvailability(false);
-        }
-    };
-
     const touchStartX = useRef(0);
     const touchEndX = useRef(0);
 
@@ -499,43 +473,6 @@ export default function ProfilePage() {
                         <Pencil className="w-3.5 h-3.5 text-purple-500" />
                         Editar Perfil
                     </button>
-
-                    {/* Controle de Disponibilidade para Criadoras */}
-                    <div className="mt-3 w-full max-w-xs flex items-center justify-between p-3 rounded-2xl bg-white border border-slate-200/80 shadow-xs">
-                        <div className="flex items-center gap-2.5">
-                            <span className="relative flex h-2.5 w-2.5">
-                                {isAvailable && (
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                )}
-                                <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isAvailable ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
-                            </span>
-                            <div className="text-left">
-                                <p className="text-xs font-bold text-slate-800">
-                                    {isAvailable ? 'Disponível para responder' : 'Indisponível no momento'}
-                                </p>
-                                <p className="text-[10px] text-slate-500">
-                                    {isAvailable ? 'Destaque ativo no Explorar' : 'Sem destaque no Explorar'}
-                                </p>
-                            </div>
-                        </div>
-                        <button
-                            type="button"
-                            role="switch"
-                            aria-checked={isAvailable}
-                            onClick={handleToggleAvailability}
-                            disabled={isTogglingAvailability}
-                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                isAvailable ? 'bg-emerald-500' : 'bg-slate-200'
-                            }`}
-                        >
-                            <span
-                                aria-hidden="true"
-                                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                                    isAvailable ? 'translate-x-5' : 'translate-x-0'
-                                }`}
-                            />
-                        </button>
-                    </div>
 
                 </div>
 

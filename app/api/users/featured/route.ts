@@ -38,8 +38,7 @@ export async function GET(request: NextRequest) {
             clerkId: { $ne: userId },
             isSuspended: { $ne: true },
             $or: [
-                { isAvailable: { $ne: false } },
-                { lastSeen: { $gte: activeLimitDate } },
+                                { lastSeen: { $gte: activeLimitDate } },
                 { isOnline: true },
                 { createdAt: { $gte: activeLimitDate } }
             ]
@@ -70,7 +69,8 @@ export async function GET(request: NextRequest) {
 
         // Encontrar criadores/clientes em destaque
         const featuredUsers = await User.find(queryFilter)
-        .select('clerkId username name email photoUrl coverUrl isProfessional identityStatus subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers bio createdAt avgResponseTimeMinutes isOnline isAvailable lastSeen birthDate city state isHighSpender')
+        .select('clerkId username name email photoUrl coverUrl isProfessional identityStatus subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers bio createdAt avgResponseTimeMinutes isOnline lastSeen lastAccessAt birthDate city state isHighSpender')
+        .sort({ isOnline: -1, lastSeen: -1, lastAccessAt: -1, createdAt: -1 })
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .lean() as any[];
 
@@ -275,6 +275,8 @@ export async function GET(request: NextRequest) {
                 lastActiveTime = Date.now();
             } else if (u.lastSeen) {
                 lastActiveTime = new Date(u.lastSeen).getTime();
+            } else if (u.lastAccessAt) {
+                lastActiveTime = new Date(u.lastAccessAt).getTime();
             } else if (u.createdAt) {
                 lastActiveTime = new Date(u.createdAt).getTime();
             }
@@ -338,8 +340,7 @@ export async function GET(request: NextRequest) {
                 lastActiveTime,
                 publicPhotosCount: photosCount,
                 isOnline: isOnlineNow,
-                isAvailable: u.isAvailable !== false,
-                lastSeen: u.lastSeen ?? null,
+                                lastSeen: u.lastSeen ?? null,
                 birthDate: u.birthDate ?? null,
                 city: u.city ?? '',
                 state: u.state ?? '',
