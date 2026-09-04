@@ -8,6 +8,7 @@ export type ExploreRankable = {
     exploreProfileViewsCount: number;
     qualifiedConversationsCount: number;
     isOnline: boolean;
+    isAvailable?: boolean;
     lastActiveTime: number;
     completeness: number;
     identityStatus?: string | null;
@@ -18,7 +19,8 @@ function isVerified(user: ExploreRankable): number {
 }
 
 function compareDiscovery(a: ExploreRankable, b: ExploreRankable) {
-    return a.exploreImpressionsCount - b.exploreImpressionsCount
+    return Number(b.isAvailable !== false) - Number(a.isAvailable !== false)
+        || a.exploreImpressionsCount - b.exploreImpressionsCount
         || isVerified(b) - isVerified(a)
         || b.qualifiedConversationsCount - a.qualifiedConversationsCount
         || Number(b.isOnline) - Number(a.isOnline)
@@ -28,7 +30,8 @@ function compareDiscovery(a: ExploreRankable, b: ExploreRankable) {
 }
 
 function compareQuality(a: ExploreRankable, b: ExploreRankable) {
-    return b.qualifiedConversationsCount - a.qualifiedConversationsCount
+    return Number(b.isAvailable !== false) - Number(a.isAvailable !== false)
+        || b.qualifiedConversationsCount - a.qualifiedConversationsCount
         || isVerified(b) - isVerified(a)
         || Number(b.isOnline) - Number(a.isOnline)
         || b.completeness - a.completeness

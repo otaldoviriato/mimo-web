@@ -50,6 +50,7 @@ export interface IUser extends Document {
     isHighSpender: boolean;
     bio?: string;
     isOnline?: boolean;
+    isAvailable?: boolean;
     lastSeen?: Date;
     accessCount?: number;
     lastAccessAt?: Date;
@@ -248,6 +249,11 @@ const UserSchema = new Schema<IUser>({
     isOnline: {
         type: Boolean,
         default: false,
+    },
+    isAvailable: {
+        type: Boolean,
+        default: true,
+        index: true,
     },
     lastSeen: {
         type: Date,

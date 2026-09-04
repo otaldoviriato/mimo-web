@@ -473,6 +473,7 @@ export async function GET(request: NextRequest) {
                 conversationsLastWeekCount,
                 messagesLastWeekCount,
                 mediaGiftsLastWeekCount,
+                isAvailable: user.isAvailable ?? true,
             },
         });
     } catch (error: any) {
@@ -491,7 +492,7 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, completeProfile, subscriptionPrice, isSubscriptionEnabled, bio, emailNotificationsEnabled, newUserNotificationsEnabled, hideFromExplore, subscriberDiscountPercentage, birthDate, city, state } = body;
+        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, completeProfile, subscriptionPrice, isSubscriptionEnabled, bio, emailNotificationsEnabled, newUserNotificationsEnabled, hideFromExplore, subscriberDiscountPercentage, birthDate, city, state, isAvailable } = body;
 
         await connectToDatabase();
 
@@ -534,6 +535,9 @@ export async function PATCH(request: NextRequest) {
         
         if (isProfessional !== undefined) {
             updateData.isProfessional = isProfessional;
+        }
+        if (isAvailable !== undefined) {
+            updateData.isAvailable = Boolean(isAvailable);
         }
 
         // Determina dinamicamente o onboardingStep para o updateData

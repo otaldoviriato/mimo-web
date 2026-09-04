@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { userApi } from '@/services/api';
 import { useMyProfile, useFeaturedUsers } from '@/hooks/useQueries';
-import { ShieldCheck, Search, X, MapPin, Zap, MessageSquare } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { trackAcquisitionEvent } from '@/lib/clientAcquisitionAnalytics';
 
 const calculateAge = (birthDateString?: string | Date) => {
@@ -24,8 +24,6 @@ const calculateAge = (birthDateString?: string | Date) => {
     }
 };
 
-type ExploreFilter = 'todos' | 'online' | 'verificadas' | 'novas';
-
 export default function SearchPage() {
     const router = useRouter();
     const { data: userData } = useMyProfile();
@@ -40,11 +38,9 @@ export default function SearchPage() {
         isFetchingNextPage,
     } = useFeaturedUsers();
     const [error, setError] = useState('');
-    const [lightbox, setLightbox] = useState<{ photos: string[]; index: number } | null>(null);
     const exposedProfiles = useRef(new Set<string>());
     const loadMoreRef = useRef<HTMLDivElement>(null);
 
-    const [activeFilter, setActiveFilter] = useState<ExploreFilter>('todos');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
 
     useEffect(() => {
@@ -53,50 +49,11 @@ export default function SearchPage() {
         }
     }, [userData, router]);
 
-    const getEmptyStateMessage = () => {
-        if (activeFilter === 'online') {
-            return 'Nenhuma criadora online no momento.';
-        }
-        if (activeFilter === 'verificadas') {
-            return 'Nenhuma criadora verificada encontrada no momento.';
-        }
-        if (activeFilter === 'novas') {
-            return 'Nenhuma criadora nova no momento.';
-        }
-        return 'Nenhum perfil encontrado no momento.';
-    };
-
-    const getFilteredUsers = () => {
-        let sourceList = username.trim() ? foundUsers : featuredUsers;
-
-        if (activeFilter === 'online') {
-            sourceList = sourceList.filter((u) => !!u.isOnline);
-        } else if (activeFilter === 'verificadas') {
-            sourceList = sourceList.filter((u) => u.identityStatus === 'approved');
-        } else if (activeFilter === 'novas') {
-            sourceList = sourceList.filter((u) => !!u.isNew);
-        }
-
-        return sourceList;
-    };
-
-    const closeLightbox = () => setLightbox(null);
-
     const clearSearch = () => {
         setUsername('');
         setFoundUsers([]);
         setError('');
         setLoading(false);
-    };
-
-    const lightboxPrev = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        setLightbox(prev => prev ? { ...prev, index: (prev.index - 1 + prev.photos.length) % prev.photos.length } : null);
-    };
-
-    const lightboxNext = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        setLightbox(prev => prev ? { ...prev, index: (prev.index + 1) % prev.photos.length } : null);
     };
 
     // Resolve a transição de visualização imediatamente para não travar a animação de volta
@@ -148,12 +105,6 @@ export default function SearchPage() {
         return () => observer.disconnect();
     }, [fetchNextPage, hasNextPage, isFetchingNextPage, username]);
 
-
-
-    const handleStartChat = (clerkId: string) => {
-        router.push(`/chat/${clerkId}`);
-    };
-
     const handleExploreProfile = (user: any) => {
         const isDirectSearch = Boolean(username.trim());
         if (!isDirectSearch) {
@@ -196,15 +147,14 @@ export default function SearchPage() {
         };
     }, [username]);
 
-    // Renderiza Card da Criadora em Grid 3:4 com sinais de confiança e qualidade
+    // Renderiza Card da Criadora em Grid 3:4 com foto limpa, foco visual e status de disponibilidade
     const renderCreatorCard = (user: any) => {
         const age = calculateAge(user.birthDate);
         const displayName = age !== null 
             ? `${user.name || `@${user.username}`}, ${age}` 
             : (user.name || `@${user.username}`);
-        const locationStr = user.city && user.state ? `${user.city}, ${user.state}` : (user.city || user.state || 'Brasil');
         const mainPhoto = user.photoUrl || (user.publicPhotos && user.publicPhotos[0]) || '/Logo.svg';
-        const isVerified = user.identityStatus === 'approved';
+        const isAvailable = user.isAvailable !== false;
 
         return (
             <div
@@ -220,66 +170,25 @@ export default function SearchPage() {
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
 
-                {/* Overlay gradiente escuro na parte inferior */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent pointer-events-none" />
+                {/* Overlay gradiente escuro suave na parte inferior */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
 
-                {/* Badges superiores esquerdas (Verificada ou Novidade) */}
-                <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 z-10">
-                    {isVerified && (
-                        <div className="bg-emerald-600/90 backdrop-blur-xs text-white text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1 border border-emerald-400/30">
-                            <ShieldCheck className="w-3 h-3 text-white" />
-                            <span>Verificada</span>
-                        </div>
-                    )}
-                    {user.isNew && !isVerified && (
-                        <div className="bg-purple-600/90 backdrop-blur-xs text-white text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm">
-                            Novidade
-                        </div>
-                    )}
-                </div>
-
-                {/* Badge Online (topo direito) */}
-                {!!user.isOnline && (
-                    <div className="absolute top-2.5 right-2.5 bg-black/50 backdrop-blur-md text-white text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1.5 z-10 border border-white/10">
+                {/* Badge de Disponibilidade (topo direito) */}
+                {isAvailable && (
+                    <div className="absolute top-2.5 right-2.5 bg-black/40 backdrop-blur-md text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1.5 z-10 border border-emerald-500/20">
                         <span className="relative flex h-1.5 w-1.5">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                         </span>
-                        <span>Online</span>
+                        <span>Disponível</span>
                     </div>
                 )}
 
-                {/* Conteúdo inferior com dados de identificação e confiança */}
-                <div className="absolute bottom-0 inset-x-0 p-3 text-white flex flex-col gap-1 z-10">
-                    <div className="flex items-center gap-1.5">
-                        <h3 className="text-sm sm:text-base font-black tracking-tight leading-tight truncate">
-                            {displayName}
-                        </h3>
-                    </div>
-
-                    <div className="flex items-center gap-1 text-[11px] text-slate-300 font-medium tracking-tight">
-                        <MapPin className="w-3 h-3 text-purple-400 shrink-0" />
-                        <span className="truncate">{locationStr}</span>
-                    </div>
-
-                    {/* Sinais de Marketplace: Tempo de resposta e Conversas qualificadas */}
-                    <div className="flex items-center gap-2 pt-0.5 flex-wrap">
-                        {user.avgResponseTimeMinutes !== null && user.avgResponseTimeMinutes !== undefined && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-300 bg-black/40 backdrop-blur-xs px-1.5 py-0.5 rounded-md border border-amber-400/20">
-                                <Zap className="w-2.5 h-2.5 text-amber-400" />
-                                {user.avgResponseTimeMinutes <= 15
-                                    ? 'Responde rápido'
-                                    : `~${user.avgResponseTimeMinutes} min`}
-                            </span>
-                        )}
-
-                        {user.qualifiedConversationsCount > 0 && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-200 bg-black/40 backdrop-blur-xs px-1.5 py-0.5 rounded-md border border-purple-400/20">
-                                <MessageSquare className="w-2.5 h-2.5 text-purple-300" />
-                                {user.qualifiedConversationsCount} {user.qualifiedConversationsCount === 1 ? 'conversa' : 'conversas'}
-                            </span>
-                        )}
-                    </div>
+                {/* Conteúdo inferior com Nome e Idade */}
+                <div className="absolute bottom-0 inset-x-0 p-3 text-white flex flex-col gap-0.5 z-10">
+                    <h3 className="text-sm sm:text-base font-black tracking-tight leading-tight truncate drop-shadow-sm">
+                        {displayName}
+                    </h3>
                 </div>
             </div>
         );
@@ -298,7 +207,7 @@ export default function SearchPage() {
         );
     }
 
-    const filteredUsers = getFilteredUsers();
+    const displayUsers = username.trim() ? foundUsers : featuredUsers;
 
     return (
         <div className="flex flex-col h-full bg-slate-50">
@@ -355,64 +264,6 @@ export default function SearchPage() {
                 </div>
             )}
 
-            {/* Controle de Filtros para Descoberta no Marketplace (Para Clientes) */}
-            <div className="bg-slate-50/95 backdrop-blur-md px-4 pt-3 pb-2 border-b border-slate-200/60 sticky top-0 z-10 shrink-0">
-                <div className="bg-slate-200/70 p-1 rounded-2xl flex items-center gap-1 max-w-md mx-auto shadow-inner">
-                    {/* Todos */}
-                    <button
-                        onClick={() => setActiveFilter('todos')}
-                        className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-extrabold transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer ${
-                            activeFilter === 'todos'
-                                ? 'bg-white text-purple-900 shadow-xs border border-slate-200/50'
-                                : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                    >
-                        <span>Todas</span>
-                    </button>
-
-                    {/* Online */}
-                    <button
-                        onClick={() => setActiveFilter('online')}
-                        className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-extrabold transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer ${
-                            activeFilter === 'online'
-                                ? 'bg-white text-purple-900 shadow-xs border border-slate-200/50'
-                                : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                    >
-                        <span className="relative flex h-2 w-2">
-                            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${activeFilter === 'online' ? 'bg-emerald-400 opacity-75' : 'hidden'}`}></span>
-                            <span className={`relative inline-flex rounded-full h-2 w-2 ${activeFilter === 'online' ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
-                        </span>
-                        <span>Online</span>
-                    </button>
-
-                    {/* Verificadas */}
-                    <button
-                        onClick={() => setActiveFilter('verificadas')}
-                        className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-extrabold transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer ${
-                            activeFilter === 'verificadas'
-                                ? 'bg-white text-purple-900 shadow-xs border border-slate-200/50'
-                                : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                    >
-                        <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
-                        <span>Verificadas</span>
-                    </button>
-
-                    {/* Novas */}
-                    <button
-                        onClick={() => setActiveFilter('novas')}
-                        className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-extrabold transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer ${
-                            activeFilter === 'novas'
-                                ? 'bg-white text-purple-900 shadow-xs border border-slate-200/50'
-                                : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                    >
-                        <span>Novas</span>
-                    </button>
-                </div>
-            </div>
-
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-4 pb-16 md:pb-4 flex flex-col">
                 {error && username.length > 2 && (
@@ -437,13 +288,13 @@ export default function SearchPage() {
                             </div>
                         ) : (
                             <>
-                                {filteredUsers.length > 0 ? (
+                                {displayUsers.length > 0 ? (
                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                                        {filteredUsers.map((user) => renderCreatorCard(user))}
+                                        {displayUsers.map((user) => renderCreatorCard(user))}
                                     </div>
                                 ) : (
                                     <div className="flex-1 min-h-[50vh] flex items-center justify-center text-center text-slate-400 text-xs sm:text-sm font-medium py-12 px-4 animate-in fade-in duration-300">
-                                        <p>{getEmptyStateMessage()}</p>
+                                        <p>Nenhuma criadora disponível no momento.</p>
                                     </div>
                                 )}
                                 <div ref={loadMoreRef} className="flex min-h-12 items-center justify-center py-3" aria-live="polite">
