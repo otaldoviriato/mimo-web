@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
 
         // Buscar fotos públicas livres da galeria para estes usuários
         const clerkIds = featuredUsers.map(u => u.clerkId);
-        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers newClientHoursThreshold activeRechargedClientDaysThreshold activeUnrechargedClientHoursThreshold earningsSessionInactivityMinutes earningsSessionMinimumCents clientLevels').lean() as any;
+        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers newClientHoursThreshold activeRechargedClientDaysThreshold activeUnrechargedClientHoursThreshold earningsSessionInactivityMinutes earningsSessionMinimumCents').lean() as any;
 
         const [exploreEvents, qualifiedConversations] = await Promise.all([
             AcquisitionEvent.aggregate([
@@ -219,8 +219,7 @@ export async function GET(request: NextRequest) {
         const messagesLastWeekMap = new Map<string, number>();
         messagesGroup.forEach((g: any) => messagesLastWeekMap.set(g._id, g.count));
 
-        // 1. Agregação de recargas históricas para os usuários listados (se for profissional)
-        const clientRechargesMap = new Map<string, number>();
+        // 1. Agregação de recargas para os usuários listados (se for profissional)
         const clientHasRechargeMap = new Map<string, boolean>();
         if (currentUser?.isProfessional) {
             const rechargeAgg = await Transaction.aggregate([
@@ -239,32 +238,11 @@ export async function GET(request: NextRequest) {
                 }
             ]);
             rechargeAgg.forEach((item: any) => {
-                clientRechargesMap.set(item._id, item.total);
                 if (item.total > 0) {
                     clientHasRechargeMap.set(item._id, true);
                 }
             });
         }
-
-        const getClientLevel = (amount: number): any => {
-            if (!settings?.clientLevels || settings.clientLevels.length === 0) {
-                let levelName = 'Novo';
-                let color = '#64748B';
-                let icon = 'Medal';
-                if (amount > 0 && amount <= 100) { levelName = 'Bronze'; color = '#D97706'; }
-                else if (amount > 100 && amount <= 500) { levelName = 'Prata'; color = '#64748B'; }
-                else if (amount > 500 && amount <= 1000) { levelName = 'Ouro'; color = '#EAB308'; icon = 'Crown'; }
-                else if (amount > 1000) { levelName = 'VIP'; color = '#000000'; icon = 'Crown'; }
-                return { name: levelName, color, icon };
-            }
-            const sortedLevels = [...settings.clientLevels].sort((a: any, b: any) => b.minAmount - a.minAmount);
-            for (const lvl of sortedLevels) {
-                if (amount >= lvl.minAmount) {
-                    return { name: lvl.name, color: lvl.color, icon: lvl.icon };
-                }
-            }
-            return { name: 'Novo', color: '#64748B', icon: 'Medal' };
-        };
 
         // Mapear usuários, calcular a completude do perfil e anexar até 4 fotos públicas
         const usersWithPhotos = featuredUsers.map(u => {
@@ -367,7 +345,6 @@ export async function GET(request: NextRequest) {
                 exploreImpressionsCount,
                 exploreProfileViewsCount,
                 qualifiedConversationsCount,
-                clientLevel: getClientLevel(clientRechargesMap.get(u.clerkId) || 0),
                 hasChat: talkedUserIds.has(u.clerkId),
                 hasRecharge,
                 tier,

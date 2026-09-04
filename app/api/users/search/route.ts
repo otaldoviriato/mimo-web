@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
             return acc;
         }, {});
 
-        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers newProfileDaysThreshold newClientHoursThreshold activeRechargedClientDaysThreshold activeUnrechargedClientHoursThreshold clientLevels').lean() as any;
+        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers newProfileDaysThreshold newClientHoursThreshold activeRechargedClientDaysThreshold activeUnrechargedClientHoursThreshold').lean() as any;
         const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
         const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
         const thresholdDays = settings?.newProfileDaysThreshold ?? 15;
@@ -107,7 +107,6 @@ export async function GET(request: NextRequest) {
         const activeUnrechargedClientHoursThreshold = settings?.activeUnrechargedClientHoursThreshold ?? 24;
 
         // 1. Agregação de recargas históricas para os usuários listados (se for profissional)
-        const clientRechargesMap = new Map<string, number>();
         const clientHasRechargeMap = new Map<string, boolean>();
         if (currentUser?.isProfessional) {
             const rechargeAgg = await Transaction.aggregate([
@@ -126,30 +125,10 @@ export async function GET(request: NextRequest) {
                 }
             ]);
             rechargeAgg.forEach((item: any) => {
-                clientRechargesMap.set(item._id, item.total);
                 if (item.total > 0) clientHasRechargeMap.set(item._id, true);
             });
         }
 
-        const getClientLevel = (amount: number): any => {
-            if (!settings?.clientLevels || settings.clientLevels.length === 0) {
-                let levelName = 'Novo';
-                let color = '#64748B';
-                let icon = 'Medal';
-                if (amount > 0 && amount <= 100) { levelName = 'Bronze'; color = '#D97706'; }
-                else if (amount > 100 && amount <= 500) { levelName = 'Prata'; color = '#64748B'; }
-                else if (amount > 500 && amount <= 1000) { levelName = 'Ouro'; color = '#EAB308'; icon = 'Crown'; }
-                else if (amount > 1000) { levelName = 'VIP'; color = '#000000'; icon = 'Crown'; }
-                return { name: levelName, color, icon };
-            }
-            const sortedLevels = [...settings.clientLevels].sort((a: any, b: any) => b.minAmount - a.minAmount);
-            for (const lvl of sortedLevels) {
-                if (amount >= lvl.minAmount) {
-                    return { name: lvl.name, color: lvl.color, icon: lvl.icon };
-                }
-            }
-            return { name: 'Novo', color: '#64748B', icon: 'Medal' };
-        };
 
         // Mapear usuários e calcular scores
         const usersWithScores = foundUsers.map(u => {
@@ -254,7 +233,6 @@ export async function GET(request: NextRequest) {
                 birthDate: u.birthDate ?? null,
                 city: u.city ?? '',
                 state: u.state ?? '',
-                clientLevel: getClientLevel(clientRechargesMap.get(u.clerkId) || 0),
                 hasChat: talkedUserIds.has(u.clerkId),
                 hasRecharge,
                 tier,

@@ -27,7 +27,6 @@ const PATH_TITLES: Record<string, string> = {
     '/admin/settings/payments': 'Configurações — Meios de Pagamento',
     '/admin/settings/app': 'Configurações — App & Experiência',
     '/admin/settings/admins': 'Configurações — Administradores',
-    '/admin/settings/levels': 'Configurações — Faixas & Medalhas',
 };
 
 function AdminLayoutContent({ children }: { children: React.ReactNode }) {

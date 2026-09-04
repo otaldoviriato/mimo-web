@@ -29,7 +29,6 @@ const TAB_MAPPINGS: Record<string, string> = {
     'settings-payments': '/admin/settings/payments',
     'settings-app': '/admin/settings/app',
     'settings-admins': '/admin/settings/admins',
-    'settings-levels': '/admin/settings/levels',
 };
 
 function formatRelativeTime(dateInput: string | Date | null | undefined): string {

@@ -7,7 +7,7 @@ import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { SubscribeModal } from '@/components/SubscribeModal';
 import { useUserByUsername, usePublicGallery, useSubscribe, useMyProfile } from '@/hooks/useQueries';
-import { UserX, Camera, Lock, Eye, EyeOff, X, ChevronLeft, ChevronRight, ShieldCheck, Crown, Gift, Award, Medal, Star } from 'lucide-react';
+import { UserX, Camera, Lock, Eye, EyeOff, X, ChevronLeft, ChevronRight, ShieldCheck, Gift } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { trackAcquisitionEvent } from '@/lib/clientAcquisitionAnalytics';
 
@@ -419,82 +419,22 @@ export default function UserProfilePage({ params, username: propUsername, onBack
 
                 {/* Painel de Perfil do Cliente */}
                 {me?.isProfessional && !user.isProfessional && relationshipStats && (() => {
-                    const totalRecharge = relationshipStats.totalHistoricalRecharge ?? 0;
-                    const totalRechargeInReais = totalRecharge;
                     const totalSpentWithMe = (relationshipStats.totalSpent ?? 0) / 100;
                     const hasGift = relationshipStats.hasEverSentGift ?? false;
                     const openCount = relationshipStats.messageOpenRate90 ?? 0;
                     const totalSent = relationshipStats.last10MessagesSentCount ?? 0;
                     const isVeryAttentive = totalSent >= 5 && openCount >= Math.ceil(totalSent * 0.9);
-                    const levelInfo = relationshipStats.clientLevelInfo || { name: 'Novo', color: '#64748B', icon: 'Medal' };
-
-                    const getLevel = (): any => {
-                        const IconComponent = 
-                            levelInfo.icon === 'Crown' ? Crown :
-                            levelInfo.icon === 'Star' ? Star :
-                            levelInfo.icon === 'Medal' ? Medal : Award;
-                        
-                        const isVip = levelInfo.name.toUpperCase() === 'VIP' || levelInfo.color === '#000000';
-
-                        return {
-                            label: levelInfo.name,
-                            sublabel: isVip 
-                                ? 'Membro VIP — Benefícios e prioridade premium'
-                                : `Nível ${levelInfo.name} ativo na plataforma`,
-                            gradient: isVip
-                                ? 'from-slate-950 via-slate-900 to-black border border-slate-800'
-                                : 'from-slate-100 to-slate-50 border border-slate-200/60',
-                            iconBg: isVip ? 'bg-slate-800/80' : 'bg-white shadow-sm',
-                            textColor: isVip ? 'text-white' : 'text-slate-800',
-                            subtextColor: isVip ? 'text-slate-400' : 'text-slate-500',
-                            pillBg: isVip ? 'bg-slate-850 border border-slate-700' : 'bg-slate-100 border border-slate-200',
-                            pillText: isVip ? 'text-slate-100' : 'text-slate-600',
-                            style: isVip ? {} : { 
-                                backgroundColor: `${levelInfo.color}06`,
-                                borderColor: `${levelInfo.color}15`
-                            },
-                            icon: <IconComponent className="w-[22px] h-[22px]" style={{ color: levelInfo.color }} />
-                        };
-                    };
-
-                    const level = getLevel();
-                    const isVip = levelInfo.name.toUpperCase() === 'VIP' || levelInfo.color === '#000000';
                     const hasAnyAchievement = hasGift || isVeryAttentive;
 
                     return (
                         <div className="w-full max-w-md mt-5 z-10 animate-in fade-in slide-in-from-bottom-3 duration-500 space-y-3">
-                            {/* Card de Nível — visual rico com gradiente */}
-                            <div 
-                                className={`w-full rounded-3xl bg-gradient-to-br ${level.gradient} overflow-hidden shadow-sm`}
-                                style={level.style}
-                            >
-                                <div className="px-5 pt-5 pb-4">
-                                    {/* Topo: label e pill */}
-                                    <div className="flex items-center justify-between mb-4">
-                                        <span className={`text-[10px] font-black uppercase tracking-[0.18em] ${isVip ? 'text-slate-400' : 'text-slate-400'}`}>Nível do Cliente</span>
-                                        <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full ${level.pillBg} ${level.pillText}`}>
-                                            {level.label}
-                                        </span>
-                                    </div>
-
-                                    {/* Centro: ícone + nome do nível */}
-                                    <div className="flex items-center gap-4">
-                                        <div className={`w-14 h-14 rounded-2xl ${level.iconBg} flex items-center justify-center shadow-sm shrink-0`}>
-                                            {level.icon}
-                                        </div>
-                                        <div>
-                                            <p className={`text-2.5xl font-black tracking-tight leading-none ${level.textColor}`}>{level.label}</p>
-                                            <p className={`text-xs font-medium mt-1.5 leading-tight ${level.subtextColor}`}>{level.sublabel}</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Rodapé: divisor + gasto comigo */}
-                                    <div className={`mt-4 pt-4 border-t ${isVip ? 'border-white/5' : 'border-black/5'} flex items-center justify-between`}>
-                                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Gastou com você</span>
-                                        <span className={`text-base font-black ${isVip ? 'text-purple-400' : 'text-purple-750'}`}>
-                                            {totalSpentWithMe.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                        </span>
-                                    </div>
+                            {/* Card de Resumo de Gastos com a Profissional */}
+                            <div className="w-full rounded-3xl bg-white border border-slate-200/80 p-5 shadow-sm">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Gastou com você</span>
+                                    <span className="text-base font-black text-purple-700">
+                                        {totalSpentWithMe.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </span>
                                 </div>
                             </div>
 

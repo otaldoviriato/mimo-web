@@ -21,7 +21,6 @@ import {
     Smartphone,
     ShieldCheck,
     Compass,
-    Award,
     Bell,
     ArrowLeft,
     ChartNoAxesCombined
@@ -87,7 +86,6 @@ const MENU_SECTIONS: MenuSection[] = [
             { href: '/admin/settings/payments', label: 'Meios de Pagamento', icon: CreditCard },
             { href: '/admin/settings/app', label: 'App & Experiência', icon: Smartphone },
             { href: '/admin/settings/admins', label: 'Administradores', icon: ShieldCheck },
-            { href: '/admin/settings/levels', label: 'Faixas & Medalhas', icon: Award },
         ],
     },
 ];

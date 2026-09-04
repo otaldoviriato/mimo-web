@@ -34,7 +34,6 @@ interface SettingsSnapshot {
     activeUnrechargedClientHoursThreshold: number;
     exploreSortingCriteria: string[];
     adminClerkIds: string[];
-    clientLevels: any[];
     creatorEngagementEmailsEnabled: boolean;
     creatorEngagementStep1Enabled: boolean;
     creatorEngagementStep1Hours: number;
@@ -80,7 +79,6 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     const [activeRechargedClientDaysThreshold, setActiveRechargedClientDaysThreshold] = useState(30);
     const [activeUnrechargedClientHoursThreshold, setActiveUnrechargedClientHoursThreshold] = useState(24);
     const [exploreSortingCriteria, setExploreSortingCriteria] = useState<string[]>(['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness']);
-    const [clientLevels, setClientLevels] = useState<any[]>([]);
 
     // Parametrização de e-mails de engajamento de criadoras
     const [creatorEngagementEmailsEnabled, setCreatorEngagementEmailsEnabled] = useState(true);
@@ -128,7 +126,6 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         activeUnrechargedClientHoursThreshold: s.activeUnrechargedClientHoursThreshold ?? 24,
         exploreSortingCriteria: s.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'],
         adminClerkIds: richAdmins.map(a => a.clerkId),
-        clientLevels: s.clientLevels || [],
         creatorEngagementEmailsEnabled: s.creatorEngagementEmailsEnabled ?? true,
         creatorEngagementStep1Enabled: s.creatorEngagementStep1Enabled ?? true,
         creatorEngagementStep1Hours: s.creatorEngagementStep1Hours ?? 24,
@@ -184,7 +181,6 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     setActiveRechargedClientDaysThreshold(s.activeRechargedClientDaysThreshold ?? 30);
                     setActiveUnrechargedClientHoursThreshold(s.activeUnrechargedClientHoursThreshold ?? 24);
                     setExploreSortingCriteria(s.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness']);
-                    setClientLevels(s.clientLevels || []);
                     setCreatorEngagementEmailsEnabled(s.creatorEngagementEmailsEnabled ?? true);
                     setCreatorEngagementStep1Enabled(s.creatorEngagementStep1Enabled ?? true);
                     setCreatorEngagementStep1Hours(s.creatorEngagementStep1Hours ?? 24);
@@ -283,7 +279,6 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     activeRechargedClientDaysThreshold,
                     activeUnrechargedClientHoursThreshold,
                     exploreSortingCriteria,
-                    clientLevels,
                     creatorEngagementEmailsEnabled,
                     creatorEngagementStep1Enabled,
                     creatorEngagementStep1Hours,
@@ -324,7 +319,6 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                 setActiveRechargedClientDaysThreshold(s.activeRechargedClientDaysThreshold ?? 30);
                 setActiveUnrechargedClientHoursThreshold(s.activeUnrechargedClientHoursThreshold ?? 24);
                 setExploreSortingCriteria(s.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness']);
-                setClientLevels(s.clientLevels || []);
                 setCreatorEngagementEmailsEnabled(s.creatorEngagementEmailsEnabled ?? true);
                 setCreatorEngagementStep1Enabled(s.creatorEngagementStep1Enabled ?? true);
                 setCreatorEngagementStep1Hours(s.creatorEngagementStep1Hours ?? 24);
@@ -416,18 +410,6 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         exploreSortingCriteria.length !== savedSnapshot.exploreSortingCriteria.length ||
         exploreSortingCriteria.some((c, idx) => c !== savedSnapshot.exploreSortingCriteria[idx])
     );
-    const isDirtyLevels = savedSnapshot !== null && (
-        clientLevels.length !== (savedSnapshot as any).clientLevels?.length ||
-        clientLevels.some((lvl, idx) => {
-            const snapLvl = (savedSnapshot as any).clientLevels?.[idx];
-            if (!snapLvl) return true;
-            return lvl.id !== snapLvl.id ||
-                   lvl.name !== snapLvl.name ||
-                   lvl.minAmount !== snapLvl.minAmount ||
-                   lvl.color !== snapLvl.color ||
-                   lvl.icon !== snapLvl.icon;
-        })
-    );
 
     return {
         settings, loadingSettings, isAuthorized, saving, savedSnapshot,
@@ -463,13 +445,11 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         activeRechargedClientDaysThreshold, setActiveRechargedClientDaysThreshold,
         activeUnrechargedClientHoursThreshold, setActiveUnrechargedClientHoursThreshold,
         exploreSortingCriteria, setExploreSortingCriteria,
-        clientLevels, setClientLevels,
         creatorEngagementEmailsEnabled, setCreatorEngagementEmailsEnabled,
         creatorEngagementStep1Enabled, setCreatorEngagementStep1Enabled,
         creatorEngagementStep1Hours, setCreatorEngagementStep1Hours,
         creatorEngagementStep2Enabled, setCreatorEngagementStep2Enabled,
         creatorEngagementStep2Hours, setCreatorEngagementStep2Hours,
-        isDirtyLevels,
         adminListRich,
         adminSearch, setAdminSearch,
         adminSearchResults,

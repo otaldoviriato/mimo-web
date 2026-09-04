@@ -175,50 +175,6 @@ export async function GET(request: NextRequest) {
         ]);
         const messagesByUser = new Map(messagesAgg.map(m => [m._id, m.total]));
 
-        // Nível de recargas dos últimos 30 dias para classificar o nível do cliente
-        const startOf30Days = new Date();
-        startOf30Days.setDate(startOf30Days.getDate() - 30);
-        
-        const recharges30DaysAgg = await Transaction.aggregate([
-            {
-                $match: {
-                    userId: { $in: clerkIds },
-                    source: 'recharge',
-                    status: { $in: ['PAID', 'COMPLETED'] },
-                    timestamp: { $gte: startOf30Days }
-                }
-            },
-            {
-                $group: {
-                    _id: '$userId',
-                    total: { $sum: '$amount' } // já está em reais no banco
-                }
-            }
-        ]);
-        const recharges30DaysMap = new Map(recharges30DaysAgg.map(r => [r._id, r.total]));
-
-
-
-        const getClientLevel = (amount: number): any => {
-            if (!settings?.clientLevels || settings.clientLevels.length === 0) {
-                let levelName = 'Novo';
-                let color = '#64748B';
-                let icon = 'Medal';
-                if (amount > 0 && amount <= 100) { levelName = 'Bronze'; color = '#D97706'; }
-                else if (amount > 100 && amount <= 500) { levelName = 'Prata'; color = '#64748B'; }
-                else if (amount > 500 && amount <= 1000) { levelName = 'Ouro'; color = '#EAB308'; icon = 'Crown'; }
-                else if (amount > 1000) { levelName = 'VIP'; color = '#000000'; icon = 'Crown'; }
-                return { name: levelName, color, icon };
-            }
-            const sortedLevels = [...settings.clientLevels].sort((a: any, b: any) => b.minAmount - a.minAmount);
-            for (const lvl of sortedLevels) {
-                if (amount >= lvl.minAmount) {
-                    return { name: lvl.name, color: lvl.color, icon: lvl.icon };
-                }
-            }
-            return { name: 'Novo', color: '#64748B', icon: 'Medal' };
-        };
-
         return NextResponse.json({
             users: usersList.map(u => ({
                 id: u.clerkId,
@@ -245,7 +201,6 @@ export async function GET(request: NextRequest) {
                 lastAccessAt: u.lastAccessAt ? new Date(u.lastAccessAt).toISOString() : null,
                 roomsCount: roomsByUser.get(u.clerkId) || 0,
                 messagesCount: messagesByUser.get(u.clerkId) || 0,
-                clientLevel: u.isProfessional ? null : getClientLevel(recharges30DaysMap.get(u.clerkId) || 0),
             }))
         });
 
