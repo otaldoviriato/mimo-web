@@ -213,30 +213,27 @@ export default function SearchPage() {
                 {/* Overlay gradiente escuro suave na parte inferior */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
 
-                {/* Badge Online / Recência (topo direito) - Paleta oficial Mimo (Branco & Roxo) */}
-                {status.label && (
-                    <div className={`absolute top-2.5 right-2.5 backdrop-blur-md text-[10.5px] font-semibold px-2.5 py-0.5 rounded-full shadow-sm flex items-center gap-1.5 z-10 border transition-all ${
-                        status.isOnline
-                            ? 'bg-white/95 text-emerald-600 border-emerald-200/90 shadow-emerald-500/10'
-                            : 'bg-white/95 text-purple-700 border-purple-200/80 shadow-purple-900/5'
-                    }`}>
+                {/* Badge Online (topo direito) - Apenas se estiver Online: Fundo branco sólido e texto verde */}
+                {status.isOnline && (
+                    <div className="absolute top-2.5 right-2.5 bg-white text-emerald-600 border border-emerald-100 text-[10.5px] font-bold px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1.5 z-10">
                         <span className="relative flex h-1.5 w-1.5 shrink-0">
-                            {status.isOnline && (
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            )}
-                            <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${
-                                status.isOnline ? 'bg-emerald-500' : 'bg-purple-600'
-                            }`}></span>
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                         </span>
-                        <span className="leading-none whitespace-nowrap">{status.label}</span>
+                        <span className="leading-none whitespace-nowrap">Online</span>
                     </div>
                 )}
 
-                {/* Conteúdo inferior com Nome e Idade */}
+                {/* Conteúdo inferior com Nome, Idade e Recência de acesso */}
                 <div className="absolute bottom-0 inset-x-0 p-3 text-white flex flex-col gap-0.5 z-10">
                     <h3 className="text-sm sm:text-base font-black tracking-tight leading-tight truncate drop-shadow-sm">
                         {displayName}
                     </h3>
+                    {!status.isOnline && status.label && (
+                        <p className="text-[11px] sm:text-xs text-white/90 font-medium tracking-wide drop-shadow-sm truncate">
+                            {status.label}
+                        </p>
+                    )}
                 </div>
             </div>
         );
