@@ -5,12 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import {
     ArrowRight,
-    ShieldCheck,
     MessageCircle,
-    CheckCircle2,
-    Lock,
-    Zap,
-    Flame,
 } from 'lucide-react';
 
 interface NetflixStyleLandingProps {
@@ -238,9 +233,9 @@ export function NetflixStyleLanding({
                 </Link>
             </header>
 
-            {/* ─── CONTEÚDO ALINHADO À ESQUERDA: CLAREZA BRUTAL E SEM VÁCUO ─── */}
+            {/* ─── CONTEÚDO ALINHADO À ESQUERDA: ULTRA DIRETO E ENXUTO ─── */}
             <main className="relative z-20 flex-1 flex flex-col justify-center px-6 sm:px-12 lg:px-16 max-w-7xl mx-auto w-full my-auto py-8 sm:py-12">
-                <div className="max-w-xl text-left space-y-5">
+                <div className="max-w-xl text-left space-y-6">
                     {/* Badge Sutil */}
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-100/90 border border-purple-200 text-purple-700 text-xs font-bold uppercase tracking-wider shadow-xs">
                         <MessageCircle className="w-3.5 h-3.5 text-purple-600" />
@@ -248,41 +243,17 @@ export function NetflixStyleLanding({
                     </div>
 
                     {/* Título Principal de Impacto: A Proposta Central do Mimo */}
-                    <div className="space-y-1 text-left">
-                        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.1]">
-                            O app de conversa onde você{' '}
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-600">
-                                nunca toma vácuo
-                            </span>.
-                        </h1>
-                    </div>
+                    <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.1]">
+                        O app onde você{' '}
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-600">
+                            nunca toma vácuo
+                        </span>.
+                    </h1>
 
-                    {/* Subtítulo com Problema & Solução Clara */}
-                    <p className="text-sm sm:text-base lg:text-lg text-slate-600 leading-relaxed font-medium">
-                        Cansado de ser ignorado no Tinder e no Instagram? No Mimo você conversa no privado de mulheres reais e tem a certeza de receber respostas com áudios e fotos exclusivas.
+                    {/* Subtítulo super conciso */}
+                    <p className="text-base sm:text-lg text-slate-600 font-medium">
+                        Converse no privado com mulheres reais com resposta garantida.
                     </p>
-
-                    {/* 3 Micro-pílulas do Mecanismo */}
-                    <div className="space-y-2 pt-1 text-xs sm:text-sm font-semibold text-slate-700">
-                        <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                            </div>
-                            <span><strong>Resposta Garantida:</strong> Elas respondem você pessoalmente no privado.</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
-                                <Lock className="w-3.5 h-3.5 text-purple-600" />
-                            </div>
-                            <span><strong>Mídias Exclusivas:</strong> Fotos e áudios que você não vê em rede social.</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-                                <Zap className="w-3.5 h-3.5 text-amber-600" />
-                            </div>
-                            <span><strong>Sem Mensalidade:</strong> Recarregue no Pix e pague só pelo que conversar.</span>
-                        </div>
-                    </div>
 
                     {/* Botão de Chamada para Ação */}
                     <div className="pt-2 max-w-sm space-y-2.5 text-left">
@@ -295,8 +266,8 @@ export function NetflixStyleLanding({
                             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                         </Link>
 
-                        <p className="text-xs text-slate-500 font-semibold">
-                            100% discreto no Pix • Sem cartão obrigatório • +18
+                        <p className="text-xs text-slate-500 font-medium">
+                            100% discreto • Sem mensalidade • +18
                         </p>
                     </div>
                 </div>
