@@ -5,7 +5,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import {
     ArrowRight,
-    MessageCircle,
 } from 'lucide-react';
 
 interface NetflixStyleLandingProps {
@@ -214,25 +213,19 @@ export function NetflixStyleLanding({
             </header>
 
             {/* ─── CONTEÚDO: ULTRA DIRETO, ENXUTO E 100% RESPONSIVO ─── */}
-            <main className="relative z-20 flex-1 flex flex-col justify-center px-5 sm:px-12 lg:px-16 max-w-7xl mx-auto w-full my-auto py-4 sm:py-12">
-                <div className="max-w-xl text-left space-y-4 sm:space-y-6">
-                    {/* Categoria do produto, sem promessa de disponibilidade imediata */}
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-100/90 border border-purple-200 text-purple-700 text-[11px] sm:text-xs font-bold uppercase tracking-wider shadow-xs">
-                        <MessageCircle className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                        <span>Conversas privadas</span>
-                    </div>
-
+            <main className="relative z-20 flex-1 flex flex-col justify-start sm:justify-center px-5 sm:px-12 lg:px-16 max-w-7xl mx-auto w-full pt-12 pb-6 sm:my-auto sm:py-12">
+                <div className="max-w-xl text-left space-y-5 sm:space-y-6">
                     {/* Título Principal de Impacto: Escala Perfeita em Telas Pequenas */}
-                    <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.15] sm:leading-[1.1]">
-                        Converse{' '}
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-600 block sm:inline">
-                            sem precisar dar match.
+                    <h1 className="text-[2.65rem] sm:text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 tracking-[-0.035em] leading-[0.98] sm:leading-[1.05]">
+                        <span className="block">Conversas Privadas.</span>
+                        <span className="mt-1.5 block text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-600">
+                            Mulheres Reais.
                         </span>
                     </h1>
 
                     {/* Proposta direta, sem promessa de resposta ou imediatismo */}
-                    <p className="text-sm sm:text-base lg:text-lg text-slate-600 font-semibold leading-relaxed">
-                        Mulheres reais. Conversas privadas.
+                    <p className="text-base sm:text-lg lg:text-xl text-slate-700 font-bold leading-snug">
+                        Converse sem precisar dar match.
                     </p>
 
                     {/* Botão de Chamada para Ação */}
