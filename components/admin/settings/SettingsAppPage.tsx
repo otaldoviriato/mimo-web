@@ -8,22 +8,12 @@ import type { UseSettingsReturn } from '@/hooks/admin/useSettings';
 type Props = Pick<UseSettingsReturn,
     | 'pwaShowAgainIntervalDays' | 'setPwaShowAgainIntervalDays'
     | 'identityVerificationPromptIntervalDays' | 'setIdentityVerificationPromptIntervalDays'
-    | 'creatorEngagementEmailsEnabled' | 'setCreatorEngagementEmailsEnabled'
-    | 'creatorEngagementStep1Enabled' | 'setCreatorEngagementStep1Enabled'
-    | 'creatorEngagementStep1Hours' | 'setCreatorEngagementStep1Hours'
-    | 'creatorEngagementStep2Enabled' | 'setCreatorEngagementStep2Enabled'
-    | 'creatorEngagementStep2Hours' | 'setCreatorEngagementStep2Hours'
     | 'isDirtyApp' | 'saving' | 'saveSettings'
 >;
 
 export function SettingsAppPage({
     pwaShowAgainIntervalDays, setPwaShowAgainIntervalDays,
     identityVerificationPromptIntervalDays, setIdentityVerificationPromptIntervalDays,
-    creatorEngagementEmailsEnabled, setCreatorEngagementEmailsEnabled,
-    creatorEngagementStep1Enabled, setCreatorEngagementStep1Enabled,
-    creatorEngagementStep1Hours, setCreatorEngagementStep1Hours,
-    creatorEngagementStep2Enabled, setCreatorEngagementStep2Enabled,
-    creatorEngagementStep2Hours, setCreatorEngagementStep2Hours,
     isDirtyApp, saving, saveSettings,
 }: Props) {
     const inputCls = 'w-full max-w-xs px-3.5 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700 shadow-sm';
@@ -104,89 +94,6 @@ export function SettingsAppPage({
                     </div>
                 </div>
 
-                {/* Seção: Réguas de E-mail de Engajamento de Criadoras */}
-                <div className="space-y-6 pt-2">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h3 className="text-base font-bold text-slate-800">Réguas de E-mail de Engajamento para Criadoras</h3>
-                            <p className="text-xs text-slate-500 font-medium mt-0.5">
-                                Disparos automáticos orientando criadoras inativas (com 0 conversas) a divulgar seu link exclusivo.
-                            </p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={creatorEngagementEmailsEnabled}
-                                onChange={(e) => setCreatorEngagementEmailsEnabled(e.target.checked)}
-                                className="sr-only peer"
-                            />
-                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                            <span className="ml-2.5 text-xs font-bold text-slate-700">
-                                {creatorEngagementEmailsEnabled ? 'Ativado Globalmente' : 'Desativado'}
-                            </span>
-                        </label>
-                    </div>
-
-                    {creatorEngagementEmailsEnabled && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                            {/* Régua 1 */}
-                            <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-purple-700">Lembrete 1 (Primeiro Passo)</h4>
-                                    <input
-                                        type="checkbox"
-                                        checked={creatorEngagementStep1Enabled}
-                                        onChange={(e) => setCreatorEngagementStep1Enabled(e.target.checked)}
-                                        className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
-                                    />
-                                </div>
-                                <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                                    Envia e-mail convidando a criadora a copiar seu link e colocar no Instagram/TikTok após o tempo configurado abaixo sem nenhuma conversa iniciada.
-                                </p>
-                                <div className="flex items-center gap-2 pt-1">
-                                    <span className="text-xs font-bold text-slate-600">Enviar após:</span>
-                                    <input
-                                        type="number"
-                                        value={creatorEngagementStep1Hours}
-                                        onChange={(e) => setCreatorEngagementStep1Hours(Number(e.target.value))}
-                                        min={1}
-                                        disabled={!creatorEngagementStep1Enabled}
-                                        className="w-20 px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/25 font-bold text-slate-700 text-center"
-                                    />
-                                    <span className="text-xs font-bold text-slate-500">horas de cadastro</span>
-                                </div>
-                            </div>
-
-                            {/* Régua 2 */}
-                            <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-purple-700">Lembrete 2 (Reforço Dica de Ouro)</h4>
-                                    <input
-                                        type="checkbox"
-                                        checked={creatorEngagementStep2Enabled}
-                                        onChange={(e) => setCreatorEngagementStep2Enabled(e.target.checked)}
-                                        className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
-                                    />
-                                </div>
-                                <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                                    Segunda mensagem de incentivo caso a criadora continue sem conversas ativas, enfatizando histórias de sucesso e kit de divulgação.
-                                </p>
-                                <div className="flex items-center gap-2 pt-1">
-                                    <span className="text-xs font-bold text-slate-600">Enviar após:</span>
-                                    <input
-                                        type="number"
-                                        value={creatorEngagementStep2Hours}
-                                        onChange={(e) => setCreatorEngagementStep2Hours(Number(e.target.value))}
-                                        min={1}
-                                        disabled={!creatorEngagementStep2Enabled}
-                                        className="w-20 px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/25 font-bold text-slate-700 text-center"
-                                    />
-                                    <span className="text-xs font-bold text-slate-500">horas de cadastro</span>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
             </div>
         </div>
     );

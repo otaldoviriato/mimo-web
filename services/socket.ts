@@ -17,6 +17,7 @@ class SocketService {
     public socket: Socket | null = null;
     private _currentUserId: string | null = null;
     private _newMessageCallback: ((data: any) => void) | null = null;
+    private _getToken: (() => Promise<string | null>) | null = null;
 
     // ── Detecção de sessão ──────────────────────────────────────────────────
 
@@ -66,8 +67,9 @@ class SocketService {
 
     // ────────────────────────────────────────────────────────────────────────
 
-    connect(userId?: string) {
+    connect(userId?: string, getToken?: () => Promise<string | null>) {
         const newUserId = userId ?? this._currentUserId;
+        if (getToken) this._getToken = getToken;
 
         // Já está conectado com o mesmo usuário — não faz nada
         if (this.socket?.connected && this._currentUserId === newUserId) {
@@ -95,12 +97,22 @@ class SocketService {
             autoConnect: true,
             reconnectionDelay: 1000,
             reconnectionDelayMax: 5000,
+            auth: async (callback) => {
+                try {
+                    callback({ token: await this._getToken?.() });
+                } catch {
+                    callback({ token: null });
+                }
+            },
         });
 
         this.socket.on('connect', () => {
             console.log('[SocketService] Socket conectado! Autenticando como', this._currentUserId);
+            // Compatibilidade apenas para implantação gradual: o servidor legado
+            // esperava este evento. O servidor novo autentica exclusivamente pelo
+            // token do Clerk enviado no handshake e ignora este evento.
             if (this._currentUserId) {
-                this.authenticate(this._currentUserId);
+                this.socket?.emit('authenticate', { userId: this._currentUserId });
             }
             this._onSocketConnected();
         });
@@ -122,12 +134,6 @@ class SocketService {
             this.socket = null;
         }
         this._currentUserId = null;
-    }
-
-    authenticate(userId: string) {
-        if (!this.socket) return;
-        console.log('[SocketService] Emitindo authenticate para', userId);
-        this.socket.emit('authenticate', { userId });
     }
 
     joinRoom(userId: string, targetUserId: string) {

@@ -100,7 +100,6 @@ interface SubscriberInfo {
 
 interface WalletDashboardData {
     balance: number;
-    pendingBalance?: number;
     totalWithdrawn: number;
     pendingWithdrawal: unknown;
     projectedMonthlyRecurring: number;
@@ -404,19 +403,6 @@ export default function WalletPage() {
                             </button>
                         </div>
 
-                        {userData?.isProfessional && (
-                            <div className="flex flex-col items-start sm:items-end bg-white/70 border border-purple-200/60 p-2.5 rounded-xl shadow-xs">
-                                <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wider">
-                                    Pendente (Conversas Abertas)
-                                </span>
-                                <span className="text-lg font-black text-amber-600">
-                                    {renderValue(dashboardData?.pendingBalance || 0)}
-                                </span>
-                                <span className="text-[9px] text-slate-400 font-medium">
-                                    Liberado após fechamento das conversas
-                                </span>
-                            </div>
-                        )}
                     </div>
 
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4 pt-4 border-t border-purple-100/50">

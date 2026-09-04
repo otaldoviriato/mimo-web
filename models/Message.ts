@@ -31,7 +31,7 @@ export interface IMessage extends Document {
     isAudio?: boolean;
     audioUrl?: string;
     audioDuration?: number;
-    billingEngineVersion?: 'marketplace_v2';
+    billingEngineVersion?: 'marketplace_v2' | 'marketplace_v3';
     idempotencyKey?: string;
     textGraphemeCount?: number;
     audioBillableSeconds?: number;
@@ -170,7 +170,7 @@ const MessageSchema = new Schema<IMessage>({
     },
     billingEngineVersion: {
         type: String,
-        enum: ['marketplace_v2'],
+        enum: ['marketplace_v2', 'marketplace_v3'],
         index: true,
     },
     idempotencyKey: {

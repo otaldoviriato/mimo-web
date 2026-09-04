@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
         const { userId } = await auth();
         const professionalId = request.nextUrl.searchParams.get('professionalId');
         const settings = await AppSettings.findOne({ key: 'global' })
-            .select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers audioPriceMultiplier')
+            .select('conversationPricePerEquivalentCharCents subscriberDiscountPercentage audioEquivalentCharsPerSecond')
             .lean();
 
         let isSubscriber = false;
@@ -33,10 +33,13 @@ export async function GET(request: NextRequest) {
             );
         }
 
+        const regularPrice = (settings?.conversationPricePerEquivalentCharCents ?? 5) / 100;
+        const subscriberDiscount = settings?.subscriberDiscountPercentage ?? 20;
+
         return NextResponse.json({
-            defaultPricePerCharSubscribers: settings?.defaultPricePerCharSubscribers ?? 0.002,
-            defaultPricePerCharNonSubscribers: settings?.defaultPricePerCharNonSubscribers ?? 0.005,
-            audioPriceMultiplier: settings?.audioPriceMultiplier ?? 5,
+            defaultPricePerCharSubscribers: regularPrice * (1 - subscriberDiscount / 100),
+            defaultPricePerCharNonSubscribers: regularPrice,
+            audioPriceMultiplier: settings?.audioEquivalentCharsPerSecond ?? 5,
             isSubscriber,
         });
     } catch (error) {

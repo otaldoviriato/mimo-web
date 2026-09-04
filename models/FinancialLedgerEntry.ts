@@ -14,7 +14,7 @@ export interface IFinancialLedgerEntry extends Document {
     relatedUserId?: string;
     fundingSource?: 'cash' | 'promotional' | 'mixed';
     effectiveAt: Date;
-    billingEngineVersion: 'marketplace_v2';
+    billingEngineVersion: 'marketplace_v2' | 'marketplace_v3';
     metadata?: Record<string, unknown>;
     createdAt: Date;
     updatedAt: Date;
@@ -34,7 +34,7 @@ const schema = new Schema<IFinancialLedgerEntry>({
     relatedUserId: { type: String, index: true },
     fundingSource: { type: String, enum: ['cash', 'promotional', 'mixed'] },
     effectiveAt: { type: Date, required: true, default: Date.now, index: true },
-    billingEngineVersion: { type: String, enum: ['marketplace_v2'], default: 'marketplace_v2' },
+    billingEngineVersion: { type: String, enum: ['marketplace_v2', 'marketplace_v3'], default: 'marketplace_v3' },
     metadata: { type: Schema.Types.Mixed },
 }, { timestamps: true });
 

@@ -53,7 +53,7 @@ export function SettingsPlatformPage({
             <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm p-6">
                 <SettingField
                     title="Taxa de Intermediação (%)"
-                    description="Percentual retido pela plataforma sobre cada cobrança de mensagem paga. Por exemplo, com 20%, se o profissional cobra R$ 1,00 por mensagem, a plataforma retém R$ 0,20 e o profissional recebe R$ 0,80 no saldo. Esta taxa é aplicada no momento em que o sistema debita o saldo do cliente. Afeta diretamente a receita bruta da plataforma e o repasse líquido aos profissionais."
+                    description="Percentual interno retido pela plataforma sobre cada mensagem paga. O preço ao cliente é global e não é definido individualmente pela profissional. A divisão é aplicada no mesmo lançamento que debita o cliente e disponibiliza o repasse profissional."
                 >
                     <div className="flex items-center gap-3">
                         <input

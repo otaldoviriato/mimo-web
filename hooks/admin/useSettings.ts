@@ -69,8 +69,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     const [lowBalanceThresholdInCents, setLowBalanceThresholdInCents] = useState(1000);
     const [onlineDelayMinutes, setOnlineDelayMinutes] = useState(2);
     const [activeUserThresholdDays, setActiveUserThresholdDays] = useState(7);
-    const [defaultPricePerCharSubscribers, setDefaultPricePerCharSubscribers] = useState(0.002);
-    const [defaultPricePerCharNonSubscribers, setDefaultPricePerCharNonSubscribers] = useState(0.005);
+    const [defaultPricePerCharSubscribers, setDefaultPricePerCharSubscribers] = useState(0.04);
+    const [defaultPricePerCharNonSubscribers, setDefaultPricePerCharNonSubscribers] = useState(0.05);
     const [audioPriceMultiplier, setAudioPriceMultiplier] = useState(5);
     const [pwaShowAgainIntervalDays, setPwaShowAgainIntervalDays] = useState(7);
     const [identityVerificationPromptIntervalDays, setIdentityVerificationPromptIntervalDays] = useState(7);
@@ -78,13 +78,13 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     const [newClientHoursThreshold, setNewClientHoursThreshold] = useState(24);
     const [activeRechargedClientDaysThreshold, setActiveRechargedClientDaysThreshold] = useState(30);
     const [activeUnrechargedClientHoursThreshold, setActiveUnrechargedClientHoursThreshold] = useState(24);
-    const [exploreSortingCriteria, setExploreSortingCriteria] = useState<string[]>(['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness']);
+    const [exploreSortingCriteria, setExploreSortingCriteria] = useState<string[]>(['online', 'recentAccess']);
 
     // Parametrização de e-mails de engajamento de criadoras
-    const [creatorEngagementEmailsEnabled, setCreatorEngagementEmailsEnabled] = useState(true);
-    const [creatorEngagementStep1Enabled, setCreatorEngagementStep1Enabled] = useState(true);
+    const [creatorEngagementEmailsEnabled, setCreatorEngagementEmailsEnabled] = useState(false);
+    const [creatorEngagementStep1Enabled, setCreatorEngagementStep1Enabled] = useState(false);
     const [creatorEngagementStep1Hours, setCreatorEngagementStep1Hours] = useState(24);
-    const [creatorEngagementStep2Enabled, setCreatorEngagementStep2Enabled] = useState(true);
+    const [creatorEngagementStep2Enabled, setCreatorEngagementStep2Enabled] = useState(false);
     const [creatorEngagementStep2Hours, setCreatorEngagementStep2Hours] = useState(72);
 
     // Gerenciamento de administradores
@@ -115,8 +115,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         lowBalanceThresholdInCents: s.lowBalanceThresholdInCents ?? 1000,
         onlineDelayMinutes: s.onlineDelayMinutes ?? 2,
         activeUserThresholdDays: s.activeUserThresholdDays ?? 7,
-        defaultPricePerCharSubscribers: s.defaultPricePerCharSubscribers ?? 0.002,
-        defaultPricePerCharNonSubscribers: s.defaultPricePerCharNonSubscribers ?? 0.005,
+        defaultPricePerCharSubscribers: s.defaultPricePerCharSubscribers ?? 0.04,
+        defaultPricePerCharNonSubscribers: s.defaultPricePerCharNonSubscribers ?? 0.05,
         audioPriceMultiplier: s.audioPriceMultiplier ?? 5,
         pwaShowAgainIntervalDays: s.pwaShowAgainIntervalDays ?? 7,
         identityVerificationPromptIntervalDays: s.identityVerificationPromptIntervalDays ?? 7,
@@ -124,7 +124,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         newClientHoursThreshold: s.newClientHoursThreshold ?? 24,
         activeRechargedClientDaysThreshold: s.activeRechargedClientDaysThreshold ?? 30,
         activeUnrechargedClientHoursThreshold: s.activeUnrechargedClientHoursThreshold ?? 24,
-        exploreSortingCriteria: s.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'],
+        exploreSortingCriteria: ['online', 'recentAccess'],
         adminClerkIds: richAdmins.map(a => a.clerkId),
         creatorEngagementEmailsEnabled: s.creatorEngagementEmailsEnabled ?? true,
         creatorEngagementStep1Enabled: s.creatorEngagementStep1Enabled ?? true,
@@ -171,8 +171,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     setLowBalanceThresholdInCents(s.lowBalanceThresholdInCents ?? 1000);
                     setOnlineDelayMinutes(s.onlineDelayMinutes ?? 2);
                     setActiveUserThresholdDays(s.activeUserThresholdDays ?? 7);
-                    setDefaultPricePerCharSubscribers(s.defaultPricePerCharSubscribers ?? 0.002);
-                    setDefaultPricePerCharNonSubscribers(s.defaultPricePerCharNonSubscribers ?? 0.005);
+                    setDefaultPricePerCharSubscribers(s.defaultPricePerCharSubscribers ?? 0.04);
+                    setDefaultPricePerCharNonSubscribers(s.defaultPricePerCharNonSubscribers ?? 0.05);
                     setAudioPriceMultiplier(s.audioPriceMultiplier ?? 5);
                     setPwaShowAgainIntervalDays(s.pwaShowAgainIntervalDays ?? 7);
                     setIdentityVerificationPromptIntervalDays(s.identityVerificationPromptIntervalDays ?? 7);
@@ -180,7 +180,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     setNewClientHoursThreshold(s.newClientHoursThreshold ?? 24);
                     setActiveRechargedClientDaysThreshold(s.activeRechargedClientDaysThreshold ?? 30);
                     setActiveUnrechargedClientHoursThreshold(s.activeUnrechargedClientHoursThreshold ?? 24);
-                    setExploreSortingCriteria(s.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness']);
+                    setExploreSortingCriteria(['online', 'recentAccess']);
                     setCreatorEngagementEmailsEnabled(s.creatorEngagementEmailsEnabled ?? true);
                     setCreatorEngagementStep1Enabled(s.creatorEngagementStep1Enabled ?? true);
                     setCreatorEngagementStep1Hours(s.creatorEngagementStep1Hours ?? 24);
@@ -278,12 +278,6 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     newClientHoursThreshold,
                     activeRechargedClientDaysThreshold,
                     activeUnrechargedClientHoursThreshold,
-                    exploreSortingCriteria,
-                    creatorEngagementEmailsEnabled,
-                    creatorEngagementStep1Enabled,
-                    creatorEngagementStep1Hours,
-                    creatorEngagementStep2Enabled,
-                    creatorEngagementStep2Hours,
                 }),
             });
             if (response.ok) {
@@ -309,8 +303,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                 setMaxExclusivePhotos(s.maxExclusivePhotos);
                 setOnlineDelayMinutes(s.onlineDelayMinutes ?? 2);
                 setActiveUserThresholdDays(s.activeUserThresholdDays ?? 7);
-                setDefaultPricePerCharSubscribers(s.defaultPricePerCharSubscribers ?? 0.002);
-                setDefaultPricePerCharNonSubscribers(s.defaultPricePerCharNonSubscribers ?? 0.005);
+                setDefaultPricePerCharSubscribers(s.defaultPricePerCharSubscribers ?? 0.04);
+                setDefaultPricePerCharNonSubscribers(s.defaultPricePerCharNonSubscribers ?? 0.05);
                 setAudioPriceMultiplier(s.audioPriceMultiplier ?? 5);
                 setPwaShowAgainIntervalDays(s.pwaShowAgainIntervalDays ?? 7);
                 setIdentityVerificationPromptIntervalDays(s.identityVerificationPromptIntervalDays ?? 7);
@@ -318,7 +312,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                 setNewClientHoursThreshold(s.newClientHoursThreshold ?? 24);
                 setActiveRechargedClientDaysThreshold(s.activeRechargedClientDaysThreshold ?? 30);
                 setActiveUnrechargedClientHoursThreshold(s.activeUnrechargedClientHoursThreshold ?? 24);
-                setExploreSortingCriteria(s.exploreSortingCriteria || ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness']);
+                setExploreSortingCriteria(['online', 'recentAccess']);
                 setCreatorEngagementEmailsEnabled(s.creatorEngagementEmailsEnabled ?? true);
                 setCreatorEngagementStep1Enabled(s.creatorEngagementStep1Enabled ?? true);
                 setCreatorEngagementStep1Hours(s.creatorEngagementStep1Hours ?? 24);
@@ -395,21 +389,13 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     );
     const isDirtyApp = savedSnapshot !== null && (
         pwaShowAgainIntervalDays !== savedSnapshot.pwaShowAgainIntervalDays ||
-        identityVerificationPromptIntervalDays !== savedSnapshot.identityVerificationPromptIntervalDays ||
-        creatorEngagementEmailsEnabled !== savedSnapshot.creatorEngagementEmailsEnabled ||
-        creatorEngagementStep1Enabled !== savedSnapshot.creatorEngagementStep1Enabled ||
-        creatorEngagementStep1Hours !== savedSnapshot.creatorEngagementStep1Hours ||
-        creatorEngagementStep2Enabled !== savedSnapshot.creatorEngagementStep2Enabled ||
-        creatorEngagementStep2Hours !== savedSnapshot.creatorEngagementStep2Hours
+        identityVerificationPromptIntervalDays !== savedSnapshot.identityVerificationPromptIntervalDays
     );
     const isDirtyAdmins = savedSnapshot !== null && (
         adminListRich.length !== savedSnapshot.adminClerkIds.length ||
         adminListRich.some(a => !savedSnapshot.adminClerkIds.includes(a.clerkId))
     );
-    const isDirtyExplore = savedSnapshot !== null && (
-        exploreSortingCriteria.length !== savedSnapshot.exploreSortingCriteria.length ||
-        exploreSortingCriteria.some((c, idx) => c !== savedSnapshot.exploreSortingCriteria[idx])
-    );
+    const isDirtyExplore = false;
 
     return {
         settings, loadingSettings, isAuthorized, saving, savedSnapshot,

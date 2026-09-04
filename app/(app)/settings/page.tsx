@@ -97,7 +97,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const { isInstallable, promptInstall, mounted, isStandalone } = usePWA();
     const { permission: notificationPermission, handleRequestPermission } = usePushNotifications();
 
-    const { data: userData, isLoading: loadingProfile, refetch: refetchProfile } = useMyProfile();
+    const { data: userData, isLoading: loadingProfile } = useMyProfile();
     const updateProfileMutation = useUpdateProfile();
 
     const [username, setUsername] = useState('');
@@ -110,7 +110,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const [isSubscriptionEnabled, setIsSubscriptionEnabled] = useState(false);
     const [bio, setBio] = useState('');
     const [hideFromExplore, setHideFromExplore] = useState(false);
-    const [subscriberDiscountPercentage, setSubscriberDiscountPercentage] = useState('20');
     
     const [loading, setLoading] = useState(false);
     const [saveError, setSaveError] = useState('');
@@ -127,16 +126,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const [accountAction, setAccountAction] = useState<'suspend' | 'delete' | null>(null);
     const [accountActionLoading, setAccountActionLoading] = useState(false);
     const [accountActionError, setAccountActionError] = useState('');
-    const [showMigrationModal, setShowMigrationModal] = useState(false);
-    const [migrationLoading, setMigrationLoading] = useState(false);
-    const [migrationSubmitting, setMigrationSubmitting] = useState(false);
-    const [migrationConfirmed, setMigrationConfirmed] = useState(false);
-    const [migrationError, setMigrationError] = useState('');
-    const [migrationEligibility, setMigrationEligibility] = useState<{
-        eligible: boolean;
-        message?: string;
-        conversationCount: number;
-    } | null>(null);
 
     const [birthDate, setBirthDate] = useState('');
     const [state, setState] = useState('');
@@ -167,7 +156,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             setBio(userData.bio || '');
             setEmailNotificationsEnabled(userData.emailNotificationsEnabled ?? true);
             setNewUserNotificationsEnabled(userData.newUserNotificationsEnabled ?? false);
-            setSubscriberDiscountPercentage((userData.subscriberDiscountPercentage ?? 20).toString());
             setHideFromExplore(userData.hideFromExplore === true);
             setBirthDate(userData.birthDate ? new Date(userData.birthDate).toISOString().split('T')[0] : '');
             setState(userData.state || '');
@@ -264,7 +252,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                 const limitMax = userData?.maxSubscriptionPrice ?? 200;
                 const limitMin = userData?.minSubscriptionPrice ?? 10;
                 const price = Number(subscriptionPrice.replace(/\D/g, '')) / 100;
-                const discount = Number(subscriberDiscountPercentage) || 20;
 
                 if (isSubscriptionEnabled) {
                     if (price <= 0) {
@@ -274,11 +261,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                     }
                     if (price < limitMin) {
                         setSaveError(`O preço da assinatura não pode ser menor que o valor mínimo de R$ ${limitMin.toFixed(2)}`);
-                        setLoading(false);
-                        return;
-                    }
-                    if (discount < 20 || discount > 80) {
-                        setSaveError('O desconto da assinatura deve ser entre 20% e 80%');
                         setLoading(false);
                         return;
                     }
@@ -317,7 +299,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             const limitMax = userData?.maxSubscriptionPrice ?? 200;
             const limitMin = userData?.minSubscriptionPrice ?? 10;
             const price = Number(subscriptionPrice.replace(/\D/g, '')) / 100;
-            const discount = Number(subscriberDiscountPercentage) || 20;
 
             if (isSubscriptionEnabled) {
                 if (price <= 0) {
@@ -327,11 +308,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                 }
                 if (price < limitMin) {
                     setSaveSubscriptionError(`O preço da assinatura não pode ser menor que o valor mínimo de R$ ${limitMin.toFixed(2)}`);
-                    setLoadingSubscription(false);
-                    return;
-                }
-                if (discount < 20 || discount > 80) {
-                    setSaveSubscriptionError('O desconto da assinatura deve ser entre 20% e 80%');
                     setLoadingSubscription(false);
                     return;
                 }
@@ -345,8 +321,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
 
             const updateData: any = {
                 isSubscriptionEnabled,
-                subscriptionPrice: price,
-                subscriberDiscountPercentage: discount
+                subscriptionPrice: price
             };
 
             await updateProfileMutation.mutateAsync(updateData);
@@ -393,50 +368,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             setAccountActionError(error.message || 'Não foi possível concluir a ação.');
         } finally {
             setAccountActionLoading(false);
-        }
-    };
-
-    const openMigrationModal = async () => {
-        setShowMigrationModal(true);
-        setMigrationLoading(true);
-        setMigrationConfirmed(false);
-        setMigrationError('');
-        setMigrationEligibility(null);
-
-        try {
-            const response = await fetch('/api/users/me/professional-migration', { cache: 'no-store' });
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(data.error || 'Não foi possível verificar sua conta.');
-            setMigrationEligibility(data);
-        } catch (error: any) {
-            setMigrationError(error.message || 'Não foi possível verificar sua conta.');
-        } finally {
-            setMigrationLoading(false);
-        }
-    };
-
-    const handleMigrationConfirm = async () => {
-        if (!migrationEligibility?.eligible || !migrationConfirmed) return;
-
-        setMigrationSubmitting(true);
-        setMigrationError('');
-        try {
-            const response = await fetch('/api/users/me/professional-migration', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ confirmConversationRemoval: true }),
-            });
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(data.message || data.error || 'Não foi possível migrar sua conta.');
-
-            localStorage.removeItem('mimo_profile');
-            await queryClient.invalidateQueries({ queryKey: ['user', 'me'] });
-            await refetchProfile();
-            router.replace('/onboarding');
-        } catch (error: any) {
-            setMigrationError(error.message || 'Não foi possível migrar sua conta.');
-        } finally {
-            setMigrationSubmitting(false);
         }
     };
 
@@ -489,16 +420,13 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
 
     const initialSubscriptionPrice = userData?.subscriptionPrice ?? 0;
     const initialIsSubscriptionEnabled = userData?.isSubscriptionEnabled ?? false;
-    const initialDiscount = userData?.subscriberDiscountPercentage ?? 20;
 
     const currentSubscriptionPriceClean = Number(subscriptionPrice.replace(/\D/g, '')) / 100;
-    const currentDiscount = Number(subscriberDiscountPercentage) || 20;
 
     const hasSubscriptionChanges =
         profileIsProfessional && (
             currentSubscriptionPriceClean !== initialSubscriptionPrice ||
-            isSubscriptionEnabled !== initialIsSubscriptionEnabled ||
-            currentDiscount !== initialDiscount
+            isSubscriptionEnabled !== initialIsSubscriptionEnabled
         );
 
     const layoutClass = isSubPage
@@ -708,23 +636,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                                 </div>
                                             </div>
 
-                                            <div className="px-4 py-3.5 bg-slate-50/30 transition-all">
-                                                <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Desconto para Assinantes (%)</label>
-                                                <input
-                                                    className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
-                                                    placeholder="20"
-                                                    value={subscriberDiscountPercentage}
-                                                    onChange={(e) => {
-                                                        const val = e.target.value.replace(/\D/g, '');
-                                                        setSubscriberDiscountPercentage(val);
-                                                    }}
-                                                    type="text"
-                                                    inputMode="numeric"
-                                                />
-                                                <p className="text-[9px] text-gray-400 mt-1">
-                                                    Defina a porcentagem de desconto (de 20% a 80%) para assinantes sobre o preço do caractere.
-                                                </p>
-                                            </div>
                                         </>
                                     )}
 

@@ -1,21 +1,13 @@
 export const EXPLORE_RESULT_LIMIT = 30;
-export const EXPLORE_DISCOVERY_IMPRESSIONS = 100;
-export const EXPLORE_DISCOVERY_INTERVAL = 5;
-
 export type ExploreRankable = {
     clerkId: string;
-    exploreImpressionsCount: number;
-    exploreProfileViewsCount: number;
-    qualifiedConversationsCount: number;
     isOnline: boolean;
     lastActiveTime: number;
-    completeness: number;
-    identityStatus?: string | null;
 };
 
 function compareByRecency(a: ExploreRankable, b: ExploreRankable) {
-    return b.lastActiveTime - a.lastActiveTime
-        || Number(b.isOnline) - Number(a.isOnline)
+    return Number(b.isOnline) - Number(a.isOnline)
+        || b.lastActiveTime - a.lastActiveTime
         || a.clerkId.localeCompare(b.clerkId);
 }
 

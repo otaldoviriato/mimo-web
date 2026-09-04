@@ -11,6 +11,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { clearMimoClientSession } from '@/lib/clientSession';
 import { REFERRAL_STORAGE_KEY, getReferralFromSearchParams, type ReferralMetadata } from '@/lib/referral';
 import { getPendingPostAuthRedirect, POST_AUTH_REDIRECT_STORAGE_KEY } from '@/lib/postAuthRedirect';
+import { CAMPAIGN_ATTRIBUTION_STORAGE_KEY } from '@/components/CampaignVisitTracker';
 
 function GiftCapture() {
     const searchParams = useSearchParams();
@@ -136,6 +137,16 @@ export default function LoginPage() {
         }
     };
 
+    const getPendingCampaign = (): Record<string, unknown> | undefined => {
+        if (typeof window === 'undefined') return undefined;
+        try {
+            const stored = localStorage.getItem(CAMPAIGN_ATTRIBUTION_STORAGE_KEY);
+            return stored ? JSON.parse(stored) : undefined;
+        } catch {
+            return undefined;
+        }
+    };
+
     const onSendCode = async () => {
         if (!email.trim()) { setError('Por favor, insira seu email'); return; }
         if (!signInLoaded || !signUpLoaded) { setError('Serviço de autenticação não carregado'); return; }
@@ -189,9 +200,13 @@ export default function LoginPage() {
                 // Conta não existe — cria transparentemente sem o usuário perceber
                 try {
                     const pendingReferral = getPendingReferral();
+                    const pendingCampaign = getPendingCampaign();
                     const signUpParams: any = {
                         emailAddress: email,
-                        ...(pendingReferral ? { unsafeMetadata: { mimoReferral: pendingReferral } } : {}),
+                        ...((pendingReferral || pendingCampaign) ? { unsafeMetadata: {
+                            ...(pendingReferral ? { mimoReferral: pendingReferral } : {}),
+                            ...(pendingCampaign ? { mimoCampaign: pendingCampaign } : {}),
+                        } } : {}),
                     };
 
                     await signUp!.create(signUpParams);
@@ -305,6 +320,7 @@ export default function LoginPage() {
         const executeGoogleAuth = async () => {
             const pendingGift = typeof window !== 'undefined' ? localStorage.getItem('mimo_pending_gift') : null;
             const pendingReferral = getPendingReferral();
+            const pendingCampaign = getPendingCampaign();
             const pendingRedirect = getPendingPostAuthRedirect();
             clearMimoClientSession(queryClient);
             if (pendingGift && typeof window !== 'undefined') {
@@ -324,10 +340,13 @@ export default function LoginPage() {
                 oidcPrompt: 'select_account',
             } as const;
 
-            if (pendingReferral) {
+            if (pendingReferral || pendingCampaign) {
                 await signUp.authenticateWithRedirect({
                     ...oauthParams,
-                    unsafeMetadata: { mimoReferral: pendingReferral },
+                    unsafeMetadata: {
+                        ...(pendingReferral ? { mimoReferral: pendingReferral } : {}),
+                        ...(pendingCampaign ? { mimoCampaign: pendingCampaign } : {}),
+                    },
                 } as any);
                 return;
             }

@@ -6,6 +6,7 @@ import { connectToDatabase } from '@/lib/db';
 import { Campaign } from '@/models/Campaign';
 import { User } from '@/models/User';
 import { MessageSquare, ShieldCheck, ArrowRight, Star } from 'lucide-react';
+import { CampaignVisitTracker } from '@/components/CampaignVisitTracker';
 
 interface PageProps {
     params: Promise<{ slug: string }>;
@@ -49,6 +50,8 @@ export default async function CampaignLandingPage({ params, searchParams }: Page
     const zone = typeof resolvedSearchParams.zone === 'string' ? resolvedSearchParams.zone : undefined;
     const creative = typeof resolvedSearchParams.creative === 'string' ? resolvedSearchParams.creative : undefined;
     const variation = typeof resolvedSearchParams.variation === 'string' ? resolvedSearchParams.variation : undefined;
+    const utm = Object.fromEntries(Object.entries(resolvedSearchParams)
+        .filter(([key, value]) => key.startsWith('utm_') && typeof value === 'string') as Array<[string, string]>);
 
     const destinationUrl = campaign.internalDestination
         || (targetProfessional ? `/${targetProfessional.username}` : '/search');
@@ -57,6 +60,7 @@ export default async function CampaignLandingPage({ params, searchParams }: Page
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between selection:bg-purple-500 selection:text-white">
+            <CampaignVisitTracker slug={campaign.slug} clickId={clickId} site={site} zone={zone} creative={creative} variation={variation} utm={utm} />
             {/* Top Navigation Header */}
             <header className="w-full bg-white/80 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 px-6 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -71,6 +75,7 @@ export default async function CampaignLandingPage({ params, searchParams }: Page
                 </div>
                 <Link
                     href={authUrl}
+                    data-campaign-cta
                     className="h-9 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
                 >
                     Entrar
@@ -149,6 +154,7 @@ export default async function CampaignLandingPage({ params, searchParams }: Page
                     <div className="flex flex-col gap-3 pt-2">
                         <Link
                             href={authUrl}
+                            data-campaign-cta
                             className="w-full h-13 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-black text-base uppercase tracking-wide transition-all shadow-md shadow-purple-600/20 flex items-center justify-center gap-2 active:scale-[0.98]"
                         >
                             <span>Conversar Agora</span>

@@ -23,7 +23,7 @@ import {
     Compass,
     Bell,
     ArrowLeft,
-    ChartNoAxesCombined
+    Megaphone
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -48,7 +48,7 @@ const MENU_SECTIONS: MenuSection[] = [
         title: 'Visão Geral',
         items: [
             { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-            { href: '/admin/acquisition', label: 'Aquisição & Retenção', icon: ChartNoAxesCombined },
+            { href: '/admin/campaigns', label: 'Campanhas', icon: Megaphone },
         ],
     },
     {

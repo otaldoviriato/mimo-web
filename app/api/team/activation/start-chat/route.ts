@@ -11,7 +11,7 @@ const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
 export async function POST(request: NextRequest) {
     try {
-        const { userId } = await auth();
+        const { userId, getToken } = await auth();
         if (!userId) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         }
@@ -75,9 +75,10 @@ export async function POST(request: NextRequest) {
 
         // Notificar servidor de chat em tempo real via socket / push notification
         const chatServerUrl = process.env.NEXT_PUBLIC_CHAT_SERVER_URL || 'http://localhost:3001';
+        const chatToken = await getToken();
         fetch(`${chatServerUrl}/api/internal/notify-activation-chat`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${chatToken}` },
             body: JSON.stringify({
                 roomId,
                 senderId: userId,

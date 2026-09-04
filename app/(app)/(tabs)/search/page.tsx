@@ -36,8 +36,7 @@ const formatOnlineStatus = (
         if (!isNaN(d)) timestamp = d;
     }
 
-    // Se o socket indicar online ou se a última atividade foi há menos de 10 minutos -> Online
-    if (isOnline || (timestamp > 0 && (now - timestamp) < 10 * 60 * 1000)) {
+    if (isOnline) {
         return { isOnline: true, label: 'Online' };
     }
 

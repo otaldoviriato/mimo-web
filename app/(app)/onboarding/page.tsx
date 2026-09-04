@@ -6,15 +6,13 @@ import { useClerk } from '@clerk/nextjs';
 import {
     User, Crown, Check, CheckCircle2, ShieldCheck, CreditCard, Calendar,
     Camera, ChevronLeft, UserCheck, Loader2, X, Plus, AlertCircle, LogOut,
-    Share2, Copy, Link2, ArrowRight
+    ArrowRight
 } from 'lucide-react';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useMyProfile } from '@/hooks/useQueries';
 import { ImageCropper } from '@/components/ImageCropper';
 import { useQueryClient } from '@tanstack/react-query';
 import { clearMimoClientSession } from '@/lib/clientSession';
-import { buildProfileShareUrl } from '@/lib/referral';
-import { recordLinkShared } from '@/lib/clientAcquisitionAnalytics';
 import { calculateOnboardingStep } from '@/lib/onboarding';
 import { consumePostAuthRedirect } from '@/lib/postAuthRedirect';
 
@@ -86,57 +84,6 @@ export default function OnboardingPage() {
 
     const [showLogoutModal, setShowLogoutModal] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
-    const [copiedLink, setCopiedLink] = useState(false);
-
-    const copyProfileLink = async (url: string) => {
-        if (typeof window === 'undefined') return;
-
-        try {
-            if (navigator.clipboard && window.isSecureContext) {
-                await navigator.clipboard.writeText(url);
-            } else {
-                const textArea = document.createElement('textarea');
-                textArea.value = url;
-                textArea.setAttribute('readonly', '');
-                textArea.style.position = 'fixed';
-                textArea.style.left = '-9999px';
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-            }
-            recordLinkShared('copy_button');
-        } catch (err) {
-            console.error('Erro ao copiar link do perfil:', err);
-        }
-
-        setCopiedLink(true);
-        setTimeout(() => setCopiedLink(false), 2500);
-    };
-
-    const handleShareProfile = async (url: string) => {
-        if (typeof window === 'undefined') return;
-
-        const shareData = {
-            title: 'MimoChat',
-            text: 'Acesse meu perfil no MimoChat.',
-            url,
-        };
-
-        if (navigator.share) {
-            try {
-                await navigator.share(shareData);
-                recordLinkShared('native_share');
-                return;
-            } catch (err: unknown) {
-                if (err instanceof DOMException && err.name === 'AbortError') return;
-                console.error('Erro ao compartilhar perfil:', err);
-            }
-        }
-
-        await copyProfileLink(url);
-    };
-
     const handleConfirmLogout = async () => {
         setIsLoggingOut(true);
         try {
@@ -631,7 +578,7 @@ export default function OnboardingPage() {
                     </div>
                 )}
 
-                {/* Cards de seleção de papel */}
+                {/* A jornada pública é sempre a do cliente. */}
                 <div className="flex flex-col gap-3 mt-6">
                     {/* Cliente */}
                     <button
@@ -664,37 +611,6 @@ export default function OnboardingPage() {
                         </div>
                     </button>
 
-                    {/* Candidaturas profissionais acontecem fora do cadastro comum. */}
-                    <button
-                        hidden
-                        type="button"
-                        onClick={() => setRole('professional')}
-                        disabled={roleLoading}
-                        className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-200 text-left cursor-pointer select-none active:scale-[0.985] ${
-                            role === 'professional'
-                                ? 'bg-purple-50 border-purple-500'
-                                : 'bg-white border-gray-100 shadow-sm hover:border-purple-200'
-                        }`}
-                    >
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-200 ${
-                            role === 'professional' ? 'bg-purple-600' : 'bg-purple-50'
-                        }`}>
-                            <Crown className={`w-6 h-6 ${role === 'professional' ? 'text-white' : 'text-purple-500'}`} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-bold leading-tight ${role === 'professional' ? 'text-purple-900' : 'text-gray-900'}`}>
-                                Quero receber por conversa
-                            </p>
-                            <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">
-                                Defina seus valores, receba mensagens e monetize no MimoChat
-                            </p>
-                        </div>
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all duration-200 ${
-                            role === 'professional' ? 'bg-purple-600 border-purple-600' : 'border-gray-200 bg-white'
-                        }`}>
-                            {role === 'professional' && <Check className="w-3 h-3 text-white stroke-[3]" />}
-                        </div>
-                    </button>
                 </div>
             </div>
 
@@ -1048,9 +964,6 @@ export default function OnboardingPage() {
     const renderDone = () => {
         const isProf = userData?.isProfessional || role === 'professional';
         const userSlug = username || userData?.username || '';
-        const fullLink = typeof window !== 'undefined' && userData?.clerkId
-            ? buildProfileShareUrl(window.location.origin, userSlug, userData.clerkId)
-            : `mimo.chat/${userSlug}`;
         const creatorName = displayName || userData?.name || userSlug || 'Seu perfil';
         const profileImage = photoPreview || userData?.photoUrl;
         const profileHandle = userSlug ? `@${userSlug}` : '@seu-perfil';
@@ -1099,7 +1012,7 @@ export default function OnboardingPage() {
                                 Seu perfil está no ar!
                             </h2>
                             <p className="text-sm font-medium text-slate-600 max-w-[320px] mx-auto leading-relaxed">
-                                Para começar a receber conversas, compartilhe o link do seu perfil com seu público.
+                                O Mimo direcionará clientes para você. Mantenha o app acessível e responda quando estiver disponível.
                             </p>
                         </div>
 
@@ -1125,64 +1038,14 @@ export default function OnboardingPage() {
                                     {profileHandle}
                                 </p>
 
-                                {/* Link Copy Box */}
-                                <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-2 flex items-center justify-between gap-2 shadow-inner">
-                                    <div className="flex items-center gap-2 pl-2.5 min-w-0 flex-1">
-                                        <Link2 className="w-4 h-4 text-purple-600 shrink-0" />
-                                        <span className="text-xs font-mono font-medium text-slate-700 truncate">
-                                            {fullLink}
-                                        </span>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => copyProfileLink(fullLink)}
-                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
-                                            copiedLink
-                                                ? 'bg-emerald-600 text-white shadow-sm'
-                                                : 'bg-purple-600 hover:bg-purple-700 text-white active:scale-95'
-                                        }`}
-                                    >
-                                        {copiedLink ? (
-                                            <>
-                                                <Check className="w-3.5 h-3.5" />
-                                                Copiado
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Copy className="w-3.5 h-3.5" />
-                                                Copiar
-                                            </>
-                                        )}
-                                    </button>
+                                <div className="w-full rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-xs font-semibold leading-relaxed text-emerald-800">
+                                    Seu perfil já pode aparecer para clientes no Explorar e nas campanhas do Mimo.
                                 </div>
                             </div>
                         </div>
 
-                        {/* Step-by-step Guide */}
-                        <div className="bg-purple-50/70 border border-purple-100 rounded-2xl p-4 space-y-3">
-                            <h4 className="text-xs font-extrabold uppercase tracking-wider text-purple-900 flex items-center gap-1.5">
-                                Como conseguir novas conversas:
-                            </h4>
-                            <div className="space-y-2.5 text-xs text-slate-700 font-medium">
-                                <div className="flex items-start gap-2.5">
-                                    <div className="w-5 h-5 rounded-full bg-purple-200 text-purple-800 font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">
-                                        1
-                                    </div>
-                                    <p>Copie o seu link exclusivo do MimoChat acima.</p>
-                                </div>
-                                <div className="flex items-start gap-2.5">
-                                    <div className="w-5 h-5 rounded-full bg-purple-200 text-purple-800 font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">
-                                        2
-                                    </div>
-                                    <p>Adicione na bio do <strong>Instagram, TikTok</strong> ou <strong>Status do WhatsApp</strong>.</p>
-                                </div>
-                                <div className="flex items-start gap-2.5">
-                                    <div className="w-5 h-5 rounded-full bg-purple-200 text-purple-800 font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">
-                                        3
-                                    </div>
-                                    <p>Seus seguidores vão clicar no link para iniciar conversas com você!</p>
-                                </div>
-                            </div>
+                        <div className="rounded-2xl border border-purple-100 bg-purple-50/70 p-4 text-xs font-medium leading-relaxed text-slate-700">
+                            Quando você estiver conectada, seu perfil aparece antes no Explorar. Ao sair, o cliente verá com transparência quando foi seu último acesso.
                         </div>
                     </div>
                 </div>
@@ -1190,10 +1053,6 @@ export default function OnboardingPage() {
                 {/* Bottom Actions Footer */}
                 <div className="px-5 pt-3 pb-[calc(env(safe-area-inset-bottom)+16px)] shrink-0 bg-white border-t border-slate-200/80 shadow-lg">
                     <div className="max-w-md mx-auto space-y-2.5">
-                        <PrimaryButton onClick={() => handleShareProfile(fullLink)}>
-                            <Share2 className="w-4 h-4" />
-                            Compartilhar meu perfil
-                        </PrimaryButton>
                         <button
                             type="button"
                             onClick={navigateToApp}

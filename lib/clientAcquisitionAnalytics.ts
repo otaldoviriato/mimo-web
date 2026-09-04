@@ -1,6 +1,6 @@
 'use client';
 
-const VISITOR_KEY = 'mimo_analytics_visitor_id';
+const VISITOR_KEY = 'mimo_visitor_id';
 
 type PublicEvent = {
     eventType: 'link_viewed' | 'explore_profile_impression' | 'explore_profile_viewed';

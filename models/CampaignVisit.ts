@@ -14,6 +14,12 @@ export interface ICampaignVisit extends Document {
     landingViewedAt: Date;
     ctaClickedAt?: Date | null;
     signupCompletedAt?: Date | null;
+    firstProfileViewedAt?: Date | null;
+    firstProfileViewedProfessionalId?: string | null;
+    firstRechargeAt?: Date | null;
+    firstRechargeAmountCents?: number | null;
+    firstPaidMessageAt?: Date | null;
+    firstPaidMessageProfessionalId?: string | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -32,6 +38,12 @@ const schema = new Schema<ICampaignVisit>({
     landingViewedAt: { type: Date, required: true, default: Date.now, index: true },
     ctaClickedAt: { type: Date, default: null },
     signupCompletedAt: { type: Date, default: null },
+    firstProfileViewedAt: { type: Date, default: null },
+    firstProfileViewedProfessionalId: { type: String, default: null, index: true },
+    firstRechargeAt: { type: Date, default: null },
+    firstRechargeAmountCents: { type: Number, default: null },
+    firstPaidMessageAt: { type: Date, default: null },
+    firstPaidMessageProfessionalId: { type: String, default: null, index: true },
 }, { timestamps: true });
 
 schema.index({ campaignId: 1, visitorId: 1 }, { unique: true });

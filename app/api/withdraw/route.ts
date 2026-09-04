@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
             asaasTransferId,
         });
 
-        // 6. Zera o saldo disponível na carteira (preservando o saldo pendente em conversas abertas)
+        // 6. Reserva o saldo disponível para o saque.
         if (user.isProfessional) {
             user.professionalAvailableCents = 0;
             user.balance = 0;

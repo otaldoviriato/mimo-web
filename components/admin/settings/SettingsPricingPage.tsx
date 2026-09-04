@@ -104,7 +104,7 @@ export function SettingsPricingPage({
                     title="Multiplicador de Preço do Áudio"
                     description={
                         <span>
-                            Fator aplicado sobre o preco por caractere da plataforma para calcular o valor cobrado por segundo de audio. Exemplo: se o preco por caractere e R$ 0,005 e o multiplicador e 5, cada segundo de audio custa R$ 0,025.
+                            Cada segundo de áudio equivale a esta quantidade de caracteres. Com R$ 0,05 por caractere e 5 equivalentes, cada segundo custa R$ 0,25.
                         </span>
                     }
                     unit="x por segundo"
@@ -155,7 +155,7 @@ export function SettingsPricingPage({
 
                 <SettingField
                     title="Desconto Automático para Assinantes (%)"
-                    description="Percentual de desconto aplicado automaticamente pelo sistema sobre o preço por caractere quando o usuário possui uma assinatura ativa com aquele profissional. Este desconto é calculado em cima do preço configurado pelo profissional para assinantes. Por exemplo: se o preço é R$ 0,005/char e o desconto é 20%, o assinante paga R$ 0,004/char. Este mecanismo incentiva assinaturas como forma de reduzir o custo de mensagens."
+                    description="Percentual global aplicado automaticamente sobre o preço por caractere quando o cliente possui uma assinatura ativa com aquela profissional. Por exemplo: com preço global de R$ 0,05 e desconto de 20%, o assinante paga R$ 0,04 por caractere. Não é a taxa da plataforma e não pode ser definido individualmente pela profissional."
                     unit="%"
                 >
                     <input

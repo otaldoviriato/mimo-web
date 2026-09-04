@@ -2,7 +2,7 @@
 
 ## Especificação de produto e plano completo de migração
 
-**Status:** base de planejamento; a refatoração ainda não foi iniciada
+**Status:** histórico de planejamento. As regras de qualificação descritas neste documento foram canceladas em 4 de setembro de 2026 e não representam o produto ativo. Consulte [legacy-data-reference.md](./legacy-data-reference.md) para a regra `marketplace_v3` implementada.
 
 **Data:** 3 de setembro de 2026
 
@@ -11,6 +11,8 @@
 **Documento complementar:** [legacy-data-reference.md](./legacy-data-reference.md)
 
 Este documento consolida as decisões de produto tomadas até agora, registra o estado real encontrado no código e organiza a migração do Mimo para um marketplace de conversas. Criá-lo não altera comportamento, banco ou produção.
+
+> **Decisão superveniente:** toda mensagem paga pelo cliente remunera a profissional imediatamente. Não existem meta de caracteres, barra de progresso, janela de três horas, conversa qualificada, bônus ou saldo pendente. O Explorar usa somente online e último acesso. As seções abaixo sobre qualificação e bônus são preservadas como memória decisória, não como especificação.
 
 O objetivo não é adaptar parcialmente o modelo anterior. Ao final da migração, o produto ativo deve operar exclusivamente como marketplace-first. Dados antigos serão preservados para auditoria, mas não poderão continuar determinando cadastro, aquisição, ranking, preço, remuneração, dashboards ou comunicação.
 
@@ -25,11 +27,11 @@ O Mimo deixa de ser uma ferramenta para profissionais monetizarem a audiência q
 3. profissionais entram por seleção, convite e aprovação controlada;
 4. a vitrine interna apresenta profissionais reais, verificadas, completas e com sinais honestos de atividade;
 5. o cliente paga um preço global e previsível por caractere equivalente enviado;
-6. a profissional não recebe por cada mensagem isolada: ela passa a receber somente quando ajuda a formar uma conversa qualificada;
-7. a remuneração é calculada por uma regra objetiva, retroativa e transparente, sem IA decidindo dinheiro;
+6. a profissional recebe imediatamente sua participação em cada mensagem paga pelo cliente;
+7. a remuneração usa preço global e divisão objetiva, sem IA, bônus ou qualificação decidindo dinheiro;
 8. qualidade, fraude e tentativa de tirar a conversa da plataforma são tratadas por moderação e sanções de conta, não por confisco de saldo;
 9. campanhas, atribuição e conversão substituem compartilhamentos de links e “clientes trazidos” como centro da operação;
-10. o BackOffice passa a mostrar, em primeiro lugar, conversas qualificadas acontecendo e o funil de tráfego pago.
+10. o BackOffice passa a mostrar conversas financeiramente ativas e o funil de tráfego pago.
 
 ### 1.1 Princípios não negociáveis
 

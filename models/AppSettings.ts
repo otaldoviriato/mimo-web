@@ -77,7 +77,7 @@ const AppSettingsSchema = new Schema<IAppSettings>({
     platformFeePercentage: {
         type: Number,
         required: true,
-        default: 10,
+        default: 20,
         min: 0,
         max: 100,
     },
@@ -204,13 +204,13 @@ const AppSettingsSchema = new Schema<IAppSettings>({
     defaultPricePerCharSubscribers: {
         type: Number,
         required: true,
-        default: 0.002,
+        default: 0.04,
         min: 0,
     },
     defaultPricePerCharNonSubscribers: {
         type: Number,
         required: true,
-        default: 0.005,
+        default: 0.05,
         min: 0,
     },
     audioPriceMultiplier: {

@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/lib/db';
 import { recordAcquisitionEvent } from '@/lib/acquisitionAnalytics';
 import { sanitizeReferralValue } from '@/lib/referral';
 import { User } from '@/models/User';
+import { CampaignVisit } from '@/models/CampaignVisit';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -58,6 +59,14 @@ export async function POST(request: NextRequest) {
             origin: eventType === 'link_viewed' ? 'profile_share' : 'explore',
             metadata: cleanMetadata(body.metadata),
         });
+
+        if (eventType === 'explore_profile_viewed') {
+            await CampaignVisit.findOneAndUpdate(
+                { visitorId, firstProfileViewedAt: null },
+                { $set: { firstProfileViewedAt: new Date(), firstProfileViewedProfessionalId: professionalId } },
+                { sort: { landingViewedAt: -1 } },
+            );
+        }
 
         return new NextResponse(null, { status: 204 });
     } catch (error) {

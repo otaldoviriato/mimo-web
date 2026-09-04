@@ -1,7 +1,9 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IModerationReview extends Document {
-    conversationId: mongoose.Types.ObjectId;
+    roomId?: string;
+    messageIds: string[];
+    conversationId?: mongoose.Types.ObjectId;
     status: 'pending_review' | 'confirmed_violation' | 'dismissed';
     matchedRules: string[];
     excerpts: string[];
@@ -15,7 +17,9 @@ export interface IModerationReview extends Document {
 }
 
 const schema = new Schema<IModerationReview>({
-    conversationId: { type: Schema.Types.ObjectId, ref: 'QualifiedConversation', required: true, unique: true },
+    roomId: { type: String, index: true },
+    messageIds: { type: [String], default: [] },
+    conversationId: { type: Schema.Types.ObjectId, ref: 'QualifiedConversation', unique: true, sparse: true },
     status: { type: String, enum: ['pending_review', 'confirmed_violation', 'dismissed'], default: 'pending_review', index: true },
     matchedRules: { type: [String], default: [] },
     excerpts: { type: [String], default: [] },

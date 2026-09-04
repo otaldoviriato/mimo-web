@@ -1,13 +1,7 @@
 import { NextResponse } from 'next/server';
-import { auth, clerkClient } from '@clerk/nextjs/server';
+import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
-import { Room } from '@/models/Room';
-import { Message } from '@/models/Message';
-import { GalleryItem } from '@/models/GalleryItem';
-import { Transaction } from '@/models/Transaction';
-import { MicroTransaction } from '@/models/MicroTransaction';
-import { WithdrawRequest } from '@/models/WithdrawRequest';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,48 +51,21 @@ export async function DELETE() {
 
         await connectToDatabase();
 
-        const rooms = await Room.find({ participants: userId }).select('_id').lean();
-        const roomIds = rooms.map((room: any) => room._id);
+        const user = await User.findOneAndUpdate(
+            { clerkId: userId },
+            { $set: {
+                isSuspended: true,
+                suspendedAt: new Date(),
+                accountDeletionRequestedAt: new Date(),
+                isOnline: false,
+                fcmToken: '',
+                fcmTokens: [],
+            } },
+            { new: true },
+        );
+        if (!user) return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 404 });
 
-        try {
-            const client = await clerkClient();
-            await client.users.updateUserMetadata(userId, {
-                unsafeMetadata: {
-                    role: null,
-                    profileSelectedAt: null,
-                    profileRoleSource: null,
-                },
-            });
-        } catch (clerkErr) {
-            console.warn('[DELETE /api/users/me/account] Failed to clear Clerk profile metadata:', clerkErr);
-        }
-
-        await Promise.all([
-            User.findOneAndDelete({ clerkId: userId }),
-            GalleryItem.deleteMany({ ownerId: userId }),
-            Transaction.deleteMany({ userId }),
-            MicroTransaction.deleteMany({
-                $or: [
-                    { senderId: userId },
-                    { receiverId: userId },
-                ],
-            }),
-            WithdrawRequest.deleteMany({ userId }),
-            Message.deleteMany({
-                $or: [
-                    { roomId: { $in: roomIds } },
-                    { senderId: userId },
-                    { receiverId: userId },
-                ],
-            }),
-            Room.deleteMany({ participants: userId }),
-            User.updateMany(
-                { subscribers: userId },
-                { $pull: { subscribers: userId } }
-            ),
-        ]);
-
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ success: true, retainedForAudit: true });
     } catch (error) {
         console.error('Error deleting user account:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

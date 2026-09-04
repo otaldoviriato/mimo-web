@@ -12,7 +12,7 @@ async function getOrCreateSettings() {
     if (!settings) {
         settings = await AppSettings.create({
             key: 'global',
-            platformFeePercentage: 10,
+            platformFeePercentage: 20,
             uploadLimitMB: 50,
             autoModeration: true,
             professionalsOnlyCreateRooms: false,
@@ -29,15 +29,16 @@ async function getOrCreateSettings() {
             lowBalanceThresholdInCents: 1000,
             earningsSessionInactivityMinutes: 120,
             earningsSessionMinimumCents: 1000,
-            defaultPricePerCharSubscribers: 0.002,
-            defaultPricePerCharNonSubscribers: 0.005,
+            defaultPricePerCharSubscribers: 0.04,
+            defaultPricePerCharNonSubscribers: 0.05,
             audioPriceMultiplier: 5,
+            conversationPricePerEquivalentCharCents: 5,
+            audioEquivalentCharsPerSecond: 5,
             pwaShowAgainIntervalDays: 7,
             identityVerificationPromptIntervalDays: 7,
             newProfileDaysThreshold: 15,
             onlineDelayMinutes: 2,
             activeUserThresholdDays: 7,
-            exploreSortingCriteria: ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'],
         });
     } else {
         // Garantir que novos campos sejam populados se não existirem
@@ -55,9 +56,13 @@ async function getOrCreateSettings() {
         if (settings.lowBalanceThresholdInCents === undefined) { settings.lowBalanceThresholdInCents = 1000; updated = true; }
         if (settings.minSubscriptionPrice === undefined) { settings.minSubscriptionPrice = 10; updated = true; }
         if (settings.institutionalEmails === undefined) { settings.institutionalEmails = ['viriatoceo@mimochat.com.br']; updated = true; }
-        if (settings.defaultPricePerCharSubscribers === undefined) { settings.defaultPricePerCharSubscribers = 0.002; updated = true; }
-        if (settings.defaultPricePerCharNonSubscribers === undefined) { settings.defaultPricePerCharNonSubscribers = 0.005; updated = true; }
+        const canonicalPrice = (settings.conversationPricePerEquivalentCharCents ?? 5) / 100;
+        const derivedSubscriberPrice = canonicalPrice * (1 - (settings.subscriberDiscountPercentage ?? 20) / 100);
+        if (settings.defaultPricePerCharSubscribers !== derivedSubscriberPrice) { settings.defaultPricePerCharSubscribers = derivedSubscriberPrice; updated = true; }
+        if (settings.defaultPricePerCharNonSubscribers !== canonicalPrice) { settings.defaultPricePerCharNonSubscribers = canonicalPrice; updated = true; }
         if (settings.audioPriceMultiplier === undefined) { settings.audioPriceMultiplier = 5; updated = true; }
+        if (settings.conversationPricePerEquivalentCharCents === undefined) { settings.conversationPricePerEquivalentCharCents = 5; updated = true; }
+        if (settings.audioEquivalentCharsPerSecond === undefined) { settings.audioEquivalentCharsPerSecond = 5; updated = true; }
         if (settings.pwaShowAgainIntervalDays === undefined) { settings.pwaShowAgainIntervalDays = 7; updated = true; }
         if (settings.identityVerificationPromptIntervalDays === undefined) { settings.identityVerificationPromptIntervalDays = 7; updated = true; }
         if (settings.newProfileDaysThreshold === undefined) { settings.newProfileDaysThreshold = 15; updated = true; }
@@ -66,15 +71,6 @@ async function getOrCreateSettings() {
         if (settings.activeUnrechargedClientHoursThreshold === undefined) { settings.activeUnrechargedClientHoursThreshold = 24; updated = true; }
         if (settings.onlineDelayMinutes === undefined) { settings.onlineDelayMinutes = 2; updated = true; }
         if (settings.activeUserThresholdDays === undefined) { settings.activeUserThresholdDays = 7; updated = true; }
-        if (settings.creatorEngagementEmailsEnabled === undefined) { settings.creatorEngagementEmailsEnabled = true; updated = true; }
-        if (settings.creatorEngagementStep1Enabled === undefined) { settings.creatorEngagementStep1Enabled = true; updated = true; }
-        if (settings.creatorEngagementStep1Hours === undefined) { settings.creatorEngagementStep1Hours = 24; updated = true; }
-        if (settings.creatorEngagementStep2Enabled === undefined) { settings.creatorEngagementStep2Enabled = true; updated = true; }
-        if (settings.creatorEngagementStep2Hours === undefined) { settings.creatorEngagementStep2Hours = 72; updated = true; }
-        if (settings.exploreSortingCriteria === undefined || settings.exploreSortingCriteria.length === 0) {
-            settings.exploreSortingCriteria = ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'];
-            updated = true;
-        }
         if (updated) {
             await settings.save();
         }
@@ -187,33 +183,7 @@ export async function PUT(request: NextRequest) {
             activeUnrechargedClientHoursThreshold,
             onlineDelayMinutes,
             activeUserThresholdDays,
-            exploreSortingCriteria,
-            creatorEngagementEmailsEnabled,
-            creatorEngagementStep1Enabled,
-            creatorEngagementStep1Hours,
-            creatorEngagementStep2Enabled,
-            creatorEngagementStep2Hours,
         } = body;
-
-        if (creatorEngagementEmailsEnabled !== undefined) {
-            settings.creatorEngagementEmailsEnabled = Boolean(creatorEngagementEmailsEnabled);
-        }
-        if (creatorEngagementStep1Enabled !== undefined) {
-            settings.creatorEngagementStep1Enabled = Boolean(creatorEngagementStep1Enabled);
-        }
-        if (creatorEngagementStep1Hours !== undefined) {
-            const val = Number(creatorEngagementStep1Hours);
-            if (isNaN(val) || val < 1) return NextResponse.json({ error: 'Prazo da régua 1 deve ser de pelo menos 1 hora' }, { status: 400 });
-            settings.creatorEngagementStep1Hours = val;
-        }
-        if (creatorEngagementStep2Enabled !== undefined) {
-            settings.creatorEngagementStep2Enabled = Boolean(creatorEngagementStep2Enabled);
-        }
-        if (creatorEngagementStep2Hours !== undefined) {
-            const val = Number(creatorEngagementStep2Hours);
-            if (isNaN(val) || val < 1) return NextResponse.json({ error: 'Prazo da régua 2 deve ser de pelo menos 1 hora' }, { status: 400 });
-            settings.creatorEngagementStep2Hours = val;
-        }
 
         // Validações básicas
         if (platformFeePercentage !== undefined) {
@@ -382,6 +352,7 @@ export async function PUT(request: NextRequest) {
                 return NextResponse.json({ error: 'Preço por caractere padrão para não-assinantes inválido' }, { status: 400 });
             }
             settings.defaultPricePerCharNonSubscribers = val;
+            settings.conversationPricePerEquivalentCharCents = Math.round(val * 100);
         }
 
         if (audioPriceMultiplier !== undefined) {
@@ -390,6 +361,7 @@ export async function PUT(request: NextRequest) {
                 return NextResponse.json({ error: 'Multiplicador de preço do áudio inválido' }, { status: 400 });
             }
             settings.audioPriceMultiplier = val;
+            settings.audioEquivalentCharsPerSecond = Math.round(val);
         }
 
         if (pwaShowAgainIntervalDays !== undefined) {
@@ -440,17 +412,6 @@ export async function PUT(request: NextRequest) {
             settings.activeUnrechargedClientHoursThreshold = val;
         }
 
-        if (exploreSortingCriteria !== undefined) {
-            if (!Array.isArray(exploreSortingCriteria) || exploreSortingCriteria.length === 0) {
-                return NextResponse.json({ error: 'Critérios de ordenação do explorar inválidos' }, { status: 400 });
-            }
-            const allowed = ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'];
-            const isValid = exploreSortingCriteria.every((c: any) => allowed.includes(c));
-            if (!isValid) {
-                return NextResponse.json({ error: 'Um ou mais critérios de ordenação fornecidos são inválidos' }, { status: 400 });
-            }
-            settings.exploreSortingCriteria = exploreSortingCriteria;
-        }
 
         // Validação de consistência
         if (settings.minPublicPhotos > settings.maxPublicPhotos) {

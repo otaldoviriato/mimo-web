@@ -14,7 +14,6 @@ import { AudioRecorder, type AudioRecorderStatus } from '@/components/AudioRecor
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { MediaComposerSheet } from '@/components/MediaComposerSheet';
 import { AlertTriangle, ShieldCheck, Wallet } from 'lucide-react';
-import { QualificationProgressBar, type QualificationProgressInfo } from '@/components/QualificationProgressBar';
 
 interface Message {
     _id: string;
@@ -475,7 +474,6 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const [useNativeTransition, setUseNativeTransition] = useState(false);
     const [viewportStyle, setViewportStyle] = useState<React.CSSProperties>({});
     const [lowBalanceThresholdInCents, setLowBalanceThresholdInCents] = useState(1000);
-    const [qualificationProgress, setQualificationProgress] = useState<QualificationProgressInfo | null>(null);
     const chatRootRef = useRef<HTMLDivElement>(null);
 
     const isViewerOpen = fullscreenIndex !== null || fullscreenLockedMessage !== null;
@@ -591,18 +589,6 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         ? queryClient.getQueryData<CachedRoom[]>(QueryKeys.rooms(user.id))?.find((room) => room.participants.includes(otherUserId))
         : undefined;
     const receiverBalance = receiver?.balance ?? cachedRoom?.otherUser?.balance ?? 0;
-
-    useEffect(() => {
-        if (!otherUserId || !userData?.isProfessional) return;
-        fetch(`/api/chats/qualification-progress?otherUserId=${otherUserId}`)
-            .then((r) => r.json())
-            .then((data) => {
-                if (data && !data.error) {
-                    setQualificationProgress(data);
-                }
-            })
-            .catch(console.error);
-    }, [otherUserId, userData?.isProfessional]);
 
     const decrementLocalBalance = (amountInCents: number) => {
         if (amountInCents <= 0) return;
@@ -1142,25 +1128,6 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     return r;
                 });
             });
-        });
-
-        socket.on('qualification_progress_updated', (data: any) => {
-            if (!userData?.isProfessional) return;
-            if (data) {
-                setQualificationProgress(data);
-            }
-        });
-
-        socket.on('conversation_status_updated', (data: any) => {
-            if (!userData?.isProfessional) return;
-            if (data?.progress) {
-                setQualificationProgress(data.progress);
-            } else {
-                fetch(`/api/chats/qualification-progress?otherUserId=${otherUserId}`)
-                    .then((r) => r.json())
-                    .then((res) => res && !res.error && setQualificationProgress(res))
-                    .catch(console.error);
-            }
         });
 
         socket.on('professional_wallet_updated', () => {
@@ -2567,10 +2534,6 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                         </span>
                     </span>
                 </button>
-            )}
-
-            {userData?.isProfessional && (
-                <QualificationProgressBar progress={qualificationProgress} isProfessional={userData?.isProfessional} />
             )}
 
             {/* Messages Container Wrapper */}

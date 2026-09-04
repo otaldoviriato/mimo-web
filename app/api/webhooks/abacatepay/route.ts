@@ -4,6 +4,7 @@ import { Transaction } from '@/models/Transaction';
 import { User } from '@/models/User';
 import { sendPushNotification } from '@/lib/push';
 import { recordAcquisitionEvent } from '@/lib/acquisitionAnalytics';
+import { CampaignVisit } from '@/models/CampaignVisit';
 
 export async function POST(req: NextRequest) {
     try {
@@ -78,7 +79,18 @@ export async function POST(req: NextRequest) {
         const amountInCents = Math.round((transaction.amount || 0) * 100);
         const user = await User.findOneAndUpdate(
             { clerkId: transaction.userId },
-            { $inc: { balance: amountInCents } },
+            [{
+                $set: {
+                    balance: { $add: [{ $ifNull: ['$balance', 0] }, amountInCents] },
+                    customerCashAvailableCents: {
+                        $cond: [
+                            { $ne: [{ $type: '$marketplaceWalletMigratedAt' }, 'missing'] },
+                            { $add: [{ $ifNull: ['$customerCashAvailableCents', 0] }, amountInCents] },
+                            '$customerCashAvailableCents',
+                        ],
+                    },
+                },
+            }],
             { new: true }
         );
 
@@ -98,6 +110,12 @@ export async function POST(req: NextRequest) {
             occurredAt: transaction.timestamp || new Date(),
             metadata: { provider: 'abacatepay', transactionId: transaction._id.toString() },
         });
+
+        await CampaignVisit.findOneAndUpdate(
+            { userId: transaction.userId, firstRechargeAt: null },
+            { $set: { firstRechargeAt: transaction.timestamp || new Date(), firstRechargeAmountCents: amountInCents } },
+            { sort: { signupCompletedAt: -1, createdAt: -1 } },
+        );
 
         console.log(`[SUCESSO] Saldo creditado para ${user.username} via webhook.`);
 

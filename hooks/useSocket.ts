@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { socketService } from '@/services/socket';
 import type { Socket } from 'socket.io-client';
+import { useAuth } from '@clerk/nextjs';
 
 /**
  * Hook que garante que o socket está conectado e autenticado.
@@ -14,6 +15,7 @@ import type { Socket } from 'socket.io-client';
  * quando o socket é (re)criado, garantindo que consumidores recebam a ref correta.
  */
 export function useSocket(userId: string | undefined) {
+    const { getToken } = useAuth();
     // Contador que muda sempre que o socket é (re)criado — força re-render nos consumidores
     const [socketVersion, setSocketVersion] = useState(0);
     const [connected, setConnected] = useState(false);
@@ -29,7 +31,7 @@ export function useSocket(userId: string | undefined) {
         }
 
         // Conecta (idempotente — não reconecta se já tiver o mesmo userId)
-        socketService.connect(userId);
+        socketService.connect(userId, getToken);
 
         const s = socketService.socket;
         if (!s) return;
@@ -38,7 +40,6 @@ export function useSocket(userId: string | undefined) {
             console.log('[Socket] Conectado, id:', s.id);
             setConnected(true);
             // Re-autentica sempre que conecta/reconecta
-            socketService.authenticate(userId);
             // Incrementa a versão AQUI — só após conexão real — para que o ChatPage
             // chame joinRoom com o socket já pronto. Se incrementássemos antes, o
             // joinRoom seria emitido enquanto o socket ainda estava conectando (ex:
@@ -74,7 +75,7 @@ export function useSocket(userId: string | undefined) {
                 cleanupRef.current = null;
             }
         };
-    }, [userId]);
+    }, [getToken, userId]);
 
     return {
         // Retorna o socket diretamente do singleton — é sempre a ref mais atual

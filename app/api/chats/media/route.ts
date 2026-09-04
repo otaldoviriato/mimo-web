@@ -12,7 +12,7 @@ const CHAT_SERVER_URL = process.env.NEXT_PUBLIC_CHAT_SERVER_URL || 'http://local
 
 export async function POST(request: NextRequest) {
     try {
-        const { userId } = await auth();
+        const { userId, getToken } = await auth();
 
         if (!userId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -152,9 +152,10 @@ export async function POST(request: NextRequest) {
         }
 
         // Send to mimo-chat-server
+        const chatToken = await getToken();
         const chatServerResponse = await fetch(`${CHAT_SERVER_URL}/api/internal/send-locked-media`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${chatToken}` },
             body: JSON.stringify({
                 roomId,
                 senderId: userId,

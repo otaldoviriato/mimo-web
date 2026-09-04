@@ -98,9 +98,9 @@ export async function GET(request: NextRequest) {
             return acc;
         }, {});
 
-        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers newProfileDaysThreshold newClientHoursThreshold activeRechargedClientDaysThreshold activeUnrechargedClientHoursThreshold').lean() as any;
-        const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
-        const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
+        const settings = await AppSettings.findOne({ key: 'global' }).select('conversationPricePerEquivalentCharCents subscriberDiscountPercentage newProfileDaysThreshold newClientHoursThreshold activeRechargedClientDaysThreshold activeUnrechargedClientHoursThreshold').lean() as any;
+        const defaultNonSub = (settings?.conversationPricePerEquivalentCharCents ?? 5) / 100;
+        const defaultSub = defaultNonSub * (1 - (settings?.subscriberDiscountPercentage ?? 20) / 100);
         const thresholdDays = settings?.newProfileDaysThreshold ?? 15;
         const newClientHoursThreshold = settings?.newClientHoursThreshold ?? 24;
         const activeRechargedClientDaysThreshold = settings?.activeRechargedClientDaysThreshold ?? 30;
@@ -242,7 +242,7 @@ export async function GET(request: NextRequest) {
             };
         });
 
-        // Na busca, não filtramos por perfil qualificado/completo para permitir que qualquer usuário profissional aprovado correspondente seja encontrado.
+        // Na busca textual, qualquer perfil profissional aprovado pode ser encontrado.
         const filteredUsers = usersWithScores;
 
         // Ordenação manual: Por Tier (1 -> 2 -> 3), Perfis sem conversa aberta primeiro, exact username matches depois, depois por score

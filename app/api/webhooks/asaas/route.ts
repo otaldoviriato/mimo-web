@@ -7,6 +7,7 @@ import { Transaction } from '@/models/Transaction';
 import { User } from '@/models/User';
 import { WithdrawRequest } from '@/models/WithdrawRequest';
 import { recordAcquisitionEvent } from '@/lib/acquisitionAnalytics';
+import { CampaignVisit } from '@/models/CampaignVisit';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
 
@@ -216,9 +217,21 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ received: true, message: 'Already paid' });
         }
 
+        const rechargeAmountCents = Math.round((transaction.amount || 0) * 100);
         const user = await User.findOneAndUpdate(
             { clerkId: transaction.userId },
-            { $inc: { balance: Math.round((transaction.amount || 0) * 100) } },
+            [{
+                $set: {
+                    balance: { $add: [{ $ifNull: ['$balance', 0] }, rechargeAmountCents] },
+                    customerCashAvailableCents: {
+                        $cond: [
+                            { $ne: [{ $type: '$marketplaceWalletMigratedAt' }, 'missing'] },
+                            { $add: [{ $ifNull: ['$customerCashAvailableCents', 0] }, rechargeAmountCents] },
+                            '$customerCashAvailableCents',
+                        ],
+                    },
+                },
+            }],
             { new: true }
         );
 
@@ -234,10 +247,16 @@ export async function POST(request: NextRequest) {
             clientId: transaction.userId,
             professionalId: user.acquiredByProfessionalId,
             origin: user.acquisitionSource || 'unknown',
-            amountCents: Math.round((transaction.amount || 0) * 100),
+            amountCents: rechargeAmountCents,
             occurredAt: transaction.timestamp || new Date(),
             metadata: { provider: 'asaas', transactionId: transaction._id.toString() },
         });
+
+        await CampaignVisit.findOneAndUpdate(
+            { userId: transaction.userId, firstRechargeAt: null },
+            { $set: { firstRechargeAt: transaction.timestamp || new Date(), firstRechargeAmountCents: rechargeAmountCents } },
+            { sort: { signupCompletedAt: -1, createdAt: -1 } },
+        );
 
         const amountInReais = (transaction.amount || 0).toLocaleString('pt-BR', {
             style: 'currency',

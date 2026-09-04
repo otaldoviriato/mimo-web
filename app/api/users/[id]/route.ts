@@ -47,10 +47,10 @@ export async function GET(
             }
         }
 
-        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers audioPriceMultiplier').lean();
-        const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
-        const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
-        const audioPriceMultiplier = settings?.audioPriceMultiplier ?? 5;
+        const settings = await AppSettings.findOne({ key: 'global' }).select('conversationPricePerEquivalentCharCents subscriberDiscountPercentage audioEquivalentCharsPerSecond').lean();
+        const defaultNonSub = (settings?.conversationPricePerEquivalentCharCents ?? 5) / 100;
+        const defaultSub = defaultNonSub * (1 - (settings?.subscriberDiscountPercentage ?? 20) / 100);
+        const audioPriceMultiplier = settings?.audioEquivalentCharsPerSecond ?? 5;
         let effectiveSubscribers = user.subscribers || [];
 
         if (user.isProfessional) {

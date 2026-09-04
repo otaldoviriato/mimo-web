@@ -6,6 +6,7 @@ import { WithdrawRequest } from '@/models/WithdrawRequest';
 import { MicroTransaction } from '@/models/MicroTransaction';
 import { Transaction } from '@/models/Transaction';
 import { Subscription } from '@/models/Subscription';
+import { Message } from '@/models/Message';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,13 +58,10 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        // 1. Saldo disponível e saldo pendente (Marketplace V2)
+        // 1. Saldo disponível. Mensagens do marketplace são liquidadas imediatamente.
         const balance = user.isProfessional
             ? (user.professionalAvailableCents ?? user.balance ?? 0)
             : (user.balance ?? 0);
-        const pendingBalance = user.isProfessional
-            ? (user.professionalPendingCents ?? 0)
-            : 0;
 
         // 2. Saque pendente
         const pendingWithdrawal = await WithdrawRequest.findOne({
@@ -126,12 +124,12 @@ export async function GET(request: NextRequest) {
         });
 
         // Cálculo de estatísticas de mensagens pagas (Prioridade do aplicativo)
-        const messageStatsResult = await MicroTransaction.aggregate([
-            { $match: { userId: user.clerkId, type: 'credit', source: 'message' } },
+        const messageStatsResult = await Message.aggregate([
+            { $match: { receiverId: user.clerkId, receiverEarnings: { $gt: 0 } } },
             {
                 $group: {
                     _id: null,
-                    totalAmount: { $sum: '$amount' },
+                    totalAmount: { $sum: '$receiverEarnings' },
                     count: { $sum: 1 }
                 }
             }
@@ -140,6 +138,7 @@ export async function GET(request: NextRequest) {
         const totalMessageEarnings = messageStatsResult[0]?.totalAmount ?? 0;
         const totalMessagesCount = messageStatsResult[0]?.count ?? 0;
         const averageEarningPerMessage = totalMessagesCount > 0 ? Math.round(totalMessageEarnings / totalMessagesCount) : 0;
+        earningsByCategory.message = totalMessageEarnings;
 
         // Cálculo de estatísticas de mídias privadas desbloqueadas (Foco de monetização)
         const mediaStatsResult = await MicroTransaction.aggregate([
@@ -162,12 +161,12 @@ export async function GET(request: NextRequest) {
         startOfMonth.setHours(0, 0, 0, 0);
 
         // Estatísticas mensais de mensagens
-        const monthlyMessageStatsResult = await MicroTransaction.aggregate([
-            { $match: { userId: user.clerkId, type: 'credit', source: 'message', timestamp: { $gte: startOfMonth } } },
+        const monthlyMessageStatsResult = await Message.aggregate([
+            { $match: { receiverId: user.clerkId, receiverEarnings: { $gt: 0 }, timestamp: { $gte: startOfMonth } } },
             {
                 $group: {
                     _id: null,
-                    totalAmount: { $sum: '$amount' },
+                    totalAmount: { $sum: '$receiverEarnings' },
                     count: { $sum: 1 }
                 }
             }
@@ -298,7 +297,6 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json({
             balance,
-            pendingBalance,
             totalWithdrawn,
             pendingWithdrawal,
             projectedMonthlyRecurring,

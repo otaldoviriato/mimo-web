@@ -5,6 +5,8 @@ import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { Resend } from 'resend';
 import { grantWelcomeCredit } from '@/lib/creditCampaign';
+import { Campaign } from '@/models/Campaign';
+import { CampaignVisit } from '@/models/CampaignVisit';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
 const webhookSecret = process.env.CLERK_WEBHOOK_SECRET || '';
@@ -49,7 +51,7 @@ export async function POST(req: Request) {
 
     // Processar eventos: user.created, user.updated, user.deleted
     if (eventType === 'user.created') {
-        const { id, email_addresses, username, first_name, last_name, image_url } = evt.data;
+        const { id, email_addresses, username, first_name, last_name, image_url, unsafe_metadata } = evt.data;
 
         const generatedUsername = username || email_addresses[0]?.email_address.split('@')[0];
         const name = [first_name, last_name].filter(Boolean).join(' ') || generatedUsername;
@@ -83,6 +85,17 @@ export async function POST(req: Request) {
             },
             { upsert: true, new: true }
         );
+
+        const attribution = unsafe_metadata?.mimoCampaign;
+        if (attribution?.slug && attribution?.visitorId) {
+            const campaign = await Campaign.findOne({ slug: String(attribution.slug).toLowerCase() }).select('_id').lean();
+            if (campaign) {
+                await CampaignVisit.updateOne(
+                    { campaignId: campaign._id, visitorId: String(attribution.visitorId) },
+                    { $set: { userId: id, signupCompletedAt: new Date() } },
+                );
+            }
+        }
 
         console.log(`✅ Clerk Webhook: User created: ${generatedUsername} (Professional: ${isProfessional}, Status: ${professionalStatus})`);
 

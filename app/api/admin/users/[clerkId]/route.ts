@@ -60,8 +60,8 @@ export async function GET(
             'clerkId name username email photoUrl'
         ).lean();
 
-        const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
-        const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
+        const defaultNonSub = (settings?.conversationPricePerEquivalentCharCents ?? 5) / 100;
+        const defaultSub = defaultNonSub * (1 - (settings?.subscriberDiscountPercentage ?? 20) / 100);
 
         // Histórico financeiro de movimentações de crédito (depósitos, recargas e cupons)
         const clientFinancialTransactions = await Transaction.find({

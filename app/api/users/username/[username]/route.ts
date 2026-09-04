@@ -301,9 +301,9 @@ export async function GET(
             }
         }
 
-        const settings = await AppSettings.findOne({ key: 'global' }).select('defaultPricePerCharSubscribers defaultPricePerCharNonSubscribers').lean();
-        const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
-        const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
+        const settings = await AppSettings.findOne({ key: 'global' }).select('conversationPricePerEquivalentCharCents subscriberDiscountPercentage').lean();
+        const defaultNonSub = (settings?.conversationPricePerEquivalentCharCents ?? 5) / 100;
+        const defaultSub = defaultNonSub * (1 - (settings?.subscriberDiscountPercentage ?? 20) / 100);
         let effectiveSubscribers = user.subscribers || [];
 
         let activeConversationsCount = 0;

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User, type ICard } from '@/models/User';
-import { Room } from '@/models/Room';
 import { Message } from '@/models/Message';
 import { AppSettings } from '@/models/AppSettings';
 import { GalleryItem } from '@/models/GalleryItem';
@@ -12,7 +11,6 @@ import { MicroTransaction } from '@/models/MicroTransaction';
 import { Subscription } from '@/models/Subscription';
 import { grantWelcomeCredit } from '@/lib/creditCampaign';
 import { Resend } from 'resend';
-import { buildProfileRoleMetadata, getCreatorLandingProfileRole } from '@/lib/profileRole';
 import { subscriptionPriceBRLToCents } from '@/lib/subscriptionBilling';
 import { sendAdminAlert } from '@/lib/adminAlerts';
 import { sendNewProfessionalTeamAlert } from '@/lib/teamAlerts';
@@ -103,14 +101,12 @@ export async function GET(request: NextRequest) {
                 const cleanId = userId.startsWith('user_') ? userId.slice(5) : userId;
                 const username = clerkUser.username || `user_${cleanId.substring(Math.max(0, cleanId.length - 8))}`;
 
-                const roleMetadata = getCreatorLandingProfileRole(clerkUser.unsafeMetadata);
                 const pendingReferral = getReferralFromUnsafeMetadata(clerkUser.unsafeMetadata)
                     || getReferralFromRequestHeaders(request.headers);
-                const isProfessional = roleMetadata === 'professional';
                 const professionalStatus = null; 
 
-                const defaultSub = settings?.defaultPricePerCharSubscribers ?? 0.002;
-                const defaultNonSub = settings?.defaultPricePerCharNonSubscribers ?? 0.005;
+                const defaultNonSub = (settings?.conversationPricePerEquivalentCharCents ?? 5) / 100;
+                const defaultSub = defaultNonSub * (1 - (settings?.subscriberDiscountPercentage ?? 20) / 100);
 
                 const userFields: any = {
                     clerkId: userId,
@@ -122,7 +118,7 @@ export async function GET(request: NextRequest) {
                     chargePerCharSubscribers: defaultSub,
                     chargePerCharNonSubscribers: defaultNonSub,
                 };
-                userFields.isProfessional = isProfessional;
+                userFields.isProfessional = false;
 
                 user = await User.create(userFields);
                 user = await applyReferralAttribution(user, pendingReferral);
@@ -435,8 +431,8 @@ export async function GET(request: NextRequest) {
                 identityStatus: user.identityStatus || null,
                 subscriptionPrice: user.subscriptionPrice || 0,
                 isSubscriptionEnabled: user.isSubscriptionEnabled ?? false,
-                chargePerCharSubscribers: settings?.defaultPricePerCharSubscribers ?? 0.002,
-                chargePerCharNonSubscribers: settings?.defaultPricePerCharNonSubscribers ?? 0.005,
+                chargePerCharSubscribers: ((settings?.conversationPricePerEquivalentCharCents ?? 5) / 100) * (1 - (settings?.subscriberDiscountPercentage ?? 20) / 100),
+                chargePerCharNonSubscribers: (settings?.conversationPricePerEquivalentCharCents ?? 5) / 100,
                 subscribers: activeSubscriberIds,
                 pixKey: user.taxId || user.pixKey,
                 savedCards: (user.savedCards || []).map((card: ICard) => ({
@@ -492,7 +488,7 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, completeProfile, subscriptionPrice, isSubscriptionEnabled, bio, emailNotificationsEnabled, newUserNotificationsEnabled, hideFromExplore, subscriberDiscountPercentage, birthDate, city, state, isAvailable } = body;
+        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, completeProfile, subscriptionPrice, isSubscriptionEnabled, bio, emailNotificationsEnabled, newUserNotificationsEnabled, hideFromExplore, birthDate, city, state, isAvailable } = body;
 
         await connectToDatabase();
 
@@ -516,11 +512,6 @@ export async function PATCH(request: NextRequest) {
             );
         }
 
-        const isProfessionalChanging =
-            isProfessional !== undefined &&
-            currentUser?.isProfessional !== undefined &&
-            isProfessional !== currentUser.isProfessional;
-
         const updateData: any = {};
         if (username !== undefined) {
             updateData.username = typeof username === 'string'
@@ -533,9 +524,6 @@ export async function PATCH(request: NextRequest) {
         if (phone !== undefined) updateData.phone = phone;
         if (taxId !== undefined) updateData.taxId = taxId;
         
-        if (isProfessional !== undefined) {
-            updateData.isProfessional = isProfessional;
-        }
         if (isAvailable !== undefined) {
             updateData.isAvailable = Boolean(isAvailable);
         }
@@ -545,7 +533,7 @@ export async function PATCH(request: NextRequest) {
         const nextName = name !== undefined ? name.trim() : currentUser?.name;
         const nextUsername = username !== undefined ? username : currentUser?.username;
         const nextTaxId = taxId !== undefined ? taxId : currentUser?.taxId;
-        const nextIsProfessional = isProfessional !== undefined ? isProfessional : currentUser?.isProfessional;
+        const nextIsProfessional = currentUser?.isProfessional ?? false;
 
         updateData.onboardingStep = calculateOnboardingStep({
             photoUrl: nextPhoto,
@@ -582,14 +570,7 @@ export async function PATCH(request: NextRequest) {
             }
         }
 
-        if (subscriberDiscountPercentage !== undefined) {
-            const discountNum = Number(subscriberDiscountPercentage);
-            if (isNaN(discountNum) || discountNum < 20 || discountNum > 80) {
-                return NextResponse.json({ error: 'O desconto da assinatura deve ser entre 20% e 80%' }, { status: 400 });
-            }
-            updateData.subscriberDiscountPercentage = discountNum;
-        }
-        const isProf = isProfessional !== undefined ? isProfessional : (currentUser?.isProfessional ?? false);
+        const isProf = currentUser?.isProfessional ?? false;
 
         if (bio !== undefined) {
             if (bio && !isProf) {
@@ -707,35 +688,6 @@ export async function PATCH(request: NextRequest) {
             }).catch(err => console.error('[AdminAlert] Erro ao disparar alerta de nova profissional:', err));
         }
 
-        // Se isProfessional mudou, deleta todas as conversas do usuário e atualiza metadados
-        if (isProfessionalChanging) {
-            const rooms = await Room.find({ participants: userId }).select('_id').lean();
-            const roomIds = rooms.map((r: any) => r._id);
-
-            await Promise.all([
-                Room.deleteMany({ participants: userId }),
-                Message.deleteMany({ roomId: { $in: roomIds } }),
-            ]);
-
-            // Sincroniza metadados no Clerk
-            try {
-                const client = await clerkClient();
-                await client.users.updateUserMetadata(userId, {
-                    unsafeMetadata: buildProfileRoleMetadata(isProfessional ? 'professional' : 'client')
-                });
-                console.log(`[PATCH /api/users/me] Clerk unsafeMetadata atualizado para role "${isProfessional ? 'professional' : 'client'}" para o usuário ${userId}`);
-            } catch (clerkErr) {
-                console.error('[PATCH /api/users/me] Erro ao atualizar metadados no Clerk:', clerkErr);
-            }
-
-            // Se mudou para profissional, define professionalStatus = null e salva
-            if (isProfessional) {
-                user.professionalStatus = null;
-                await user.save();
-                // Envio de e-mail de notificação para o admin desativado conforme solicitado
-            }
-        }
-
         let updatedActiveSubscriberIds = user.subscribers || [];
         if (user.isProfessional) {
             const activeSubscriptions = await Subscription.find({
@@ -765,8 +717,8 @@ export async function PATCH(request: NextRequest) {
                 professionalStatus: user.professionalStatus,
                 subscriptionPrice: user.subscriptionPrice || 0,
                 isSubscriptionEnabled: user.isSubscriptionEnabled ?? false,
-                chargePerCharSubscribers: settings?.defaultPricePerCharSubscribers ?? 0.002,
-                chargePerCharNonSubscribers: settings?.defaultPricePerCharNonSubscribers ?? 0.005,
+                chargePerCharSubscribers: ((settings?.conversationPricePerEquivalentCharCents ?? 5) / 100) * (1 - (settings?.subscriberDiscountPercentage ?? 20) / 100),
+                chargePerCharNonSubscribers: (settings?.conversationPricePerEquivalentCharCents ?? 5) / 100,
                 subscribers: updatedActiveSubscriberIds,
                 pixKey: user.taxId || user.pixKey,
                 savedCards: (user.savedCards || []).map((card: ICard) => ({

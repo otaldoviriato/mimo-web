@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { slug, visitorId, clickId, site, zone, creative, variation, utm } = body;
+        const { slug, visitorId, clickId, site, zone, creative, variation, utm, event } = body;
 
         if (!slug || !visitorId) {
             return NextResponse.json({ error: 'slug e visitorId são obrigatórios' }, { status: 400 });
@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
                     utm: utm || {},
                     targetProfessionalId: campaign.targetProfessionalId || null,
                 },
+                ...(event === 'cta_clicked' ? { $set: { ctaClickedAt: new Date() } } : {}),
             },
             { upsert: true, new: true },
         );

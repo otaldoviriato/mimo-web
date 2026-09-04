@@ -9,7 +9,7 @@ export async function POST(
     { params }: { params: Promise<{ messageId: string }> }
 ) {
     try {
-        const { userId } = await auth();
+        const { userId, getToken } = await auth();
 
         if (!userId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -25,9 +25,10 @@ export async function POST(
         }
 
         // Call internal chat server to handle transactions and unlock logic
+        const chatToken = await getToken();
         const chatServerResponse = await fetch(`${CHAT_SERVER_URL}/api/internal/unlock-image`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${chatToken}` },
             body: JSON.stringify({
                 messageId,
                 userId,
