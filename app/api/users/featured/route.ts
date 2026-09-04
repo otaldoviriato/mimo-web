@@ -339,6 +339,7 @@ export async function GET(request: NextRequest) {
                 publicPhotosCount: photosCount,
                 isOnline: isOnlineNow,
                 isAvailable: u.isAvailable !== false,
+                lastSeen: u.lastSeen ?? null,
                 birthDate: u.birthDate ?? null,
                 city: u.city ?? '',
                 state: u.state ?? '',

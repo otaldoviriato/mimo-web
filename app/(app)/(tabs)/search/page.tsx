@@ -24,6 +24,31 @@ const calculateAge = (birthDateString?: string | Date) => {
     }
 };
 
+const formatLastSeen = (lastSeen?: string | Date | number): string => {
+    if (!lastSeen) return '';
+    try {
+        const date = new Date(lastSeen);
+        if (isNaN(date.getTime())) return '';
+        const now = Date.now();
+        const diffMinutes = Math.floor((now - date.getTime()) / (1000 * 60));
+
+        if (diffMinutes < 1) return 'Entrou agora há pouco';
+        if (diffMinutes < 60) return `Entrou há ${diffMinutes} min`;
+
+        const diffHours = Math.floor(diffMinutes / 60);
+        if (diffHours < 24) {
+            return `Entrou há ${diffHours} ${diffHours === 1 ? 'hora' : 'horas'}`;
+        }
+
+        const diffDays = Math.floor(diffHours / 24);
+        if (diffDays === 1) return 'Entrou ontem';
+        if (diffDays < 7) return `Entrou há ${diffDays} dias`;
+        return 'Entrou recentemente';
+    } catch {
+        return '';
+    }
+};
+
 export default function SearchPage() {
     const router = useRouter();
     const { data: userData } = useMyProfile();
@@ -105,7 +130,7 @@ export default function SearchPage() {
         return () => observer.disconnect();
     }, [fetchNextPage, hasNextPage, isFetchingNextPage, username]);
 
-    const handleExploreProfile = (user: any) => {
+    const handleOpenChat = (user: any) => {
         const isDirectSearch = Boolean(username.trim());
         if (!isDirectSearch) {
             trackAcquisitionEvent({
@@ -113,7 +138,8 @@ export default function SearchPage() {
                 professionalId: user.clerkId,
             });
         }
-        router.push(`/${user.username}?source=${isDirectSearch ? 'search' : 'explore'}`);
+        // Ao clicar, direciona imediatamente para a sala de conversa com a criadora
+        router.push(`/chat/${user.clerkId}`);
     };
 
     useEffect(() => {
@@ -147,7 +173,7 @@ export default function SearchPage() {
         };
     }, [username]);
 
-    // Renderiza Card da Criadora em Grid 3:4 com foto limpa, foco visual e status de disponibilidade
+    // Renderiza Card da Criadora em Grid 3:4 com foco total na foto, nome, idade e visto por último
     const renderCreatorCard = (user: any) => {
         const age = calculateAge(user.birthDate);
         const displayName = age !== null 
@@ -155,12 +181,13 @@ export default function SearchPage() {
             : (user.name || `@${user.username}`);
         const mainPhoto = user.photoUrl || (user.publicPhotos && user.publicPhotos[0]) || '/Logo.svg';
         const isAvailable = user.isAvailable !== false;
+        const lastSeenText = formatLastSeen(user.lastSeen || user.lastActiveTime);
 
         return (
             <div
                 key={user.clerkId}
                 data-explore-professional-id={!username.trim() ? user.clerkId : undefined}
-                onClick={() => handleExploreProfile(user)}
+                onClick={() => handleOpenChat(user)}
                 className="relative aspect-[3/4] rounded-2xl overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 cursor-pointer active:scale-[0.98] border border-slate-200/80 bg-slate-100 group"
             >
                 {/* Imagem de fundo */}
@@ -184,11 +211,16 @@ export default function SearchPage() {
                     </div>
                 )}
 
-                {/* Conteúdo inferior com Nome e Idade */}
+                {/* Conteúdo inferior com Nome, Idade e Visto por último */}
                 <div className="absolute bottom-0 inset-x-0 p-3 text-white flex flex-col gap-0.5 z-10">
                     <h3 className="text-sm sm:text-base font-black tracking-tight leading-tight truncate drop-shadow-sm">
                         {displayName}
                     </h3>
+                    {lastSeenText && (
+                        <p className="text-[11px] text-slate-300 font-medium tracking-tight drop-shadow-xs">
+                            {lastSeenText}
+                        </p>
+                    )}
                 </div>
             </div>
         );
