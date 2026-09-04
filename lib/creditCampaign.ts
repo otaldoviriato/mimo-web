@@ -32,7 +32,7 @@ export async function grantWelcomeCredit(
     }
 
     // 2. Valida o tipo do usuário (somente cliente pode receber)
-    const user = await User.findOne({ clerkId: userId }).select('isProfessional onboardingStep email phone taxId name username photoUrl balance promotionalBalance');
+    const user = await User.findOne({ clerkId: userId }).select('isProfessional onboardingStep email phone taxId birthDate name username photoUrl balance promotionalBalance');
     if (!user) {
         return { success: false, reason: 'user_not_found' };
     }

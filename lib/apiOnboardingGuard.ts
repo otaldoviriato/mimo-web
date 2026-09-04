@@ -7,7 +7,7 @@ export async function requireCompletedOnboarding(userId: string) {
     await connectToDatabase();
 
     const user = await User.findOne({ clerkId: userId })
-        .select('clerkId isProfessional taxId name username photoUrl onboardingStep')
+        .select('clerkId isProfessional taxId birthDate name username photoUrl onboardingStep')
         .lean();
 
     if (!user || !isOnboardingCompleted(user)) {
