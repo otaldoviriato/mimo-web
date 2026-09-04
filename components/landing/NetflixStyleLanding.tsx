@@ -45,7 +45,7 @@ const COL_4: ProfileItem[] = [
     { name: 'Vanessa Lima, 23', image: 'https://images.unsplash.com/photo-1524250502761-1ac6f2e30d43?auto=format&fit=crop&w=400&q=80', badge: 'Online', badgeType: 'online' },
     { name: 'Isabela Costa, 26', image: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=400&q=80', badge: 'Ativa hoje', badgeType: 'today' },
     { name: 'Nicole Rocha, 20', image: 'https://images.unsplash.com/photo-1519699047748-de8e457a634e?auto=format&fit=crop&w=400&q=80', badge: 'Ativa hoje', badgeType: 'today' },
-    { name: 'Bruna Alves, 24', image: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80', badge: 'Há 1d', badgeType: 'recent' },
+    { name: 'Bruna Alves, 24', image: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80', badge: 'Há 1d', badgeType: 'recent' },
 ];
 
 const COL_5: ProfileItem[] = [
