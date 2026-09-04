@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
         const client = user.isProfessional ? otherUser : user;
         const professional = user.isProfessional ? user : otherUser;
 
-        if (!professional.isProfessional || client.isProfessional) {
+        if (!user.isProfessional || !professional.isProfessional || client.isProfessional) {
             return NextResponse.json({
                 status: 'none',
                 progressPercent: 0,

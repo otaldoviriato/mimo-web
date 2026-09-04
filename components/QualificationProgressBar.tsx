@@ -62,7 +62,7 @@ export function QualificationProgressBar({ progress, isProfessional }: Props) {
         return () => clearInterval(interval);
     }, [targetDate]);
 
-    if (!progress || progress.status === 'none') {
+    if (!isProfessional || !progress || progress.status === 'none') {
         return null;
     }
 

@@ -478,18 +478,6 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const [qualificationProgress, setQualificationProgress] = useState<QualificationProgressInfo | null>(null);
     const chatRootRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        if (!otherUserId) return;
-        fetch(`/api/chats/qualification-progress?otherUserId=${otherUserId}`)
-            .then((r) => r.json())
-            .then((data) => {
-                if (data && !data.error) {
-                    setQualificationProgress(data);
-                }
-            })
-            .catch(console.error);
-    }, [otherUserId]);
-
     const isViewerOpen = fullscreenIndex !== null || fullscreenLockedMessage !== null;
 
     useEffect(() => {
@@ -603,6 +591,18 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         ? queryClient.getQueryData<CachedRoom[]>(QueryKeys.rooms(user.id))?.find((room) => room.participants.includes(otherUserId))
         : undefined;
     const receiverBalance = receiver?.balance ?? cachedRoom?.otherUser?.balance ?? 0;
+
+    useEffect(() => {
+        if (!otherUserId || !userData?.isProfessional) return;
+        fetch(`/api/chats/qualification-progress?otherUserId=${otherUserId}`)
+            .then((r) => r.json())
+            .then((data) => {
+                if (data && !data.error) {
+                    setQualificationProgress(data);
+                }
+            })
+            .catch(console.error);
+    }, [otherUserId, userData?.isProfessional]);
 
     const decrementLocalBalance = (amountInCents: number) => {
         if (amountInCents <= 0) return;
@@ -1145,12 +1145,14 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         });
 
         socket.on('qualification_progress_updated', (data: any) => {
+            if (!userData?.isProfessional) return;
             if (data) {
                 setQualificationProgress(data);
             }
         });
 
         socket.on('conversation_status_updated', (data: any) => {
+            if (!userData?.isProfessional) return;
             if (data?.progress) {
                 setQualificationProgress(data.progress);
             } else {
@@ -2567,7 +2569,9 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 </button>
             )}
 
-            <QualificationProgressBar progress={qualificationProgress} isProfessional={userData?.isProfessional} />
+            {userData?.isProfessional && (
+                <QualificationProgressBar progress={qualificationProgress} isProfessional={userData?.isProfessional} />
+            )}
 
             {/* Messages Container Wrapper */}
             <div className="flex-1 relative overflow-hidden flex flex-col">
