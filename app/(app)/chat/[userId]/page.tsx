@@ -13,7 +13,7 @@ import { Drawer } from 'vaul';
 import { AudioRecorder, type AudioRecorderStatus } from '@/components/AudioRecorder';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { MediaComposerSheet } from '@/components/MediaComposerSheet';
-import { AlertTriangle, ShieldCheck, Wallet } from 'lucide-react';
+import { AlertTriangle, ShieldCheck, Wallet, Clock, MessageCircle } from 'lucide-react';
 
 interface Message {
     _id: string;
@@ -2542,11 +2542,53 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 <div 
                     ref={messagesContainerRef} 
                     onScroll={handleScroll} 
-                    className={`flex-1 overflow-y-auto overflow-x-hidden flex flex-col ${loadingMessages ? '' : 'flex-col-reverse'} gap-1`}
+                    className={`flex-1 overflow-y-auto overflow-x-hidden flex flex-col ${
+                        loadingMessages 
+                            ? '' 
+                            : messages.length === 0 
+                                ? 'justify-center items-center' 
+                                : 'flex-col-reverse'
+                    } gap-1`}
                     style={{ overscrollBehaviorY: 'contain' }}
                 >
                 {loadingMessages ? (
                     <MessageSkeleton />
+                ) : messages.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in duration-300 w-full max-w-sm">
+                        <div className="relative mb-3">
+                            <Avatar uri={receiver?.photoUrl} size={84} />
+                            {receiver?.isOnline && (
+                                <span className="absolute bottom-0.5 right-0.5 block h-4 w-4 rounded-full bg-emerald-400 ring-2 ring-white shadow-sm" />
+                            )}
+                        </div>
+                        <h3 className="text-base font-bold text-slate-800 tracking-tight">
+                            {receiver?.name || (receiver?.username ? `@${receiver.username}` : 'Criadora Mimo')}
+                        </h3>
+                        {receiver?.username && (
+                            <p className="text-xs text-slate-400 font-medium mb-4">@{receiver.username}</p>
+                        )}
+
+                        {receiver?.isProfessional && (
+                            <div className="w-full bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-xs flex flex-col gap-2.5 text-left mb-4">
+                                <div className="flex items-center gap-2.5 text-xs font-semibold text-slate-800">
+                                    <Clock className="w-4 h-4 text-purple-600 shrink-0" />
+                                    <span>
+                                        {receiver.avgResponseTimeMinutes && receiver.avgResponseTimeMinutes <= 60
+                                            ? 'Costuma responder em menos de 1h'
+                                            : 'Geralmente responde no mesmo dia'}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2.5 text-xs font-semibold text-slate-800">
+                                    <MessageCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                                    <span>Responde a quase todas as mensagens</span>
+                                </div>
+                            </div>
+                        )}
+
+                        <p className="text-xs text-slate-400 max-w-[240px] leading-relaxed">
+                            Envie uma mensagem para iniciar a conversa.
+                        </p>
+                    </div>
                 ) : (
                     <>
                         <div ref={messagesEndRef} />

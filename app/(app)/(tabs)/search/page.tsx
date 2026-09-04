@@ -24,10 +24,21 @@ const calculateAge = (birthDateString?: string | Date) => {
     }
 };
 
+type ActivityBadgeType = 'online' | 'today' | 'recent' | 'away';
+
+interface ActivityStatus {
+    type: ActivityBadgeType;
+    label: string;
+}
+
 const formatOnlineStatus = (
     lastSeen?: string | Date | number,
     isOnline?: boolean
-): { isOnline: boolean; label: string } => {
+): ActivityStatus => {
+    if (isOnline) {
+        return { type: 'online', label: 'Online' };
+    }
+
     const now = Date.now();
     let timestamp = 0;
 
@@ -36,30 +47,22 @@ const formatOnlineStatus = (
         if (!isNaN(d)) timestamp = d;
     }
 
-    if (isOnline) {
-        return { isOnline: true, label: 'Online' };
-    }
-
     if (!timestamp) {
-        return { isOnline: false, label: '' };
+        return { type: 'away', label: 'Ausente' };
     }
 
-    const diffMinutes = Math.floor((now - timestamp) / (1000 * 60));
+    const diffHours = Math.floor((now - timestamp) / (1000 * 60 * 60));
 
-    if (diffMinutes < 60) {
-        return { isOnline: false, label: `Online há ${diffMinutes} min` };
-    }
-
-    const diffHours = Math.floor(diffMinutes / 60);
     if (diffHours < 24) {
-        return { isOnline: false, label: `Online há ${diffHours}h` };
+        return { type: 'today', label: 'Ativa hoje' };
     }
 
     const diffDays = Math.floor(diffHours / 24);
-    if (diffDays === 1) {
-        return { isOnline: false, label: 'Online ontem' };
+    if (diffDays <= 7) {
+        return { type: 'recent', label: `Há ${diffDays}d` };
     }
-    return { isOnline: false, label: `Online há ${diffDays} dias` };
+
+    return { type: 'away', label: 'Ausente' };
 };
 
 export default function SearchPage() {
@@ -212,8 +215,8 @@ export default function SearchPage() {
                 {/* Overlay gradiente escuro suave na parte inferior */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
 
-                {/* Badge Online (topo direito) - Apenas se estiver Online: Fundo branco sólido e texto verde */}
-                {status.isOnline && (
+                {/* Badge de Atividade (topo direito) */}
+                {status.type === 'online' && (
                     <div className="absolute top-2.5 right-2.5 bg-white text-emerald-600 border border-emerald-100 text-[10.5px] font-bold px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1.5 z-10">
                         <span className="relative flex h-1.5 w-1.5 shrink-0">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -223,16 +226,30 @@ export default function SearchPage() {
                     </div>
                 )}
 
-                {/* Conteúdo inferior com Nome, Idade e Recência de acesso */}
+                {status.type === 'today' && (
+                    <div className="absolute top-2.5 right-2.5 bg-white/95 text-purple-700 border border-purple-100 text-[10.5px] font-bold px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1.5 z-10 backdrop-blur-xs">
+                        <span className="h-1.5 w-1.5 rounded-full bg-purple-500 shrink-0"></span>
+                        <span className="leading-none whitespace-nowrap">Ativa hoje</span>
+                    </div>
+                )}
+
+                {status.type === 'recent' && (
+                    <div className="absolute top-2.5 right-2.5 bg-black/45 text-white/90 border border-white/10 text-[10px] font-semibold px-2 py-0.5 rounded-full shadow-xs flex items-center gap-1 z-10 backdrop-blur-sm">
+                        <span className="leading-none whitespace-nowrap">{status.label}</span>
+                    </div>
+                )}
+
+                {status.type === 'away' && (
+                    <div className="absolute top-2.5 right-2.5 bg-black/35 text-white/60 border border-white/5 text-[9.5px] font-medium px-2 py-0.5 rounded-full shadow-xs flex items-center gap-1 z-10 backdrop-blur-sm">
+                        <span className="leading-none whitespace-nowrap">Ausente</span>
+                    </div>
+                )}
+
+                {/* Conteúdo inferior com Nome e Idade */}
                 <div className="absolute bottom-0 inset-x-0 p-3 text-white flex flex-col gap-0.5 z-10">
                     <h3 className="text-sm sm:text-base font-black tracking-tight leading-tight truncate drop-shadow-sm">
                         {displayName}
                     </h3>
-                    {!status.isOnline && status.label && (
-                        <p className="text-[11px] sm:text-xs text-white/90 font-medium tracking-wide drop-shadow-sm truncate">
-                            {status.label}
-                        </p>
-                    )}
                 </div>
             </div>
         );
