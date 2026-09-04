@@ -97,11 +97,11 @@ export function NetflixStyleLanding({
         <div className="relative min-h-screen w-full bg-slate-50 text-slate-900 flex flex-col justify-between overflow-hidden selection:bg-purple-600 selection:text-white">
             {/* ─── PAREDE DE PERFIS NO FUNDO (ESTILO NETFLIX / EXPLORAR MIMO) ─── */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4 p-3 sm:p-5 opacity-40 sm:opacity-50 scale-105 transform -translate-y-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4 p-3 sm:p-5 opacity-80 sm:opacity-85 scale-105 transform -translate-y-2">
                     {BACKGROUND_PROFILES.map((profile, i) => (
                         <div
                             key={i}
-                            className="relative aspect-[3/4] rounded-2xl overflow-hidden shadow-xs border border-slate-200/80 bg-slate-100"
+                            className="relative aspect-[3/4] rounded-2xl overflow-hidden shadow-sm border border-slate-200 bg-slate-100"
                         >
                             {/* Imagem do Card */}
                             <Image
@@ -146,19 +146,19 @@ export function NetflixStyleLanding({
                     ))}
                 </div>
 
-                {/* ─── OVERLAY SUAVE CLARO (Mantém o tema claro idêntico ao app) ─── */}
-                <div className="absolute inset-0 bg-gradient-to-b from-white/70 via-white/85 to-slate-50/95 backdrop-blur-[2px]" />
+                {/* ─── OVERLAY SUAVE DIRECIONAL (Lado esquerdo translúcido para leitura, lado direito aberto para ver as fotos) ─── */}
+                <div className="absolute inset-0 bg-gradient-to-b sm:bg-gradient-to-r from-white/95 via-white/80 to-white/30 backdrop-blur-[1px]" />
             </div>
 
             {/* ─── HEADER MINIMALISTA ─── */}
-            <header className="relative z-20 w-full max-w-6xl mx-auto px-5 sm:px-8 py-4 flex items-center justify-between">
+            <header className="relative z-20 w-full max-w-7xl mx-auto px-6 sm:px-12 lg:px-16 py-5 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <Link href="/" className="flex items-center">
                         <Image
                             src="/Logo.svg"
                             alt="MimoChat"
-                            width={130}
-                            height={34}
+                            width={135}
+                            height={36}
                             priority
                             className="h-8 w-auto object-contain"
                         />
@@ -168,16 +168,16 @@ export function NetflixStyleLanding({
                 <Link
                     href={destinationUrl}
                     {...ctaProps}
-                    className="h-9 px-5 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-sm shadow-purple-600/20 flex items-center gap-1.5"
+                    className="h-10 px-5 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-sm shadow-purple-600/20 flex items-center gap-1.5"
                 >
                     <span>Entrar</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
             </header>
 
-            {/* ─── CONTEÚDO CENTRAL (ESTILO NETFLIX: DIRETO, IMERSIVO E SEM TEXTÃO) ─── */}
-            <main className="relative z-20 flex-1 flex flex-col items-center justify-center px-4 sm:px-6 text-center my-auto py-12">
-                <div className="max-w-2xl mx-auto space-y-6">
+            {/* ─── CONTEÚDO ALINHADO À ESQUERDA (IMPACTO DIRETO) ─── */}
+            <main className="relative z-20 flex-1 flex flex-col justify-center px-6 sm:px-12 lg:px-16 max-w-7xl mx-auto w-full my-auto py-12">
+                <div className="max-w-xl text-left space-y-6">
                     {/* Badge Sutil de Autenticidade */}
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-100/90 border border-purple-200 text-purple-700 text-xs font-bold uppercase tracking-wider shadow-xs">
                         <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
@@ -185,32 +185,32 @@ export function NetflixStyleLanding({
                     </div>
 
                     {/* Título Principal Marcante */}
-                    <div className="space-y-1">
-                        <h1 className="text-4xl sm:text-6xl font-black text-slate-900 tracking-tight leading-[1.08]">
+                    <div className="space-y-1 text-left">
+                        <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black text-slate-900 tracking-tight leading-[1.08]">
                             Conversas Privadas.
                         </h1>
-                        <h2 className="text-4xl sm:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-600 tracking-tight leading-[1.08]">
+                        <h2 className="text-4xl sm:text-6xl lg:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-600 tracking-tight leading-[1.08]">
                             Mulheres Reais.
                         </h2>
                     </div>
 
                     {/* Subtítulo de 1 Linha */}
-                    <p className="text-sm sm:text-lg text-slate-600 max-w-md mx-auto leading-relaxed font-medium">
+                    <p className="text-base sm:text-xl text-slate-600 leading-relaxed font-medium">
                         Fotos exclusivas e mensagens diretas no privado. Sem mensalidade fixa.
                     </p>
 
-                    {/* Botão de Chamada para Ação Único e Poderoso */}
-                    <div className="pt-3 max-w-sm mx-auto space-y-3">
+                    {/* Botão de Chamada para Ação Alinhado à Esquerda */}
+                    <div className="pt-2 max-w-sm space-y-2.5 text-left">
                         <Link
                             href={destinationUrl}
                             {...ctaProps}
-                            className="w-full h-14 sm:h-16 px-8 rounded-2xl bg-purple-600 hover:bg-purple-700 active:scale-[0.98] text-white font-black text-base sm:text-lg uppercase tracking-wider shadow-xl shadow-purple-600/30 transition-all flex items-center justify-center gap-2.5 group"
+                            className="w-full sm:w-auto h-14 sm:h-16 px-10 rounded-2xl bg-purple-600 hover:bg-purple-700 active:scale-[0.98] text-white font-black text-base sm:text-lg uppercase tracking-wider shadow-xl shadow-purple-600/30 transition-all flex items-center justify-center gap-2.5 group"
                         >
                             <span>Ver Perfis</span>
                             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                         </Link>
 
-                        <p className="text-xs text-slate-600 font-semibold">
+                        <p className="text-xs text-slate-500 font-semibold">
                             100% discreto • Acesso para maiores de 18 anos
                         </p>
                     </div>
@@ -218,8 +218,8 @@ export function NetflixStyleLanding({
             </main>
 
             {/* ─── RODAPÉ MINIMALISTA ─── */}
-            <footer className="relative z-20 w-full py-4 px-6 text-center text-xs text-slate-600 border-t border-slate-200/60 bg-white/40 backdrop-blur-xs">
-                <div className="flex items-center justify-center gap-4 font-medium">
+            <footer className="relative z-20 w-full py-4 px-6 sm:px-12 lg:px-16 text-xs text-slate-500 border-t border-slate-200/60 bg-white/40 backdrop-blur-xs">
+                <div className="max-w-7xl mx-auto flex items-center justify-start gap-4 font-medium">
                     <Link href="/termos-de-uso" className="hover:text-slate-900 transition-colors">Termos</Link>
                     <span>•</span>
                     <Link href="/politica-de-privacidade" className="hover:text-slate-900 transition-colors">Privacidade</Link>
