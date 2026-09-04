@@ -47,20 +47,25 @@ const formatOnlineStatus = (
 
     const diffMinutes = Math.floor((now - timestamp) / (1000 * 60));
 
+    // Menos de 1 hora -> ex: "Há 15 min"
     if (diffMinutes < 60) {
-        return { isOnline: false, label: `Online há ${diffMinutes} min` };
+        return { isOnline: false, label: `Há ${diffMinutes} min` };
     }
 
     const diffHours = Math.floor(diffMinutes / 60);
-    if (diffHours < 24) {
-        return { isOnline: false, label: `Online há ${diffHours} ${diffHours === 1 ? 'hora' : 'horas'}` };
+
+    // Até 12 horas -> ex: "Há 3h"
+    if (diffHours <= 12) {
+        return { isOnline: false, label: `Há ${diffHours}h` };
     }
 
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays === 1) {
-        return { isOnline: false, label: 'Online ontem' };
+    // Entre 12h e 24h -> "Ativa hoje" (positivo, sem parecer quase offline)
+    if (diffHours < 24) {
+        return { isOnline: false, label: 'Ativa hoje' };
     }
-    return { isOnline: false, label: `Online há ${diffDays} dias` };
+
+    // Acima de 24h: não polui a foto com etiqueta negativa de ausência
+    return { isOnline: false, label: '' };
 };
 
 export default function SearchPage() {
@@ -213,20 +218,20 @@ export default function SearchPage() {
                 {/* Overlay gradiente escuro suave na parte inferior */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
 
-                {/* Badge Online / Recência (topo direito) */}
+                {/* Badge Online / Recência (topo direito) - Tema claro da paleta Mimo */}
                 {status.label && (
-                    <div className={`absolute top-2.5 right-2.5 backdrop-blur-md text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1.5 z-10 border ${
+                    <div className={`absolute top-2.5 right-2.5 backdrop-blur-md text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-xs flex items-center gap-1.5 z-10 border transition-all ${
                         status.isOnline
-                            ? 'bg-black/50 text-emerald-400 border-emerald-500/25'
-                            : 'bg-black/55 text-slate-200 border-white/10'
+                            ? 'bg-white/95 text-emerald-700 border-emerald-300/60 shadow-emerald-500/10'
+                            : 'bg-white/90 text-slate-700 border-slate-200/80 shadow-black/5'
                     }`}>
                         <span className="relative flex h-1.5 w-1.5">
                             {status.isOnline && (
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                             )}
-                            <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${status.isOnline ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+                            <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${status.isOnline ? 'bg-emerald-500' : 'bg-purple-500'}`}></span>
                         </span>
-                        <span>{status.label}</span>
+                        <span className="leading-none">{status.label}</span>
                     </div>
                 )}
 
