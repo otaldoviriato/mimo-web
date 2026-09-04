@@ -1,5 +1,5 @@
 import React from 'react';
-import { LandingView } from '@/components/landing/LandingView';
+import { SimulationLanding } from '@/components/landing/SimulationLanding';
 import { CampaignVisitTracker } from '@/components/CampaignVisitTracker';
 
 interface DescubraPageProps {
@@ -36,7 +36,7 @@ export default async function DescubraPage({ searchParams }: DescubraPageProps) 
                 variation={variation}
                 utm={utm}
             />
-            <LandingView
+            <SimulationLanding
                 authRedirectUrl="/login"
                 ctaTrackingAttr={true}
             />
