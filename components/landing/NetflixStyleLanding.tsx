@@ -3,7 +3,15 @@
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, ShieldCheck } from 'lucide-react';
+import {
+    ArrowRight,
+    ShieldCheck,
+    MessageCircle,
+    CheckCircle2,
+    Lock,
+    Zap,
+    Flame,
+} from 'lucide-react';
 
 interface NetflixStyleLandingProps {
     authRedirectUrl?: string;
@@ -17,32 +25,46 @@ interface ProfileItem {
     badgeType: 'today' | 'online' | 'recent';
 }
 
-const COLUMN_1: ProfileItem[] = [
+const COL_1: ProfileItem[] = [
     { name: 'Gabriely Fernandes, 19', image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80', badge: 'Ativa hoje', badgeType: 'today' },
     { name: 'Fernanda, 24', image: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&q=80', badge: 'Online', badgeType: 'online' },
     { name: 'Larissa Marques, 22', image: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80', badge: 'Ativa hoje', badgeType: 'today' },
     { name: 'Andressa, 26', image: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?auto=format&fit=crop&w=400&q=80', badge: 'Há 1d', badgeType: 'recent' },
 ];
 
-const COLUMN_2: ProfileItem[] = [
+const COL_2: ProfileItem[] = [
     { name: 'Camila Rocha, 21', image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80', badge: 'Online', badgeType: 'online' },
     { name: 'Beatriz Lima, 25', image: 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?auto=format&fit=crop&w=400&q=80', badge: 'Ativa hoje', badgeType: 'today' },
     { name: 'Mariana Silva, 23', image: 'https://images.unsplash.com/photo-1502823403499-6ccfcf4fb453?auto=format&fit=crop&w=400&q=80', badge: 'Ativa hoje', badgeType: 'today' },
     { name: 'Juliana Paes, 27', image: 'https://images.unsplash.com/photo-1514315384763-ba401779410f?auto=format&fit=crop&w=400&q=80', badge: 'Há 2d', badgeType: 'recent' },
 ];
 
-const COLUMN_3: ProfileItem[] = [
+const COL_3: ProfileItem[] = [
     { name: 'Rafaela Santos, 22', image: 'https://images.unsplash.com/photo-1526080652727-5b77f74eacd2?auto=format&fit=crop&w=400&q=80', badge: 'Ativa hoje', badgeType: 'today' },
     { name: 'Letícia Mendonça, 24', image: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=400&q=80', badge: 'Online', badgeType: 'online' },
     { name: 'Débora Silveira, 23', image: 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?auto=format&fit=crop&w=400&q=80', badge: 'Ativa hoje', badgeType: 'today' },
     { name: 'Carolina Dias, 25', image: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80', badge: 'Ativa hoje', badgeType: 'today' },
 ];
 
-const COLUMN_4: ProfileItem[] = [
+const COL_4: ProfileItem[] = [
     { name: 'Vanessa Lima, 23', image: 'https://images.unsplash.com/photo-1524250502761-1ac6f2e30d43?auto=format&fit=crop&w=400&q=80', badge: 'Online', badgeType: 'online' },
-    { name: 'Isabela Costa, 26', image: 'https://images.unsplash.com/photo-1519046904884-53103b34b206?auto=format&fit=crop&w=400&q=80', badge: 'Ativa hoje', badgeType: 'today' },
-    { name: 'Nicole Rocha, 20', image: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80', badge: 'Ativa hoje', badgeType: 'today' },
-    { name: 'Bruna Alves, 24', image: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?auto=format&fit=crop&w=400&q=80', badge: 'Há 1d', badgeType: 'recent' },
+    { name: 'Isabela Costa, 26', image: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=400&q=80', badge: 'Ativa hoje', badgeType: 'today' },
+    { name: 'Nicole Rocha, 20', image: 'https://images.unsplash.com/photo-1519699047748-de8e457a634e?auto=format&fit=crop&w=400&q=80', badge: 'Ativa hoje', badgeType: 'today' },
+    { name: 'Bruna Alves, 24', image: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80', badge: 'Há 1d', badgeType: 'recent' },
+];
+
+const COL_5: ProfileItem[] = [
+    { name: 'Amanda Vieira, 22', image: 'https://images.unsplash.com/photo-1516726817505-f5ed825624d8?auto=format&fit=crop&w=400&q=80', badge: 'Ativa hoje', badgeType: 'today' },
+    { name: 'Thais Ribeiro, 25', image: 'https://images.unsplash.com/photo-1520813792240-56fc4a3765a7?auto=format&fit=crop&w=400&q=80', badge: 'Online', badgeType: 'online' },
+    { name: 'Jessica Torres, 23', image: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80', badge: 'Ativa hoje', badgeType: 'today' },
+    { name: 'Priscila Ramos, 26', image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80', badge: 'Há 2d', badgeType: 'recent' },
+];
+
+const COL_6: ProfileItem[] = [
+    { name: 'Luana Martins, 24', image: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&q=80', badge: 'Online', badgeType: 'online' },
+    { name: 'Natalia Melo, 21', image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80', badge: 'Ativa hoje', badgeType: 'today' },
+    { name: 'Bianca Farias, 25', image: 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?auto=format&fit=crop&w=400&q=80', badge: 'Ativa hoje', badgeType: 'today' },
+    { name: 'Marcela Fontes, 23', image: 'https://images.unsplash.com/photo-1502823403499-6ccfcf4fb453?auto=format&fit=crop&w=400&q=80', badge: 'Há 1d', badgeType: 'recent' },
 ];
 
 function ProfileCard({ profile }: { profile: ProfileItem }) {
@@ -52,7 +74,7 @@ function ProfileCard({ profile }: { profile: ProfileItem }) {
                 src={profile.image}
                 alt={profile.name}
                 fill
-                sizes="(max-width: 640px) 160px, 220px"
+                sizes="(max-width: 640px) 140px, 200px"
                 className="object-cover"
             />
             {/* Gradiente escuro inferior idêntico ao Explorar */}
@@ -98,9 +120,9 @@ export function NetflixStyleLanding({
 
     return (
         <div className="relative min-h-screen w-full bg-slate-50 text-slate-900 flex flex-col justify-between overflow-hidden selection:bg-purple-600 selection:text-white">
-            {/* Keyframes inline para o slide contínuo e suave (60 FPS acelerado por GPU) */}
+            {/* Animação suave e desacelerada (60 FPS com aceleração GPU) */}
             <style>{`
-                @keyframes marqueeSlide {
+                @keyframes slowMarquee {
                     0% {
                         transform: translate3d(0, 0, 0);
                     }
@@ -109,64 +131,86 @@ export function NetflixStyleLanding({
                     }
                 }
                 .slide-col-1 {
-                    animation: marqueeSlide 42s linear infinite;
+                    animation: slowMarquee 78s linear infinite;
                     will-change: transform;
                 }
                 .slide-col-2 {
-                    animation: marqueeSlide 34s linear infinite;
+                    animation: slowMarquee 65s linear infinite;
                     will-change: transform;
                 }
                 .slide-col-3 {
-                    animation: marqueeSlide 48s linear infinite;
+                    animation: slowMarquee 88s linear infinite;
                     will-change: transform;
                 }
                 .slide-col-4 {
-                    animation: marqueeSlide 38s linear infinite;
+                    animation: slowMarquee 72s linear infinite;
+                    will-change: transform;
+                }
+                .slide-col-5 {
+                    animation: slowMarquee 82s linear infinite;
+                    will-change: transform;
+                }
+                .slide-col-6 {
+                    animation: slowMarquee 68s linear infinite;
                     will-change: transform;
                 }
             `}</style>
 
-            {/* ─── PAREDE DE PERFIS INCLINADA NA DIAGONAL COM MOVIMENTO DE SLIDE ─── */}
+            {/* ─── PAREDE DE PERFIS: COBERTURA TOTAL SEM BORDAS VAZIAS (-6deg) ─── */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 flex items-center justify-center">
-                {/* Contêiner Rotacionado e Escalado */}
+                {/* Contêiner amplo escalado cobrindo 100% dos cantos */}
                 <div
-                    className="flex gap-4 sm:gap-5 w-[140vw] sm:w-[130vw] shrink-0 justify-center opacity-85 sm:opacity-90"
+                    className="flex gap-3.5 sm:gap-4.5 w-[190vw] sm:w-[170vw] shrink-0 justify-center opacity-85 sm:opacity-90"
                     style={{
-                        transform: 'rotate(-10deg) scale(1.3)',
+                        transform: 'rotate(-6deg) scale(1.4)',
                         transformOrigin: 'center center',
                     }}
                 >
                     {/* Coluna 1 */}
-                    <div className="flex flex-col gap-4 sm:gap-5 w-[140px] sm:w-[190px] md:w-[220px] shrink-0 slide-col-1">
-                        {[...COLUMN_1, ...COLUMN_1].map((p, i) => (
+                    <div className="flex flex-col gap-3.5 sm:gap-4.5 w-[140px] sm:w-[180px] md:w-[200px] shrink-0 slide-col-1">
+                        {[...COL_1, ...COL_1].map((p, i) => (
                             <ProfileCard key={`col1-${i}`} profile={p} />
                         ))}
                     </div>
 
                     {/* Coluna 2 */}
-                    <div className="flex flex-col gap-4 sm:gap-5 w-[140px] sm:w-[190px] md:w-[220px] shrink-0 slide-col-2 pt-12">
-                        {[...COLUMN_2, ...COLUMN_2].map((p, i) => (
+                    <div className="flex flex-col gap-3.5 sm:gap-4.5 w-[140px] sm:w-[180px] md:w-[200px] shrink-0 slide-col-2 pt-10">
+                        {[...COL_2, ...COL_2].map((p, i) => (
                             <ProfileCard key={`col2-${i}`} profile={p} />
                         ))}
                     </div>
 
                     {/* Coluna 3 */}
-                    <div className="flex flex-col gap-4 sm:gap-5 w-[140px] sm:w-[190px] md:w-[220px] shrink-0 slide-col-3">
-                        {[...COLUMN_3, ...COLUMN_3].map((p, i) => (
+                    <div className="flex flex-col gap-3.5 sm:gap-4.5 w-[140px] sm:w-[180px] md:w-[200px] shrink-0 slide-col-3">
+                        {[...COL_3, ...COL_3].map((p, i) => (
                             <ProfileCard key={`col3-${i}`} profile={p} />
                         ))}
                     </div>
 
                     {/* Coluna 4 */}
-                    <div className="flex flex-col gap-4 sm:gap-5 w-[140px] sm:w-[190px] md:w-[220px] shrink-0 slide-col-4 pt-16">
-                        {[...COLUMN_4, ...COLUMN_4].map((p, i) => (
+                    <div className="flex flex-col gap-3.5 sm:gap-4.5 w-[140px] sm:w-[180px] md:w-[200px] shrink-0 slide-col-4 pt-14">
+                        {[...COL_4, ...COL_4].map((p, i) => (
                             <ProfileCard key={`col4-${i}`} profile={p} />
+                        ))}
+                    </div>
+
+                    {/* Coluna 5 */}
+                    <div className="flex flex-col gap-3.5 sm:gap-4.5 w-[140px] sm:w-[180px] md:w-[200px] shrink-0 slide-col-5">
+                        {[...COL_5, ...COL_5].map((p, i) => (
+                            <ProfileCard key={`col5-${i}`} profile={p} />
+                        ))}
+                    </div>
+
+                    {/* Coluna 6 */}
+                    <div className="flex flex-col gap-3.5 sm:gap-4.5 w-[140px] sm:w-[180px] md:w-[200px] shrink-0 slide-col-6 pt-12">
+                        {[...COL_6, ...COL_6].map((p, i) => (
+                            <ProfileCard key={`col6-${i}`} profile={p} />
                         ))}
                     </div>
                 </div>
 
-                {/* ─── OVERLAY SUAVE DIRECIONAL (Lado esquerdo translúcido para leitura, lado direito aberto para ver as fotos) ─── */}
-                <div className="absolute inset-0 bg-gradient-to-b sm:bg-gradient-to-r from-white/95 via-white/80 to-white/30 backdrop-blur-[1px]" />
+                {/* ─── OVERLAY GRADIENTE DIRECIONAL (Fundo translúcido na esquerda para leitura, aberto na direita) ─── */}
+                <div className="absolute inset-0 bg-gradient-to-b sm:bg-gradient-to-r from-white/95 via-white/80 to-white/25 backdrop-blur-[1px]" />
             </div>
 
             {/* ─── HEADER MINIMALISTA ─── */}
@@ -194,43 +238,65 @@ export function NetflixStyleLanding({
                 </Link>
             </header>
 
-            {/* ─── CONTEÚDO ALINHADO À ESQUERDA (IMPACTO DIRETO) ─── */}
-            <main className="relative z-20 flex-1 flex flex-col justify-center px-6 sm:px-12 lg:px-16 max-w-7xl mx-auto w-full my-auto py-12">
-                <div className="max-w-xl text-left space-y-6">
-                    {/* Badge Sutil de Autenticidade */}
+            {/* ─── CONTEÚDO ALINHADO À ESQUERDA: CLAREZA BRUTAL E SEM VÁCUO ─── */}
+            <main className="relative z-20 flex-1 flex flex-col justify-center px-6 sm:px-12 lg:px-16 max-w-7xl mx-auto w-full my-auto py-8 sm:py-12">
+                <div className="max-w-xl text-left space-y-5">
+                    {/* Badge Sutil */}
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-100/90 border border-purple-200 text-purple-700 text-xs font-bold uppercase tracking-wider shadow-xs">
-                        <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
-                        <span>Perfis Verificados</span>
+                        <MessageCircle className="w-3.5 h-3.5 text-purple-600" />
+                        <span>Novo App de Conversa</span>
                     </div>
 
-                    {/* Título Principal Marcante */}
+                    {/* Título Principal de Impacto: A Proposta Central do Mimo */}
                     <div className="space-y-1 text-left">
-                        <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black text-slate-900 tracking-tight leading-[1.08]">
-                            Conversas Privadas.
+                        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.1]">
+                            O app de conversa onde você{' '}
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-600">
+                                nunca toma vácuo
+                            </span>.
                         </h1>
-                        <h2 className="text-4xl sm:text-6xl lg:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-600 tracking-tight leading-[1.08]">
-                            Mulheres Reais.
-                        </h2>
                     </div>
 
-                    {/* Subtítulo de 1 Linha */}
-                    <p className="text-base sm:text-xl text-slate-600 leading-relaxed font-medium">
-                        Fotos exclusivas e mensagens diretas no privado. Sem mensalidade fixa.
+                    {/* Subtítulo com Problema & Solução Clara */}
+                    <p className="text-sm sm:text-base lg:text-lg text-slate-600 leading-relaxed font-medium">
+                        Cansado de ser ignorado no Tinder e no Instagram? No Mimo você conversa no privado de mulheres reais e tem a certeza de receber respostas com áudios e fotos exclusivas.
                     </p>
 
-                    {/* Botão de Chamada para Ação Alinhado à Esquerda */}
+                    {/* 3 Micro-pílulas do Mecanismo */}
+                    <div className="space-y-2 pt-1 text-xs sm:text-sm font-semibold text-slate-700">
+                        <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            </div>
+                            <span><strong>Resposta Garantida:</strong> Elas respondem você pessoalmente no privado.</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+                                <Lock className="w-3.5 h-3.5 text-purple-600" />
+                            </div>
+                            <span><strong>Mídias Exclusivas:</strong> Fotos e áudios que você não vê em rede social.</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                                <Zap className="w-3.5 h-3.5 text-amber-600" />
+                            </div>
+                            <span><strong>Sem Mensalidade:</strong> Recarregue no Pix e pague só pelo que conversar.</span>
+                        </div>
+                    </div>
+
+                    {/* Botão de Chamada para Ação */}
                     <div className="pt-2 max-w-sm space-y-2.5 text-left">
                         <Link
                             href={destinationUrl}
                             {...ctaProps}
-                            className="w-full sm:w-auto h-14 sm:h-16 px-10 rounded-2xl bg-purple-600 hover:bg-purple-700 active:scale-[0.98] text-white font-black text-base sm:text-lg uppercase tracking-wider shadow-xl shadow-purple-600/30 transition-all flex items-center justify-center gap-2.5 group"
+                            className="w-full sm:w-auto h-14 sm:h-16 px-8 sm:px-10 rounded-2xl bg-purple-600 hover:bg-purple-700 active:scale-[0.98] text-white font-black text-base sm:text-lg uppercase tracking-wider shadow-xl shadow-purple-600/30 transition-all flex items-center justify-center gap-2.5 group"
                         >
-                            <span>Ver Perfis</span>
+                            <span>Ver Mulheres no App</span>
                             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                         </Link>
 
                         <p className="text-xs text-slate-500 font-semibold">
-                            100% discreto • Acesso para maiores de 18 anos
+                            100% discreto no Pix • Sem cartão obrigatório • +18
                         </p>
                     </div>
                 </div>
