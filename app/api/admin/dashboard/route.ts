@@ -7,6 +7,8 @@ import { Transaction } from '@/models/Transaction';
 import { MicroTransaction } from '@/models/MicroTransaction';
 import { AppSettings } from '@/models/AppSettings';
 import { QualifiedConversation } from '@/models/QualifiedConversation';
+import { QualificationAttempt } from '@/models/QualificationAttempt';
+import { ModerationReview } from '@/models/ModerationReview';
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
@@ -283,39 +285,113 @@ export async function GET(request: NextRequest) {
         });
 
         // --- CONVERSAS QUALIFICADAS RECENTES (FEED DO MARKETPLACE) ---
-        const recentQualifiedConversationsDocs = await QualifiedConversation.find()
-            .sort({ updatedAt: -1 })
-            .limit(10)
-            .lean() as any[];
+        const [
+            recentQualifiedConversationsDocs,
+            totalQualifiedCount,
+            openConversationsCount,
+            totalAttemptsCount,
+            qualifiedAttemptsCount,
+            financialAgg,
+            pendingModerationCount,
+        ] = await Promise.all([
+            QualifiedConversation.find()
+                .sort({ updatedAt: -1 })
+                .limit(50)
+                .lean() as any,
+            QualifiedConversation.countDocuments(),
+            QualifiedConversation.countDocuments({ status: 'open' }),
+            QualificationAttempt.countDocuments(),
+            QualificationAttempt.countDocuments({ status: 'qualified' }),
+            QualifiedConversation.aggregate([
+                {
+                    $group: {
+                        _id: null,
+                        totalGross: { $sum: '$grossChargedCents' },
+                        totalPayout: { $sum: '$professionalPayoutCents' },
+                        totalMargin: { $sum: '$platformMarginCents' },
+                    }
+                }
+            ]),
+            ModerationReview.countDocuments({ status: 'pending' }),
+        ]);
+
+        const financialTotals = financialAgg[0] || { totalGross: 0, totalPayout: 0, totalMargin: 0 };
+        const qualificationRateVal = totalAttemptsCount > 0
+            ? Math.round((qualifiedAttemptsCount / totalAttemptsCount) * 100)
+            : 0;
+
+        const marketplaceMetrics = {
+            totalQualified: totalQualifiedCount,
+            openConversations: openConversationsCount,
+            qualificationRate: `${qualificationRateVal}%`,
+            grossRevenueCents: financialTotals.totalGross || 0,
+            professionalPayoutCents: financialTotals.totalPayout || 0,
+            platformMarginCents: financialTotals.totalMargin || 0,
+            pendingModerationCount,
+        };
 
         const participantIds = new Set<string>();
-        recentQualifiedConversationsDocs.forEach(c => {
+        recentQualifiedConversationsDocs.forEach((c: any) => {
             if (c.clientId) participantIds.add(c.clientId);
             if (c.professionalId) participantIds.add(c.professionalId);
         });
 
         const participantsMap = new Map(
             (await User.find({ clerkId: { $in: Array.from(participantIds) } }).select('clerkId name username photoUrl').lean())
-                .map(u => [u.clerkId, u])
+                .map((u: any) => [u.clerkId, u])
         );
 
-        const recentQualifiedConversations = recentQualifiedConversationsDocs.map(c => ({
-            id: c._id.toString(),
-            roomId: c.roomId,
-            client: participantsMap.get(c.clientId) || { clerkId: c.clientId, name: 'Cliente' },
-            professional: participantsMap.get(c.professionalId) || { clerkId: c.professionalId, name: 'Profissional' },
-            status: c.status,
-            equivalentChars: c.clientEquivalentChars,
-            grossChargedCents: c.grossChargedCents,
-            payoutCents: c.professionalPayoutCents || 0,
-            marginCents: c.platformMarginCents || 0,
-            unlockedBonuses: c.unlockedBonuses || [],
-            moderationStatus: c.moderationStatus,
-            updatedAt: c.updatedAt,
-        }));
+        const recentQualifiedConversations = recentQualifiedConversationsDocs.map((c: any) => {
+            const clientUser = participantsMap.get(c.clientId);
+            const profUser = participantsMap.get(c.professionalId);
+
+            // Anonimização do cliente na listagem do feed
+            let anonymizedClientName = 'Cliente';
+            if (clientUser) {
+                if (clientUser.name) {
+                    const parts = clientUser.name.trim().split(' ');
+                    anonymizedClientName = parts.length > 1
+                        ? `${parts[0]} ${parts[1][0]}.`
+                        : parts[0];
+                } else if (clientUser.username) {
+                    anonymizedClientName = `@${clientUser.username.substring(0, 3)}***`;
+                }
+            }
+
+            return {
+                id: c._id.toString(),
+                roomId: c.roomId,
+                client: {
+                    clerkId: c.clientId,
+                    name: anonymizedClientName,
+                    username: clientUser?.username || 'cliente',
+                    photoUrl: clientUser?.photoUrl || null,
+                },
+                professional: {
+                    clerkId: c.professionalId,
+                    name: profUser?.name || `@${profUser?.username || 'profissional'}`,
+                    username: profUser?.username || '',
+                    photoUrl: profUser?.photoUrl || null,
+                },
+                status: c.status,
+                equivalentChars: c.clientEquivalentChars,
+                grossChargedCents: c.grossChargedCents,
+                payoutCents: c.professionalPayoutCents || 0,
+                marginCents: c.platformMarginCents || 0,
+                unlockedBonuses: c.unlockedBonuses || [],
+                moderationStatus: c.moderationStatus,
+                startedAt: c.startedAt,
+                qualifiedAt: c.qualifiedAt,
+                lastParticipantActivityAt: c.lastParticipantActivityAt,
+                closesAt: c.closesAt,
+                settledAt: c.settledAt,
+                updatedAt: c.updatedAt,
+            };
+        });
 
         // 3. Responder
         return NextResponse.json({
+            marketplaceMetrics,
             metrics: {
                 active24h: { value: active24hCount.toLocaleString('pt-BR') },
                 absent: { value: absentCount.toLocaleString('pt-BR') },

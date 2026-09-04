@@ -1,32 +1,15 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAdminContext } from '@/context/AdminSettingsContext';
 import { StatsCard } from '@/components/admin/StatsCard';
-import { SortableColumnHeader } from '@/components/admin/SortableColumnHeader';
 import {
-    UserCheck, UserX, UserPlus, Clock, Search, ExternalLink
+    MessageSquareCheck, TrendingUp, Coins, ShieldCheck,
+    Search, Clock, ExternalLink, Eye, Zap, Flame, Award,
+    CheckCircle2, AlertTriangle, MessageCircle, ArrowRight, RefreshCw
 } from 'lucide-react';
-
-type SortKey =
-    | 'name'
-    | 'status'
-    | 'accessCount'
-    | 'avgFrequency'
-    | 'broughtClientsCount'
-    | 'lastClientBroughtAt'
-    | 'lastAccessAt'
-    | 'totalEarned';
-
-type SortDir = 'asc' | 'desc';
-
-const STATUS_WEIGHT: Record<string, number> = {
-    active: 3,
-    absent: 2,
-    inactive: 1,
-};
 
 const TAB_MAPPINGS: Record<string, string> = {
     dashboard: '/admin',
@@ -50,12 +33,12 @@ const TAB_MAPPINGS: Record<string, string> = {
 };
 
 function formatRelativeTime(dateInput: string | Date | null | undefined): string {
-    if (!dateInput) return 'Sem acesso recente';
+    if (!dateInput) return '-';
     const date = new Date(dateInput);
-    if (isNaN(date.getTime())) return 'Sem acesso recente';
+    if (isNaN(date.getTime())) return '-';
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
-    if (diffMs < 0) return 'Agora mesmo';
+    if (diffMs < 0) return 'Agora';
 
     const diffMin = Math.floor(diffMs / (1000 * 60));
     const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
@@ -68,25 +51,25 @@ function formatRelativeTime(dateInput: string | Date | null | undefined): string
     return date.toLocaleDateString('pt-BR');
 }
 
+function formatCentsToBRL(cents: number | undefined | null): string {
+    return ((cents || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+type ConversationFilterStatus = 'all' | 'open' | 'settlement_pending' | 'settled' | 'moderation';
+
+const BONUS_LABELS: Record<string, { label: string; icon: React.ComponentType<any> }> = {
+    quickReply: { label: '+10% Agilidade', icon: Zap },
+    engagement: { label: '+15% Engajamento', icon: Flame },
+    deepConversation: { label: '+15% Profundidade', icon: Award },
+};
+
 export default function AdminDashboardPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { dashboardData, loadingDashboard } = useAdminContext();
+    const { dashboardData, loadingDashboard, fetchDashboard } = useAdminContext();
 
-    const [profTab, setProfTab] = useState<'active_absent' | 'inactive'>('active_absent');
-    const [profSearch, setProfSearch] = useState('');
-
-    const [sortKey, setSortKey] = useState<SortKey | null>(null);
-    const [sortDir, setSortDir] = useState<SortDir>('desc');
-
-    const handleSort = (key: SortKey) => {
-        if (sortKey === key) {
-            setSortDir(prev => (prev === 'desc' ? 'asc' : 'desc'));
-        } else {
-            setSortKey(key);
-            setSortDir(key === 'name' || key === 'status' ? 'asc' : 'desc');
-        }
-    };
+    const [statusFilter, setStatusFilter] = useState<ConversationFilterStatus>('all');
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Suporte a links antigos com ?tab=... para redirecionamento transparente
     useEffect(() => {
@@ -96,350 +79,498 @@ export default function AdminDashboardPage() {
         }
     }, [searchParams, router]);
 
+    const marketplaceMetrics = dashboardData?.marketplaceMetrics || {};
+    const qualifiedConversations: any[] = useMemo(() => {
+        return dashboardData?.recentQualifiedConversations || [];
+    }, [dashboardData]);
+
+    const filteredConversations = useMemo(() => {
+        return qualifiedConversations.filter((c: any) => {
+            // Filtro por status
+            if (statusFilter === 'open' && c.status !== 'open') return false;
+            if (statusFilter === 'settlement_pending' && c.status !== 'settlement_pending') return false;
+            if (statusFilter === 'settled' && c.status !== 'settled') return false;
+            if (statusFilter === 'moderation') {
+                const isFlagged = c.moderationStatus === 'pending_review' || c.moderationStatus === 'confirmed_violation';
+                if (!isFlagged) return false;
+            }
+
+            // Filtro por busca
+            if (!searchQuery.trim()) return true;
+            const q = searchQuery.toLowerCase().trim();
+            const profName = (c.professional?.name || '').toLowerCase();
+            const profUsername = (c.professional?.username || '').toLowerCase();
+            const clientName = (c.client?.name || '').toLowerCase();
+            const roomId = (c.roomId || '').toLowerCase();
+
+            return profName.includes(q) || profUsername.includes(q) || clientName.includes(q) || roomId.includes(q);
+        });
+    }, [qualifiedConversations, statusFilter, searchQuery]);
+
+    const countOpen = useMemo(() => qualifiedConversations.filter(c => c.status === 'open').length, [qualifiedConversations]);
+    const countPending = useMemo(() => qualifiedConversations.filter(c => c.status === 'settlement_pending').length, [qualifiedConversations]);
+    const countSettled = useMemo(() => qualifiedConversations.filter(c => c.status === 'settled').length, [qualifiedConversations]);
+    const countModeration = useMemo(() => qualifiedConversations.filter(c => c.moderationStatus === 'pending_review' || c.moderationStatus === 'confirmed_violation').length, [qualifiedConversations]);
+
     return (
         <div className="space-y-6">
-            {/* Cards de Métricas Estratégicas */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatsCard title="Profissionais Ativas" value={loadingDashboard ? '...' : dashboardData?.metrics?.active24h?.value || '0'} icon={UserCheck} color="green" />
-                <StatsCard title="Profissionais Ausentes" value={loadingDashboard ? '...' : dashboardData?.metrics?.absent?.value || '0'} icon={Clock} color="amber" />
-                <StatsCard title="Profissionais Inativas" value={loadingDashboard ? '...' : dashboardData?.metrics?.inactive?.value || '0'} icon={UserX} color="rose" />
-                <StatsCard title="Clientes Trazidos" value={loadingDashboard ? '...' : dashboardData?.metrics?.totalBroughtClients?.value || '0'} icon={UserPlus} color="purple" />
+            {/* Top Header com Título e Atualização */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/80 p-5 rounded-2xl shadow-xs">
+                <div>
+                    <h1 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+                        <MessageSquareCheck className="text-purple-600" size={24} />
+                        Dashboard Operacional do Marketplace
+                    </h1>
+                    <p className="text-xs text-slate-500 font-medium mt-1">
+                        Acompanhamento em tempo real das conversas qualificadas, metas e saúde financeira da plataforma.
+                    </p>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0">
+                    <button
+                        onClick={() => fetchDashboard()}
+                        disabled={loadingDashboard}
+                        className="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold rounded-xl transition-all disabled:opacity-50 cursor-pointer"
+                    >
+                        <RefreshCw size={14} className={loadingDashboard ? 'animate-spin' : ''} />
+                        <span>Atualizar</span>
+                    </button>
+                    <Link
+                        href="/admin/professionals"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold rounded-xl border border-purple-200/60 transition-all cursor-pointer"
+                    >
+                        <span>Painel de Profissionais</span>
+                        <ArrowRight size={13} />
+                    </Link>
+                </div>
             </div>
 
-            {/* Tabela Principal de Profissionais (Largura Total) */}
+            {/* Alerta de Moderação Urgente (se houver) */}
+            {(marketplaceMetrics.pendingModerationCount > 0 || countModeration > 0) && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-xs animate-in fade-in">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                            <AlertTriangle size={20} />
+                        </div>
+                        <div>
+                            <h4 className="text-sm font-bold text-amber-900">
+                                {marketplaceMetrics.pendingModerationCount || countModeration} conversa(s) aguardando moderação
+                            </h4>
+                            <p className="text-xs text-amber-700 mt-0.5">
+                                Detectada suspeita de compartilhamento de contato externo durante o fluxo de conversa qualificada.
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => setStatusFilter('moderation')}
+                        className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-extrabold rounded-xl shadow-xs transition-colors cursor-pointer shrink-0"
+                    >
+                        Ver na fila
+                    </button>
+                </div>
+            )}
+
+            {/* Cards de Métricas Estratégicas do Marketplace */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <StatsCard
+                    title="Conversas Qualificadas"
+                    value={loadingDashboard ? '...' : (marketplaceMetrics.totalQualified ?? qualifiedConversations.length)}
+                    change={`${marketplaceMetrics.openConversations ?? countOpen} abertas`}
+                    isPositive={true}
+                    icon={MessageSquareCheck}
+                    color="purple"
+                />
+                <StatsCard
+                    title="Taxa de Qualificação"
+                    value={loadingDashboard ? '...' : (marketplaceMetrics.qualificationRate || '0%')}
+                    change="Meta 500 chars"
+                    isPositive={true}
+                    icon={TrendingUp}
+                    color="green"
+                />
+                <StatsCard
+                    title="Receita Bruta Gerada"
+                    value={loadingDashboard ? '...' : formatCentsToBRL(marketplaceMetrics.grossRevenueCents)}
+                    icon={Coins}
+                    color="blue"
+                />
+                <StatsCard
+                    title="Margem da Plataforma"
+                    value={loadingDashboard ? '...' : formatCentsToBRL(marketplaceMetrics.platformMarginCents)}
+                    change={`Repasse: ${formatCentsToBRL(marketplaceMetrics.professionalPayoutCents)}`}
+                    isPositive={true}
+                    icon={ShieldCheck}
+                    color="amber"
+                />
+            </div>
+
+            {/* Tabela Principal — Feed Operacional de Conversas Qualificadas */}
             <div className="w-full bg-white border border-slate-200/80 rounded-2xl shadow-sm flex flex-col overflow-hidden">
-                {/* Header do Painel */}
+                {/* Header da Tabela com Filtros e Busca */}
                 <div className="p-5 border-b border-slate-100 bg-white space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div>
-                            <h3 className="text-base font-bold text-slate-800 tracking-tight flex items-center gap-2">
-                                <UserCheck size={18} className="text-purple-600" />
-                                Acompanhamento de Profissionais
+                            <h3 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                                <MessageCircle size={18} className="text-purple-600" />
+                                Feed de Conversas Qualificadas
                             </h3>
                             <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                                Atividade recente e métricas de atribuição de novos clientes masculinos.
+                                Sessões que alcançaram pelo menos 500 caracteres equivalentes com resposta da profissional.
                             </p>
                         </div>
+
                         {/* Campo de Busca */}
-                        <div className="relative w-full sm:w-64">
+                        <div className="relative w-full sm:w-72">
                             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                             <input
                                 type="text"
-                                placeholder="Buscar profissional..."
-                                value={profSearch}
-                                onChange={(e) => setProfSearch(e.target.value)}
-                                className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
+                                placeholder="Buscar profissional, cliente ou sala..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all font-medium"
                             />
                         </div>
                     </div>
 
-                    {/* Seleção de Abas Internas */}
-                    <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                    {/* Filtros de Status (Tabs) */}
+                    <div className="flex items-center gap-2 pt-1 border-t border-slate-100 overflow-x-auto">
                         <button
-                            onClick={() => setProfTab('active_absent')}
-                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                profTab === 'active_absent'
-                                    ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/20'
+                            onClick={() => setStatusFilter('all')}
+                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                                statusFilter === 'all'
+                                    ? 'bg-purple-600 text-white shadow-xs'
                                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
                             }`}
                         >
-                            <span>Ativas & Ausentes</span>
-                            <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${
-                                profTab === 'active_absent' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                            <span>Todas</span>
+                            <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-extrabold ${
+                                statusFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
                             }`}>
-                                {dashboardData?.activeAndAbsentProfessionals?.length || 0}
+                                {qualifiedConversations.length}
                             </span>
                         </button>
 
                         <button
-                            onClick={() => setProfTab('inactive')}
-                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                profTab === 'inactive'
-                                    ? 'bg-rose-600 text-white shadow-sm shadow-rose-600/20'
+                            onClick={() => setStatusFilter('open')}
+                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                                statusFilter === 'open'
+                                    ? 'bg-emerald-600 text-white shadow-xs'
                                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
                             }`}
                         >
-                            <span>Inativas (&gt; 7 dias)</span>
-                            <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${
-                                profTab === 'inactive' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                            <span>Abertas Agora</span>
+                            <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-extrabold ${
+                                statusFilter === 'open' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-800'
                             }`}>
-                                {dashboardData?.inactiveProfessionals?.length || 0}
+                                {countOpen}
                             </span>
                         </button>
+
+                        <button
+                            onClick={() => setStatusFilter('settlement_pending')}
+                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                                statusFilter === 'settlement_pending'
+                                    ? 'bg-amber-600 text-white shadow-xs'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
+                            }`}
+                        >
+                            <span>Liquidação Pendente</span>
+                            <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-extrabold ${
+                                statusFilter === 'settlement_pending' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
+                            }`}>
+                                {countPending}
+                            </span>
+                        </button>
+
+                        <button
+                            onClick={() => setStatusFilter('settled')}
+                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                                statusFilter === 'settled'
+                                    ? 'bg-slate-700 text-white shadow-xs'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
+                            }`}
+                        >
+                            <span>Liquidadas</span>
+                            <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-extrabold ${
+                                statusFilter === 'settled' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                            }`}>
+                                {countSettled}
+                            </span>
+                        </button>
+
+                        {countModeration > 0 && (
+                            <button
+                                onClick={() => setStatusFilter('moderation')}
+                                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                                    statusFilter === 'moderation'
+                                        ? 'bg-rose-600 text-white shadow-xs'
+                                        : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
+                                }`}
+                            >
+                                <AlertTriangle size={12} />
+                                <span>Com Suspeita</span>
+                                <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-extrabold ${
+                                    statusFilter === 'moderation' ? 'bg-white/20 text-white' : 'bg-rose-200 text-rose-800'
+                                }`}>
+                                    {countModeration}
+                                </span>
+                            </button>
+                        )}
                     </div>
                 </div>
 
-                {/* Tabela de Dados */}
+                {/* Tabela de Dados das Conversas */}
                 <div className="flex-1 overflow-x-auto">
                     {loadingDashboard ? (
                         <div className="py-20 flex flex-col items-center justify-center gap-2">
                             <div className="animate-spin h-6 w-6 text-purple-600 rounded-full border-2 border-slate-200 border-t-purple-600" />
-                            <span className="text-xs text-slate-400 font-semibold">Carregando profissionais...</span>
+                            <span className="text-xs text-slate-400 font-semibold">Carregando feed operacional...</span>
                         </div>
-                    ) : (() => {
-                        const rawList = profTab === 'active_absent'
-                            ? (dashboardData?.activeAndAbsentProfessionals || [])
-                            : (dashboardData?.inactiveProfessionals || []);
+                    ) : filteredConversations.length === 0 ? (
+                        <div className="py-20 px-4 text-center flex flex-col items-center justify-center">
+                            <div className="w-14 h-14 rounded-2xl bg-purple-50 text-purple-600 border border-purple-100 flex items-center justify-center mb-3">
+                                <MessageSquareCheck size={26} />
+                            </div>
+                            <h4 className="text-sm font-bold text-slate-800">
+                                Nenhuma conversa qualificada encontrada
+                            </h4>
+                            <p className="text-xs text-slate-500 max-w-sm mt-1 leading-relaxed">
+                                {searchQuery.trim()
+                                    ? 'Nenhum resultado corresponde aos termos da sua busca.'
+                                    : 'Conversas remuneráveis aparecerão aqui em tempo real assim que o cliente e a profissional atingirem 500 caracteres equivalentes.'}
+                            </p>
+                            {searchQuery.trim() && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="mt-3 text-xs text-purple-600 font-bold hover:underline cursor-pointer"
+                                >
+                                    Limpar busca
+                                </button>
+                            )}
+                        </div>
+                    ) : (
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+                                    <th className="py-3.5 px-5">Profissional</th>
+                                    <th className="py-3.5 px-5">Cliente</th>
+                                    <th className="py-3.5 px-5">Status</th>
+                                    <th className="py-3.5 px-5">Carga (Chars)</th>
+                                    <th className="py-3.5 px-5">Gasto Bruto</th>
+                                    <th className="py-3.5 px-5">Repasse Profissional</th>
+                                    <th className="py-3.5 px-5">Margem Mimo</th>
+                                    <th className="py-3.5 px-5">Bônus</th>
+                                    <th className="py-3.5 px-5">Moderação</th>
+                                    <th className="py-3.5 px-5">Última Atividade</th>
+                                    <th className="py-3.5 px-5 text-center">Auditoria</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {filteredConversations.map((conv: any) => {
+                                    const prof = conv.professional;
+                                    const client = conv.client;
 
-                        const filtered = rawList.filter((prof: any) => {
-                            if (!profSearch.trim()) return true;
-                            const q = profSearch.toLowerCase().trim().replace('@', '');
-                            return (
-                                prof.name?.toLowerCase().includes(q) ||
-                                prof.username?.toLowerCase().includes(q) ||
-                                prof.email?.toLowerCase().includes(q)
-                            );
-                        });
+                                    // Badge de status
+                                    let statusBadge = null;
+                                    if (conv.status === 'open') {
+                                        statusBadge = (
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                                Aberta
+                                            </span>
+                                        );
+                                    } else if (conv.status === 'settlement_pending') {
+                                        statusBadge = (
+                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">
+                                                <Clock size={12} />
+                                                Liquidação Pendente
+                                            </span>
+                                        );
+                                    } else {
+                                        statusBadge = (
+                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-slate-100 text-slate-700 border border-slate-200">
+                                                <CheckCircle2 size={12} className="text-slate-500" />
+                                                Liquidada
+                                            </span>
+                                        );
+                                    }
 
-                        const displayList = (() => {
-                            if (!sortKey) return filtered;
+                                    // Badge de moderação
+                                    const isSuspicious = conv.moderationStatus === 'pending_review' || conv.moderationStatus === 'confirmed_violation';
 
-                            return [...filtered].sort((a: any, b: any) => {
-                                let valA: any = 0;
-                                let valB: any = 0;
-
-                                switch (sortKey) {
-                                    case 'name':
-                                        valA = a.name || a.username || '';
-                                        valB = b.name || b.username || '';
-                                        break;
-                                    case 'status':
-                                        valA = STATUS_WEIGHT[a.status] || 0;
-                                        valB = STATUS_WEIGHT[b.status] || 0;
-                                        break;
-                                    case 'accessCount':
-                                        valA = a.accessCount || 0;
-                                        valB = b.accessCount || 0;
-                                        break;
-                                    case 'avgFrequency':
-                                        valA = a.avgFrequencyValue || 0;
-                                        valB = b.avgFrequencyValue || 0;
-                                        break;
-                                    case 'broughtClientsCount':
-                                        valA = a.broughtClientsCount || 0;
-                                        valB = b.broughtClientsCount || 0;
-                                        break;
-                                    case 'lastClientBroughtAt':
-                                        valA = a.lastClientBroughtAt ? new Date(a.lastClientBroughtAt).getTime() : 0;
-                                        valB = b.lastClientBroughtAt ? new Date(b.lastClientBroughtAt).getTime() : 0;
-                                        break;
-                                    case 'lastAccessAt':
-                                        valA = a.lastAccessAt ? new Date(a.lastAccessAt).getTime() : 0;
-                                        valB = b.lastAccessAt ? new Date(b.lastAccessAt).getTime() : 0;
-                                        break;
-                                    case 'totalEarned':
-                                        valA = a.totalEarned || 0;
-                                        valB = b.totalEarned || 0;
-                                        break;
-                                }
-
-                                if (typeof valA === 'string' && typeof valB === 'string') {
-                                    const cmp = valA.localeCompare(valB, 'pt-BR');
-                                    return sortDir === 'asc' ? cmp : -cmp;
-                                }
-
-                                const numA = Number(valA);
-                                const numB = Number(valB);
-                                return sortDir === 'asc' ? numA - numB : numB - numA;
-                            });
-                        })();
-
-                        if (displayList.length === 0) {
-                            return (
-                                <div className="py-20 text-center space-y-2">
-                                    <UserX size={32} className="mx-auto text-slate-300 stroke-[1.5]" />
-                                    <p className="text-xs font-semibold text-slate-500">
-                                        {profSearch ? 'Nenhuma profissional encontrada para esta busca.' : 'Nenhuma profissional cadastrada nesta aba.'}
-                                    </p>
-                                </div>
-                            );
-                        }
-
-                        return (
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="border-b border-slate-100 bg-slate-50/50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                        <th className="py-3 px-4">
-                                            <SortableColumnHeader
-                                                label="Profissional"
-                                                active={sortKey === 'name'}
-                                                direction={sortDir}
-                                                onClick={() => handleSort('name')}
-                                            />
-                                        </th>
-                                        <th className="py-3 px-3">
-                                            <SortableColumnHeader
-                                                label="Status"
-                                                active={sortKey === 'status'}
-                                                direction={sortDir}
-                                                onClick={() => handleSort('status')}
-                                            />
-                                        </th>
-                                        <th className="py-3 px-3 text-center">
-                                            <SortableColumnHeader
-                                                label="Total Acessos"
-                                                active={sortKey === 'accessCount'}
-                                                direction={sortDir}
-                                                onClick={() => handleSort('accessCount')}
-                                                align="center"
-                                            />
-                                        </th>
-                                        <th className="py-3 px-3 text-center">
-                                            <SortableColumnHeader
-                                                label="Frequência Média"
-                                                active={sortKey === 'avgFrequency'}
-                                                direction={sortDir}
-                                                onClick={() => handleSort('avgFrequency')}
-                                                align="center"
-                                            />
-                                        </th>
-                                        <th className="py-3 px-3 text-center">
-                                            <SortableColumnHeader
-                                                label="Clientes Trazidos"
-                                                active={sortKey === 'broughtClientsCount'}
-                                                direction={sortDir}
-                                                onClick={() => handleSort('broughtClientsCount')}
-                                                align="center"
-                                            />
-                                        </th>
-                                        <th className="py-3 px-3">
-                                            <SortableColumnHeader
-                                                label="Última Atração"
-                                                active={sortKey === 'lastClientBroughtAt'}
-                                                direction={sortDir}
-                                                onClick={() => handleSort('lastClientBroughtAt')}
-                                            />
-                                        </th>
-                                        <th className="py-3 px-3">
-                                            <SortableColumnHeader
-                                                label="Último Acesso"
-                                                active={sortKey === 'lastAccessAt'}
-                                                direction={sortDir}
-                                                onClick={() => handleSort('lastAccessAt')}
-                                            />
-                                        </th>
-                                        <th className="py-3 px-4 text-right">
-                                            <SortableColumnHeader
-                                                label="Faturamento"
-                                                active={sortKey === 'totalEarned'}
-                                                direction={sortDir}
-                                                onClick={() => handleSort('totalEarned')}
-                                                align="right"
-                                            />
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 text-xs">
-                                    {displayList.map((prof: any) => (
-                                        <tr key={prof.clerkId} className="hover:bg-slate-50/80 transition-colors group">
-                                            {/* Profissional Info */}
-                                            <td className="py-3 px-4">
-                                                <div className="flex items-center gap-3">
+                                    return (
+                                        <tr key={conv.id} className="hover:bg-slate-50/50 transition-colors group">
+                                            {/* Profissional */}
+                                            <td className="py-3.5 px-5">
+                                                <div className="flex items-center gap-2.5">
                                                     {prof.photoUrl ? (
-                                                        <img src={prof.photoUrl} alt={prof.name} className="w-9 h-9 rounded-xl object-cover border border-slate-200 shrink-0" />
+                                                        <img
+                                                            src={prof.photoUrl}
+                                                            alt={prof.name}
+                                                            className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
+                                                        />
                                                     ) : (
-                                                        <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs shrink-0">
-                                                            {prof.name[0]?.toUpperCase() || 'P'}
+                                                        <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-black shrink-0">
+                                                            {prof.name?.[0]?.toUpperCase() || 'P'}
                                                         </div>
                                                     )}
-                                                    <div className="flex flex-col min-w-0">
-                                                        <Link href={`/admin/users/${prof.clerkId}`} className="font-bold text-slate-800 hover:text-purple-600 transition-colors truncate flex items-center gap-1">
+                                                    <div className="min-w-0">
+                                                        <span className="text-xs font-bold text-slate-900 block truncate">
                                                             {prof.name}
-                                                            <ExternalLink size={11} className="opacity-0 group-hover:opacity-100 transition-opacity text-purple-600 shrink-0" />
-                                                        </Link>
-                                                        <span className="text-[10px] text-slate-400 font-semibold truncate">@{prof.username}</span>
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-400 font-semibold block truncate">
+                                                            @{prof.username || 'sem_username'}
+                                                        </span>
                                                     </div>
                                                 </div>
                                             </td>
 
-                                            {/* Status Badge */}
-                                            <td className="py-3 px-3 whitespace-nowrap">
-                                                {prof.status === 'active' && (
-                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-bold text-[10px]">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                                        Ativa ({formatRelativeTime(prof.lastAccessAt)})
-                                                    </span>
-                                                )}
-                                                {prof.status === 'absent' && (
-                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200/80 font-bold text-[10px]">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                                                        Ausente ({formatRelativeTime(prof.lastAccessAt)})
-                                                    </span>
-                                                )}
-                                                {prof.status === 'inactive' && (
-                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200 font-bold text-[10px]">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                                                        Inativa ({formatRelativeTime(prof.lastAccessAt)})
-                                                    </span>
-                                                )}
-                                            </td>
-
-                                            {/* Total Acessos */}
-                                            <td className="py-3 px-3 text-center whitespace-nowrap">
-                                                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-xs">
-                                                    {prof.accessCount || 0} {prof.accessCount === 1 ? 'acesso' : 'acessos'}
+                                            {/* Cliente */}
+                                            <td className="py-3.5 px-5">
+                                                <span className="text-xs font-semibold text-slate-700 block truncate">
+                                                    {client.name}
                                                 </span>
                                             </td>
 
-                                            {/* Frequência Média */}
-                                            <td className="py-3 px-3 text-center whitespace-nowrap">
-                                                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100 font-bold text-[11px]">
-                                                    {prof.avgFrequencyLabel || 'Nenhum acesso'}
+                                            {/* Status */}
+                                            <td className="py-3.5 px-5">
+                                                {statusBadge}
+                                            </td>
+
+                                            {/* Carga Equivalente */}
+                                            <td className="py-3.5 px-5">
+                                                <span className="text-xs font-extrabold text-slate-800">
+                                                    {conv.equivalentChars || 0}
+                                                </span>
+                                                <span className="text-[10px] text-slate-400 font-medium ml-1">equiv.</span>
+                                            </td>
+
+                                            {/* Gasto Bruto */}
+                                            <td className="py-3.5 px-5">
+                                                <span className="text-xs font-bold text-slate-900">
+                                                    {formatCentsToBRL(conv.grossChargedCents)}
                                                 </span>
                                             </td>
 
-                                            {/* Clientes Trazidos */}
-                                            <td className="py-3 px-3 text-center whitespace-nowrap">
-                                                <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-black ${
-                                                    prof.broughtClientsCount > 0
-                                                        ? 'bg-purple-50 text-purple-700 border border-purple-200/60'
-                                                        : 'bg-slate-50 text-slate-400 border border-slate-100'
-                                                }`}>
-                                                    {prof.broughtClientsCount} {prof.broughtClientsCount === 1 ? 'cliente' : 'clientes'}
+                                            {/* Repasse Profissional */}
+                                            <td className="py-3.5 px-5">
+                                                <span className="text-xs font-bold text-emerald-700">
+                                                    {formatCentsToBRL(conv.payoutCents)}
                                                 </span>
                                             </td>
 
-                                            {/* Última Atração */}
-                                            <td className="py-3 px-3 whitespace-nowrap text-slate-600 font-medium text-[11px]">
-                                                {prof.lastClientBroughtAt ? (
-                                                    <div className="flex flex-col">
-                                                        <span className="font-bold text-slate-700">{formatRelativeTime(prof.lastClientBroughtAt)}</span>
-                                                        <span className="text-[9px] text-slate-400">
-                                                            {new Date(prof.lastClientBroughtAt).toLocaleDateString('pt-BR')} às {new Date(prof.lastClientBroughtAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                                        </span>
+                                            {/* Margem Mimo */}
+                                            <td className="py-3.5 px-5">
+                                                <span className="text-xs font-bold text-purple-700">
+                                                    {formatCentsToBRL(conv.marginCents)}
+                                                </span>
+                                            </td>
+
+                                            {/* Bônus Desbloqueados */}
+                                            <td className="py-3.5 px-5">
+                                                {conv.unlockedBonuses && conv.unlockedBonuses.length > 0 ? (
+                                                    <div className="flex items-center gap-1 flex-wrap">
+                                                        {conv.unlockedBonuses.map((bKey: string) => {
+                                                            const item = BONUS_LABELS[bKey] || { label: bKey, icon: Award };
+                                                            const IconComp = item.icon;
+                                                            return (
+                                                                <span
+                                                                    key={bKey}
+                                                                    className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200/60"
+                                                                >
+                                                                    <IconComp size={10} />
+                                                                    {item.label}
+                                                                </span>
+                                                            );
+                                                        })}
                                                     </div>
                                                 ) : (
-                                                    <span className="text-slate-400 italic text-[11px]">Nenhum ainda</span>
+                                                    <span className="text-[11px] text-slate-400 font-medium">-</span>
                                                 )}
                                             </td>
 
-                                            {/* Último Acesso */}
-                                            <td className="py-3 px-3 whitespace-nowrap text-slate-600 font-medium text-[11px]">
-                                                {prof.lastAccessAt ? (
-                                                    <div className="flex flex-col">
-                                                        <span>{new Date(prof.lastAccessAt).toLocaleDateString('pt-BR')}</span>
-                                                        <span className="text-[9px] text-slate-400">
-                                                            {new Date(prof.lastAccessAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                                        </span>
-                                                    </div>
+                                            {/* Moderação */}
+                                            <td className="py-3.5 px-5">
+                                                {isSuspicious ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200">
+                                                        <AlertTriangle size={11} />
+                                                        Suspeita
+                                                    </span>
                                                 ) : (
-                                                    <span className="text-slate-400 italic text-[11px]">N/D</span>
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-50 text-slate-500 border border-slate-200">
+                                                        <ShieldCheck size={11} className="text-emerald-500" />
+                                                        Limpo
+                                                    </span>
                                                 )}
                                             </td>
 
-                                            {/* Faturamento */}
-                                            <td className="py-3 px-4 text-right whitespace-nowrap">
-                                                <span className="font-extrabold text-slate-800 text-xs">
-                                                    {(prof.totalEarned || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                            {/* Última Atividade */}
+                                            <td className="py-3.5 px-5">
+                                                <span className="text-xs text-slate-600 font-medium">
+                                                    {formatRelativeTime(conv.lastParticipantActivityAt || conv.updatedAt)}
                                                 </span>
+                                            </td>
+
+                                            {/* Ação / Auditoria */}
+                                            <td className="py-3.5 px-5 text-center">
+                                                <Link
+                                                    href={`/admin/rooms`}
+                                                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-slate-50 hover:bg-purple-50 text-slate-500 hover:text-purple-600 transition-colors border border-slate-200/60"
+                                                    title="Auditar conversa"
+                                                >
+                                                    <Eye size={14} />
+                                                </Link>
                                             </td>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        );
-                    })()}
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
                 </div>
+            </div>
+
+            {/* Links rápidos para gestão detalhada */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Link
+                    href="/admin/professionals"
+                    className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-xs hover:border-purple-300 transition-all flex items-center justify-between group"
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+                            👩‍💼
+                        </div>
+                        <div>
+                            <h4 className="text-sm font-bold text-slate-900 group-hover:text-purple-700 transition-colors">
+                                Gestão de Profissionais
+                            </h4>
+                            <p className="text-xs text-slate-500 font-medium">
+                                Ver catálogo completo, taxas, status de verificação e atividades.
+                            </p>
+                        </div>
+                    </div>
+                    <ArrowRight size={16} className="text-slate-400 group-hover:text-purple-600 group-hover:translate-x-0.5 transition-all" />
+                </Link>
+
+                <Link
+                    href="/admin/financial"
+                    className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-xs hover:border-purple-300 transition-all flex items-center justify-between group"
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                            💳
+                        </div>
+                        <div>
+                            <h4 className="text-sm font-bold text-slate-900 group-hover:text-emerald-700 transition-colors">
+                                Extrato Financeiro & Balanços
+                            </h4>
+                            <p className="text-xs text-slate-500 font-medium">
+                                Ver depósitos, saques solicitados e conciliação contábil.
+                            </p>
+                        </div>
+                    </div>
+                    <ArrowRight size={16} className="text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all" />
+                </Link>
             </div>
         </div>
     );
