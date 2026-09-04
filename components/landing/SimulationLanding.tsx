@@ -187,9 +187,9 @@ export function SimulationLanding({
                                         <h2 className="font-extrabold text-slate-900 text-xs">Débora Silveira</h2>
                                         <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
                                     </div>
-                                    <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                        Online agora
+                                    <span className="text-[10px] text-purple-700 font-bold flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                        Chat Privado
                                     </span>
                                 </div>
                             </div>
@@ -209,7 +209,7 @@ export function SimulationLanding({
                             {step >= 1 && (
                                 <div className="self-start max-w-[85%] bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-tl-xs p-2.5 shadow-xs animate-in fade-in slide-in-from-bottom-2 duration-300">
                                     <p className="leading-snug">
-                                        Oi amor... acordado a essa hora? Tava na cama pensando em você 🙈
+                                        Oi amor! Vi que você me mandou mensagem... tava aqui na cama e resolvi te responder 🙈
                                     </p>
                                     <span className="text-[9px] text-slate-600 block text-right mt-1 font-semibold">
                                         23:42
@@ -233,7 +233,7 @@ export function SimulationLanding({
                             {step >= 3 && (
                                 <div className="self-start max-w-[85%] bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-tl-xs p-2.5 shadow-xs animate-in fade-in slide-in-from-bottom-2 duration-300">
                                     <p className="leading-snug">
-                                        Obrigada lindo! Tirei uma foto agorinha que só você vai ver no privado...
+                                        Obrigada lindo! Tirei uma foto íntima que só mando aqui no privado...
                                     </p>
                                     <span className="text-[9px] text-slate-600 block text-right mt-1 font-semibold">
                                         23:43
@@ -315,7 +315,7 @@ export function SimulationLanding({
                                         </div>
                                     </div>
                                     <p className="text-[10px] text-purple-700 font-semibold leading-snug">
-                                        &quot;Gostou da foto gato? Vem pro chat continuar o papo... tô te esperando 💕&quot;
+                                        &quot;Gostou da foto gato? Vem pro chat continuar o papo comigo... respondo todas as suas mensagens por áudio 💕&quot;
                                     </p>
                                 </div>
                             )}
@@ -349,19 +349,19 @@ export function SimulationLanding({
                                     className="w-full h-full object-cover"
                                 />
                             </div>
-                            <span className="absolute bottom-1 right-1 px-2.5 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-black border-2 border-white shadow-md flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                                Online
+                            <span className="absolute bottom-1 right-1 px-2.5 py-0.5 rounded-full bg-purple-600 text-white text-[10px] font-black border-2 border-white shadow-md flex items-center gap-1">
+                                <ShieldCheck className="w-3 h-3 text-white" />
+                                Privado
                             </span>
                         </div>
 
                         {/* Chamada Irresistível de Impacto Emocional */}
                         <div className="space-y-2">
                             <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight drop-shadow-md">
-                                Débora e outras mulheres estão online agora.
+                                O contato direto que você não tem em rede social nenhuma.
                             </h2>
                             <p className="text-sm text-purple-200/90 font-medium">
-                                Conversas privadas, fotos reais e sem enrolação.
+                                Áudios reais, fotos exclusivas e conversas no privado com mulheres de verdade.
                             </p>
                         </div>
 
@@ -372,12 +372,12 @@ export function SimulationLanding({
                                 {...ctaProps}
                                 className="w-full h-14 rounded-2xl bg-gradient-to-r from-purple-600 via-purple-500 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.98] text-white font-black text-base uppercase tracking-wider shadow-[0_10px_35px_rgba(147,51,234,0.5)] transition-all flex items-center justify-center gap-2 border border-purple-400/30 ring-4 ring-purple-500/20"
                             >
-                                <span>Ver Mulheres Online</span>
+                                <span>Explorar Perfis</span>
                                 <ArrowRight className="w-5 h-5" />
                             </Link>
 
                             <p className="text-[11px] text-white/50 font-medium">
-                                100% Discreto • Sem mensalidade fixa • +18
+                                100% Discreto • Sem mensalidade • Respostas reais no seu tempo
                             </p>
                         </div>
 
