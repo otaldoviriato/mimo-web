@@ -9,7 +9,8 @@ const isPublicRoute = createRouteMatcher([
     '/manifest.json',
     '/firebase-messaging-sw.js',
     '/.well-known/(.*)',
-    '/api/creator-applications(.*)'
+    '/api/creator-applications(.*)',
+    '/api/campaigns/visit(.*)',
 ]);
 
 export default clerkMiddleware(async (auth, req) => {

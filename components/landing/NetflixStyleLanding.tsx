@@ -75,27 +75,6 @@ function ProfileCard({ profile }: { profile: ProfileItem }) {
             {/* Gradiente escuro inferior idêntico ao Explorar */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
-            {/* Badge superior direito */}
-            {profile.badgeType === 'today' && (
-                <div className="absolute top-2 right-2 bg-white/95 text-purple-700 border border-purple-100 text-[9px] font-bold px-2 py-0.5 rounded-full shadow-md flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-purple-500 shrink-0" />
-                    <span>{profile.badge}</span>
-                </div>
-            )}
-
-            {profile.badgeType === 'online' && (
-                <div className="absolute top-2 right-2 bg-white text-emerald-600 border border-emerald-100 text-[9px] font-bold px-2 py-0.5 rounded-full shadow-md flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
-                    <span>Online</span>
-                </div>
-            )}
-
-            {profile.badgeType === 'recent' && (
-                <div className="absolute top-2 right-2 bg-black/45 text-white/90 border border-white/10 text-[9px] font-semibold px-2 py-0.5 rounded-full shadow-xs">
-                    <span>{profile.badge}</span>
-                </div>
-            )}
-
             {/* Nome e Idade inferior */}
             <div className="absolute bottom-0 inset-x-0 p-2.5 sm:p-3 text-white">
                 <h4 className="text-xs sm:text-sm font-black tracking-tight leading-tight truncate drop-shadow-sm">
@@ -237,23 +216,23 @@ export function NetflixStyleLanding({
             {/* ─── CONTEÚDO: ULTRA DIRETO, ENXUTO E 100% RESPONSIVO ─── */}
             <main className="relative z-20 flex-1 flex flex-col justify-center px-5 sm:px-12 lg:px-16 max-w-7xl mx-auto w-full my-auto py-4 sm:py-12">
                 <div className="max-w-xl text-left space-y-4 sm:space-y-6">
-                    {/* Badge Sutil e Alinhado ao Banner */}
+                    {/* Categoria do produto, sem promessa de disponibilidade imediata */}
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-100/90 border border-purple-200 text-purple-700 text-[11px] sm:text-xs font-bold uppercase tracking-wider shadow-xs">
                         <MessageCircle className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                        <span>Primeiro App de Chat com Garantia</span>
+                        <span>Conversas privadas</span>
                     </div>
 
                     {/* Título Principal de Impacto: Escala Perfeita em Telas Pequenas */}
                     <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.15] sm:leading-[1.1]">
-                        Conversas Privadas.{' '}
+                        Converse{' '}
                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-600 block sm:inline">
-                            Mulheres Reais.
+                            sem precisar dar match.
                         </span>
                     </h1>
 
-                    {/* Subtítulo de Garantia */}
+                    {/* Proposta direta, sem promessa de resposta ou imediatismo */}
                     <p className="text-sm sm:text-base lg:text-lg text-slate-600 font-semibold leading-relaxed">
-                        Respostas em até 24h ou seu dinheiro de volta.
+                        Mulheres reais. Conversas privadas.
                     </p>
 
                     {/* Botão de Chamada para Ação */}
@@ -263,7 +242,7 @@ export function NetflixStyleLanding({
                             {...ctaProps}
                             className="w-full sm:w-auto h-13 sm:h-16 px-7 sm:px-10 rounded-2xl bg-purple-600 hover:bg-purple-700 active:scale-[0.98] text-white font-black text-base sm:text-lg uppercase tracking-wider shadow-lg shadow-purple-600/25 transition-all flex items-center justify-center gap-2.5 group"
                         >
-                            <span>Ver Mulheres no App</span>
+                            <span>Conhecer Mulheres</span>
                             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                         </Link>
 

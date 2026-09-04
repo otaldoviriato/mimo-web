@@ -8,7 +8,7 @@ interface DescubraPageProps {
 
 export const metadata = {
     title: 'MimoChat | Conversas Privadas com Mulheres Reais',
-    description: 'Fotos exclusivas e mensagens diretas no privado. Sem mensalidade fixa.',
+    description: 'Converse sem precisar dar match. Mulheres reais e conversas privadas no MimoChat.',
 };
 
 export default async function DescubraPage({ searchParams }: DescubraPageProps) {
