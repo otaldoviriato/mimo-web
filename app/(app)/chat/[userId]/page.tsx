@@ -14,7 +14,7 @@ import { Drawer } from 'vaul';
 import { AudioRecorder, type AudioRecorderStatus } from '@/components/AudioRecorder';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { MediaComposerSheet } from '@/components/MediaComposerSheet';
-import { AlertTriangle, ShieldCheck, Wallet, Clock, MessageCircle } from 'lucide-react';
+import { AlertTriangle, ShieldCheck, Wallet, Clock, MessageCircle, LockKeyhole } from 'lucide-react';
 
 interface Message {
     _id: string;
@@ -2916,11 +2916,25 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                 </div>
                                             )}
                                     {item.isContentLocked ? (
-                                        <button onClick={() => openRechargeModal({ currentBalanceInCents: balance, requiredAmountInCents: item.receiptChargeCents ?? 0 })} className="text-left text-sm p-2 space-y-2">
-                                            <span className="block font-semibold">Mensagem bloqueada</span>
-                                            <span className="block">Recarregue para visualizar esta mensagem.</span>
-                                            <span className="block text-purple-700 font-semibold">Recarregar</span>
-                                        </button>
+                                        <div className="w-60 max-w-full py-2">
+                                            <div className="flex items-center gap-1.5 text-[11px] font-medium text-purple-700">
+                                                <LockKeyhole size={12} aria-hidden="true" />
+                                                {item.isAudio ? 'Áudio recebido' : 'Mensagem recebida'}
+                                                <time className="ml-auto text-[10px] font-normal text-gray-400">
+                                                    {new Date(item.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                </time>
+                                            </div>
+                                            <div aria-hidden="true" className="pointer-events-none my-3 max-h-40 min-h-8 overflow-hidden whitespace-pre-wrap break-words select-none text-sm leading-6 text-gray-600 blur-[5px]">
+                                                {item.isAudio ? '▂ ▅ ▃ ▇ ▄ ▂ ▆ ▇ ▃ ▅ ▂ ▄ ▆ ▃ ▅ ▂' : (item.content || '•••')}
+                                            </div>
+                                            <div className="border-t border-purple-100 pt-2.5">
+                                                <p className="mb-2 text-xs leading-4 text-gray-500">Recarregue seu saldo para {item.isAudio ? 'ouvir' : 'ler'} esta mensagem.</p>
+                                                <button type="button" onClick={() => openRechargeModal({ currentBalanceInCents: balance, requiredAmountInCents: item.receiptChargeCents ?? 0 })} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600">
+                                                    <LockKeyhole size={14} aria-hidden="true" />
+                                                    Recarregar e desbloquear
+                                                </button>
+                                            </div>
+                                        </div>
                                     ) : isLocked || item.originalImageUrl || item.isVideo || isAudio || item.isExpired ? (
                                         <>
                                             {item.isExpired || (item.expiresAt && new Date(item.expiresAt).getTime() > 0 && new Date(item.expiresAt) < new Date()) ? (
