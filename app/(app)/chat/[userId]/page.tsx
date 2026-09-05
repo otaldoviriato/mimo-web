@@ -22,6 +22,7 @@ interface Message {
     receiverId: string;
     content: string;
     charCount: number;
+    equivalentCharCount?: number;
     billingStatus?: 'free' | 'pending' | 'paid';
     isContentLocked?: boolean;
     receiptChargeCents?: number;
@@ -666,6 +667,42 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const latestPartnerMessage = React.useMemo(() => {
         return messages.filter(m => m.senderId === otherUserId).slice(-1)[0];
     }, [messages, otherUserId]);
+
+    const ACTIVE_CONVERSATION_WINDOW_MS = 5 * 60 * 1000; // 5 minutos de janela para conversa ativa
+
+    const isClientActiveInConversation = React.useMemo(() => {
+        if (receiver?.isOnline) return true;
+        if (!latestPartnerMessage?.timestamp) return false;
+        const diffMs = Date.now() - new Date(latestPartnerMessage.timestamp).getTime();
+        return diffMs >= 0 && diffMs < ACTIVE_CONVERSATION_WINDOW_MS;
+    }, [receiver?.isOnline, latestPartnerMessage?.timestamp]);
+
+    const offlineTurnStats = React.useMemo(() => {
+        if (!userData?.isProfessional) {
+            return { usedChars: 0, isLimitReached: false, remainingChars: 50, maxBillableChars: 50 };
+        }
+
+        const maxBillableChars = chatPricing?.maxBillableMessageChars ?? 50;
+        let usedChars = 0;
+
+        for (let i = messages.length - 1; i >= 0; i--) {
+            const m = messages[i];
+            if (m.senderId === otherUserId) {
+                break;
+            }
+            if (m.senderId === user?.id) {
+                const chars = m.equivalentCharCount ?? (m.charCount > 0 ? m.charCount : 0);
+                if (chars > 0) {
+                    usedChars += chars;
+                }
+            }
+        }
+
+        const remainingChars = Math.max(0, maxBillableChars - usedChars);
+        const isLimitReached = !isClientActiveInConversation && remainingChars <= 0;
+
+        return { usedChars, isLimitReached, remainingChars, maxBillableChars };
+    }, [userData?.isProfessional, chatPricing?.maxBillableMessageChars, messages, otherUserId, user?.id, isClientActiveInConversation]);
 
     // Lista derivada das mídias históricas carregadas combinadas com as mídias das mensagens locais
     const mediaItems = React.useMemo(() => {
@@ -1944,6 +1981,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             console.warn('[handleSend] Retorno antecipado (condição inválida). Texto vazio, sending true ou socket nulo.');
             return;
         }
+
+        if (offlineTurnStats.isLimitReached) {
+            alert('Você atingiu o limite de envio para clientes ausentes. Aguarde a resposta do cliente para continuar.');
+            return;
+        }
         
         if (!await ensureClientName()) return;
         const charCount = messageText.trim().length;
@@ -2009,6 +2051,10 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     };
 
     const handleSendAudio = async (audioBlob: Blob, durationInSeconds: number) => {
+        if (offlineTurnStats.isLimitReached) {
+            alert('Você atingiu o limite de envio para clientes ausentes. Aguarde a resposta do cliente para continuar.');
+            return;
+        }
         if (!await ensureClientName()) return;
         const tempId = `temp-audio-${Date.now()}`;
         const previewUrl = URL.createObjectURL(audioBlob);
@@ -3304,12 +3350,21 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     />
                 )}
 
+                {offlineTurnStats.isLimitReached && (
+                    <div className="mb-2.5 px-4 py-2.5 bg-amber-50 border border-amber-200/80 rounded-2xl flex items-center gap-3 shadow-xs select-none animate-in fade-in slide-in-from-bottom-2 duration-200">
+                        <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                        <p className="text-xs text-amber-900 font-medium leading-relaxed">
+                            Você atingiu o limite de mensagens para clientes ausentes ({offlineTurnStats.maxBillableChars} caracteres). Aguarde a resposta de <span className="font-bold">{receiver?.name || receiver?.username || 'cliente'}</span> para continuar conversando.
+                        </p>
+                    </div>
+                )}
+
                 <div className="flex items-end gap-3">
                     {audioRecordingStatus === 'idle' && (
                         <div className="relative shrink-0">
                             <button
                                 onClick={() => setAttachMenuVisible(!attachMenuVisible)}
-                                disabled={!connected || !!selectedFile}
+                                disabled={!connected || !!selectedFile || offlineTurnStats.isLimitReached}
                                 className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shrink-0 ${
                                     attachMenuVisible ? 'bg-purple-600 text-white rotate-45' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                                 }`}
@@ -3398,18 +3453,20 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     )}
 
                     {audioRecordingStatus === 'idle' && (
-                        <div className="flex-1 min-w-0 flex flex-col justify-center bg-gray-100 rounded-2xl px-3.5 py-2 min-h-[44px] max-h-[140px] transition-all">
+                        <div className={`flex-1 min-w-0 flex flex-col justify-center rounded-2xl px-3.5 py-2 min-h-[44px] max-h-[140px] transition-all ${
+                            offlineTurnStats.isLimitReached ? 'bg-gray-50 border border-amber-200/60' : 'bg-gray-100'
+                        }`}>
                             <textarea
                                 ref={inputRef}
                                 value={selectedFile ? "Mídia selecionada para envio..." : messageText}
-                                disabled={!!selectedFile}
+                                disabled={!!selectedFile || offlineTurnStats.isLimitReached}
                                 onChange={(e) => handleTyping(e.target.value)}
                                 onKeyDown={handleKeyDown}
                                 onFocus={() => setIsInputFocused(true)}
                                 onBlur={() => setIsInputFocused(false)}
-                                placeholder="Digite sua mensagem..."
+                                placeholder={offlineTurnStats.isLimitReached ? "Aguarde a resposta para continuar a conversa..." : "Digite sua mensagem..."}
                                 rows={1}
-                                className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none leading-5 py-0.5 disabled:text-gray-400"
+                                className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none leading-5 py-0.5 disabled:text-gray-400 disabled:cursor-not-allowed"
                                 style={{ maxHeight: '96px' }}
                                 onInput={(e) => {
                                     const el = e.currentTarget;
@@ -3441,6 +3498,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                         <button
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
+                                if (offlineTurnStats.isLimitReached) return;
                                 if (selectedFile) {
                                     sendSelectedMedia(0, false, 60);
                                 } else if (charCount > 0 && !userData?.isProfessional && receiver?.isProfessional && !monetizationDisabled && currentRate > 0 && balance < estimatedCostInCents) {
@@ -3452,11 +3510,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                     handleSend();
                                 }
                             }}
-                            disabled={(!messageText.trim() && !selectedFile) || !connected}
+                            disabled={(!messageText.trim() && !selectedFile) || !connected || offlineTurnStats.isLimitReached}
                             className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shrink-0 select-none ${
-                                (messageText.trim() || selectedFile) && connected
+                                (messageText.trim() || selectedFile) && connected && !offlineTurnStats.isLimitReached
                                     ? 'bg-purple-600 hover:bg-purple-700 shadow-sm text-white'
-                                    : 'bg-gray-200 text-gray-400'
+                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                             }`}
                         >
                             {sending ? (
@@ -3472,7 +3530,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                         </button>
                     ) : (
                         <AudioRecorder
-                            connected={connected && userData !== undefined}
+                            connected={connected && userData !== undefined && !offlineTurnStats.isLimitReached}
                             onSendAudio={handleSendAudio}
                             onStatusChange={setAudioRecordingStatus}
                             maxDurationSeconds={maxAudioDurationSeconds}
