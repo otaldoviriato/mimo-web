@@ -3098,12 +3098,24 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                     {item.isContentLocked ? (
                                         <button
                                             type="button"
-                                            aria-label="Mensagem bloqueada. Toque para recarregar e desbloquear."
                                             onClick={() => openRechargeModal({ currentBalanceInCents: balance, requiredAmountInCents: item.receiptChargeCents ?? 0 })}
                                             className="relative block max-w-full cursor-pointer text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-purple-600 rounded-sm"
                                         >
-                                            <span aria-hidden="true" className="pointer-events-none select-none text-sm leading-relaxed whitespace-pre-wrap break-words blur-[5px]">
+                                            <span className="grid w-52 max-w-full overflow-hidden rounded-xl">
+                                            <span aria-hidden="true" className="pointer-events-none col-start-1 row-start-1 select-none text-sm leading-relaxed whitespace-pre-wrap break-words blur-[5px]">
                                                 {item.isAudio ? '▂ ▅ ▃ ▇ ▄ ▂ ▆ ▇ ▃ ▅ ▂ ▄ ▆ ▃ ▅ ▂' : (item.content || '•••')}
+                                            </span>
+                                            <span className="relative col-start-1 row-start-1 flex w-full min-w-0 flex-col items-center justify-center gap-1.5 bg-amber-50/80 px-3 py-4 text-center text-amber-900">
+                                                <LockKeyhole size={16} className="text-amber-600" aria-hidden="true" />
+                                                <span className="text-xs font-semibold">Faltou saldo para liberar</span>
+                                                <span className="text-[11px] leading-4 text-amber-800">Esta mensagem não foi liberada automaticamente porque seu saldo era insuficiente.</span>
+                                                {typeof item.receiptChargeCents === 'number' && item.receiptChargeCents > 0 && (
+                                                    <span className="text-[11px] font-semibold text-amber-900">
+                                                        Valor da mensagem: {(item.receiptChargeCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                    </span>
+                                                )}
+                                                <span className="mt-0.5 text-[11px] font-semibold text-amber-700">Toque para adicionar saldo</span>
+                                            </span>
                                             </span>
                                             <span className="inline-flex items-center gap-1.5 float-right mt-2 ml-2 mb-[-2px]">
                                                 <time className="text-[10px] font-medium text-gray-400">
@@ -3501,12 +3513,6 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             <div className={`bg-white border-t border-gray-200 px-4 pt-3 shrink-0 ${
                 isInputFocused ? 'pb-3' : 'pb-[calc(16px+env(safe-area-inset-bottom))]'
             }`}>
-                {messages.some(message => message.isContentLocked) && (
-                    <p role="status" className="mb-3 flex items-center justify-center gap-1.5 text-center text-[11px] leading-4 text-gray-500">
-                        <LockKeyhole size={12} className="shrink-0" aria-hidden="true" />
-                        Mensagens bloqueadas. Adicione saldo para desbloquear.
-                    </p>
-                )}
                 {replyingTo && (
                     <div className="flex items-center justify-between bg-purple-50 border-l-4 border-purple-600 rounded-r-xl p-3 mb-3 animate-in slide-in-from-bottom-2 duration-150">
                         <div className="flex-1 min-w-0 pr-4">
