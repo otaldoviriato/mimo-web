@@ -143,7 +143,18 @@ export async function GET(request: NextRequest) {
 
                     const debitResult = await User.updateOne(
                         { clerkId: subscriberId, balance: { $gte: priceInCents } },
-                        { $inc: { balance: -priceInCents } },
+                        [{
+                            $set: {
+                                balance: { $subtract: ['$balance', priceInCents] },
+                                customerCashAvailableCents: {
+                                    $cond: [
+                                        { $ne: [{ $type: '$marketplaceWalletMigratedAt' }, 'missing'] },
+                                        { $max: [0, { $subtract: [{ $ifNull: ['$customerCashAvailableCents', 0] }, priceInCents] }] },
+                                        '$customerCashAvailableCents',
+                                    ],
+                                },
+                            },
+                        }],
                         { session }
                     );
 
@@ -158,7 +169,18 @@ export async function GET(request: NextRequest) {
                             professionalStatus: 'approved',
                             isSubscriptionEnabled: true,
                         },
-                        { $inc: { balance: professionalEarnings } },
+                        [{
+                            $set: {
+                                balance: { $add: [{ $ifNull: ['$balance', 0] }, professionalEarnings] },
+                                professionalAvailableCents: {
+                                    $cond: [
+                                        { $ne: [{ $type: '$marketplaceWalletMigratedAt' }, 'missing'] },
+                                        { $add: [{ $ifNull: ['$professionalAvailableCents', 0] }, professionalEarnings] },
+                                        '$professionalAvailableCents',
+                                    ],
+                                },
+                            },
+                        }],
                         { session }
                     );
 

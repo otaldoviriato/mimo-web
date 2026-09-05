@@ -213,10 +213,53 @@ interface EarningsIndicatorProps {
     cost: number;
     isSelected: boolean;
     isNew: boolean;
+    timestamp?: string;
 }
 
-function EarningsIndicator({ messageId, receiverEarnings, cost, isSelected, isNew }: EarningsIndicatorProps) {
-    return receiverEarnings && receiverEarnings > 0 ? <span className="self-center text-[11px] font-semibold text-emerald-700 whitespace-nowrap">+ R$ {(receiverEarnings / 100).toFixed(2).replace('.', ',')}</span> : null;
+function EarningsIndicator({ messageId, receiverEarnings, cost, isSelected, isNew, timestamp }: EarningsIndicatorProps) {
+    const [shown, setShown] = useState(false);
+
+    useEffect(() => {
+        // Se for nova mensagem ou enviada recentemente (últimos 25s)
+        const isRecent = timestamp ? (Date.now() - new Date(timestamp).getTime() < 25000) : false;
+        if (isNew || isRecent) {
+            const enterTimer = setTimeout(() => {
+                setShown(true);
+            }, 50);
+
+            // Fica alguns segundos visível e volta deslizando para trás do balão
+            const exitTimer = setTimeout(() => {
+                setShown(false);
+            }, 3800);
+
+            return () => {
+                clearTimeout(enterTimer);
+                clearTimeout(exitTimer);
+            };
+        }
+    }, [isNew, timestamp]);
+
+    const isVisible = isSelected || shown;
+
+    if (!receiverEarnings || receiverEarnings <= 0) return null;
+
+    return (
+        <div
+            className={`self-end mb-1 z-0 overflow-hidden transition-all duration-500 ease-out flex items-center ${
+                isVisible
+                    ? 'max-w-[120px] opacity-100 mr-2'
+                    : 'max-w-0 opacity-0 mr-0 pointer-events-none'
+            }`}
+        >
+            <span
+                className={`transform transition-transform duration-500 ease-out ${
+                    isVisible ? 'translate-x-0' : 'translate-x-full'
+                } text-[11px] font-semibold text-emerald-500 whitespace-nowrap select-none`}
+            >
+                + R$ {(receiverEarnings / 100).toFixed(2).replace('.', ',')}
+            </span>
+        </div>
+    );
 }
 
 interface MediaEarningsIndicatorProps {
@@ -1102,6 +1145,13 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     if (index !== -1) {
                         const newMessages = [...prev];
                         newMessages[index] = { ...data.message, status: 'sent' as const };
+                        if (data.message._id) {
+                            setNewIncomingMessageIds((prevIds) => {
+                                const nextIds = new Set(prevIds);
+                                nextIds.add(data.message._id);
+                                return nextIds;
+                            });
+                        }
                         return newMessages;
                     }
                 }
@@ -2320,10 +2370,6 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     {showNameModal && <ClientNameModal onSaved={async () => {
                 await refetchMyProfile(); setShowNameModal(false); nameResolution.current?.(true); nameResolution.current = null;
             }} onCancel={() => { setShowNameModal(false); nameResolution.current?.(false); nameResolution.current = null; }} />}
-            {!userData?.isProfessional && !receiver?.isTeam && <details className="order-last bg-purple-50 px-4 py-2 text-xs text-purple-900 shrink-0">
-                <summary className="cursor-pointer">Envio grátis · preços das mensagens recebidas</summary>
-                <p className="pt-2">Você paga R$ {((chatPricing?.isSubscriber ? chatPricing?.defaultPricePerCharSubscribers : chatPricing?.defaultPricePerCharNonSubscribers) ?? 0).toFixed(2).replace('.', ',')} por caractere recebido, até {chatPricing?.maxBillableMessageChars ?? 50} caracteres por mensagem. Cada segundo de áudio equivale a {chatPricing?.audioPriceMultiplier ?? 5} caracteres, com o mesmo limite. A cobrança ocorre no recebimento, mesmo sem abrir o chat. Sem saldo, a mensagem fica pendente até uma recarga.</p>
-            </details>}
             {/* Header */}
             <div className="shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 z-20 sticky top-0 shadow-md flex items-center gap-2">
                 {selectedMessageIds.size > 0 ? (
@@ -2775,6 +2821,19 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                 isNew={newUnlockedMediaIds.has(item._id)}
                                             />
                                         )}
+                                        {isMine && userData?.isProfessional && item.billingStatus === 'pending' && (
+                                            <span className="self-end mb-1 mr-1.5 text-[11px] font-medium text-amber-700 select-none">Pendente</span>
+                                        )}
+                                        {isMine && userData?.isProfessional && item.billingStatus === 'paid' && (
+                                            <EarningsIndicator
+                                                messageId={item._id}
+                                                receiverEarnings={item.receiverEarnings}
+                                                cost={item.cost}
+                                                isSelected={selectedMessageIds.has(item._id)}
+                                                isNew={newIncomingMessageIds.has(item._id)}
+                                                timestamp={item.timestamp}
+                                            />
+                                        )}
                                         <div
                                             className={`reply-swipe-balloon relative z-10 max-w-[75%] ${isLocked || item.originalImageUrl || item.isVideo || item.isExpired ? 'p-0 bg-transparent shadow-none' : (isAudio ? 'p-3' : 'px-3 py-1.5')} rounded-2xl ${
                                             (!isLocked && !item.originalImageUrl && !item.isVideo && !item.isExpired) 
@@ -3152,16 +3211,6 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                         </div>
                                     )}
                                 </div>
-                                    {isMine && userData?.isProfessional && item.billingStatus === 'pending' && <span className="self-center text-[11px] text-amber-700">Pendente</span>}
-                                    {isMine && userData?.isProfessional && item.billingStatus === 'paid' && (
-                                        <EarningsIndicator
-                                            messageId={item._id}
-                                            receiverEarnings={item.receiverEarnings}
-                                            cost={item.cost}
-                                            isSelected={selectedMessageIds.has(item._id)}
-                                            isNew={newIncomingMessageIds.has(item._id)}
-                                        />
-                                    )}
                                 </>
                             )}
                                 </div>
@@ -3358,7 +3407,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                 onKeyDown={handleKeyDown}
                                 onFocus={() => setIsInputFocused(true)}
                                 onBlur={() => setIsInputFocused(false)}
-                                placeholder="Digite sua mensagem (envio grátis)..."
+                                placeholder="Digite sua mensagem..."
                                 rows={1}
                                 className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none leading-5 py-0.5 disabled:text-gray-400"
                                 style={{ maxHeight: '96px' }}

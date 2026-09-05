@@ -142,15 +142,22 @@ export async function grantWelcomeCredit(
             noticeShown: false,
         });
 
-        // Incrementa o saldo do usuário (balance e promotionalBalance)
+        // Incrementa o saldo do usuário (balance e promotionalBalance, e customerPromoAvailableCents se migrado)
         await User.updateOne(
             { clerkId: userId },
-            {
-                $inc: {
-                    balance: amount,
-                    promotionalBalance: amount
-                }
-            }
+            [{
+                $set: {
+                    balance: { $add: [{ $ifNull: ['$balance', 0] }, amount] },
+                    promotionalBalance: { $add: [{ $ifNull: ['$promotionalBalance', 0] }, amount] },
+                    customerPromoAvailableCents: {
+                        $cond: [
+                            { $ne: [{ $type: '$marketplaceWalletMigratedAt' }, 'missing'] },
+                            { $add: [{ $ifNull: ['$customerPromoAvailableCents', 0] }, amount] },
+                            '$customerPromoAvailableCents',
+                        ],
+                    },
+                },
+            }]
         );
 
         // Registra transação e microtransação

@@ -102,7 +102,7 @@ export function SettingsPricingPage({
                     />
                 </SettingField>
 
-                <SettingField title="Limite de caracteres cobrados por mensagem" description="Textos e áudios recebidos pelo cliente são cobrados até este limite de caracteres equivalentes. O excedente é grátis; o envio não é limitado." unit="caracteres">
+                <SettingField title="Limite de caracteres cobrados por turno (cumulativo)" description="Textos e áudios enviados consecutivamente pelo profissional são cobrados até este limite acumulado de caracteres equivalentes. Quando o cliente responde qualquer mensagem, o limite zera e recomeça. Mensagens subsequentes antes da resposta do cliente são entregues gratuitamente." unit="caracteres">
                     <input type="number" min={1} max={10000} step={1} value={maxBillableMessageChars} onChange={e => setMaxBillableMessageChars(Number(e.target.value))} className={inputCls} />
                 </SettingField>
                 <SettingField

@@ -62,10 +62,18 @@ export async function POST(req: NextRequest) {
         // 1. Tenta creditar o saldo e registrar o cupom na conta do usuário de forma atômica.
         // A condição `claimedGiftCodes: { $ne: rawCode }` garante que se duas requisições
         // chegarem em paralelo, apenas uma conseguirá dar match e atualizar o documento.
+        const incFields: any = { balance: amount };
+        if (user.isProfessional) {
+            incFields.professionalAvailableCents = amount;
+        } else {
+            incFields.promotionalBalance = amount;
+            incFields.customerPromoAvailableCents = amount;
+        }
+
         const updatedUser = await User.findOneAndUpdate(
             { clerkId: userId, claimedGiftCodes: { $ne: rawCode } },
             {
-                $inc: { balance: amount },
+                $inc: incFields,
                 $push: { claimedGiftCodes: rawCode },
             },
             { new: true }
@@ -91,10 +99,18 @@ export async function POST(req: NextRequest) {
 
         if (!updatedGift) {
             // Reverte o crédito inserido no usuário para manter a consistência do sistema
+            const revertFields: any = { balance: -amount };
+            if (user.isProfessional) {
+                revertFields.professionalAvailableCents = -amount;
+            } else {
+                revertFields.promotionalBalance = -amount;
+                revertFields.customerPromoAvailableCents = -amount;
+            }
+
             await User.findOneAndUpdate(
                 { clerkId: userId },
                 {
-                    $inc: { balance: -amount },
+                    $inc: revertFields,
                     $pull: { claimedGiftCodes: rawCode }
                 }
             );

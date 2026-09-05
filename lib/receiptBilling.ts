@@ -2,15 +2,16 @@ export const RECEIPT_TERMS_VERSION = 'receipt-2026-09-05';
 export const PENDING_MESSAGE_LABEL = 'Recarregue para visualizar esta mensagem.';
 
 export function requiresReceiptConsent(user: { isProfessional?: boolean; isTeam?: boolean; receiptTermsVersion?: string | null; receiptTermsAcceptedAt?: unknown } | null | undefined): boolean {
-    return !user || (!user.isProfessional && !user.isTeam &&
-        (user.receiptTermsVersion !== RECEIPT_TERMS_VERSION || !user.receiptTermsAcceptedAt));
+    if (!user || user.isTeam) return false;
+    return user.receiptTermsVersion !== RECEIPT_TERMS_VERSION || !user.receiptTermsAcceptedAt;
 }
 
-export function billableReceivedCharacters(count: number, cap = 50): number {
-    if (!Number.isSafeInteger(count) || count < 0 || !Number.isSafeInteger(cap) || cap < 1) {
+export function billableReceivedCharacters(count: number, cap = 50, usedInTurn = 0): number {
+    if (!Number.isSafeInteger(count) || count < 0 || !Number.isSafeInteger(cap) || cap < 1 || !Number.isSafeInteger(usedInTurn) || usedInTurn < 0) {
         throw new Error('Quantidade de caracteres inválida.');
     }
-    return Math.min(count, cap);
+    const remainingCap = Math.max(0, cap - usedInTurn);
+    return Math.min(count, remainingCap);
 }
 
 // Never send pending content, audio URLs or quoted text to the paying recipient.

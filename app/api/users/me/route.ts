@@ -17,6 +17,7 @@ import { sendNewProfessionalTeamAlert } from '@/lib/teamAlerts';
 import { getReferralFromRequestHeaders, getReferralFromUnsafeMetadata, type ReferralMetadata } from '@/lib/referral';
 import { calculateOnboardingStep } from '@/lib/onboarding';
 import { RECEIPT_TERMS_VERSION } from '@/lib/receiptBilling';
+import { autoHealUserBalanceIfDivergent } from '@/lib/wallet';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
 
@@ -163,11 +164,11 @@ export async function GET(request: NextRequest) {
                 expiresAt: { $lt: new Date() },
                 status: 'active'
             });
+            let totalReverted = 0;
             for (const grant of expiredGrants) {
                 const amountToRevert = grant.amountRemaining;
                 if (amountToRevert > 0) {
-                    user.balance = Math.max(0, user.balance - amountToRevert);
-                    user.promotionalBalance = Math.max(0, (user.promotionalBalance || 0) - amountToRevert);
+                    totalReverted += amountToRevert;
                 }
                 grant.status = 'expired';
                 await grant.save();
@@ -196,8 +197,20 @@ export async function GET(request: NextRequest) {
                     metadata: { reason: 'Expirou o prazo de validade' }
                 });
             }
-            if (expiredGrants.length > 0) {
-                await user.save();
+            if (totalReverted > 0) {
+                const incFields: any = {
+                    balance: -totalReverted,
+                    promotionalBalance: -totalReverted,
+                };
+                if (user.marketplaceWalletMigratedAt) {
+                    incFields.customerPromoAvailableCents = -totalReverted;
+                }
+                await User.updateOne({ _id: user._id }, { $inc: incFields });
+                user.balance = Math.max(0, (user.balance || 0) - totalReverted);
+                user.promotionalBalance = Math.max(0, (user.promotionalBalance || 0) - totalReverted);
+                if (user.marketplaceWalletMigratedAt) {
+                    user.customerPromoAvailableCents = Math.max(0, (user.customerPromoAvailableCents || 0) - totalReverted);
+                }
             }
         } catch (expirationErr: any) {
             console.error('[GET /api/users/me] Erro ao expirar créditos do usuário:', expirationErr);
@@ -405,6 +418,8 @@ export async function GET(request: NextRequest) {
             }
         }
 
+        const effectiveBalance = await autoHealUserBalanceIfDivergent(user);
+
         return NextResponse.json({
             user: {
                 id: user._id,
@@ -423,7 +438,7 @@ export async function GET(request: NextRequest) {
                 state: user.state,
                 photoUrl: user.photoUrl,
                 coverUrl: user.coverUrl,
-                balance: user.balance,
+                balance: effectiveBalance.totalBalance,
                 isProfessional: user.isProfessional,
                 isTeam: Boolean(user.isTeam),
                 teamTitle: user.teamTitle || 'Equipe Mimo',
@@ -467,7 +482,7 @@ export async function GET(request: NextRequest) {
                 hideFromExplore: user.hideFromExplore ?? false,
                 publicPhotosCount,
                 avgResponseTimeMinutes: user.avgResponseTimeMinutes,
-                promotionalBalance: user.promotionalBalance || 0,
+                promotionalBalance: effectiveBalance.promotionalBalance,
                 promotionalBalanceLabel,
                 welcomeCreditNotice,
                 hasWelcomeCreditEnded,
@@ -704,6 +719,8 @@ export async function PATCH(request: NextRequest) {
             updatedActiveSubscriberIds = activeSubscriptions.map((subscription) => subscription.subscriberId);
         }
 
+        const effectiveBalance = await autoHealUserBalanceIfDivergent(user);
+
         return NextResponse.json({
             user: {
                 id: user._id,
@@ -718,7 +735,7 @@ export async function PATCH(request: NextRequest) {
                 state: user.state,
                 photoUrl: user.photoUrl,
                 coverUrl: user.coverUrl,
-                balance: user.balance,
+                balance: effectiveBalance.totalBalance,
                 isProfessional: user.isProfessional,
                 professionalStatus: user.professionalStatus,
                 subscriptionPrice: user.subscriptionPrice || 0,

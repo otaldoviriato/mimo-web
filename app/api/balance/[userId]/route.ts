@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
+import { autoHealUserBalanceIfDivergent } from '@/lib/wallet';
 
 export async function GET(
     request: NextRequest,
@@ -18,13 +19,15 @@ export async function GET(
 
         await connectToDatabase();
 
-        const user = await User.findOne({ clerkId: userId }).select('balance').lean();
+        const user = await User.findOne({ clerkId: userId });
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        return NextResponse.json({ balance: user.balance });
+        const effectiveBalance = await autoHealUserBalanceIfDivergent(user);
+
+        return NextResponse.json({ balance: effectiveBalance.totalBalance });
 
     } catch (error) {
         console.error('Error fetching balance:', error);

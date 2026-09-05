@@ -166,7 +166,18 @@ export async function POST(
 
             const debitResult = await User.updateOne(
                 { clerkId: requesterId, balance: { $gte: priceInCents } },
-                { $inc: { balance: -priceInCents } }
+                [{
+                    $set: {
+                        balance: { $subtract: ['$balance', priceInCents] },
+                        customerCashAvailableCents: {
+                            $cond: [
+                                { $ne: [{ $type: '$marketplaceWalletMigratedAt' }, 'missing'] },
+                                { $max: [0, { $subtract: [{ $ifNull: ['$customerCashAvailableCents', 0] }, priceInCents] }] },
+                                '$customerCashAvailableCents',
+                            ],
+                        },
+                    },
+                }]
             );
 
             if (debitResult.modifiedCount === 0) {
@@ -181,7 +192,18 @@ export async function POST(
                     professionalStatus: 'approved',
                     isSubscriptionEnabled: true,
                 },
-                { $inc: { balance: professionalEarnings } }
+                [{
+                    $set: {
+                        balance: { $add: [{ $ifNull: ['$balance', 0] }, professionalEarnings] },
+                        professionalAvailableCents: {
+                            $cond: [
+                                { $ne: [{ $type: '$marketplaceWalletMigratedAt' }, 'missing'] },
+                                { $add: [{ $ifNull: ['$professionalAvailableCents', 0] }, professionalEarnings] },
+                                '$professionalAvailableCents',
+                            ],
+                        },
+                    },
+                }]
             );
 
             if (creditResult.modifiedCount === 0) {
@@ -240,7 +262,18 @@ export async function POST(
             if (debited) {
                 await User.updateOne(
                     { clerkId: requesterId },
-                    { $inc: { balance: priceInCents } }
+                    [{
+                        $set: {
+                            balance: { $add: [{ $ifNull: ['$balance', 0] }, priceInCents] },
+                            customerCashAvailableCents: {
+                                $cond: [
+                                    { $ne: [{ $type: '$marketplaceWalletMigratedAt' }, 'missing'] },
+                                    { $add: [{ $ifNull: ['$customerCashAvailableCents', 0] }, priceInCents] },
+                                    '$customerCashAvailableCents',
+                                ],
+                            },
+                        },
+                    }]
                 ).catch((refundError) => {
                     console.error('[POST /api/users/[id]/subscribe] Failed to refund subscriber after subscription error:', refundError);
                 });
@@ -249,7 +282,18 @@ export async function POST(
             if (credited) {
                 await User.updateOne(
                     { clerkId: ownerId },
-                    { $inc: { balance: -professionalEarnings } }
+                    [{
+                        $set: {
+                            balance: { $max: [0, { $subtract: [{ $ifNull: ['$balance', 0] }, professionalEarnings] }] },
+                            professionalAvailableCents: {
+                                $cond: [
+                                    { $ne: [{ $type: '$marketplaceWalletMigratedAt' }, 'missing'] },
+                                    { $max: [0, { $subtract: [{ $ifNull: ['$professionalAvailableCents', 0] }, professionalEarnings] }] },
+                                    '$professionalAvailableCents',
+                                ],
+                            },
+                        },
+                    }]
                 ).catch((revertCreditError) => {
                     console.error('[POST /api/users/[id]/subscribe] Failed to revert professional credit after subscription error:', revertCreditError);
                 });

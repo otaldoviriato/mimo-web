@@ -42,9 +42,21 @@ export async function GET(
 
                     if (paidTransaction) {
                         transaction = paidTransaction;
+                        const rechargeAmountCents = Math.round((transaction.amount || 0) * 100);
                         await User.findOneAndUpdate(
                             { clerkId: userId },
-                            { $inc: { balance: Math.round((transaction.amount || 0) * 100) } }
+                            [{
+                                $set: {
+                                    balance: { $add: [{ $ifNull: ['$balance', 0] }, rechargeAmountCents] },
+                                    customerCashAvailableCents: {
+                                        $cond: [
+                                            { $ne: [{ $type: '$marketplaceWalletMigratedAt' }, 'missing'] },
+                                            { $add: [{ $ifNull: ['$customerCashAvailableCents', 0] }, rechargeAmountCents] },
+                                            '$customerCashAvailableCents',
+                                        ],
+                                    },
+                                },
+                            }]
                         );
                     } else {
                         transaction = await Transaction.findOne({ abacatePayId: id, userId }) || transaction;
