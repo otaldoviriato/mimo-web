@@ -51,6 +51,7 @@ export function useChatPricing(professionalId?: string) {
                 defaultPricePerCharSubscribers: number;
                 defaultPricePerCharNonSubscribers: number;
                 maxBillableMessageChars: number;
+                maxOnlineCumulativeChars?: number;
                 offlineFollowUpIntervalHours?: number;
                 offlineFollowUpMaxAttempts?: number;
                 audioPriceMultiplier: number;

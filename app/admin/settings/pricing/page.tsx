@@ -23,6 +23,8 @@ export default function AdminSettingsPricingPage() {
             setSubscriberDiscountPercentage={settings.setSubscriberDiscountPercentage}
             maxBillableMessageChars={settings.maxBillableMessageChars}
             setMaxBillableMessageChars={settings.setMaxBillableMessageChars}
+            maxOnlineCumulativeChars={settings.maxOnlineCumulativeChars}
+            setMaxOnlineCumulativeChars={settings.setMaxOnlineCumulativeChars}
             offlineFollowUpIntervalHours={settings.offlineFollowUpIntervalHours}
             setOfflineFollowUpIntervalHours={settings.setOfflineFollowUpIntervalHours}
             offlineFollowUpMaxAttempts={settings.offlineFollowUpMaxAttempts}

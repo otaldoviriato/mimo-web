@@ -13,6 +13,7 @@ type Props = Pick<UseSettingsReturn,
     | 'maxSubscriptionPrice' | 'setMaxSubscriptionPrice'
     | 'subscriberDiscountPercentage' | 'setSubscriberDiscountPercentage'
     | 'maxBillableMessageChars' | 'setMaxBillableMessageChars'
+    | 'maxOnlineCumulativeChars' | 'setMaxOnlineCumulativeChars'
     | 'offlineFollowUpIntervalHours' | 'setOfflineFollowUpIntervalHours'
     | 'offlineFollowUpMaxAttempts' | 'setOfflineFollowUpMaxAttempts'
     | 'audioPriceMultiplier' | 'setAudioPriceMultiplier'
@@ -41,6 +42,7 @@ export function SettingsPricingPage({
     maxSubscriptionPrice, setMaxSubscriptionPrice,
     subscriberDiscountPercentage, setSubscriberDiscountPercentage,
     maxBillableMessageChars, setMaxBillableMessageChars,
+    maxOnlineCumulativeChars, setMaxOnlineCumulativeChars,
     offlineFollowUpIntervalHours, setOfflineFollowUpIntervalHours,
     offlineFollowUpMaxAttempts, setOfflineFollowUpMaxAttempts,
     audioPriceMultiplier, setAudioPriceMultiplier,
@@ -106,8 +108,12 @@ export function SettingsPricingPage({
                     />
                 </SettingField>
 
-                <SettingField title="Limite de caracteres cobrados por turno (cumulativo)" description="Textos e áudios enviados consecutivamente pelo profissional são cobrados até este limite acumulado de caracteres equivalentes. Quando o cliente responde qualquer mensagem, o limite zera e recomeça. Mensagens subsequentes antes da resposta do cliente são bloqueadas." unit="caracteres">
+                <SettingField title="Limite de caracteres com cliente ausente/offline (por tentativa)" description="Textos e áudios enviados consecutivamente pelo profissional para cliente ausente são limitados a este valor acumulado por tentativa." unit="caracteres">
                     <input type="number" min={1} max={10000} step={1} value={maxBillableMessageChars} onChange={e => setMaxBillableMessageChars(Number(e.target.value))} className={inputCls} />
+                </SettingField>
+
+                <SettingField title="Limite cumulativo de caracteres com cliente online" description="Textos e áudios enviados consecutivamente pela profissional com o cliente ativo/online são limitados a este total de caracteres. Quando o cliente responde qualquer mensagem, o limite zera e recomeça. Ao atingir este limite sem resposta do cliente, o chat é bloqueado com aviso explicativo." unit="caracteres">
+                    <input type="number" min={10} max={20000} step={10} value={maxOnlineCumulativeChars} onChange={e => setMaxOnlineCumulativeChars(Number(e.target.value))} className={inputCls} />
                 </SettingField>
 
                 <SettingField title="Intervalo para nova tentativa com cliente ausente" description="Tempo mínimo de espera em horas para liberar uma nova cota de caracteres e permitir que a criadora chame a atenção do cliente ausente novamente caso ele ainda não tenha respondido." unit="horas">

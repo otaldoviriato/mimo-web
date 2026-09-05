@@ -26,6 +26,7 @@ interface SettingsSnapshot {
     defaultPricePerCharSubscribers: number;
     defaultPricePerCharNonSubscribers: number;
     maxBillableMessageChars: number;
+    maxOnlineCumulativeChars: number;
     offlineFollowUpIntervalHours: number;
     offlineFollowUpMaxAttempts: number;
     audioPriceMultiplier: number;
@@ -75,6 +76,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     const [defaultPricePerCharSubscribers, setDefaultPricePerCharSubscribers] = useState(0.04);
     const [defaultPricePerCharNonSubscribers, setDefaultPricePerCharNonSubscribers] = useState(0.05);
     const [maxBillableMessageChars, setMaxBillableMessageChars] = useState(50);
+    const [maxOnlineCumulativeChars, setMaxOnlineCumulativeChars] = useState(500);
     const [offlineFollowUpIntervalHours, setOfflineFollowUpIntervalHours] = useState(24);
     const [offlineFollowUpMaxAttempts, setOfflineFollowUpMaxAttempts] = useState(3);
     const [audioPriceMultiplier, setAudioPriceMultiplier] = useState(5);
@@ -124,6 +126,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         defaultPricePerCharSubscribers: s.defaultPricePerCharSubscribers ?? 0.04,
         defaultPricePerCharNonSubscribers: s.defaultPricePerCharNonSubscribers ?? 0.05,
         maxBillableMessageChars: s.maxBillableMessageChars ?? 50,
+        maxOnlineCumulativeChars: s.maxOnlineCumulativeChars ?? 500,
         offlineFollowUpIntervalHours: s.offlineFollowUpIntervalHours ?? 24,
         offlineFollowUpMaxAttempts: s.offlineFollowUpMaxAttempts ?? 3,
         audioPriceMultiplier: s.audioPriceMultiplier ?? 5,
@@ -184,6 +187,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     setDefaultPricePerCharNonSubscribers(s.defaultPricePerCharNonSubscribers ?? 0.05);
                     setAudioPriceMultiplier(s.audioPriceMultiplier ?? 5);
                     setMaxBillableMessageChars(s.maxBillableMessageChars ?? 50);
+                    setMaxOnlineCumulativeChars(s.maxOnlineCumulativeChars ?? 500);
                     setOfflineFollowUpIntervalHours(s.offlineFollowUpIntervalHours ?? 24);
                     setOfflineFollowUpMaxAttempts(s.offlineFollowUpMaxAttempts ?? 3);
                     setPwaShowAgainIntervalDays(s.pwaShowAgainIntervalDays ?? 7);
@@ -284,6 +288,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     defaultPricePerCharSubscribers,
                     defaultPricePerCharNonSubscribers,
                     maxBillableMessageChars,
+                    maxOnlineCumulativeChars,
                     offlineFollowUpIntervalHours,
                     offlineFollowUpMaxAttempts,
                     audioPriceMultiplier,
@@ -322,6 +327,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                 setDefaultPricePerCharNonSubscribers(s.defaultPricePerCharNonSubscribers ?? 0.05);
                 setAudioPriceMultiplier(s.audioPriceMultiplier ?? 5);
                 setMaxBillableMessageChars(s.maxBillableMessageChars ?? 50);
+                setMaxOnlineCumulativeChars(s.maxOnlineCumulativeChars ?? 500);
                 setOfflineFollowUpIntervalHours(s.offlineFollowUpIntervalHours ?? 24);
                 setOfflineFollowUpMaxAttempts(s.offlineFollowUpMaxAttempts ?? 3);
                 setPwaShowAgainIntervalDays(s.pwaShowAgainIntervalDays ?? 7);
@@ -389,6 +395,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         defaultPricePerCharSubscribers !== savedSnapshot.defaultPricePerCharSubscribers ||
         defaultPricePerCharNonSubscribers !== savedSnapshot.defaultPricePerCharNonSubscribers ||
         maxBillableMessageChars !== savedSnapshot.maxBillableMessageChars ||
+        maxOnlineCumulativeChars !== savedSnapshot.maxOnlineCumulativeChars ||
         offlineFollowUpIntervalHours !== savedSnapshot.offlineFollowUpIntervalHours ||
         offlineFollowUpMaxAttempts !== savedSnapshot.offlineFollowUpMaxAttempts ||
         audioPriceMultiplier !== savedSnapshot.audioPriceMultiplier
@@ -445,6 +452,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         defaultPricePerCharSubscribers, setDefaultPricePerCharSubscribers,
         defaultPricePerCharNonSubscribers, setDefaultPricePerCharNonSubscribers,
         maxBillableMessageChars, setMaxBillableMessageChars,
+        maxOnlineCumulativeChars, setMaxOnlineCumulativeChars,
         offlineFollowUpIntervalHours, setOfflineFollowUpIntervalHours,
         offlineFollowUpMaxAttempts, setOfflineFollowUpMaxAttempts,
         audioPriceMultiplier, setAudioPriceMultiplier,

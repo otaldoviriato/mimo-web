@@ -702,6 +702,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
     const offlineTurnStats = React.useMemo(() => {
         const maxBillableChars = chatPricing?.maxBillableMessageChars ?? 50;
+        const maxOnlineCumulativeChars = chatPricing?.maxOnlineCumulativeChars ?? 500;
         const followUpIntervalHours = chatPricing?.offlineFollowUpIntervalHours ?? 24;
         const followUpMaxAttempts = chatPricing?.offlineFollowUpMaxAttempts ?? 3;
         const intervalMs = followUpIntervalHours * 60 * 60 * 1000;
@@ -710,8 +711,10 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             return {
                 canSend: true,
                 isLimitReached: false,
+                limitType: 'none' as 'none' | 'online' | 'offline',
                 remainingChars: maxBillableChars,
                 maxBillableChars,
+                maxOnlineCumulativeChars,
                 attemptNumber: 1,
                 maxAttempts: followUpMaxAttempts,
                 isExhausted: false,
@@ -737,12 +740,36 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         }
         proMsgsSinceClient.reverse();
 
+        const totalProCharsSinceClient = proMsgsSinceClient.reduce((acc, item) => acc + item.chars, 0);
+
+        // 1. Conversa Ativa (cliente online ou interagiu nos últimos 5 min):
+        // Aplica limite cumulativo contínuo parametrizado (default 500 chars)
+        if (isClientActiveInConversation) {
+            const isLimitReached = totalProCharsSinceClient >= maxOnlineCumulativeChars;
+            return {
+                canSend: !isLimitReached,
+                isLimitReached,
+                limitType: isLimitReached ? ('online' as const) : ('none' as const),
+                remainingChars: Math.max(0, maxOnlineCumulativeChars - totalProCharsSinceClient),
+                maxBillableChars,
+                maxOnlineCumulativeChars,
+                attemptNumber: 1,
+                maxAttempts: followUpMaxAttempts,
+                isExhausted: false,
+                msUntilNextAttempt: 0,
+            };
+        }
+
+        // 2. Cliente ausente/offline:
+        // Aplica janelas de follow-up com cotas de 50 caracteres
         if (proMsgsSinceClient.length === 0) {
             return {
                 canSend: true,
                 isLimitReached: false,
+                limitType: 'none' as const,
                 remainingChars: maxBillableChars,
                 maxBillableChars,
+                maxOnlineCumulativeChars,
                 attemptNumber: 1,
                 maxAttempts: followUpMaxAttempts,
                 isExhausted: false,
@@ -774,8 +801,10 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 return {
                     canSend: true,
                     isLimitReached: false,
+                    limitType: 'none' as const,
                     remainingChars: maxBillableChars,
                     maxBillableChars,
+                    maxOnlineCumulativeChars,
                     attemptNumber: attempts.length + 1,
                     maxAttempts: followUpMaxAttempts,
                     isExhausted: false,
@@ -783,10 +812,12 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 };
             } else {
                 return {
-                    canSend: isClientActiveInConversation,
-                    isLimitReached: !isClientActiveInConversation,
+                    canSend: false,
+                    isLimitReached: true,
+                    limitType: 'offline' as const,
                     remainingChars: 0,
                     maxBillableChars,
+                    maxOnlineCumulativeChars,
                     attemptNumber: attempts.length,
                     maxAttempts: followUpMaxAttempts,
                     isExhausted: true,
@@ -800,8 +831,10 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             return {
                 canSend: true,
                 isLimitReached: false,
+                limitType: 'none' as const,
                 remainingChars: Math.max(0, maxBillableChars - usedInCurrent),
                 maxBillableChars,
+                maxOnlineCumulativeChars,
                 attemptNumber: attempts.length,
                 maxAttempts: followUpMaxAttempts,
                 isExhausted: false,
@@ -811,13 +844,14 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
         const msUntilNextAttempt = Math.max(0, (lastAttempt.lastMessageAt.getTime() + intervalMs) - nowMs);
         const isExhausted = attempts.length >= followUpMaxAttempts;
-        const isLimitReached = !isClientActiveInConversation;
 
         return {
-            canSend: !isLimitReached,
-            isLimitReached,
+            canSend: false,
+            isLimitReached: true,
+            limitType: 'offline' as const,
             remainingChars: 0,
             maxBillableChars,
+            maxOnlineCumulativeChars,
             attemptNumber: attempts.length,
             maxAttempts: followUpMaxAttempts,
             isExhausted,
@@ -826,6 +860,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     }, [
         userData?.isProfessional,
         chatPricing?.maxBillableMessageChars,
+        chatPricing?.maxOnlineCumulativeChars,
         chatPricing?.offlineFollowUpIntervalHours,
         chatPricing?.offlineFollowUpMaxAttempts,
         messages,
@@ -2115,7 +2150,9 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
         if (offlineTurnStats.isLimitReached) {
             const partnerName = receiver?.name || receiver?.username || 'o cliente';
-            if (offlineTurnStats.isExhausted) {
+            if (offlineTurnStats.limitType === 'online') {
+                toast.error(`Você atingiu o limite máximo de mensagens sem uma resposta do cliente. Aguarde a resposta de ${partnerName}.`);
+            } else if (offlineTurnStats.isExhausted) {
                 toast.error(`Você atingiu o limite de ${offlineTurnStats.maxAttempts} tentativas para clientes ausentes. Aguarde a resposta de ${partnerName}.`);
             } else {
                 toast.error(`Você poderá mandar uma nova mensagem de ${offlineTurnStats.maxBillableChars} caracteres em ${formatFollowUpCountdown(offlineTurnStats.msUntilNextAttempt)} (tentativa ${offlineTurnStats.attemptNumber + 1} de ${offlineTurnStats.maxAttempts}). Aguarde a resposta de ${partnerName}.`);
@@ -2189,7 +2226,9 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const handleSendAudio = async (audioBlob: Blob, durationInSeconds: number) => {
         if (offlineTurnStats.isLimitReached) {
             const partnerName = receiver?.name || receiver?.username || 'o cliente';
-            if (offlineTurnStats.isExhausted) {
+            if (offlineTurnStats.limitType === 'online') {
+                toast.error(`Você atingiu o limite máximo de mensagens sem uma resposta do cliente. Aguarde a resposta de ${partnerName}.`);
+            } else if (offlineTurnStats.isExhausted) {
                 toast.error(`Você atingiu o limite de ${offlineTurnStats.maxAttempts} tentativas para clientes ausentes. Aguarde a resposta de ${partnerName}.`);
             } else {
                 toast.error(`Você poderá mandar um novo áudio/mensagem em ${formatFollowUpCountdown(offlineTurnStats.msUntilNextAttempt)} (tentativa ${offlineTurnStats.attemptNumber + 1} de ${offlineTurnStats.maxAttempts}). Aguarde a resposta de ${partnerName}.`);
@@ -3512,7 +3551,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     <div className="mb-2.5 px-4 py-2.5 bg-amber-50 border border-amber-200/80 rounded-2xl flex items-center gap-3 shadow-xs select-none animate-in fade-in slide-in-from-bottom-2 duration-200">
                         <Clock className="w-4 h-4 text-amber-600 shrink-0" />
                         <p className="text-xs text-amber-900 font-medium leading-relaxed">
-                            {offlineTurnStats.isExhausted ? (
+                            {offlineTurnStats.limitType === 'online' ? (
+                                <>
+                                    Você atingiu o limite máximo de mensagens sem uma resposta do cliente. Aguarde a resposta de <span className="font-bold">{receiver?.name || receiver?.username || 'cliente'}</span> para continuar conversando.
+                                </>
+                            ) : offlineTurnStats.isExhausted ? (
                                 <>
                                     Você atingiu o limite máximo de {offlineTurnStats.maxAttempts} tentativas para clientes ausentes. Aguarde a resposta de <span className="font-bold">{receiver?.name || receiver?.username || 'cliente'}</span> para continuar conversando.
                                 </>
@@ -3632,9 +3675,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                 onBlur={() => setIsInputFocused(false)}
                                 placeholder={
                                     offlineTurnStats.isLimitReached
-                                        ? (offlineTurnStats.isExhausted
-                                            ? "Aguarde a resposta para continuar a conversa..."
-                                            : `Nova mensagem liberada em ${formatFollowUpCountdown(offlineTurnStats.msUntilNextAttempt)}...`)
+                                        ? (offlineTurnStats.limitType === 'online'
+                                            ? `Limite atingido. Aguarde a resposta de ${receiver?.name || receiver?.username || 'cliente'}...`
+                                            : (offlineTurnStats.isExhausted
+                                                ? "Aguarde a resposta para continuar a conversa..."
+                                                : `Nova mensagem liberada em ${formatFollowUpCountdown(offlineTurnStats.msUntilNextAttempt)}...`))
                                         : "Digite sua mensagem..."
                                 }
                                 rows={1}

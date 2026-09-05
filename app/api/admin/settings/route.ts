@@ -69,6 +69,10 @@ async function getOrCreateSettings() {
         if (settings.newClientHoursThreshold === undefined) { settings.newClientHoursThreshold = 24; updated = true; }
         if (settings.activeRechargedClientDaysThreshold === undefined) { settings.activeRechargedClientDaysThreshold = 30; updated = true; }
         if (settings.activeUnrechargedClientHoursThreshold === undefined) { settings.activeUnrechargedClientHoursThreshold = 24; updated = true; }
+        if (settings.maxBillableMessageChars === undefined) { settings.maxBillableMessageChars = 50; updated = true; }
+        if (settings.maxOnlineCumulativeChars === undefined) { settings.maxOnlineCumulativeChars = 500; updated = true; }
+        if (settings.offlineFollowUpIntervalHours === undefined) { settings.offlineFollowUpIntervalHours = 24; updated = true; }
+        if (settings.offlineFollowUpMaxAttempts === undefined) { settings.offlineFollowUpMaxAttempts = 3; updated = true; }
         if (settings.onlineDelayMinutes === undefined) { settings.onlineDelayMinutes = 2; updated = true; }
         if (settings.activeUserThresholdDays === undefined) { settings.activeUserThresholdDays = 7; updated = true; }
         if (updated) {
@@ -175,6 +179,7 @@ export async function PUT(request: NextRequest) {
             defaultPricePerCharSubscribers,
             defaultPricePerCharNonSubscribers,
             maxBillableMessageChars,
+            maxOnlineCumulativeChars,
             offlineFollowUpIntervalHours,
             offlineFollowUpMaxAttempts,
             audioPriceMultiplier,
@@ -361,6 +366,10 @@ export async function PUT(request: NextRequest) {
         if (maxBillableMessageChars !== undefined) {
             if (!Number.isSafeInteger(maxBillableMessageChars) || maxBillableMessageChars < 1 || maxBillableMessageChars > 10000) return NextResponse.json({ error: 'Limite de caracteres deve ser inteiro entre 1 e 10000.' }, { status: 400 });
             settings.maxBillableMessageChars = maxBillableMessageChars;
+        }
+        if (maxOnlineCumulativeChars !== undefined) {
+            if (!Number.isSafeInteger(maxOnlineCumulativeChars) || maxOnlineCumulativeChars < 10 || maxOnlineCumulativeChars > 20000) return NextResponse.json({ error: 'Limite de caracteres online deve ser inteiro entre 10 e 20000.' }, { status: 400 });
+            settings.maxOnlineCumulativeChars = maxOnlineCumulativeChars;
         }
         if (offlineFollowUpIntervalHours !== undefined) {
             if (!Number.isSafeInteger(offlineFollowUpIntervalHours) || offlineFollowUpIntervalHours < 1 || offlineFollowUpIntervalHours > 720) return NextResponse.json({ error: 'Intervalo de follow-up deve ser inteiro entre 1 e 720 horas.' }, { status: 400 });
