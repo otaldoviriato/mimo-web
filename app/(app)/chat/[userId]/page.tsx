@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, use } from 'react';
 import axios from 'axios';
+import { ClientNameModal } from '@/components/ClientNameModal';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useUser } from '@clerk/nextjs';
 import { useQueryClient } from '@tanstack/react-query';
@@ -21,6 +22,9 @@ interface Message {
     receiverId: string;
     content: string;
     charCount: number;
+    billingStatus?: 'free' | 'pending' | 'paid';
+    isContentLocked?: boolean;
+    receiptChargeCents?: number;
     cost: number;
     timestamp: string;
     isRead?: boolean;
@@ -212,8 +216,7 @@ interface EarningsIndicatorProps {
 }
 
 function EarningsIndicator({ messageId, receiverEarnings, cost, isSelected, isNew }: EarningsIndicatorProps) {
-    // No marketplace-first, ganhos não são por mensagem avulsa; popup "+ R$" desativado
-    return null;
+    return receiverEarnings && receiverEarnings > 0 ? <span className="self-center text-[11px] font-semibold text-emerald-700 whitespace-nowrap">+ R$ {(receiverEarnings / 100).toFixed(2).replace('.', ',')}</span> : null;
 }
 
 interface MediaEarningsIndicatorProps {
@@ -580,7 +583,16 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     // professional vs non-professional routing once userData becomes available.
     const pendingMediaRef = useRef<{ file: File; isVideoFile: boolean } | null>(null);
 
-    const { data: userData } = useMyProfile();
+    const { data: userData, refetch: refetchMyProfile } = useMyProfile();
+    const [showNameModal, setShowNameModal] = useState(false);
+    const nameResolution = useRef<((value: boolean) => void) | null>(null);
+    const ensureClientName = async () => {
+        if (userData?.isProfessional || userData?.isTeam || userData?.name?.trim()) return true;
+        if (nameResolution.current) return false;
+        setShowNameModal(true);
+        return new Promise<boolean>(resolve => { nameResolution.current = resolve; });
+    };
+    useEffect(() => () => { nameResolution.current?.(false); }, []);
     const { data: receiver } = useUserById(otherUserId);
     const { data: chatPricing } = useChatPricing(receiver?.isProfessional ? receiver.clerkId : undefined);
     const balance = userData?.balance ?? 0;
@@ -1082,6 +1094,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         });
 
         socketService.onNewMessage((data: { message: Message; tempId?: string }) => {
+            if ([data.message.senderId, data.message.receiverId].sort().join('_') !== roomId) return;
             setMessages((prev) => {
                 // Se for uma mensagem que nós enviamos (tem tempId), atualiza a mensagem otimista
                 if (data.tempId) {
@@ -1459,6 +1472,10 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         isTemporaryMedia: boolean = false,
         expiryMinutes: number = 0
     ) => {
+        if (!await ensureClientName()) {
+            setMessages(prev => prev.filter(message => message.tempId !== tempId));
+            return;
+        }
         setUploadTasks(prev => ({
             ...prev,
             [tempId]: { tempId, progress: 0, status: 'uploading' }
@@ -1871,32 +1888,16 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         }
     };
 
-    const handleSend = () => {
+    const handleSend = async () => {
         console.log('[handleSend] Tentando enviar mensagem. Texto:', messageText.trim().substring(0, 20), 'sending:', sending, 'socket:', !!socket);
         if (!messageText.trim() || sending || !socket) {
             console.warn('[handleSend] Retorno antecipado (condição inválida). Texto vazio, sending true ou socket nulo.');
             return;
         }
         
+        if (!await ensureClientName()) return;
         const charCount = messageText.trim().length;
-        const isTeamMemberInvolved = userData?.isTeam || receiver?.isTeam;
-        let costInCents = 0;
-        if (charCount > 0 && receiver?.isProfessional && !monetizationDisabled && !isTeamMemberInvolved) {
-            const costPerCharInCents = currentRate * 100;
-            const rawCostInCents = charCount * costPerCharInCents;
-            costInCents = Math.max(1, Math.ceil(rawCostInCents));
-        }
-
-        console.log('[handleSend] Dados de custo. charCount:', charCount, 'receiverIsProfessional:', receiver?.isProfessional, 'isTeamMemberInvolved:', isTeamMemberInvolved, 'costInCents:', costInCents, 'balance:', balance);
-
-        if (!isTeamMemberInvolved && receiver?.isProfessional && balance < costInCents) {
-            console.warn('[handleSend] Saldo insuficiente. Requerido:', costInCents, 'Disponível:', balance);
-            openRechargeModal({
-                currentBalanceInCents: balance,
-                requiredAmountInCents: costInCents,
-            });
-            return;
-        }
+        const costInCents = 0;
 
         const tempId = `temp-${Date.now()}`;
         const newMsg: Message = {
@@ -1958,13 +1959,12 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     };
 
     const handleSendAudio = async (audioBlob: Blob, durationInSeconds: number) => {
+        if (!await ensureClientName()) return;
         const tempId = `temp-audio-${Date.now()}`;
         const previewUrl = URL.createObjectURL(audioBlob);
 
         const isTeamMemberInvolved = userData?.isTeam || receiver?.isTeam;
-        const estimatedAudioCostInCents = (!isTeamMemberInvolved && audioCostPerSecondInCents > 0)
-            ? Math.max(1, Math.ceil(audioCostPerSecondInCents * durationInSeconds))
-            : 0;
+        const estimatedAudioCostInCents = 0;
 
         const newMsg: Message = {
             _id: tempId,
@@ -2090,8 +2090,8 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     // Envia a mídia selecionada (selectedFile) com o preço/duração já definidos.
     // Usado pelo MediaComposerSheet (profissional configurou preço/duração) e pelo
     // fallback no compose bar (envio durante a janela em que userData ainda está carregando).
-    const sendSelectedMedia = (priceInCents: number, isTemporaryMedia: boolean, expiryMinutes: number, coverFrameDataUrl?: string) => {
-        if (!selectedFile) return;
+    const sendSelectedMedia = async (priceInCents: number, isTemporaryMedia: boolean, expiryMinutes: number, coverFrameDataUrl?: string) => {
+        if (!selectedFile || !await ensureClientName()) return;
 
         const file = selectedFile;
         const isVideoFile = isVideo;
@@ -2189,6 +2189,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     };
 
     const handleSendGift = async () => {
+        if (!await ensureClientName()) return;
         if (!giftAmountStr || parseFloat(giftAmountStr) <= 0) return;
         
         const giftAmountInCents = parseFloat(giftAmountStr) * 100;
@@ -2252,11 +2253,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const charCount = messageText.trim().length;
     const isSubscriber = chatPricing?.isSubscriber ?? false;
     const isTeamMemberInvolved = userData?.isTeam || receiver?.isTeam;
-    const currentRate = (receiver?.isProfessional && !monetizationDisabled && !isTeamMemberInvolved)
-        ? (isSubscriber
-            ? (chatPricing?.defaultPricePerCharSubscribers ?? 0)
-            : (chatPricing?.defaultPricePerCharNonSubscribers ?? 0))
-        : 0;
+    const currentRate = 0; // Client sends are free; prices describe incoming messages only.
     let estimatedCostInCents = 0;
     if (charCount > 0 && receiver?.isProfessional && !monetizationDisabled && !isTeamMemberInvolved) {
         estimatedCostInCents = Math.max(1, Math.ceil(charCount * currentRate * 100));
@@ -2300,7 +2297,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 style={{ ...viewportStyle, overscrollBehaviorY: 'none' }}
             >
                 <p className="text-gray-700 font-medium">
-                    {isSelfChat
+            {isSelfChat
                         ? 'Você não pode conversar com você mesmo.'
                         : 'Esta conversa não está disponível.'}
                 </p>
@@ -2320,6 +2317,13 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             className={`flex flex-col bg-gray-50 overflow-hidden ${layoutClass} ${animationClass}`}
             style={{ ...viewportStyle, overscrollBehaviorY: 'none' }}
         >
+                    {showNameModal && <ClientNameModal onSaved={async () => {
+                await refetchMyProfile(); setShowNameModal(false); nameResolution.current?.(true); nameResolution.current = null;
+            }} onCancel={() => { setShowNameModal(false); nameResolution.current?.(false); nameResolution.current = null; }} />}
+            {!userData?.isProfessional && !receiver?.isTeam && <details className="order-last bg-purple-50 px-4 py-2 text-xs text-purple-900 shrink-0">
+                <summary className="cursor-pointer">Envio grátis · preços das mensagens recebidas</summary>
+                <p className="pt-2">Você paga R$ {((chatPricing?.isSubscriber ? chatPricing?.defaultPricePerCharSubscribers : chatPricing?.defaultPricePerCharNonSubscribers) ?? 0).toFixed(2).replace('.', ',')} por caractere recebido, até {chatPricing?.maxBillableMessageChars ?? 50} caracteres por mensagem. Cada segundo de áudio equivale a {chatPricing?.audioPriceMultiplier ?? 5} caracteres, com o mesmo limite. A cobrança ocorre no recebimento, mesmo sem abrir o chat. Sem saldo, a mensagem fica pendente até uma recarga.</p>
+            </details>}
             {/* Header */}
             <div className="shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 z-20 sticky top-0 shadow-md flex items-center gap-2">
                 {selectedMessageIds.size > 0 ? (
@@ -2806,7 +2810,13 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                     </span>
                                                 </div>
                                             )}
-                                    {isLocked || item.originalImageUrl || item.isVideo || isAudio || item.isExpired ? (
+                                    {item.isContentLocked ? (
+                                        <button onClick={() => openRechargeModal({ currentBalanceInCents: balance, requiredAmountInCents: item.receiptChargeCents ?? 0 })} className="text-left text-sm p-2 space-y-2">
+                                            <span className="block font-semibold">Mensagem bloqueada</span>
+                                            <span className="block">Recarregue para visualizar esta mensagem.</span>
+                                            <span className="block text-purple-700 font-semibold">Recarregar</span>
+                                        </button>
+                                    ) : isLocked || item.originalImageUrl || item.isVideo || isAudio || item.isExpired ? (
                                         <>
                                             {item.isExpired || (item.expiresAt && new Date(item.expiresAt).getTime() > 0 && new Date(item.expiresAt) < new Date()) ? (
                                                 <div className="relative w-60 h-60 rounded-2xl bg-slate-100 flex flex-col items-center justify-center gap-2 text-slate-400 border border-slate-200 shadow-inner">
@@ -3142,7 +3152,8 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                         </div>
                                     )}
                                 </div>
-                                    {!isMine && userData?.isProfessional && (
+                                    {isMine && userData?.isProfessional && item.billingStatus === 'pending' && <span className="self-center text-[11px] text-amber-700">Pendente</span>}
+                                    {isMine && userData?.isProfessional && item.billingStatus === 'paid' && (
                                         <EarningsIndicator
                                             messageId={item._id}
                                             receiverEarnings={item.receiverEarnings}
@@ -3347,7 +3358,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                 onKeyDown={handleKeyDown}
                                 onFocus={() => setIsInputFocused(true)}
                                 onBlur={() => setIsInputFocused(false)}
-                                placeholder="Digite sua mensagem..."
+                                placeholder="Digite sua mensagem (envio grátis)..."
                                 rows={1}
                                 className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none leading-5 py-0.5 disabled:text-gray-400"
                                 style={{ maxHeight: '96px' }}
@@ -3416,7 +3427,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                             onSendAudio={handleSendAudio}
                             onStatusChange={setAudioRecordingStatus}
                             maxDurationSeconds={maxAudioDurationSeconds}
-                            confirmBeforeSend={userData?.isProfessional === false}
+                            confirmBeforeSend={false}
                             costPerSecondInCents={audioCostPerSecondInCents}
                             onInsufficientBalance={() =>
                                 openRechargeModal(

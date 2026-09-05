@@ -8,6 +8,8 @@ import { grantWelcomeCredit } from '@/lib/creditCampaign';
 import { Campaign } from '@/models/Campaign';
 import { CampaignVisit } from '@/models/CampaignVisit';
 
+import { RECEIPT_TERMS_VERSION } from '@/lib/receiptBilling';
+
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
 const webhookSecret = process.env.CLERK_WEBHOOK_SECRET || '';
 
@@ -54,7 +56,7 @@ export async function POST(req: Request) {
         const { id, email_addresses, username, first_name, last_name, image_url, unsafe_metadata } = evt.data;
 
         const generatedUsername = username || email_addresses[0]?.email_address.split('@')[0];
-        const name = [first_name, last_name].filter(Boolean).join(' ') || generatedUsername;
+        const name = [first_name, last_name].filter(Boolean).join(' ');
         const email = email_addresses[0]?.email_address?.toLowerCase()?.trim();
 
         const isProfessional = false;
@@ -81,6 +83,8 @@ export async function POST(req: Request) {
                     professionalAvailableCents: 0,
                     professionalReservedForWithdrawalCents: 0,
                     marketplaceWalletMigratedAt: new Date(),
+                    receiptTermsVersion: RECEIPT_TERMS_VERSION,
+                    receiptTermsAcceptedAt: new Date(),
                 }
             },
             { upsert: true, new: true }

@@ -13,7 +13,7 @@ export default function TermosDeUsoPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-gray-100 pb-6 mb-8 gap-4">
                     <div>
                         <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Termos de Uso</h1>
-                        <p className="text-sm text-gray-500 mt-1">Última atualização: 6 de junho de 2026</p>
+                        <p className="text-sm text-gray-500 mt-1">Última atualização: 5 de setembro de 2026 — versão receipt-2026-09-05</p>
                     </div>
                     <button
                         onClick={() => router.back()}
@@ -32,7 +32,7 @@ export default function TermosDeUsoPage() {
                     <section className="space-y-3">
                         <h2 className="text-xl font-bold text-gray-900 border-l-4 border-purple-500 pl-3">1. Aceitação dos Termos</h2>
                         <p className="text-sm sm:text-base leading-relaxed">
-                            Ao criar uma conta, fazer login, acessar ou utilizar a plataforma MimoChat, você declara possuir capacidade civil plena e concorda expressamente e sem reservas com todas as cláusulas e condições previstas nestes Termos de Uso e em nossa Política de Privacidade. Caso não concorde com qualquer disposição aqui contida, você não deve acessar ou utilizar nossos serviços.
+                            Para usar a plataforma MimoChat, você deve possuir capacidade civil plena. Clientes novos e existentes devem aceitar expressamente a versão atual destes Termos e tomar ciência da Política de Privacidade; fazer login, por si só, não registra esse aceite. O acesso às funcionalidades fica bloqueado até a confirmação. Caso não concorde com qualquer disposição aqui contida, você não deve acessar ou utilizar nossos serviços.
                         </p>
                     </section>
 
@@ -94,7 +94,16 @@ export default function TermosDeUsoPage() {
                             A plataforma utiliza gateways de pagamentos terceirizados (incluindo <strong>Asaas</strong> e <strong>Abacate Pay</strong>) para o processamento de Pix e cartões de crédito. 
                         </p>
                         <p className="text-sm sm:text-base leading-relaxed">
-                            Os pagamentos enviados na forma de "mimos" (créditos virtuais voluntários) caracterizam-se legalmente como doações por liberalidade dos Usuários aos Perfis Monetizados, não constituindo obrigação de contraprestação específica de serviços físicos e sendo, portanto, <strong>não reembolsáveis</strong>.
+                            O envio de texto, áudio, fotos e vídeos pelo cliente é gratuito. Textos e áudios enviados pela profissional são debitados automaticamente do saldo do cliente no recebimento, inclusive quando ele estiver offline ou não visualizar a conversa. Cada mensagem é cobrada uma única vez. O valor por caractere e o desconto de assinante são definidos pela plataforma e informados no chat.
+                        </p>
+                        <p className="text-sm sm:text-base leading-relaxed">
+                            O limite inicial é de 50 caracteres cobrados por mensagem, parametrizável pela plataforma. O excedente não é cobrado e não impede o envio. Áudios são convertidos de segundos para caracteres equivalentes conforme o fator informado no chat, arredondando a duração para o segundo seguinte e aplicando o mesmo limite.
+                        </p>
+                        <p className="text-sm sm:text-base leading-relaxed">
+                            Sem saldo suficiente para o valor integral, a mensagem fica pendente e seu conteúdo não é disponibilizado ao cliente. Após uma recarga, as pendências são processadas automaticamente, da mais antiga para a mais recente, até o limite do saldo. O preço registrado no recebimento é preservado. O ganho da profissional só é creditado quando ocorre o débito, descontada a taxa da plataforma.
+                        </p>
+                        <p className="text-sm sm:text-base leading-relaxed">
+                            A nova cobrança só se aplica após o aceite expresso. Mensagens anteriores ao aceite e o histórico existente não são cobrados retroativamente. Fotos e vídeos pagos oferecidos pela profissional mantêm seu preço próprio e desbloqueio mediante a ação do cliente. Assinaturas e presentes mantêm suas regras. Os direitos previstos na legislação aplicável permanecem preservados.
                         </p>
                     </section>
 

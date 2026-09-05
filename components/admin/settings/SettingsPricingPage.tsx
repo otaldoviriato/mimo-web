@@ -12,6 +12,7 @@ type Props = Pick<UseSettingsReturn,
     | 'minSubscriptionPrice' | 'setMinSubscriptionPrice'
     | 'maxSubscriptionPrice' | 'setMaxSubscriptionPrice'
     | 'subscriberDiscountPercentage' | 'setSubscriberDiscountPercentage'
+    | 'maxBillableMessageChars' | 'setMaxBillableMessageChars'
     | 'audioPriceMultiplier' | 'setAudioPriceMultiplier'
     | 'isDirtyPricing' | 'saving' | 'saveSettings'
 >;
@@ -37,6 +38,7 @@ export function SettingsPricingPage({
     minSubscriptionPrice, setMinSubscriptionPrice,
     maxSubscriptionPrice, setMaxSubscriptionPrice,
     subscriberDiscountPercentage, setSubscriberDiscountPercentage,
+    maxBillableMessageChars, setMaxBillableMessageChars,
     audioPriceMultiplier, setAudioPriceMultiplier,
     isDirtyPricing, saving, saveSettings,
 }: Props) {
@@ -100,6 +102,9 @@ export function SettingsPricingPage({
                     />
                 </SettingField>
 
+                <SettingField title="Limite de caracteres cobrados por mensagem" description="Textos e áudios recebidos pelo cliente são cobrados até este limite de caracteres equivalentes. O excedente é grátis; o envio não é limitado." unit="caracteres">
+                    <input type="number" min={1} max={10000} step={1} value={maxBillableMessageChars} onChange={e => setMaxBillableMessageChars(Number(e.target.value))} className={inputCls} />
+                </SettingField>
                 <SettingField
                     title="Multiplicador de Preço do Áudio"
                     description={

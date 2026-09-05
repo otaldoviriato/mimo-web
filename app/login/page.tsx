@@ -91,6 +91,8 @@ export default function LoginPage() {
                 const res = await fetch('/api/users/me', { credentials: 'same-origin' });
                 if (res.ok) {
                     // Sessão válida no servidor: navega para o app
+                    localStorage.setItem('mimo_post_login_check_rooms', 'true');
+                    sessionStorage.removeItem('mimo_has_navigated_chats');
                     window.location.href = '/chats';
                 } else {
                     // Sessão desincronizada (ex: 401 no localhost/servidor): limpa a sessão fantasma
@@ -276,6 +278,8 @@ export default function LoginPage() {
                     await setSignUpActive!({ 
                         session: signUp!.createdSessionId,
                         beforeEmit: () => {
+                            localStorage.setItem('mimo_post_login_check_rooms', 'true');
+                            sessionStorage.removeItem('mimo_has_navigated_chats');
                             window.location.href = '/chats';
                         }
                     } as any);
@@ -289,6 +293,8 @@ export default function LoginPage() {
                     await setSignInActive!({ 
                         session: signIn!.createdSessionId,
                         beforeEmit: () => {
+                            localStorage.setItem('mimo_post_login_check_rooms', 'true');
+                            sessionStorage.removeItem('mimo_has_navigated_chats');
                             window.location.href = '/chats';
                         }
                     } as any);
@@ -331,6 +337,10 @@ export default function LoginPage() {
             }
             if (pendingRedirect && typeof window !== 'undefined') {
                 localStorage.setItem(POST_AUTH_REDIRECT_STORAGE_KEY, pendingRedirect);
+            }
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('mimo_post_login_check_rooms', 'true');
+                sessionStorage.removeItem('mimo_has_navigated_chats');
             }
 
             const oauthParams = {
@@ -397,9 +407,7 @@ export default function LoginPage() {
             <Suspense fallback={null}>
                 <GiftCapture />
             </Suspense>
-            {/* Elemento exigido pelo Clerk para CAPTCHA em flows customizados */}
-            <div id="clerk-captcha" />
-            <div className="w-full max-w-sm">
+            <div className="w-full min-w-0 max-w-sm">
                 {/* Header */}
                 <div className="text-center mb-10">
                     <div className="inline-flex w-20 h-20 items-center justify-center bg-gradient-to-br from-purple-600 to-purple-700 rounded-3xl mb-5 shadow-lg">
@@ -461,6 +469,13 @@ export default function LoginPage() {
                                     </svg>
                                 }
                                 className="w-full"
+                            />
+
+                            {/* Mantém o desafio do Clerk dentro do cartão, abaixo do Google. */}
+                            <div
+                                id="clerk-captcha"
+                                data-cl-size="compact"
+                                className="flex w-full justify-center empty:hidden"
                             />
 
                             {/* Checkbox de Maioridade e Consentimento Legal */}

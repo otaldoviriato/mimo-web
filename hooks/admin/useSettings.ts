@@ -25,6 +25,7 @@ interface SettingsSnapshot {
     activeUserThresholdDays: number;
     defaultPricePerCharSubscribers: number;
     defaultPricePerCharNonSubscribers: number;
+    maxBillableMessageChars: number;
     audioPriceMultiplier: number;
     pwaShowAgainIntervalDays: number;
     identityVerificationPromptIntervalDays: number;
@@ -71,6 +72,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     const [activeUserThresholdDays, setActiveUserThresholdDays] = useState(7);
     const [defaultPricePerCharSubscribers, setDefaultPricePerCharSubscribers] = useState(0.04);
     const [defaultPricePerCharNonSubscribers, setDefaultPricePerCharNonSubscribers] = useState(0.05);
+    const [maxBillableMessageChars, setMaxBillableMessageChars] = useState(50);
     const [audioPriceMultiplier, setAudioPriceMultiplier] = useState(5);
     const [pwaShowAgainIntervalDays, setPwaShowAgainIntervalDays] = useState(7);
     const [identityVerificationPromptIntervalDays, setIdentityVerificationPromptIntervalDays] = useState(7);
@@ -117,6 +119,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         activeUserThresholdDays: s.activeUserThresholdDays ?? 7,
         defaultPricePerCharSubscribers: s.defaultPricePerCharSubscribers ?? 0.04,
         defaultPricePerCharNonSubscribers: s.defaultPricePerCharNonSubscribers ?? 0.05,
+        maxBillableMessageChars: s.maxBillableMessageChars ?? 50,
         audioPriceMultiplier: s.audioPriceMultiplier ?? 5,
         pwaShowAgainIntervalDays: s.pwaShowAgainIntervalDays ?? 7,
         identityVerificationPromptIntervalDays: s.identityVerificationPromptIntervalDays ?? 7,
@@ -174,6 +177,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     setDefaultPricePerCharSubscribers(s.defaultPricePerCharSubscribers ?? 0.04);
                     setDefaultPricePerCharNonSubscribers(s.defaultPricePerCharNonSubscribers ?? 0.05);
                     setAudioPriceMultiplier(s.audioPriceMultiplier ?? 5);
+                    setMaxBillableMessageChars(s.maxBillableMessageChars ?? 50);
                     setPwaShowAgainIntervalDays(s.pwaShowAgainIntervalDays ?? 7);
                     setIdentityVerificationPromptIntervalDays(s.identityVerificationPromptIntervalDays ?? 7);
                     setNewProfileDaysThreshold(s.newProfileDaysThreshold ?? 15);
@@ -271,6 +275,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     activeUserThresholdDays,
                     defaultPricePerCharSubscribers,
                     defaultPricePerCharNonSubscribers,
+                    maxBillableMessageChars,
                     audioPriceMultiplier,
                     pwaShowAgainIntervalDays,
                     identityVerificationPromptIntervalDays,
@@ -306,6 +311,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                 setDefaultPricePerCharSubscribers(s.defaultPricePerCharSubscribers ?? 0.04);
                 setDefaultPricePerCharNonSubscribers(s.defaultPricePerCharNonSubscribers ?? 0.05);
                 setAudioPriceMultiplier(s.audioPriceMultiplier ?? 5);
+                    setMaxBillableMessageChars(s.maxBillableMessageChars ?? 50);
                 setPwaShowAgainIntervalDays(s.pwaShowAgainIntervalDays ?? 7);
                 setIdentityVerificationPromptIntervalDays(s.identityVerificationPromptIntervalDays ?? 7);
                 setNewProfileDaysThreshold(s.newProfileDaysThreshold ?? 15);
@@ -370,6 +376,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         subscriberDiscountPercentage !== savedSnapshot.subscriberDiscountPercentage ||
         defaultPricePerCharSubscribers !== savedSnapshot.defaultPricePerCharSubscribers ||
         defaultPricePerCharNonSubscribers !== savedSnapshot.defaultPricePerCharNonSubscribers ||
+        maxBillableMessageChars !== savedSnapshot.maxBillableMessageChars ||
         audioPriceMultiplier !== savedSnapshot.audioPriceMultiplier
     );
     const isDirtyProfiles = savedSnapshot !== null && (
@@ -423,6 +430,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         activeUserThresholdDays, setActiveUserThresholdDays,
         defaultPricePerCharSubscribers, setDefaultPricePerCharSubscribers,
         defaultPricePerCharNonSubscribers, setDefaultPricePerCharNonSubscribers,
+        maxBillableMessageChars, setMaxBillableMessageChars,
         audioPriceMultiplier, setAudioPriceMultiplier,
         pwaShowAgainIntervalDays, setPwaShowAgainIntervalDays,
         identityVerificationPromptIntervalDays, setIdentityVerificationPromptIntervalDays,

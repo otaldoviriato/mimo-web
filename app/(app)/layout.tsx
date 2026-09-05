@@ -1,4 +1,7 @@
 'use client';
+import { ReceiptConsentModal } from '@/components/ReceiptConsentModal';
+import { requiresReceiptConsent } from '@/lib/receiptBilling';
+
 
 import React, { useEffect, useRef } from 'react';
 import { useAuth, useUser } from '@clerk/nextjs';
@@ -35,7 +38,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     
     const onboardingStep = isProfileValid ? calculateOnboardingStep(userData) : null;
 
-    const isFullyCompleted = onboardingStep === 'completed';
+    const needsReceiptConsent = isProfileValid && requiresReceiptConsent(userData);
+    const isFullyCompleted = onboardingStep === 'completed' && !needsReceiptConsent;
     const isProfileResolved = isLoaded && isSignedIn && !isProfileLoading && isProfileValid;
     const shouldBlockAppRender = isLoaded && isSignedIn && (!isProfileResolved || !isFullyCompleted);
 
@@ -49,8 +53,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const [fadeOutRelease, setFadeOutRelease] = React.useState(false);
 
     const queryClient = useQueryClient();
-    const { socket, connected, socketVersion } = useSocket(user?.id);
-    const { data: rooms = [] } = useChatRooms({ enabled: isFullyCompleted });
+    const { socket, connected, socketVersion } = useSocket(isFullyCompleted ? user?.id : undefined);
+    const { data: rooms = [], isSuccess: roomsLoaded } = useChatRooms({ enabled: isFullyCompleted });
 
     const [welcomeNotice, setWelcomeNotice] = React.useState<{
         grantId: string;
@@ -473,25 +477,36 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (pathname === '/onboarding') return;
 
-        if (isProfileResolved && !isFullyCompleted) {
+        if (isProfileResolved && !isFullyCompleted && !needsReceiptConsent) {
             router.replace('/onboarding');
             return;
         }
 
-        // Se o usuário está cadastrado, mas tem 0 conversas, exibimos a tela de instrução/compartilhamento de link
+        // Se o cliente (homem) logar ou criar conta e não houver chats, redireciona para o Explorar (/search)
         if (
             isFullyCompleted &&
-            rooms !== undefined &&
-            rooms.length === 0 &&
-            typeof window !== 'undefined' &&
-            !sessionStorage.getItem('mimo_zero_rooms_onboard_shown')
+            roomsLoaded &&
+            !userData?.isProfessional &&
+            pathname === '/chats'
         ) {
-            sessionStorage.setItem('mimo_zero_rooms_onboard_shown', 'true');
-            router.replace('/onboarding');
+            const hasPostLoginFlag = typeof window !== 'undefined' && localStorage.getItem('mimo_post_login_check_rooms') === 'true';
+            const hasNotNavigatedYet = typeof window !== 'undefined' && !sessionStorage.getItem('mimo_has_navigated_chats');
+
+            if (rooms.length === 0 && (hasPostLoginFlag || hasNotNavigatedYet)) {
+                if (typeof window !== 'undefined') {
+                    localStorage.removeItem('mimo_post_login_check_rooms');
+                    sessionStorage.setItem('mimo_has_navigated_chats', 'true');
+                }
+                router.replace('/search');
+            } else if (typeof window !== 'undefined' && hasPostLoginFlag) {
+                localStorage.removeItem('mimo_post_login_check_rooms');
+                sessionStorage.setItem('mimo_has_navigated_chats', 'true');
+            }
         }
-    }, [isProfileResolved, isFullyCompleted, rooms, pathname, router]);
+    }, [isProfileResolved, isFullyCompleted, needsReceiptConsent, roomsLoaded, userData?.isProfessional, rooms, pathname, router]);
 
     if (!isSignedIn) return null;
+    if (needsReceiptConsent) return <ReceiptConsentModal onAccepted={refetchProfile} />;
 
     // Permite que /onboarding renderize seus próprios filhos — ele gerencia todo o fluxo de cadastro.
     if (pathname === '/onboarding') {

@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
 
         // Cálculo de estatísticas de mensagens pagas (Prioridade do aplicativo)
         const messageStatsResult = await Message.aggregate([
-            { $match: { receiverId: user.clerkId, receiverEarnings: { $gt: 0 } } },
+            { $match: { $or: [{ receiverId: user.clerkId, billingEngineVersion: { $ne: 'marketplace_v4' } }, { senderId: user.clerkId, billingEngineVersion: 'marketplace_v4', billingStatus: 'paid' }], receiverEarnings: { $gt: 0 } } },
             {
                 $group: {
                     _id: null,
@@ -162,7 +162,7 @@ export async function GET(request: NextRequest) {
 
         // Estatísticas mensais de mensagens
         const monthlyMessageStatsResult = await Message.aggregate([
-            { $match: { receiverId: user.clerkId, receiverEarnings: { $gt: 0 }, timestamp: { $gte: startOfMonth } } },
+            { $match: { $or: [{ receiverId: user.clerkId, billingEngineVersion: { $ne: 'marketplace_v4' } }, { senderId: user.clerkId, billingEngineVersion: 'marketplace_v4', billingStatus: 'paid' }], receiverEarnings: { $gt: 0 }, $expr: { $gte: [{ $ifNull: ['$settledAt', '$timestamp'] }, startOfMonth] } } },
             {
                 $group: {
                     _id: null,

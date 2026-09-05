@@ -16,6 +16,8 @@ export interface ICard {
 
 export interface IUser extends Document {
     clerkId: string;
+    receiptTermsVersion?: string;
+    receiptTermsAcceptedAt?: Date;
     username: string;
     name?: string;
     email: string;
@@ -87,6 +89,8 @@ const UserSchema = new Schema<IUser>({
         unique: true,
         index: true,
     },
+    receiptTermsVersion: { type: String },
+    receiptTermsAcceptedAt: { type: Date },
     username: {
         type: String,
         required: true,

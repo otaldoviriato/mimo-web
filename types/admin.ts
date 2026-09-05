@@ -25,6 +25,7 @@ export interface SettingsData {
     onlineDelayMinutes?: number;
     defaultPricePerCharSubscribers: number;
     defaultPricePerCharNonSubscribers: number;
+    maxBillableMessageChars?: number;
     audioPriceMultiplier: number;
     pwaShowAgainIntervalDays: number;
     identityVerificationPromptIntervalDays: number;

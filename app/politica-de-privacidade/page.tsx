@@ -13,7 +13,7 @@ export default function PoliticaDePrivacidadePage() {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-gray-100 pb-6 mb-8 gap-4">
                     <div>
                         <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Política de Privacidade</h1>
-                        <p className="text-sm text-gray-500 mt-1">Última atualização: 6 de junho de 2026</p>
+                        <p className="text-sm text-gray-500 mt-1">Última atualização: 5 de setembro de 2026 — versão receipt-2026-09-05</p>
                     </div>
                     <button
                         onClick={() => router.back()}
@@ -23,6 +23,12 @@ export default function PoliticaDePrivacidadePage() {
                     </button>
                 </div>
 
+                <section className="space-y-3 mb-6 text-gray-600">
+                    <h2 className="text-xl font-bold text-gray-900">Registro de aceite e cobrança de mensagens recebidas</h2>
+                    <p>Registramos a identificação da conta, a versão dos termos aceita e a data e hora da confirmação para comprovar a adesão ao modelo de cobrança. O nome informado antes do primeiro envio é usado para identificar você nas conversas.</p>
+                    <p>Para executar a cobrança automática no recebimento, processamos a quantidade de caracteres, a duração do áudio, o preço aplicado, o saldo utilizado e o estado de pagamento de cada mensagem. Esses registros permitem liberar o conteúdo, calcular repasses e evitar cobranças duplicadas, inclusive no processamento de pendências após recargas.</p>
+                    <p>O conteúdo pendente não é entregue ao cliente enquanto não houver saldo suficiente para sua liberação. O aceite dos termos não representa autorização genérica para finalidades opcionais de tratamento de dados. Permanecem disponíveis os direitos e o canal de suporte descritos nesta política.</p>
+                </section>
                 {/* Content */}
                 <div className="prose prose-purple max-w-none text-gray-600 space-y-6">
                     <p className="lead text-base sm:text-lg font-medium text-gray-700">

@@ -50,6 +50,7 @@ export function useChatPricing(professionalId?: string) {
             return response.json() as Promise<{
                 defaultPricePerCharSubscribers: number;
                 defaultPricePerCharNonSubscribers: number;
+                maxBillableMessageChars: number;
                 audioPriceMultiplier: number;
                 isSubscriber: boolean;
             }>;

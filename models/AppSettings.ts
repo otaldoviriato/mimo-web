@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IAppSettings extends Document {
+    maxBillableMessageChars: number;
     key: string;
     platformFeePercentage: number;
     uploadLimitMB: number;
@@ -55,6 +56,7 @@ export interface IAppSettings extends Document {
 }
 
 const AppSettingsSchema = new Schema<IAppSettings>({
+    maxBillableMessageChars: { type: Number, default: 50, min: 1, max: 10000 },
     key: {
         type: String,
         required: true,

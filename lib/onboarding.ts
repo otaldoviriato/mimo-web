@@ -23,6 +23,8 @@ export function calculateOnboardingStep(user: OnboardingUser | null | undefined)
         return 'identity';
     }
 
+    if (!user.isProfessional) return 'completed';
+
     const hasRequiredProfile = hasValue(user.name)
         && hasValue(user.username)
         && (!user.isProfessional || hasValue(user.photoUrl));

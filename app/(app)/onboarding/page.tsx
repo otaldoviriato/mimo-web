@@ -177,7 +177,11 @@ export default function OnboardingPage() {
 
         if (serverStep === 'completed') {
             localStorage.removeItem(STEP_KEY);
-            router.replace('/chats');
+            if (!userData.isProfessional) {
+                router.replace('/search');
+            } else {
+                router.replace('/chats');
+            }
             return;
         }
 

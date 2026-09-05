@@ -6,6 +6,9 @@ export interface IMessage extends Document {
     receiverId: string;
     content: string;
     charCount: number;
+    billingStatus?: 'free' | 'pending' | 'paid';
+    receiptChargeCents?: number;
+    settledAt?: Date;
     cost: number;
     platformFee: number;
     receiverEarnings: number;
@@ -31,7 +34,7 @@ export interface IMessage extends Document {
     isAudio?: boolean;
     audioUrl?: string;
     audioDuration?: number;
-    billingEngineVersion?: 'marketplace_v2' | 'marketplace_v3';
+    billingEngineVersion?: 'marketplace_v2' | 'marketplace_v3' | 'marketplace_v4';
     idempotencyKey?: string;
     textGraphemeCount?: number;
     audioBillableSeconds?: number;
@@ -67,6 +70,9 @@ const MessageSchema = new Schema<IMessage>({
         type: Number,
         required: true,
     },
+    billingStatus: { type: String, enum: ['free', 'pending', 'paid'], index: true },
+    receiptChargeCents: { type: Number, min: 0 },
+    settledAt: { type: Date },
     cost: {
         type: Number,
         required: true,
@@ -170,7 +176,7 @@ const MessageSchema = new Schema<IMessage>({
     },
     billingEngineVersion: {
         type: String,
-        enum: ['marketplace_v2', 'marketplace_v3'],
+        enum: ['marketplace_v2', 'marketplace_v3', 'marketplace_v4'],
         index: true,
     },
     idempotencyKey: {
@@ -214,6 +220,7 @@ const MessageSchema = new Schema<IMessage>({
     },
 });
 
+MessageSchema.index({ billingStatus: 1, receiverId: 1, timestamp: 1, _id: 1 });
 MessageSchema.index({ roomId: 1, timestamp: -1 });
 
 export const Message = (mongoose.models.Message as mongoose.Model<IMessage>) ||

@@ -21,6 +21,8 @@ export default function AdminSettingsPricingPage() {
             setMaxSubscriptionPrice={settings.setMaxSubscriptionPrice}
             subscriberDiscountPercentage={settings.subscriberDiscountPercentage}
             setSubscriberDiscountPercentage={settings.setSubscriberDiscountPercentage}
+            maxBillableMessageChars={settings.maxBillableMessageChars}
+            setMaxBillableMessageChars={settings.setMaxBillableMessageChars}
             audioPriceMultiplier={settings.audioPriceMultiplier}
             setAudioPriceMultiplier={settings.setAudioPriceMultiplier}
             isDirtyPricing={settings.isDirtyPricing}

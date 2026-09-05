@@ -1,3 +1,4 @@
+import { messageForViewer } from '@/lib/receiptBilling';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
@@ -69,7 +70,7 @@ export async function GET(
                     isExpired: true
                 };
             }
-            return m;
+            return messageForViewer(m, authUserId);
         });
 
         // Retorna em ordem cronológica (mais antiga primeiro)

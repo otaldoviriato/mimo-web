@@ -30,11 +30,13 @@ export async function GET() {
             User.findOne({ clerkId: userId }).select('balance professionalAvailableCents isProfessional').lean(),
             WithdrawRequest.find({ userId }).sort({ createdAt: -1 }).limit(50).lean(),
             Message.find({
-                receiverId: userId,
+                $or: [
+                    { receiverId: userId, billingEngineVersion: 'marketplace_v3' },
+                    { senderId: userId, billingEngineVersion: 'marketplace_v4', billingStatus: 'paid' },
+                ],
                 receiverEarnings: { $gt: 0 },
-                billingEngineVersion: 'marketplace_v3',
                 isSystem: { $ne: true },
-            }).select('_id senderId receiverEarnings timestamp createdAt isAudio').sort({ timestamp: -1 }).limit(500).lean(),
+            }).select('_id senderId receiverId receiverEarnings timestamp settledAt createdAt isAudio billingEngineVersion').sort({ timestamp: -1 }).limit(500).lean(),
             MicroTransaction.find({
                 userId,
                 type: 'credit',
@@ -47,7 +49,7 @@ export async function GET() {
         if (!user) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
 
         const relatedIds = Array.from(new Set([
-            ...paidMessages.map(message => message.senderId),
+            ...paidMessages.map(message => message.senderId === userId ? message.receiverId : message.senderId),
             ...microCredits.map(transaction => transaction.relatedUserId).filter(Boolean),
             ...subscriptions.map(transaction => transaction.relatedUserId).filter(Boolean),
         ])) as string[];
@@ -56,15 +58,16 @@ export async function GET() {
         const entries: StatementEntry[] = [];
 
         for (const message of paidMessages) {
-            const client = clientMap.get(message.senderId);
+            const clientId = message.senderId === userId ? message.receiverId : message.senderId;
+            const client = clientMap.get(clientId);
             entries.push({
                 id: `message_${message._id}`,
                 kind: 'message',
                 title: `Mensagem de ${client?.name || client?.username || 'Cliente Mimo'}`,
-                description: message.isAudio ? 'Áudio recebido e creditado imediatamente' : 'Mensagem recebida e creditada imediatamente',
+                description: message.billingEngineVersion === 'marketplace_v4' ? 'Mensagem enviada e paga pelo cliente' : 'Mensagem recebida e creditada imediatamente',
                 amount: Number(message.receiverEarnings) || 0,
-                timestamp: new Date(message.timestamp || (message as typeof message & { createdAt: Date }).createdAt),
-                relatedUserId: message.senderId,
+                timestamp: new Date(message.settledAt || message.timestamp || (message as typeof message & { createdAt: Date }).createdAt),
+                relatedUserId: clientId,
                 clientPhotoUrl: client?.photoUrl || null,
             });
         }

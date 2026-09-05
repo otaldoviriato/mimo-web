@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
         const { userId } = await auth();
         const professionalId = request.nextUrl.searchParams.get('professionalId');
         const settings = await AppSettings.findOne({ key: 'global' })
-            .select('conversationPricePerEquivalentCharCents subscriberDiscountPercentage audioEquivalentCharsPerSecond')
+            .select('conversationPricePerEquivalentCharCents subscriberDiscountPercentage audioEquivalentCharsPerSecond maxBillableMessageChars')
             .lean();
 
         let isSubscriber = false;
@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
             defaultPricePerCharSubscribers: regularPrice * (1 - subscriberDiscount / 100),
             defaultPricePerCharNonSubscribers: regularPrice,
+            maxBillableMessageChars: settings?.maxBillableMessageChars ?? 50,
             audioPriceMultiplier: settings?.audioEquivalentCharsPerSecond ?? 5,
             isSubscriber,
         });

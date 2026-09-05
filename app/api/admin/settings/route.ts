@@ -174,6 +174,7 @@ export async function PUT(request: NextRequest) {
             lowBalanceThresholdInCents,
             defaultPricePerCharSubscribers,
             defaultPricePerCharNonSubscribers,
+            maxBillableMessageChars,
             audioPriceMultiplier,
             pwaShowAgainIntervalDays,
             identityVerificationPromptIntervalDays,
@@ -355,6 +356,10 @@ export async function PUT(request: NextRequest) {
             settings.conversationPricePerEquivalentCharCents = Math.round(val * 100);
         }
 
+        if (maxBillableMessageChars !== undefined) {
+            if (!Number.isSafeInteger(maxBillableMessageChars) || maxBillableMessageChars < 1 || maxBillableMessageChars > 10000) return NextResponse.json({ error: 'Limite de caracteres deve ser inteiro entre 1 e 10000.' }, { status: 400 });
+            settings.maxBillableMessageChars = maxBillableMessageChars;
+        }
         if (audioPriceMultiplier !== undefined) {
             const val = Number(audioPriceMultiplier);
             if (isNaN(val) || val < 0) {

@@ -16,6 +16,7 @@ import { sendAdminAlert } from '@/lib/adminAlerts';
 import { sendNewProfessionalTeamAlert } from '@/lib/teamAlerts';
 import { getReferralFromRequestHeaders, getReferralFromUnsafeMetadata, type ReferralMetadata } from '@/lib/referral';
 import { calculateOnboardingStep } from '@/lib/onboarding';
+import { RECEIPT_TERMS_VERSION } from '@/lib/receiptBilling';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
 
@@ -117,6 +118,8 @@ export async function GET(request: NextRequest) {
                     professionalStatus,
                     chargePerCharSubscribers: defaultSub,
                     chargePerCharNonSubscribers: defaultNonSub,
+                    receiptTermsVersion: RECEIPT_TERMS_VERSION,
+                    receiptTermsAcceptedAt: new Date(),
                 };
                 userFields.isProfessional = false;
 
@@ -409,6 +412,8 @@ export async function GET(request: NextRequest) {
                 username: user.username,
                 name: user.name,
                 createdAt: user.createdAt,
+                receiptTermsVersion: user.receiptTermsVersion,
+                receiptTermsAcceptedAt: user.receiptTermsAcceptedAt,
                 onboardingStep: user.onboardingStep,
                 email: user.email,
                 phone: user.phone,
@@ -518,6 +523,7 @@ export async function PATCH(request: NextRequest) {
                 ? username.trim().toLowerCase().replace('@', '')
                 : username;
         }
+        if (name !== undefined && (typeof name !== 'string' || !name.trim() || name.trim().length > 80)) return NextResponse.json({ error: 'Informe um nome entre 1 e 80 caracteres.' }, { status: 400 });
         if (name !== undefined) updateData.name = name.trim();
         if (photoUrl !== undefined) updateData.photoUrl = photoUrl;
         if (coverUrl !== undefined) updateData.coverUrl = coverUrl;
