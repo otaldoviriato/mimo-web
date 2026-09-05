@@ -92,7 +92,8 @@ export default function ChatsPage() {
 
     // Modal de confirmação de exclusão
     const [deleteConfirmRoomId, setDeleteConfirmRoomId] = useState<string | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
+    const deletingRoomIds = useRef(new Set<string>());
+    const [hiddenRoomIds, setHiddenRoomIds] = useState<string[]>([]);
 
     // Estado para o menu de opções da conversa (Drawer / Bottom Sheet)
     const [selectedRoomIdForMenu, setSelectedRoomIdForMenu] = useState<string | null>(null);
@@ -145,7 +146,8 @@ export default function ChatsPage() {
         }
     }, []);
 
-    const { data: rooms = [], isLoading, isRefetching, refetch: refetchRooms } = useChatRooms();
+    const { data: cachedRooms = [], isLoading, isRefetching, refetch: refetchRooms } = useChatRooms();
+    const rooms = cachedRooms.filter((room: Room) => !hiddenRoomIds.some(id => room._id === id || (room.roomId ?? [...room.participants].sort().join('_')) === id));
     const { data: myProfile, refetch: refetchProfile } = useMyProfile();
 
     useEffect(() => {
@@ -419,63 +421,72 @@ export default function ChatsPage() {
     };
 
     const handleDeleteRoom = async (roomId: string) => {
-        if (!user?.id) return;
-        setIsDeleting(true);
+        if (!user?.id || deletingRoomIds.current.has(roomId)) return;
+        const userId = user.id;
+        const queryKey = QueryKeys.rooms(userId);
+        const matches = (room: Room) => room._id === roomId ||
+            (room.roomId ?? [...room.participants].sort().join('_')) === roomId;
+        deletingRoomIds.current.add(roomId);
+        setHiddenRoomIds(ids => [...ids, roomId]);
+        setDeleteConfirmRoomId(null);
+        setSelectedRoomIdForMenu(null);
 
-        const roomsKey = `mimo_rooms_${user.id}`;
-        const pendingKey = `mimo_pending_rooms_${user.id}`;
-        
-        const filterFn = (r: any) => 
-            r._id !== roomId && 
-            r.roomId !== roomId && 
-            (r.roomId ?? [...r.participants].sort().join('_')) !== roomId;
+        await queryClient.cancelQueries({ queryKey });
+        const previousRooms = queryClient.getQueryData<Room[]>(queryKey) ?? [];
+        const restoreRooms = (current: Room[], previous: Room[]) => {
+            const restored = [...current];
+            previous.forEach((room, index) => {
+                if (matches(room) && !restored.some(matches)) {
+                    restored.splice(Math.min(index, restored.length), 0, room);
+                }
+            });
+            return restored;
+        };
+        const storageSnapshots = new Map<string, Room[]>();
+        for (const key of [`mimo_rooms_${userId}`, `mimo_pending_rooms_${userId}`]) {
+            try {
+                const stored = JSON.parse(localStorage.getItem(key) ?? '[]') as Room[];
+                storageSnapshots.set(key, stored);
+                localStorage.setItem(key, JSON.stringify(stored.filter(room => !matches(room))));
+            } catch { /* Storage can be unavailable; the query cache still updates. */ }
+        }
+        queryClient.setQueryData<Room[]>(queryKey, old => (old ?? []).filter(room => !matches(room)));
 
-        // Limpar do localStorage imediatamente para atualizar de forma otimista
         try {
-            const cachedRooms = localStorage.getItem(roomsKey);
-            if (cachedRooms) {
-                localStorage.setItem(roomsKey, JSON.stringify(JSON.parse(cachedRooms).filter(filterFn)));
-            }
-        } catch (err) {}
-
-        try {
-            const cachedPending = localStorage.getItem(pendingKey);
-            if (cachedPending) {
-                localStorage.setItem(pendingKey, JSON.stringify(JSON.parse(cachedPending).filter(filterFn)));
-            }
-        } catch (err) {}
-
-        // Atualizar cache local do queryClient de forma imediata e otimista
-        queryClient.setQueryData(QueryKeys.rooms(user.id), (old: any[] | undefined) => {
-            if (!old) return [];
-            return old.filter(filterFn);
-        });
-
-        try {
-            const response = await fetch(`/api/rooms/${user.id}`, {
+            const response = await fetch(`/api/rooms/${userId}`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ roomId }),
             });
-
-            // Se for 404 (sala não encontrada no banco, ex: sala virtual pendente), ignoramos e prosseguimos
-            if (!response.ok && response.status !== 404) {
-                throw new Error('Falha ao excluir conversa');
-            }
-
-            socketService.deleteRoom(roomId);
-            await queryClient.invalidateQueries({ queryKey: QueryKeys.rooms(user.id) });
-            setDeleteConfirmRoomId(null);
+            // Virtual pending rooms may not exist on the server yet.
+            if (!response.ok && response.status !== 404) throw new Error('Falha ao excluir conversa');
         } catch (error) {
+            for (const [key, previous] of storageSnapshots) {
+                try {
+                    const current = JSON.parse(localStorage.getItem(key) ?? '[]') as Room[];
+                    localStorage.setItem(key, JSON.stringify(restoreRooms(current, previous)));
+                } catch { /* Restore the visible query cache even if storage fails. */ }
+            }
+            queryClient.setQueryData<Room[]>(queryKey, current => restoreRooms(current ?? [], previousRooms));
+            deletingRoomIds.current.delete(roomId);
+            setHiddenRoomIds(ids => ids.filter(id => id !== roomId));
             console.error('Erro ao excluir sala:', error);
-            alert('Não foi possível excluir a conversa. Tente novamente.');
+            alert('Não foi possível excluir a conversa. Ela foi restaurada. Tente novamente.');
+            return;
+        }
+
+        // A refresh failure must not undo a deletion already confirmed by the API.
+        try {
+            socketService.deleteRoom(roomId);
+            await queryClient.invalidateQueries({ queryKey });
+        } catch (error) {
+            console.error('Erro ao sincronizar lista de conversas:', error);
         } finally {
-            setIsDeleting(false);
+            queryClient.setQueryData<Room[]>(queryKey, current => (current ?? []).filter(room => !matches(room)));
+            deletingRoomIds.current.delete(roomId);
+            setHiddenRoomIds(ids => ids.filter(id => id !== roomId));
         }
     };
-
     const startPress = (roomId: string, clientX: number, clientY: number) => {
         isLongPressActive.current = false;
         hasMoved.current = false;
@@ -670,7 +681,7 @@ export default function ChatsPage() {
                 <div className="fixed inset-0 z-[120] flex items-center justify-center p-5">
                     <div
                         className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] animate-in fade-in duration-200"
-                        onClick={() => !isDeleting && setDeleteConfirmRoomId(null)}
+                        onClick={() => setDeleteConfirmRoomId(null)}
                     />
                     <div className="relative w-full max-w-[360px] animate-in fade-in slide-in-from-bottom-6 zoom-in-95 duration-300">
                         <div className="overflow-hidden rounded-[24px] border border-gray-100 bg-white shadow-2xl">
@@ -687,7 +698,6 @@ export default function ChatsPage() {
                                 <div className="flex gap-3">
                                     <button
                                         type="button"
-                                        disabled={isDeleting}
                                         onClick={() => setDeleteConfirmRoomId(null)}
                                         className="flex-1 rounded-xl bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 text-xs font-semibold py-3 transition-colors active:scale-[0.99] cursor-pointer"
                                     >
@@ -695,11 +705,10 @@ export default function ChatsPage() {
                                     </button>
                                     <button
                                         type="button"
-                                        disabled={isDeleting}
                                         onClick={() => deleteConfirmRoomId && handleDeleteRoom(deleteConfirmRoomId)}
                                         className="flex-1 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-semibold py-3 transition-colors shadow-md shadow-red-600/10 active:scale-[0.99] cursor-pointer flex items-center justify-center gap-1.5"
                                     >
-                                        {isDeleting ? 'Excluindo...' : 'Excluir'}
+                                        Excluir
                                     </button>
                                 </div>
                             </div>
