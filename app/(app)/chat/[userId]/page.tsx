@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, use } from 'react';
 import axios from 'axios';
+import toast from 'react-hot-toast';
 import { ClientNameModal } from '@/components/ClientNameModal';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useUser } from '@clerk/nextjs';
@@ -175,6 +176,20 @@ function formatLastSeen(
     } catch (e) {
         return '';
     }
+}
+
+function formatFollowUpCountdown(ms: number): string {
+    if (ms <= 0) return 'em instantes';
+    const totalMinutes = Math.ceil(ms / (60 * 1000));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (hours > 1) {
+        return `${hours} horas`;
+    }
+    if (hours === 1) {
+        return minutes > 0 ? `1 hora e ${minutes} min` : '1 hora';
+    }
+    return `${Math.max(1, minutes)} minutos`;
 }
 
 function formatSeparatorDate(timestamp: string | Date) {
@@ -677,14 +692,34 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         return diffMs >= 0 && diffMs < ACTIVE_CONVERSATION_WINDOW_MS;
     }, [receiver?.isOnline, latestPartnerMessage?.timestamp]);
 
+    const [timerTick, setTimerTick] = useState(0);
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setTimerTick(t => t + 1);
+        }, 30000);
+        return () => clearInterval(interval);
+    }, []);
+
     const offlineTurnStats = React.useMemo(() => {
+        const maxBillableChars = chatPricing?.maxBillableMessageChars ?? 50;
+        const followUpIntervalHours = chatPricing?.offlineFollowUpIntervalHours ?? 24;
+        const followUpMaxAttempts = chatPricing?.offlineFollowUpMaxAttempts ?? 3;
+        const intervalMs = followUpIntervalHours * 60 * 60 * 1000;
+
         if (!userData?.isProfessional) {
-            return { usedChars: 0, isLimitReached: false, remainingChars: 50, maxBillableChars: 50 };
+            return {
+                canSend: true,
+                isLimitReached: false,
+                remainingChars: maxBillableChars,
+                maxBillableChars,
+                attemptNumber: 1,
+                maxAttempts: followUpMaxAttempts,
+                isExhausted: false,
+                msUntilNextAttempt: 0,
+            };
         }
 
-        const maxBillableChars = chatPricing?.maxBillableMessageChars ?? 50;
-        let usedChars = 0;
-
+        const proMsgsSinceClient: Array<{ timestamp: Date; chars: number }> = [];
         for (let i = messages.length - 1; i >= 0; i--) {
             const m = messages[i];
             if (m.senderId === otherUserId) {
@@ -693,16 +728,112 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             if (m.senderId === user?.id) {
                 const chars = m.equivalentCharCount ?? (m.charCount > 0 ? m.charCount : 0);
                 if (chars > 0) {
-                    usedChars += chars;
+                    proMsgsSinceClient.push({
+                        timestamp: m.timestamp ? new Date(m.timestamp) : new Date(0),
+                        chars,
+                    });
+                }
+            }
+        }
+        proMsgsSinceClient.reverse();
+
+        if (proMsgsSinceClient.length === 0) {
+            return {
+                canSend: true,
+                isLimitReached: false,
+                remainingChars: maxBillableChars,
+                maxBillableChars,
+                attemptNumber: 1,
+                maxAttempts: followUpMaxAttempts,
+                isExhausted: false,
+                msUntilNextAttempt: 0,
+            };
+        }
+
+        const attempts: { firstMessageAt: Date; lastMessageAt: Date; usedChars: number }[] = [];
+        for (const item of proMsgsSinceClient) {
+            if (attempts.length === 0) {
+                attempts.push({ firstMessageAt: item.timestamp, lastMessageAt: item.timestamp, usedChars: item.chars });
+            } else {
+                const cur = attempts[attempts.length - 1];
+                if (item.timestamp.getTime() - cur.lastMessageAt.getTime() >= intervalMs) {
+                    attempts.push({ firstMessageAt: item.timestamp, lastMessageAt: item.timestamp, usedChars: item.chars });
+                } else {
+                    cur.lastMessageAt = item.timestamp;
+                    cur.usedChars += item.chars;
                 }
             }
         }
 
-        const remainingChars = Math.max(0, maxBillableChars - usedChars);
-        const isLimitReached = !isClientActiveInConversation && remainingChars <= 0;
+        const lastAttempt = attempts[attempts.length - 1];
+        const nowMs = Date.now();
+        const timeSinceLastMsg = nowMs - lastAttempt.lastMessageAt.getTime();
 
-        return { usedChars, isLimitReached, remainingChars, maxBillableChars };
-    }, [userData?.isProfessional, chatPricing?.maxBillableMessageChars, messages, otherUserId, user?.id, isClientActiveInConversation]);
+        if (timeSinceLastMsg >= intervalMs) {
+            if (attempts.length < followUpMaxAttempts) {
+                return {
+                    canSend: true,
+                    isLimitReached: false,
+                    remainingChars: maxBillableChars,
+                    maxBillableChars,
+                    attemptNumber: attempts.length + 1,
+                    maxAttempts: followUpMaxAttempts,
+                    isExhausted: false,
+                    msUntilNextAttempt: 0,
+                };
+            } else {
+                return {
+                    canSend: isClientActiveInConversation,
+                    isLimitReached: !isClientActiveInConversation,
+                    remainingChars: 0,
+                    maxBillableChars,
+                    attemptNumber: attempts.length,
+                    maxAttempts: followUpMaxAttempts,
+                    isExhausted: true,
+                    msUntilNextAttempt: 0,
+                };
+            }
+        }
+
+        const usedInCurrent = lastAttempt.usedChars;
+        if (usedInCurrent < maxBillableChars) {
+            return {
+                canSend: true,
+                isLimitReached: false,
+                remainingChars: Math.max(0, maxBillableChars - usedInCurrent),
+                maxBillableChars,
+                attemptNumber: attempts.length,
+                maxAttempts: followUpMaxAttempts,
+                isExhausted: false,
+                msUntilNextAttempt: 0,
+            };
+        }
+
+        const msUntilNextAttempt = Math.max(0, (lastAttempt.lastMessageAt.getTime() + intervalMs) - nowMs);
+        const isExhausted = attempts.length >= followUpMaxAttempts;
+        const isLimitReached = !isClientActiveInConversation;
+
+        return {
+            canSend: !isLimitReached,
+            isLimitReached,
+            remainingChars: 0,
+            maxBillableChars,
+            attemptNumber: attempts.length,
+            maxAttempts: followUpMaxAttempts,
+            isExhausted,
+            msUntilNextAttempt,
+        };
+    }, [
+        userData?.isProfessional,
+        chatPricing?.maxBillableMessageChars,
+        chatPricing?.offlineFollowUpIntervalHours,
+        chatPricing?.offlineFollowUpMaxAttempts,
+        messages,
+        otherUserId,
+        user?.id,
+        isClientActiveInConversation,
+        timerTick,
+    ]);
 
     // Lista derivada das mídias históricas carregadas combinadas com as mídias das mensagens locais
     const mediaItems = React.useMemo(() => {
@@ -1983,7 +2114,12 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         }
 
         if (offlineTurnStats.isLimitReached) {
-            alert('Você atingiu o limite de envio para clientes ausentes. Aguarde a resposta do cliente para continuar.');
+            const partnerName = receiver?.name || receiver?.username || 'o cliente';
+            if (offlineTurnStats.isExhausted) {
+                toast.error(`Você atingiu o limite de ${offlineTurnStats.maxAttempts} tentativas para clientes ausentes. Aguarde a resposta de ${partnerName}.`);
+            } else {
+                toast.error(`Você poderá mandar uma nova mensagem de ${offlineTurnStats.maxBillableChars} caracteres em ${formatFollowUpCountdown(offlineTurnStats.msUntilNextAttempt)} (tentativa ${offlineTurnStats.attemptNumber + 1} de ${offlineTurnStats.maxAttempts}). Aguarde a resposta de ${partnerName}.`);
+            }
             return;
         }
         
@@ -2052,7 +2188,12 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
     const handleSendAudio = async (audioBlob: Blob, durationInSeconds: number) => {
         if (offlineTurnStats.isLimitReached) {
-            alert('Você atingiu o limite de envio para clientes ausentes. Aguarde a resposta do cliente para continuar.');
+            const partnerName = receiver?.name || receiver?.username || 'o cliente';
+            if (offlineTurnStats.isExhausted) {
+                toast.error(`Você atingiu o limite de ${offlineTurnStats.maxAttempts} tentativas para clientes ausentes. Aguarde a resposta de ${partnerName}.`);
+            } else {
+                toast.error(`Você poderá mandar um novo áudio/mensagem em ${formatFollowUpCountdown(offlineTurnStats.msUntilNextAttempt)} (tentativa ${offlineTurnStats.attemptNumber + 1} de ${offlineTurnStats.maxAttempts}). Aguarde a resposta de ${partnerName}.`);
+            }
             return;
         }
         if (!await ensureClientName()) return;
@@ -3368,7 +3509,15 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     <div className="mb-2.5 px-4 py-2.5 bg-amber-50 border border-amber-200/80 rounded-2xl flex items-center gap-3 shadow-xs select-none animate-in fade-in slide-in-from-bottom-2 duration-200">
                         <Clock className="w-4 h-4 text-amber-600 shrink-0" />
                         <p className="text-xs text-amber-900 font-medium leading-relaxed">
-                            Você atingiu o limite de mensagens para clientes ausentes ({offlineTurnStats.maxBillableChars} caracteres). Aguarde a resposta de <span className="font-bold">{receiver?.name || receiver?.username || 'cliente'}</span> para continuar conversando.
+                            {offlineTurnStats.isExhausted ? (
+                                <>
+                                    Você atingiu o limite máximo de {offlineTurnStats.maxAttempts} tentativas para clientes ausentes. Aguarde a resposta de <span className="font-bold">{receiver?.name || receiver?.username || 'cliente'}</span> para continuar conversando.
+                                </>
+                            ) : (
+                                <>
+                                    Você poderá mandar uma nova mensagem de {offlineTurnStats.maxBillableChars} caracteres em <span className="font-bold">{formatFollowUpCountdown(offlineTurnStats.msUntilNextAttempt)}</span> (tentativa {offlineTurnStats.attemptNumber + 1} de {offlineTurnStats.maxAttempts}) ou aguarde a resposta de <span className="font-bold">{receiver?.name || receiver?.username || 'cliente'}</span>.
+                                </>
+                            )}
                         </p>
                     </div>
                 )}
@@ -3478,7 +3627,13 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                 onKeyDown={handleKeyDown}
                                 onFocus={() => setIsInputFocused(true)}
                                 onBlur={() => setIsInputFocused(false)}
-                                placeholder={offlineTurnStats.isLimitReached ? "Aguarde a resposta para continuar a conversa..." : "Digite sua mensagem..."}
+                                placeholder={
+                                    offlineTurnStats.isLimitReached
+                                        ? (offlineTurnStats.isExhausted
+                                            ? "Aguarde a resposta para continuar a conversa..."
+                                            : `Nova mensagem liberada em ${formatFollowUpCountdown(offlineTurnStats.msUntilNextAttempt)}...`)
+                                        : "Digite sua mensagem..."
+                                }
                                 rows={1}
                                 className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none leading-5 py-0.5 disabled:text-gray-400 disabled:cursor-not-allowed"
                                 style={{ maxHeight: '96px' }}

@@ -26,6 +26,8 @@ export interface SettingsData {
     defaultPricePerCharSubscribers: number;
     defaultPricePerCharNonSubscribers: number;
     maxBillableMessageChars?: number;
+    offlineFollowUpIntervalHours?: number;
+    offlineFollowUpMaxAttempts?: number;
     audioPriceMultiplier: number;
     pwaShowAgainIntervalDays: number;
     identityVerificationPromptIntervalDays: number;

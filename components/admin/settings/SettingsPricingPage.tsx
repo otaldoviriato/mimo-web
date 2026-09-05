@@ -13,6 +13,8 @@ type Props = Pick<UseSettingsReturn,
     | 'maxSubscriptionPrice' | 'setMaxSubscriptionPrice'
     | 'subscriberDiscountPercentage' | 'setSubscriberDiscountPercentage'
     | 'maxBillableMessageChars' | 'setMaxBillableMessageChars'
+    | 'offlineFollowUpIntervalHours' | 'setOfflineFollowUpIntervalHours'
+    | 'offlineFollowUpMaxAttempts' | 'setOfflineFollowUpMaxAttempts'
     | 'audioPriceMultiplier' | 'setAudioPriceMultiplier'
     | 'isDirtyPricing' | 'saving' | 'saveSettings'
 >;
@@ -39,6 +41,8 @@ export function SettingsPricingPage({
     maxSubscriptionPrice, setMaxSubscriptionPrice,
     subscriberDiscountPercentage, setSubscriberDiscountPercentage,
     maxBillableMessageChars, setMaxBillableMessageChars,
+    offlineFollowUpIntervalHours, setOfflineFollowUpIntervalHours,
+    offlineFollowUpMaxAttempts, setOfflineFollowUpMaxAttempts,
     audioPriceMultiplier, setAudioPriceMultiplier,
     isDirtyPricing, saving, saveSettings,
 }: Props) {
@@ -102,8 +106,16 @@ export function SettingsPricingPage({
                     />
                 </SettingField>
 
-                <SettingField title="Limite de caracteres cobrados por turno (cumulativo)" description="Textos e áudios enviados consecutivamente pelo profissional são cobrados até este limite acumulado de caracteres equivalentes. Quando o cliente responde qualquer mensagem, o limite zera e recomeça. Mensagens subsequentes antes da resposta do cliente são entregues gratuitamente." unit="caracteres">
+                <SettingField title="Limite de caracteres cobrados por turno (cumulativo)" description="Textos e áudios enviados consecutivamente pelo profissional são cobrados até este limite acumulado de caracteres equivalentes. Quando o cliente responde qualquer mensagem, o limite zera e recomeça. Mensagens subsequentes antes da resposta do cliente são bloqueadas." unit="caracteres">
                     <input type="number" min={1} max={10000} step={1} value={maxBillableMessageChars} onChange={e => setMaxBillableMessageChars(Number(e.target.value))} className={inputCls} />
+                </SettingField>
+
+                <SettingField title="Intervalo para nova tentativa com cliente ausente" description="Tempo mínimo de espera em horas para liberar uma nova cota de caracteres e permitir que a criadora chame a atenção do cliente ausente novamente caso ele ainda não tenha respondido." unit="horas">
+                    <input type="number" min={1} max={720} step={1} value={offlineFollowUpIntervalHours} onChange={e => setOfflineFollowUpIntervalHours(Number(e.target.value))} className={inputCls} />
+                </SettingField>
+
+                <SettingField title="Máximo de tentativas com cliente ausente" description="Quantidade máxima de tentativas consecutivas de follow-up que a criadora pode realizar para um cliente ausente antes de bloquear o chat até que ele responda." unit="vezes">
+                    <input type="number" min={1} max={20} step={1} value={offlineFollowUpMaxAttempts} onChange={e => setOfflineFollowUpMaxAttempts(Number(e.target.value))} className={inputCls} />
                 </SettingField>
                 <SettingField
                     title="Multiplicador de Preço do Áudio"

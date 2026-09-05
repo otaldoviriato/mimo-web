@@ -23,6 +23,10 @@ export default function AdminSettingsPricingPage() {
             setSubscriberDiscountPercentage={settings.setSubscriberDiscountPercentage}
             maxBillableMessageChars={settings.maxBillableMessageChars}
             setMaxBillableMessageChars={settings.setMaxBillableMessageChars}
+            offlineFollowUpIntervalHours={settings.offlineFollowUpIntervalHours}
+            setOfflineFollowUpIntervalHours={settings.setOfflineFollowUpIntervalHours}
+            offlineFollowUpMaxAttempts={settings.offlineFollowUpMaxAttempts}
+            setOfflineFollowUpMaxAttempts={settings.setOfflineFollowUpMaxAttempts}
             audioPriceMultiplier={settings.audioPriceMultiplier}
             setAudioPriceMultiplier={settings.setAudioPriceMultiplier}
             isDirtyPricing={settings.isDirtyPricing}

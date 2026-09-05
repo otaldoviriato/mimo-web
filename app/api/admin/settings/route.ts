@@ -175,6 +175,8 @@ export async function PUT(request: NextRequest) {
             defaultPricePerCharSubscribers,
             defaultPricePerCharNonSubscribers,
             maxBillableMessageChars,
+            offlineFollowUpIntervalHours,
+            offlineFollowUpMaxAttempts,
             audioPriceMultiplier,
             pwaShowAgainIntervalDays,
             identityVerificationPromptIntervalDays,
@@ -359,6 +361,14 @@ export async function PUT(request: NextRequest) {
         if (maxBillableMessageChars !== undefined) {
             if (!Number.isSafeInteger(maxBillableMessageChars) || maxBillableMessageChars < 1 || maxBillableMessageChars > 10000) return NextResponse.json({ error: 'Limite de caracteres deve ser inteiro entre 1 e 10000.' }, { status: 400 });
             settings.maxBillableMessageChars = maxBillableMessageChars;
+        }
+        if (offlineFollowUpIntervalHours !== undefined) {
+            if (!Number.isSafeInteger(offlineFollowUpIntervalHours) || offlineFollowUpIntervalHours < 1 || offlineFollowUpIntervalHours > 720) return NextResponse.json({ error: 'Intervalo de follow-up deve ser inteiro entre 1 e 720 horas.' }, { status: 400 });
+            settings.offlineFollowUpIntervalHours = offlineFollowUpIntervalHours;
+        }
+        if (offlineFollowUpMaxAttempts !== undefined) {
+            if (!Number.isSafeInteger(offlineFollowUpMaxAttempts) || offlineFollowUpMaxAttempts < 1 || offlineFollowUpMaxAttempts > 20) return NextResponse.json({ error: 'Máximo de tentativas deve ser inteiro entre 1 e 20.' }, { status: 400 });
+            settings.offlineFollowUpMaxAttempts = offlineFollowUpMaxAttempts;
         }
         if (audioPriceMultiplier !== undefined) {
             const val = Number(audioPriceMultiplier);

@@ -51,12 +51,16 @@ export interface IAppSettings extends Document {
     creatorEngagementStep1Hours: number;
     creatorEngagementStep2Enabled: boolean;
     creatorEngagementStep2Hours: number;
+    offlineFollowUpIntervalHours: number;
+    offlineFollowUpMaxAttempts: number;
     createdAt: Date;
     updatedAt: Date;
 }
 
 const AppSettingsSchema = new Schema<IAppSettings>({
     maxBillableMessageChars: { type: Number, default: 50, min: 1, max: 10000 },
+    offlineFollowUpIntervalHours: { type: Number, default: 24, min: 1, max: 720 },
+    offlineFollowUpMaxAttempts: { type: Number, default: 3, min: 1, max: 20 },
     key: {
         type: String,
         required: true,
