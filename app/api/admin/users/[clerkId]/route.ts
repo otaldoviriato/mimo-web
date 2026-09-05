@@ -63,12 +63,12 @@ export async function GET(
         const defaultNonSub = (settings?.conversationPricePerEquivalentCharCents ?? 5) / 100;
         const defaultSub = defaultNonSub * (1 - (settings?.subscriberDiscountPercentage ?? 20) / 100);
 
-        // Histórico financeiro de movimentações de crédito (depósitos, recargas e cupons)
+        // Histórico financeiro de movimentações de crédito, depósitos, recargas, cupons e ajustes
         const clientFinancialTransactions = await Transaction.find({
             userId: clerkId,
             $or: [
-                { source: { $in: ['recharge', 'gift'] } },
-                { type: { $in: ['promotional_credit_grant', 'PIX', 'CC', 'credit'] } }
+                { source: { $in: ['recharge', 'gift', 'adjustment'] } },
+                { type: { $in: ['promotional_credit_grant', 'PIX', 'CC', 'credit', 'debit'] } }
             ],
             type: { $ne: 'promotional_credit_usage' }
         }).sort({ timestamp: -1, createdAt: -1 }).lean();
@@ -85,10 +85,17 @@ export async function GET(
                 }
             }
 
-            let category: 'recharge' | 'gift' | 'campaign' = 'recharge';
+            const isDebit = tx.type === 'debit';
+            let category: 'recharge' | 'gift' | 'campaign' | 'adjustment' = 'recharge';
             let label = tx.type === 'PIX' ? 'Recarga PIX' : tx.type === 'CC' ? 'Recarga Cartão' : 'Recarga de Saldo';
 
-            if (tx.source === 'gift') {
+            if (tx.source === 'adjustment') {
+                category = 'adjustment';
+                const justification = tx.metadata?.justification || '';
+                label = isDebit 
+                    ? `Ajuste Backoffice (Débito)${justification ? `: ${justification}` : ''}`
+                    : `Ajuste Backoffice (Crédito)${justification ? `: ${justification}` : ''}`;
+            } else if (tx.source === 'gift') {
                 category = 'gift';
                 const codeName = tx.metadata?.giftCode || tx.metadata?.code || '';
                 label = codeName ? `Resgate de Cupom (${codeName})` : 'Resgate de Cupom';
@@ -106,8 +113,10 @@ export async function GET(
                 amount: rawAmount,
                 type: tx.type,
                 source: tx.source,
+                isDebit,
                 category,
                 label,
+                justification: tx.metadata?.justification || null,
                 status: tx.status || 'PAID',
                 statusLabel,
                 couponCode: tx.metadata?.giftCode || tx.metadata?.code || null,
@@ -187,7 +196,6 @@ export async function PATCH(
             name, 
             email, 
             isProfessional, 
-            balance, 
             taxId, 
             phone, 
             subscriptionPrice,
@@ -200,7 +208,6 @@ export async function PATCH(
         if (name !== undefined) updateFields.name = name;
         if (email !== undefined) updateFields.email = email;
         if (isProfessional !== undefined) updateFields.isProfessional = isProfessional;
-        if (balance !== undefined) updateFields.balance = Number(balance);
         if (taxId !== undefined) updateFields.taxId = taxId;
         if (phone !== undefined) updateFields.phone = phone;
         if (subscriptionPrice !== undefined) {

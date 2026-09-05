@@ -35,7 +35,10 @@ import {
     Filter,
     ChevronLeft,
     ChevronRight,
-    ArrowDownLeft
+    ArrowDownLeft,
+    ArrowUpRight,
+    PlusCircle,
+    Minus
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -62,8 +65,10 @@ interface ClientFinancialRecord {
     amount: number;
     type: string;
     source: string;
-    category: 'recharge' | 'gift' | 'campaign';
+    isDebit?: boolean;
+    category: 'recharge' | 'gift' | 'campaign' | 'adjustment';
     label: string;
+    justification?: string | null;
     status: string;
     statusLabel: string;
     couponCode?: string | null;
@@ -157,9 +162,17 @@ export default function UserDetailPage() {
     const [withdrawalSearch, setWithdrawalSearch] = useState('');
 
     const [showAllFinancialModal, setShowAllFinancialModal] = useState(false);
-    const [financialFilter, setFinancialFilter] = useState<'all' | 'recharge' | 'gift' | 'campaign'>('all');
+    const [financialFilter, setFinancialFilter] = useState<'all' | 'recharge' | 'gift' | 'campaign' | 'adjustment'>('all');
     const [financialPage, setFinancialPage] = useState(1);
     const [financialSearch, setFinancialSearch] = useState('');
+
+    // Estados do Modal de Ajuste de Saldo (Inserir / Debitar)
+    const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
+    const [adjustmentType, setAdjustmentType] = useState<'credit' | 'debit'>('credit');
+    const [adjustmentAmount, setAdjustmentAmount] = useState('');
+    const [targetBalance, setTargetBalance] = useState('');
+    const [adjustmentJustification, setAdjustmentJustification] = useState('');
+    const [submittingAdjustment, setSubmittingAdjustment] = useState(false);
 
     // Estados do Gerenciamento de Salas de Chat da Profissional
     const [rooms, setRooms] = useState<ChatRoom[]>([]);
@@ -398,7 +411,6 @@ export default function UserDetailPage() {
                     name,
                     email,
                     username,
-                    balance: balance * 100, // converte centavos
                     isProfessional,
                     taxId,
                     phone,
@@ -424,6 +436,121 @@ export default function UserDetailPage() {
             toast.error('Erro de conexão com o servidor.');
         } finally {
             setSaving(false);
+        }
+    };
+
+    // Abre o modal de ajuste de saldo resetando os campos
+    const handleOpenAdjustmentModal = () => {
+        setAdjustmentType('credit');
+        setAdjustmentAmount('');
+        setTargetBalance(balance.toFixed(2));
+        setAdjustmentJustification('');
+        setShowAdjustmentModal(true);
+    };
+
+    // Atualização bidirecional a partir do valor da movimentação
+    const handleAmountChange = (val: string) => {
+        setAdjustmentAmount(val);
+        const parsed = parseFloat(val);
+        if (isNaN(parsed) || parsed < 0) {
+            setTargetBalance(balance.toFixed(2));
+            return;
+        }
+        if (adjustmentType === 'credit') {
+            setTargetBalance((balance + parsed).toFixed(2));
+        } else {
+            setTargetBalance(Math.max(0, balance - parsed).toFixed(2));
+        }
+    };
+
+    // Atualização bidirecional a partir do saldo final desejado
+    const handleTargetBalanceChange = (val: string) => {
+        setTargetBalance(val);
+        const parsedTarget = parseFloat(val);
+        if (isNaN(parsedTarget) || parsedTarget < 0) {
+            setAdjustmentAmount('');
+            return;
+        }
+        if (parsedTarget > balance) {
+            setAdjustmentType('credit');
+            setAdjustmentAmount((parsedTarget - balance).toFixed(2));
+        } else if (parsedTarget < balance) {
+            setAdjustmentType('debit');
+            setAdjustmentAmount((balance - parsedTarget).toFixed(2));
+        } else {
+            setAdjustmentAmount('0.00');
+        }
+    };
+
+    // Alternar entre Creditar e Debitar
+    const handleToggleAdjustmentType = (newType: 'credit' | 'debit') => {
+        setAdjustmentType(newType);
+        const parsed = parseFloat(adjustmentAmount);
+        if (!isNaN(parsed) && parsed > 0) {
+            if (newType === 'credit') {
+                setTargetBalance((balance + parsed).toFixed(2));
+            } else {
+                setTargetBalance(Math.max(0, balance - parsed).toFixed(2));
+            }
+        }
+    };
+
+    // Confirma e executa o ajuste de saldo no servidor
+    const handleConfirmAdjustment = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const amt = parseFloat(adjustmentAmount);
+        if (isNaN(amt) || amt <= 0) {
+            toast.error('Informe um valor de movimentação válido maior que zero.');
+            return;
+        }
+        if (!adjustmentJustification || adjustmentJustification.trim().length < 5) {
+            toast.error('A justificativa é obrigatória (mínimo de 5 caracteres).');
+            return;
+        }
+        if (adjustmentType === 'debit' && amt > balance) {
+            toast.error(`O débito não pode exceder o saldo atual de ${balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}.`);
+            return;
+        }
+
+        setSubmittingAdjustment(true);
+        try {
+            const res = await fetch(`/api/admin/users/${clerkId}/balance-adjustment`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: adjustmentType,
+                    amount: amt,
+                    targetBalance: parseFloat(targetBalance) || undefined,
+                    justification: adjustmentJustification.trim(),
+                })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setBalance(data.newBalance);
+                if (user) {
+                    setUser(prev => prev ? { ...prev, balance: data.newBalance * 100 } : null);
+                }
+                toast.success(`Saldo ${adjustmentType === 'credit' ? 'creditado' : 'debitado'} com sucesso!`, {
+                    style: { borderRadius: '12px', background: '#1E293B', color: '#FFF', fontWeight: 600 }
+                });
+                setShowAdjustmentModal(false);
+
+                // Recarrega o histórico financeiro atualizado
+                const userRes = await fetch(`/api/admin/users/${clerkId}`);
+                if (userRes.ok) {
+                    const userData = await userRes.json();
+                    setFinancialHistory(userData.financialHistory || []);
+                }
+            } else {
+                const errData = await res.json();
+                toast.error(errData.error || 'Erro ao realizar ajuste de saldo.');
+            }
+        } catch (err) {
+            console.error('Erro de conexão ao ajustar saldo:', err);
+            toast.error('Erro de conexão com o servidor.');
+        } finally {
+            setSubmittingAdjustment(false);
         }
     };
 
@@ -555,6 +682,7 @@ export default function UserDetailPage() {
             const matchesCategory = financialFilter === 'all' || f.category === financialFilter;
             const matchesSearch = !financialSearch || 
                 f.label.toLowerCase().includes(financialSearch.toLowerCase()) || 
+                (f.justification && f.justification.toLowerCase().includes(financialSearch.toLowerCase())) ||
                 (f.couponCode && f.couponCode.toLowerCase().includes(financialSearch.toLowerCase())) ||
                 f.amount.toString().includes(financialSearch) ||
                 f.createdAt.toLowerCase().includes(financialSearch.toLowerCase());
@@ -759,16 +887,31 @@ export default function UserDetailPage() {
                                     Saldo e Cargo
                                 </h3>
 
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Saldo da Carteira (R$)</label>
-                                    <input 
-                                        type="number" 
-                                        step="0.01"
-                                        value={balance}
-                                        onChange={(e) => setBalance(Number(e.target.value))}
-                                        className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700"
-                                    />
-                                </div>
+        {/* Card Informativo de Saldo Atual + Ação Oficial de Ajuste */}
+        <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Saldo da Carteira</span>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full">
+                    Saldo Real
+                </span>
+            </div>
+            <div>
+                <span className="text-2xl font-black text-slate-900 tracking-tight block">
+                    {balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium mt-0.5 block">
+                    Alterações de saldo geram registro oficial com justificativa.
+                </span>
+            </div>
+            <button 
+                type="button"
+                onClick={handleOpenAdjustmentModal}
+                className="w-full py-2.5 px-3 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm shadow-purple-600/10"
+            >
+                <PlusCircle size={14} />
+                Inserir ou Debitar Saldo
+            </button>
+        </div>
 
                                 <div className="pt-2 border-t border-slate-100">
                                     <label className="flex items-center gap-2.5 cursor-pointer group">
@@ -1291,7 +1434,7 @@ export default function UserDetailPage() {
                                     <thead>
                                         <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
                                             <th className="py-4 px-6">Tipo / Movimentação</th>
-                                            <th className="py-4 px-6">Valor Creditado</th>
+                                            <th className="py-4 px-6">Valor / Movimentação</th>
                                             <th className="py-4 px-6">Data & Hora</th>
                                             <th className="py-4 px-6">Status</th>
                                         </tr>
@@ -1305,13 +1448,19 @@ export default function UserDetailPage() {
                                                             <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
                                                                 item.category === 'gift' ? 'bg-purple-50 text-purple-600 border border-purple-100' :
                                                                 item.category === 'campaign' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                                                                item.category === 'adjustment' ? (item.isDebit ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100') :
                                                                 'bg-blue-50 text-blue-600 border border-blue-100'
                                                             }`}>
                                                                 {item.category === 'gift' ? <Ticket size={14} /> :
-                                                                 item.category === 'campaign' ? <Coins size={14} /> : <CreditCard size={14} />}
+                                                                 item.category === 'campaign' ? <Coins size={14} /> :
+                                                                 item.category === 'adjustment' ? (item.isDebit ? <Minus size={14} /> : <Plus size={14} />) :
+                                                                 <CreditCard size={14} />}
                                                             </div>
                                                             <div className="flex flex-col min-w-0">
                                                                 <span className="text-xs font-bold text-slate-800 leading-tight">{item.label}</span>
+                                                                {item.justification && (
+                                                                    <span className="text-[10px] text-slate-500 font-medium italic mt-0.5">Motivo: {item.justification}</span>
+                                                                )}
                                                                 {item.couponCode && (
                                                                     <span className="text-[10px] text-purple-600 font-mono font-bold">Código: {item.couponCode}</span>
                                                                 )}
@@ -1319,8 +1468,9 @@ export default function UserDetailPage() {
                                                         </div>
                                                     </td>
                                                     <td className="py-4 px-6">
-                                                        <span className="text-sm font-extrabold text-emerald-600">
-                                                            + {item.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                        <span className={`text-sm font-extrabold ${item.isDebit ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                                            {item.isDebit ? '- ' : '+ '}
+                                                            {item.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                                         </span>
                                                     </td>
                                                     <td className="py-4 px-6 text-xs text-slate-500 font-semibold">
@@ -1961,7 +2111,7 @@ export default function UserDetailPage() {
                             </div>
 
                             <div className="flex items-center gap-1 bg-slate-200/60 p-1 rounded-xl w-full sm:w-auto">
-                                {(['all', 'recharge', 'gift', 'campaign'] as const).map((cat) => (
+                                {(['all', 'recharge', 'gift', 'campaign', 'adjustment'] as const).map((cat) => (
                                     <button
                                         key={cat}
                                         onClick={() => { setFinancialFilter(cat); setFinancialPage(1); }}
@@ -1969,7 +2119,7 @@ export default function UserDetailPage() {
                                             financialFilter === cat ? 'bg-white text-purple-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'
                                         }`}
                                     >
-                                        {cat === 'all' ? 'Todas' : cat === 'recharge' ? 'Recargas' : cat === 'gift' ? 'Cupons' : 'Campanhas'}
+                                        {cat === 'all' ? 'Todas' : cat === 'recharge' ? 'Recargas' : cat === 'gift' ? 'Cupons' : cat === 'campaign' ? 'Campanhas' : 'Ajustes'}
                                     </button>
                                 ))}
                             </div>
@@ -1981,7 +2131,7 @@ export default function UserDetailPage() {
                                 <thead>
                                     <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
                                         <th className="py-3 px-4">Tipo / Movimentação</th>
-                                        <th className="py-3 px-4">Valor Creditado</th>
+                                        <th className="py-3 px-4">Valor / Movimentação</th>
                                         <th className="py-3 px-4">Data & Hora</th>
                                         <th className="py-3 px-4">Status</th>
                                     </tr>
@@ -1997,13 +2147,19 @@ export default function UserDetailPage() {
                                                             <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
                                                                 item.category === 'gift' ? 'bg-purple-50 text-purple-600 border border-purple-100' :
                                                                 item.category === 'campaign' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                                                                item.category === 'adjustment' ? (item.isDebit ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100') :
                                                                 'bg-blue-50 text-blue-600 border border-blue-100'
                                                             }`}>
                                                                 {item.category === 'gift' ? <Ticket size={14} /> :
-                                                                 item.category === 'campaign' ? <Coins size={14} /> : <CreditCard size={14} />}
+                                                                 item.category === 'campaign' ? <Coins size={14} /> :
+                                                                 item.category === 'adjustment' ? (item.isDebit ? <Minus size={14} /> : <Plus size={14} />) :
+                                                                 <CreditCard size={14} />}
                                                             </div>
                                                             <div className="flex flex-col min-w-0">
                                                                 <span className="text-xs font-bold text-slate-800 leading-tight">{item.label}</span>
+                                                                {item.justification && (
+                                                                    <span className="text-[10px] text-slate-500 font-medium italic mt-0.5">Motivo: {item.justification}</span>
+                                                                )}
                                                                 {item.couponCode && (
                                                                     <span className="text-[10px] text-purple-600 font-mono font-bold">Código: {item.couponCode}</span>
                                                                 )}
@@ -2011,8 +2167,9 @@ export default function UserDetailPage() {
                                                         </div>
                                                     </td>
                                                     <td className="py-3 px-4">
-                                                        <span className="text-sm font-extrabold text-emerald-600">
-                                                            + {item.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                        <span className={`text-sm font-extrabold ${item.isDebit ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                                            {item.isDebit ? '- ' : '+ '}
+                                                            {item.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                                         </span>
                                                     </td>
                                                     <td className="py-3 px-4 text-xs text-slate-500 font-medium">
@@ -2071,6 +2228,218 @@ export default function UserDetailPage() {
                                 </div>
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Ajuste de Saldo (Inserir / Debitar com Cálculo Bidirecional) */}
+            {showAdjustmentModal && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+                        {/* Modal Header */}
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-9 h-9 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 font-bold">
+                                    <Coins size={18} />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-bold text-slate-800">
+                                        Ajuste de Saldo em Conta
+                                    </h3>
+                                    <p className="text-xs text-slate-400 font-medium">
+                                        {name || username} • Clerk: {clerkId}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowAdjustmentModal(false)}
+                                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <form onSubmit={handleConfirmAdjustment} className="p-6 space-y-5">
+                            {/* Card de Saldo Atual */}
+                            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex items-center justify-between">
+                                <div>
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                                        Saldo Atual da Carteira
+                                    </span>
+                                    <span className="text-2xl font-black text-slate-800 tracking-tight block mt-0.5">
+                                        {balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </span>
+                                </div>
+                                <span className="text-[10px] font-bold text-slate-500 bg-white border border-slate-200 px-2.5 py-1 rounded-lg shadow-xs">
+                                    Disponível
+                                </span>
+                            </div>
+
+                            {/* Seletor de Tipo de Operação */}
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                                    Tipo de Operação
+                                </label>
+                                <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl border border-slate-200/60">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleToggleAdjustmentType('credit')}
+                                        className={`py-2.5 px-3 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                                            adjustmentType === 'credit'
+                                                ? 'bg-emerald-600 text-white shadow-sm'
+                                                : 'text-slate-600 hover:text-slate-900'
+                                        }`}
+                                    >
+                                        <Plus size={14} />
+                                        Adicionar (Crédito)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleToggleAdjustmentType('debit')}
+                                        className={`py-2.5 px-3 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                                            adjustmentType === 'debit'
+                                                ? 'bg-rose-600 text-white shadow-sm'
+                                                : 'text-slate-600 hover:text-slate-900'
+                                        }`}
+                                    >
+                                        <Minus size={14} />
+                                        Retirar (Débito)
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Inputs Bidirecionais Conectados */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                                        {adjustmentType === 'credit' ? 'Valor a Inserir (R$)' : 'Valor a Debitar (R$)'}
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                                            R$
+                                        </span>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            placeholder="0,00"
+                                            value={adjustmentAmount}
+                                            onChange={(e) => handleAmountChange(e.target.value)}
+                                            className="w-full pl-9 pr-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-extrabold text-slate-800"
+                                        />
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 font-medium block">
+                                        Quantia a {adjustmentType === 'credit' ? 'somar' : 'subtrair'}.
+                                    </span>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                                        Saldo Final Desejado (R$)
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                                            R$
+                                        </span>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            placeholder="0,00"
+                                            value={targetBalance}
+                                            onChange={(e) => handleTargetBalanceChange(e.target.value)}
+                                            className="w-full pl-9 pr-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-extrabold text-slate-800"
+                                        />
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 font-medium block">
+                                        Valor total que o usuário terá.
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Alerta caso débito seja maior que saldo disponível */}
+                            {adjustmentType === 'debit' && parseFloat(adjustmentAmount) > balance && (
+                                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2 text-rose-700 text-xs font-bold">
+                                    <AlertTriangle size={15} className="shrink-0" />
+                                    <span>O valor a debitar é maior que o saldo atual. O saldo não pode ficar negativo.</span>
+                                </div>
+                            )}
+
+                            {/* Campo de Justificativa Obrigatória */}
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                                    <span>Justificativa da Alteração *</span>
+                                    <span className="text-[9.5px] font-bold text-purple-600">Obrigatória para auditoria</span>
+                                </label>
+                                <textarea
+                                    required
+                                    rows={3}
+                                    value={adjustmentJustification}
+                                    onChange={(e) => setAdjustmentJustification(e.target.value)}
+                                    placeholder="Ex: Estorno de cobrança incorreta no chat, bonificação promocional, correção de repasse contábil..."
+                                    className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-medium text-slate-700 resize-none"
+                                />
+                                <span className="text-[10px] text-slate-400 font-medium block">
+                                    Mínimo de 5 caracteres. Será registrado permanentemente no extrato e histórico financeiro.
+                                </span>
+                            </div>
+
+                            {/* Resumo da Operação */}
+                            <div className="p-3.5 bg-purple-50/60 border border-purple-100 rounded-2xl flex items-center justify-between">
+                                <div>
+                                    <span className="text-[10px] font-bold text-slate-500 block">Movimentação</span>
+                                    <span className={`text-xs font-black ${adjustmentType === 'credit' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                        {adjustmentType === 'credit' ? '+' : '-'} {((parseFloat(adjustmentAmount) || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </span>
+                                </div>
+                                <div className="text-right">
+                                    <span className="text-[10px] font-bold text-slate-500 block">Novo Saldo Previsto</span>
+                                    <span className="text-sm font-black text-purple-900">
+                                        {((parseFloat(targetBalance) || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Botões do Modal */}
+                            <div className="pt-2 flex items-center justify-end gap-2.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAdjustmentModal(false)}
+                                    disabled={submittingAdjustment}
+                                    className="px-4 py-2.5 border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={
+                                        submittingAdjustment ||
+                                        !adjustmentAmount ||
+                                        parseFloat(adjustmentAmount) <= 0 ||
+                                        adjustmentJustification.trim().length < 5 ||
+                                        (adjustmentType === 'debit' && parseFloat(adjustmentAmount) > balance)
+                                    }
+                                    className={`px-5 py-2.5 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-sm disabled:opacity-50 ${
+                                        adjustmentType === 'credit'
+                                            ? 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800'
+                                            : 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800'
+                                    }`}
+                                >
+                                    {submittingAdjustment ? (
+                                        <Loader2 size={14} className="animate-spin" />
+                                    ) : adjustmentType === 'credit' ? (
+                                        <Plus size={14} />
+                                    ) : (
+                                        <Minus size={14} />
+                                    )}
+                                    {submittingAdjustment 
+                                        ? 'Processando ajuste...' 
+                                        : `Confirmar ${adjustmentType === 'credit' ? 'Crédito' : 'Débito'}`}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

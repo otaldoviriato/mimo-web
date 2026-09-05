@@ -26,7 +26,7 @@ export async function GET() {
         if (!userId) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         await connectToDatabase();
 
-        const [user, withdrawals, paidMessages, microCredits, subscriptions] = await Promise.all([
+        const [user, withdrawals, paidMessages, microCredits, subscriptions, manualAdjustments] = await Promise.all([
             User.findOne({ clerkId: userId }).select('balance professionalAvailableCents isProfessional').lean(),
             WithdrawRequest.find({ userId }).sort({ createdAt: -1 }).limit(50).lean(),
             Message.find({
@@ -44,6 +44,8 @@ export async function GET() {
             }).sort({ timestamp: -1 }).limit(500).lean(),
             Transaction.find({ userId, type: 'credit', source: 'subscription', status: 'COMPLETED' })
                 .sort({ timestamp: -1 }).limit(200).lean(),
+            Transaction.find({ userId, source: 'adjustment', status: 'COMPLETED' })
+                .sort({ timestamp: -1 }).limit(100).lean(),
         ]);
 
         if (!user) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
@@ -102,6 +104,21 @@ export async function GET() {
                 timestamp: new Date(transaction.timestamp || transaction.createdAt),
                 relatedUserId: transaction.relatedUserId,
                 clientPhotoUrl: client?.photoUrl || null,
+            });
+        }
+
+        for (const transaction of manualAdjustments) {
+            const isDebit = transaction.type === 'debit';
+            const amountCents = Math.round((Number(transaction.amount) || 0) * 100);
+            const signedAmount = isDebit ? -amountCents : amountCents;
+            const justification = transaction.metadata?.justification || '';
+            entries.push({
+                id: `adj_${transaction._id}`,
+                kind: 'adjustment',
+                title: isDebit ? 'Ajuste manual de saldo (Débito)' : 'Ajuste manual de saldo (Crédito)',
+                description: justification ? `Justificativa: ${justification}` : 'Ajuste de saldo efetuado pelo Backoffice',
+                amount: signedAmount,
+                timestamp: new Date(transaction.timestamp || transaction.createdAt),
             });
         }
 

@@ -141,7 +141,6 @@ export function UserTable() {
                 body: JSON.stringify({
                     name: editName,
                     email: editEmail,
-                    balance: editBalance * 100,
                     isProfessional: editIsProfessional,
                     taxId: editTaxId,
                     phone: editPhone,
@@ -157,7 +156,6 @@ export function UserTable() {
                     ...u,
                     name: editName,
                     email: editEmail,
-                    balance: editBalance * 100,
                     isProfessional: editIsProfessional,
                     taxId: editTaxId,
                     phone: editPhone,
@@ -421,18 +419,24 @@ export function UserTable() {
                                 </div>
 
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block flex items-center gap-1">
-                                        <Coins size={12} className="text-amber-500" />
-                                        Saldo da Carteira (R$)
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block flex items-center justify-between">
+                                        <span className="flex items-center gap-1">
+                                            <Coins size={12} className="text-amber-500" />
+                                            Saldo da Carteira (R$)
+                                        </span>
+                                        <span className="text-[9px] text-purple-600 font-bold">Ajuste via Perfil</span>
                                     </label>
                                     <input 
                                         type="number" 
                                         step="0.01"
-                                        required
+                                        disabled
                                         value={editBalance}
-                                        onChange={(e) => setEditBalance(Number(e.target.value))}
-                                        className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-bold text-slate-700"
+                                        className="w-full px-3.5 py-2.5 text-xs bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-500 cursor-not-allowed"
+                                        title="Para alterar o saldo com crédito ou débito e justificativa, acesse o perfil completo do usuário."
                                     />
+                                    <span className="text-[9.5px] text-slate-400 font-medium block">
+                                        O saldo é alterado com justificativa e histórico no perfil completo.
+                                    </span>
                                 </div>
 
                                 <div className="space-y-1.5">

@@ -6,7 +6,7 @@ export interface ITransaction extends Document {
     amount: number;
     status: 'PAID' | 'PENDING' | 'CANCELLED' | 'COMPLETED' | 'debit';
     type: 'PIX' | 'CC' | 'credit' | 'debit' | 'platform_fee' | 'promotional_credit_grant' | 'promotional_credit_usage' | 'promotional_credit_expired';
-    source: 'message' | 'recharge' | 'withdrawal' | 'image_unlock' | 'gift' | 'subscription' | 'campaign';
+    source: 'message' | 'recharge' | 'withdrawal' | 'image_unlock' | 'gift' | 'subscription' | 'campaign' | 'adjustment';
     messageId?: string;
     relatedUserId?: string;
     campaignId?: string;
@@ -43,7 +43,7 @@ const TransactionSchema = new Schema<ITransaction>({
     },
     source: {
         type: String,
-        enum: ['message', 'recharge', 'withdrawal', 'image_unlock', 'gift', 'subscription', 'campaign'],
+        enum: ['message', 'recharge', 'withdrawal', 'image_unlock', 'gift', 'subscription', 'campaign', 'adjustment'],
         required: true,
     },
     messageId: {
