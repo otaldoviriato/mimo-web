@@ -15,6 +15,7 @@ import { Drawer } from 'vaul';
 import { AudioRecorder, type AudioRecorderStatus } from '@/components/AudioRecorder';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { MediaComposerSheet } from '@/components/MediaComposerSheet';
+import { PendingReceiptBalloon } from '@/components/PendingReceiptBalloon';
 import { AlertTriangle, ShieldCheck, Wallet, Clock, MessageCircle, LockKeyhole } from 'lucide-react';
 
 interface Message {
@@ -3061,8 +3062,8 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                             />
                                         )}
                                         <div
-                                            className={`reply-swipe-balloon relative z-10 max-w-[75%] ${isLocked || item.originalImageUrl || item.isVideo || item.isExpired ? 'p-0 bg-transparent shadow-none' : (isAudio ? 'p-3' : 'px-3 py-1.5')} rounded-2xl ${
-                                            (!isLocked && !item.originalImageUrl && !item.isVideo && !item.isExpired) 
+                                            className={`reply-swipe-balloon relative z-10 max-w-[75%] ${isLocked || item.originalImageUrl || item.isVideo || item.isExpired || item.isContentLocked ? 'p-0 bg-transparent shadow-none' : (isAudio ? 'p-3' : 'px-3 py-1.5')} rounded-2xl ${
+                                            (!isLocked && !item.originalImageUrl && !item.isVideo && !item.isExpired && !item.isContentLocked) 
                                         ? (isMine ? 'bg-purple-600 text-white rounded-br-sm' : 'bg-white text-gray-900 shadow-sm rounded-bl-sm')
                                                 : (isMine ? 'rounded-br-sm' : 'rounded-bl-sm')
                                             }`}
@@ -3096,34 +3097,16 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                 </div>
                                             )}
                                     {item.isContentLocked ? (
-                                        <button
-                                            type="button"
-                                            onClick={() => openRechargeModal({ currentBalanceInCents: balance, requiredAmountInCents: item.receiptChargeCents ?? 0 })}
-                                            className="relative block max-w-full cursor-pointer text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-purple-600 rounded-sm"
-                                        >
-                                            <span className="grid w-52 max-w-full overflow-hidden rounded-xl">
-                                            <span aria-hidden="true" className="pointer-events-none col-start-1 row-start-1 select-none text-sm leading-relaxed whitespace-pre-wrap break-words blur-[5px]">
-                                                {item.isAudio ? '▂ ▅ ▃ ▇ ▄ ▂ ▆ ▇ ▃ ▅ ▂ ▄ ▆ ▃ ▅ ▂' : (item.content || '•••')}
-                                            </span>
-                                            <span className="relative col-start-1 row-start-1 flex w-full min-w-0 flex-col items-center justify-center gap-1.5 bg-amber-50/80 px-3 py-4 text-center text-amber-900">
-                                                <LockKeyhole size={16} className="text-amber-600" aria-hidden="true" />
-                                                <span className="text-xs font-semibold">Faltou saldo para liberar</span>
-                                                <span className="text-[11px] leading-4 text-amber-800">Esta mensagem não foi liberada automaticamente porque seu saldo era insuficiente.</span>
-                                                {typeof item.receiptChargeCents === 'number' && item.receiptChargeCents > 0 && (
-                                                    <span className="text-[11px] font-semibold text-amber-900">
-                                                        Valor da mensagem: {(item.receiptChargeCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                                    </span>
-                                                )}
-                                                <span className="mt-0.5 text-[11px] font-semibold text-amber-700">Toque para adicionar saldo</span>
-                                            </span>
-                                            </span>
-                                            <span className="inline-flex items-center gap-1.5 float-right mt-2 ml-2 mb-[-2px]">
-                                                <time className="text-[10px] font-medium text-gray-400">
-                                                    {new Date(item.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                                </time>
-                                            </span>
-                                            <span className="block clear-both" />
-                                        </button>
+                                        <PendingReceiptBalloon
+                                            item={item}
+                                            currentBalanceInCents={balance}
+                                            onOpenRecharge={(requiredCents) =>
+                                                openRechargeModal({
+                                                    currentBalanceInCents: balance,
+                                                    requiredAmountInCents: requiredCents,
+                                                })
+                                            }
+                                        />
                                     ) : isLocked || item.originalImageUrl || item.isVideo || isAudio || item.isExpired ? (
                                         <>
                                             {item.isExpired || (item.expiresAt && new Date(item.expiresAt).getTime() > 0 && new Date(item.expiresAt) < new Date()) ? (

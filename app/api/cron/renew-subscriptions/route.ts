@@ -216,7 +216,7 @@ export async function GET(request: NextRequest) {
                             relatedUserId: professionalId,
                             metadata: { senderId: subscriberId, receiverId: professionalId }
                         },
-                    ], { session });
+                    ], { session, ordered: true });
 
                     const renewResult = await Subscription.updateOne(
                         {
