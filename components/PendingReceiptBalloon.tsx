@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { LockKeyhole, ChevronRight } from 'lucide-react';
+import { LockKeyhole, ChevronRight, Play } from 'lucide-react';
 
 interface PendingReceiptBalloonProps {
     item: {
@@ -44,71 +44,58 @@ export const PendingReceiptBalloon: React.FC<PendingReceiptBalloonProps> = ({
         <button
             type="button"
             onClick={handleClick}
-            className="group relative block w-64 max-w-full cursor-pointer text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600 rounded-2xl rounded-bl-sm transition-transform active:scale-[0.99] bg-white p-1.5 shadow-sm border border-amber-200/80"
-            aria-label={`Mensagem aguardando saldo para liberar. Valor: ${formattedPrice}. Toque para recarregar.`}
+            className="group relative block w-64 max-w-full cursor-pointer text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600 rounded-2xl rounded-bl-sm bg-white border border-slate-200/90 shadow-xs overflow-hidden transition-all active:scale-[0.99] hover:border-purple-300/80"
+            aria-label={`Mensagem recebida aguardando liberação. Valor: ${formattedPrice}. Toque para liberar.`}
         >
-            <div className="relative overflow-hidden rounded-xl border border-amber-200/80 bg-gradient-to-br from-amber-50/80 via-amber-50/40 to-orange-50/50 p-3 shadow-xs transition-colors group-hover:border-amber-300">
-                {/* Efeito Shimmer contínuo passando pelo card */}
-                <div 
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 -translate-x-full animate-shimmer-sweep bg-gradient-to-r from-transparent via-white/60 to-transparent" 
-                />
-
-                {/* Header com status vivo e cadeado */}
-                <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="relative flex h-2 w-2 shrink-0">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
-                        </span>
-                        <span className="text-[11px] font-semibold text-amber-900 tracking-tight truncate">
-                            Aguardando saldo para liberar
-                        </span>
+            {/* Conteúdo com blur real: preserva a silhueta, tamanho e curiosidade da mensagem */}
+            {item.isAudio ? (
+                <div className="p-3.5 pb-8 select-none filter blur-[3.5px] opacity-40 flex items-center gap-2 pointer-events-none">
+                    <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center shrink-0">
+                        <Play size={13} className="text-slate-600 fill-slate-600 ml-0.5" />
                     </div>
-                    <LockKeyhole size={13} className="text-amber-600 shrink-0" strokeWidth={2.4} aria-hidden="true" />
+                    <div className="flex-1 flex items-center gap-1 h-5">
+                        <div className="w-1 h-3 bg-slate-500 rounded-full" />
+                        <div className="w-1 h-5 bg-slate-500 rounded-full" />
+                        <div className="w-1 h-2 bg-slate-500 rounded-full" />
+                        <div className="w-1 h-6 bg-slate-500 rounded-full" />
+                        <div className="w-1 h-3.5 bg-slate-500 rounded-full" />
+                        <div className="w-1 h-5 bg-slate-500 rounded-full" />
+                        <div className="w-1 h-2.5 bg-slate-500 rounded-full" />
+                        <div className="w-1 h-5.5 bg-slate-500 rounded-full" />
+                        <div className="w-1 h-4 bg-slate-500 rounded-full" />
+                        <div className="w-1 h-2 bg-slate-500 rounded-full" />
+                    </div>
                 </div>
+            ) : (
+                <div className="p-3 pb-8 select-none filter blur-[4px] text-sm text-slate-700/85 leading-relaxed whitespace-pre-wrap break-words pointer-events-none min-h-[58px]">
+                    {item.content || 'Mensagem reservada'}
+                </div>
+            )}
 
-                {/* Conteúdo em espera: Áudio ou Texto com Skeleton */}
-                {item.isAudio ? (
-                    <div className="my-2.5 flex items-center gap-2 py-0.5">
-                        <div className="w-7 h-7 rounded-full bg-amber-100/90 flex items-center justify-center text-amber-700 shrink-0">
-                            <LockKeyhole size={12} strokeWidth={2.5} />
-                        </div>
-                        {/* Waveform animada em espera */}
-                        <div className="flex items-center gap-1 h-5 flex-1 px-1" aria-hidden="true">
-                            <div className="w-1 h-5 bg-amber-400/80 rounded-full animate-audio-wave-1 origin-bottom" />
-                            <div className="w-1 h-5 bg-amber-400/80 rounded-full animate-audio-wave-2 origin-bottom" />
-                            <div className="w-1 h-5 bg-amber-400/80 rounded-full animate-audio-wave-3 origin-bottom" />
-                            <div className="w-1 h-5 bg-amber-400/80 rounded-full animate-audio-wave-4 origin-bottom" />
-                            <div className="w-1 h-5 bg-amber-400/80 rounded-full animate-audio-wave-5 origin-bottom" />
-                            <div className="w-1 h-5 bg-amber-400/80 rounded-full animate-audio-wave-6 origin-bottom" />
-                            <div className="w-1 h-5 bg-amber-400/80 rounded-full animate-audio-wave-7 origin-bottom" />
-                            <div className="w-1 h-5 bg-amber-400/80 rounded-full animate-audio-wave-8 origin-bottom" />
-                        </div>
-                    </div>
-                ) : (
-                    /* Linhas Skeleton simulando mensagem retida */
-                    <div className="space-y-1.5 my-2.5 opacity-60" aria-hidden="true">
-                        <div className="h-2 bg-amber-300/70 rounded-full w-11/12" />
-                        <div className="h-2 bg-amber-300/55 rounded-full w-8/12" />
-                    </div>
-                )}
+            {/* Feixe suave de luz (shimmer) passando continuamente pelo blur (sem saltos) */}
+            <div 
+                aria-hidden="true" 
+                className="pointer-events-none absolute inset-0 -translate-x-full animate-shimmer-sweep bg-gradient-to-r from-transparent via-white/55 to-transparent" 
+            />
 
-                {/* Linha de Ação Direta com Valor */}
-                <div className="mt-2.5 flex items-center justify-between gap-2 pt-2 border-t border-amber-200/60">
-                    <span className="text-[11px] font-bold text-amber-950">
+            {/* Pill de Ação Flutuante Centralizado (Design limpo, sem amarelo gritante) */}
+            <div className="absolute inset-0 flex items-center justify-center p-2 pointer-events-none">
+                <div className="bg-white/95 backdrop-blur-md shadow-md border border-purple-200/80 rounded-full py-1.5 px-3.5 flex items-center gap-2 text-slate-800 transition-transform group-hover:scale-105">
+                    <LockKeyhole size={13} className="text-purple-600 shrink-0" strokeWidth={2.4} aria-hidden="true" />
+                    <span className="text-xs font-bold text-purple-700">
                         {formattedPrice}
                     </span>
-                    <span className="bg-amber-500 group-hover:bg-amber-600 text-white font-semibold text-[11px] px-2.5 py-1 rounded-full shadow-xs flex items-center gap-1 transition-all">
-                        <span>{item.isAudio ? 'Ouvir agora' : 'Liberar agora'}</span>
-                        <ChevronRight size={12} strokeWidth={2.5} />
+                    <span className="w-px h-3 bg-slate-200" />
+                    <span className="text-[11px] font-semibold text-slate-700 flex items-center gap-0.5">
+                        Liberar
+                        <ChevronRight size={12} className="text-slate-400" strokeWidth={2.5} />
                     </span>
                 </div>
             </div>
 
-            {/* Timestamp no canto inferior direito do balão */}
-            <div className="flex items-center justify-end gap-1 mt-1 mr-0.5">
-                <time className="text-[10px] font-medium text-gray-400">
+            {/* Horário no canto inferior direito padrão do chat */}
+            <div className="absolute bottom-1.5 right-2.5 pointer-events-none">
+                <time className="text-[10px] font-medium text-slate-400">
                     {formattedTime}
                 </time>
             </div>

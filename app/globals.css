@@ -302,7 +302,7 @@ html.transition-forward, html.transition-backward {
   animation: onboardDismiss 360ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
-/* Animação Shimmer contínua para skeletons e elementos em carregamento ativo */
+/* Animação Shimmer contínua e suave para elementos em espera ativa */
 @keyframes shimmer {
   0% {
     transform: translateX(-100%);
@@ -313,25 +313,6 @@ html.transition-forward, html.transition-backward {
 }
 
 .animate-shimmer-sweep {
-  animation: shimmer 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: shimmer 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
-
-/* Animação para waveform de áudio aguardando liberação */
-@keyframes audioWavePulse {
-  0%, 100% {
-    transform: scaleY(0.3);
-  }
-  50% {
-    transform: scaleY(1);
-  }
-}
-
-.animate-audio-wave-1 { animation: audioWavePulse 1.2s ease-in-out infinite 0.1s; }
-.animate-audio-wave-2 { animation: audioWavePulse 1.2s ease-in-out infinite 0.3s; }
-.animate-audio-wave-3 { animation: audioWavePulse 1.2s ease-in-out infinite 0.5s; }
-.animate-audio-wave-4 { animation: audioWavePulse 1.2s ease-in-out infinite 0.2s; }
-.animate-audio-wave-5 { animation: audioWavePulse 1.2s ease-in-out infinite 0.6s; }
-.animate-audio-wave-6 { animation: audioWavePulse 1.2s ease-in-out infinite 0.4s; }
-.animate-audio-wave-7 { animation: audioWavePulse 1.2s ease-in-out infinite 0.7s; }
-.animate-audio-wave-8 { animation: audioWavePulse 1.2s ease-in-out infinite 0.25s; }
 
