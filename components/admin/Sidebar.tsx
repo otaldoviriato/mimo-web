@@ -23,7 +23,8 @@ import {
     Compass,
     Bell,
     ArrowLeft,
-    Megaphone
+    Megaphone,
+    Filter
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -51,7 +52,8 @@ const MENU_SECTIONS: MenuSection[] = [
         title: 'Visão Geral',
         items: [
             { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-            { href: '/admin/campaigns', label: 'Campanhas e Funil', icon: Megaphone },
+            { href: '/admin/campaigns', label: 'Campanhas', icon: Megaphone },
+            { href: '/admin/funnel', label: 'Funil', icon: Filter },
         ],
     },
     {

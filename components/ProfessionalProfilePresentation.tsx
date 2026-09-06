@@ -180,7 +180,7 @@ export function ProfessionalProfilePresentation({ user, publicItems, exclusiveIt
                                 const hidden = !canAccess || (isOwner && item.visibility === 'subscribers' && !revealed[item._id]);
                                 return (
                                     <div key={item._id} className="relative aspect-[3/4] overflow-hidden rounded-xl bg-slate-100">
-                                        <button type="button" aria-label={hidden ? 'Conteúdo exclusivo para assinantes' : `Abrir conteúdo exclusivo ${index + 1}`} disabled={!canAccess && !user.isSubscriptionEnabled} onClick={() => canAccess ? onOpen(exclusiveItems, index) : onSubscribe()} className="absolute inset-0 h-full w-full">
+                                        <button type="button" aria-label={hidden ? 'Conteúdo exclusivo para assinantes' : `Abrir conteúdo exclusivo ${index + 1}`} disabled={!canAccess && !user.isSubscriptionEnabled} onClick={() => canAccess ? onOpen(exclusiveItems, index) : onSubscribe?.()} className="absolute inset-0 h-full w-full">
                                             {hidden ? <div className="flex h-full flex-col items-center justify-center gap-2 bg-purple-50 text-purple-600"><Lock size={22} /><span className="text-xs font-medium">Exclusivo</span></div> : item.mediaType === 'video' ? <video src={item.imageUrl} preload="metadata" className="h-full w-full object-cover" /> : <ProfilePhoto src={item.imageUrl} alt={`Foto exclusiva ${index + 1}`} />}
                                         </button>
                                         {isOwner && item.visibility === 'subscribers' && <button type="button" aria-label={hidden ? 'Revelar foto na galeria' : 'Ocultar foto na galeria'} onClick={() => setRevealed(previous => ({ ...previous, [item._id]: !previous[item._id] }))} className="absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-purple-700">{hidden ? <Eye size={18} /> : <EyeOff size={18} />}</button>}
@@ -188,7 +188,7 @@ export function ProfessionalProfilePresentation({ user, publicItems, exclusiveIt
                                 );
                             })}
                         </div>
-                        {!canAccess && privateCount > 0 && <button type="button" onClick={onSubscribe} disabled={!user.isSubscriptionEnabled} className="mt-3 flex min-h-28 w-full flex-col items-center justify-center gap-2 rounded-xl bg-purple-50 px-4 py-5 text-purple-700"><Lock size={22} /><span className="text-sm">{privateCount} {privateCount === 1 ? 'conteúdo exclusivo' : 'conteúdos exclusivos'}</span><span className="text-xs text-slate-500">Disponível para assinantes</span></button>}
+                        {!canAccess && privateCount > 0 && <button type="button" onClick={() => onSubscribe?.()} disabled={!user.isSubscriptionEnabled} className="mt-3 flex min-h-28 w-full flex-col items-center justify-center gap-2 rounded-xl bg-purple-50 px-4 py-5 text-purple-700"><Lock size={22} /><span className="text-sm">{privateCount} {privateCount === 1 ? 'conteúdo exclusivo' : 'conteúdos exclusivos'}</span><span className="text-xs text-slate-500">Disponível para assinantes</span></button>}
                     </section>
                 )}
             </div>
