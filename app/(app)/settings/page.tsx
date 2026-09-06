@@ -146,6 +146,16 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     }, []);
 
     useEffect(() => {
+        if (typeof window !== 'undefined' && window.location.hash === '#subscription') {
+            const timer = setTimeout(() => {
+                const element = document.getElementById('subscription');
+                element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 350);
+            return () => clearTimeout(timer);
+        }
+    }, []);
+
+    useEffect(() => {
         if (userData && !hasPopulated.current) {
             setUsername(userData.username || '');
             setName(userData.name || '');
@@ -689,7 +699,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                         {/* ── SEÇÃO: PREÇOS E GANHOS (Profissionais) ── */}
                         {/* ── CARD 1: OFERECER ASSINATURA ── */}
                         {profileIsProfessional && (
-                            <div>
+                            <div id="subscription">
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Oferecer Assinatura</p>
                                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-50">
                                     {/* Toggle Habilitar Assinatura */}

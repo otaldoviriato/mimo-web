@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { ChevronLeft, ChevronRight, Eye, EyeOff, Lock, Pause, Play, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Eye, EyeOff, Lock, Pause, Play, ShieldCheck, Pencil } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 
@@ -36,6 +37,7 @@ interface Props {
     subscribing: boolean;
     onBack?: () => void;
     onSubscribe?: () => void;
+    onEditSubscription?: () => void;
     onOpen: (items: ProfileGalleryItem[], index: number) => void;
     headerActions?: React.ReactNode;
 }
@@ -53,7 +55,8 @@ export function ProfilePhoto({ src, alt, priority = false, ambient = false }: { 
     );
 }
 
-export function ProfessionalProfilePresentation({ user, publicItems, exclusiveItems, privateCount, isSubscriber, isOwner, loadingGallery, subscribing, onBack, onSubscribe, onOpen, headerActions }: Props) {
+export function ProfessionalProfilePresentation({ user, publicItems, exclusiveItems, privateCount, isSubscriber, isOwner, loadingGallery, subscribing, onBack, onSubscribe, onEditSubscription, onOpen, headerActions }: Props) {
+    const router = useRouter();
     const [photoIndex, setPhotoIndex] = useState(0);
     const [expanded, setExpanded] = useState(false);
     const [revealed, setRevealed] = useState<Record<string, boolean>>({});
@@ -206,9 +209,23 @@ export function ProfessionalProfilePresentation({ user, publicItems, exclusiveIt
                     )}
                 </section>
 
-                {(user.isSubscriptionEnabled || isSubscriber) && (
+                {(user.isSubscriptionEnabled || isSubscriber || isOwner) && (
                     <section aria-label="Assinatura" className="rounded-2xl border border-purple-100 bg-purple-50/40 p-5">
-                        <p className="text-xs font-semibold text-purple-600">{isSubscriber ? 'Você é assinante' : isOwner ? 'Sua assinatura' : 'Assinatura'}</p>
+                        <div className="flex items-center justify-between">
+                            <p className="text-xs font-semibold text-purple-600">{isSubscriber ? 'Você é assinante' : isOwner ? 'Sua assinatura' : 'Assinatura'}</p>
+                            {isOwner && (
+                                <button
+                                    type="button"
+                                    onClick={() => onEditSubscription ? onEditSubscription() : router.push('/settings#subscription')}
+                                    aria-label="Editar assinatura"
+                                    title="Editar assinatura"
+                                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/90 hover:bg-white text-purple-700 hover:text-purple-900 border border-purple-200/80 shadow-2xs text-xs font-semibold transition-all active:scale-95 cursor-pointer"
+                                >
+                                    <Pencil size={12} className="text-purple-600" />
+                                    <span>Editar</span>
+                                </button>
+                            )}
+                        </div>
                         <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-900">Prioridade nas respostas</h2>
                         {discountPercentage > 0 && <p className="mt-2 text-sm font-medium leading-6 text-purple-700">{discountPercentage}% de desconto no custo das mensagens.</p>}
                         {hasExclusive && <p className="mt-2 text-sm leading-6 text-slate-600">Inclui acesso às fotos exclusivas para assinantes.</p>}
