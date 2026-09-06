@@ -131,7 +131,13 @@ export function ProfessionalProfilePresentation({ user, publicItems, exclusiveIt
                         <div className="flex w-full items-center justify-center"><Avatar size={96} /></div>
                     )}
                 </div>
-                <button type="button" onClick={onBack} aria-label="Voltar" className="absolute left-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/60"><ChevronLeft size={23} /></button>
+                {headerActions ? (
+                    <div className="absolute top-4 inset-x-4 flex items-center justify-between z-20 pointer-events-none">
+                        {headerActions}
+                    </div>
+                ) : onBack ? (
+                    <button type="button" onClick={onBack} aria-label="Voltar" className="absolute left-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/60"><ChevronLeft size={23} /></button>
+                ) : null}
                 {publicItems.length > 1 && (
                     <>
                         <div className="absolute inset-x-4 top-1/2 flex -translate-y-1/2 justify-between pointer-events-none">
