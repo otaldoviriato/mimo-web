@@ -346,8 +346,8 @@ export default function ProfilePage() {
 
     if (isProfessional) {
         return (
-            <div className="flex flex-col h-full bg-slate-50 relative overflow-y-auto no-scrollbar max-w-full pb-24">
-                <PullToRefresh onRefresh={onRefreshCreator} className="no-scrollbar">
+            <div className="flex-1 flex flex-col min-h-0 bg-white relative max-w-full overflow-hidden">
+                <PullToRefresh onRefresh={onRefreshCreator} className="no-scrollbar" contentClassName="pb-[calc(76px+env(safe-area-inset-bottom))]">
                     <ProfessionalProfilePresentation
                         key={userData?.id || 'creator-profile'}
                         user={{
