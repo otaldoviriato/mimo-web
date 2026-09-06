@@ -3818,10 +3818,10 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                 placeholder={
                                     offlineTurnStats.isLimitReached
                                         ? (offlineTurnStats.limitType === 'online'
-                                            ? `Limite atingido. Aguarde a resposta de ${receiver?.name || receiver?.username || 'cliente'}...`
+                                            ? `Bloqueado: aguarde a resposta de ${receiver?.name || receiver?.username || 'cliente'}...`
                                             : (offlineTurnStats.isExhausted
-                                                ? "Aguarde a resposta para continuar a conversa..."
-                                                : `Nova mensagem liberada em ${formatFollowUpCountdown(offlineTurnStats.msUntilNextAttempt)}...`))
+                                                ? "Bloqueado: aguarde a resposta para continuar..."
+                                                : `Bloqueado (libera em ${formatFollowUpCountdown(offlineTurnStats.msUntilNextAttempt)})...`))
                                         : "Digite sua mensagem..."
                                 }
                                 maxLength={
