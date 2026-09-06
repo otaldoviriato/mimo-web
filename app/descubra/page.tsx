@@ -7,7 +7,7 @@ interface DescubraPageProps {
 }
 
 export const metadata = {
-    title: 'MimoChat | Conversas reais. Sem fake ou IA.',
+    title: 'MimoChat | Conversas privadas. Mulheres reais.',
     description: 'Elas ganham pra te responder. Mande um oi de graça, dê mimos pras que você curtir e receba fotos e vídeos exclusivos.',
 };
 

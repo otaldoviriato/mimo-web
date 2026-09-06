@@ -217,9 +217,9 @@ export function NetflixStyleLanding({
                 <div className="w-full max-w-xl mx-auto sm:mx-0 text-left space-y-5 sm:space-y-6">
                     {/* Título Principal de Impacto: Escala Perfeita em Telas Pequenas */}
                     <h1 className="text-[2.5rem] sm:text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 tracking-[-0.035em] leading-[0.98] sm:leading-[1.05]">
-                        <span className="block">Conversas reais.</span>
+                        <span className="block">Conversas privadas.</span>
                         <span className="mt-1.5 block text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-600">
-                            Sem fake ou IA.
+                            Mulheres reais.
                         </span>
                     </h1>
 
