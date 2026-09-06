@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo, useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { 
     Plus, 
@@ -46,13 +47,16 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
     const [orderedItems, setOrderedItems] = useState<ProfileGalleryItem[]>([]);
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
     const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+    const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null);
 
-    // Pointer events para suporte fluido em dispositivos móveis e touch
+    // Pointer events para suporte fluido e infalível em desktop e touch mobile
     const pointerDragRef = useRef<{
         startX: number;
         startY: number;
         index: number;
         active: boolean;
+        pointerId: number;
+        element: HTMLElement;
     } | null>(null);
 
     const busy = 
@@ -219,93 +223,86 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
         }
     };
 
-    // ─── DRAG AND DROP NATIVO HTML5 (DESKTOP) ───
-    const handleDragStart = (e: React.DragEvent, index: number) => {
-        e.dataTransfer.setData('text/plain', String(index));
-        e.dataTransfer.effectAllowed = 'move';
-        setDraggedIndex(index);
-    };
+    // ─── POINTER CAPTURE DRAG & DROP (UNIVERSAL: DESKTOP + TOUCH) ───
+    const startPointerDrag = (e: React.PointerEvent<HTMLElement>, index: number) => {
+        if (e.button !== 0 || busy) return;
 
-    const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-    };
+        const currentTarget = e.currentTarget;
+        try {
+            currentTarget.setPointerCapture(e.pointerId);
+        } catch {}
 
-    const handleDragEnter = (targetIndex: number) => {
-        if (draggedIndex === null || draggedIndex === targetIndex) return;
-        setDragOverIndex(targetIndex);
-    };
-
-    const handleDrop = async (e: React.DragEvent, targetIndex: number) => {
-        e.preventDefault();
-        if (draggedIndex === null || draggedIndex === targetIndex) {
-            setDraggedIndex(null);
-            setDragOverIndex(null);
-            return;
-        }
-        const fromIndex = draggedIndex;
-        setDraggedIndex(null);
-        setDragOverIndex(null);
-        await applyReorder(fromIndex, targetIndex);
-    };
-
-    const handleDragEnd = () => {
-        setDraggedIndex(null);
-        setDragOverIndex(null);
-    };
-
-    // ─── POINTER / TOUCH DRAG (MOBILE & TABLET) ───
-    const handlePointerDown = (e: React.PointerEvent, index: number) => {
-        if (busy) return;
         pointerDragRef.current = {
             startX: e.clientX,
             startY: e.clientY,
             index,
             active: false,
+            pointerId: e.pointerId,
+            element: currentTarget,
         };
     };
 
-    const handlePointerMove = (e: React.PointerEvent) => {
+    const handlePointerMove = (e: React.PointerEvent<HTMLElement>) => {
         if (!pointerDragRef.current) return;
 
-        const dx = Math.abs(e.clientX - pointerDragRef.current.startX);
-        const dy = Math.abs(e.clientY - pointerDragRef.current.startY);
+        const dx = e.clientX - pointerDragRef.current.startX;
+        const dy = e.clientY - pointerDragRef.current.startY;
+        const dist = Math.hypot(dx, dy);
 
-        if (!pointerDragRef.current.active && (dx > 8 || dy > 8)) {
+        // Ativa o arraste quando move mais de 4px
+        if (!pointerDragRef.current.active && dist > 4) {
             pointerDragRef.current.active = true;
             setDraggedIndex(pointerDragRef.current.index);
         }
 
         if (pointerDragRef.current.active) {
-            const element = document.elementFromPoint(e.clientX, e.clientY);
-            const card = element?.closest('[data-photo-index]');
-            if (card) {
-                const targetIdx = Number(card.getAttribute('data-photo-index'));
-                if (!isNaN(targetIdx) && targetIdx !== dragOverIndex) {
-                    setDragOverIndex(targetIdx);
+            setDragPosition({ x: e.clientX, y: e.clientY });
+
+            // Identifica o card sob o ponteiro
+            const elements = document.elementsFromPoint(e.clientX, e.clientY);
+            for (const el of elements) {
+                const card = el.closest('[data-photo-index]');
+                if (card) {
+                    const targetIdx = Number(card.getAttribute('data-photo-index'));
+                    if (!isNaN(targetIdx) && targetIdx >= 0 && targetIdx < orderedItems.length) {
+                        setDragOverIndex(targetIdx);
+                        break;
+                    }
                 }
             }
         }
     };
 
-    const handlePointerUp = () => {
-        if (
-            pointerDragRef.current?.active && 
-            draggedIndex !== null && 
-            dragOverIndex !== null && 
-            draggedIndex !== dragOverIndex
-        ) {
-            applyReorder(draggedIndex, dragOverIndex);
+    const handlePointerUp = (e: React.PointerEvent<HTMLElement>) => {
+        if (pointerDragRef.current) {
+            try {
+                pointerDragRef.current.element.releasePointerCapture(e.pointerId);
+            } catch {}
+
+            const fromIdx = pointerDragRef.current.index;
+            const toIdx = dragOverIndex;
+
+            if (pointerDragRef.current.active && fromIdx !== null && toIdx !== null && fromIdx !== toIdx) {
+                applyReorder(fromIdx, toIdx);
+            }
+        }
+
+        pointerDragRef.current = null;
+        setDraggedIndex(null);
+        setDragOverIndex(null);
+        setDragPosition(null);
+    };
+
+    const handlePointerCancel = (e: React.PointerEvent<HTMLElement>) => {
+        if (pointerDragRef.current) {
+            try {
+                pointerDragRef.current.element.releasePointerCapture(e.pointerId);
+            } catch {}
         }
         pointerDragRef.current = null;
         setDraggedIndex(null);
         setDragOverIndex(null);
-    };
-
-    const handlePointerCancel = () => {
-        pointerDragRef.current = null;
-        setDraggedIndex(null);
-        setDragOverIndex(null);
+        setDragPosition(null);
     };
 
     return (
@@ -315,7 +312,7 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
                 <div>
                     <h2 className="text-sm font-bold text-slate-900">Fotos do Perfil</h2>
                     <p className="text-[11px] text-slate-500">
-                        A primeira foto é a sua foto de perfil. Arraste ou use as ações para ordenar.
+                        A primeira foto é a sua foto de perfil. Puxe pelo botão Mover para trocar de lugar.
                     </p>
                 </div>
                 {orderedItems.length > 0 && (
@@ -355,32 +352,21 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
                     Não foi possível carregar suas fotos.
                 </div>
             ) : (
-                <div 
-                    className="grid grid-cols-2 sm:grid-cols-3 gap-3"
-                    onPointerMove={handlePointerMove}
-                    onPointerUp={handlePointerUp}
-                    onPointerCancel={handlePointerCancel}
-                >
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {orderedItems.map((item, index) => {
                         const isPrimary = index === 0;
                         const isDragging = draggedIndex === index;
-                        const isDragOver = dragOverIndex === index;
+                        const isDragOver = dragOverIndex === index && draggedIndex !== index;
 
                         return (
                             <div
                                 key={item._id || `photo-${index}`}
                                 data-photo-index={index}
-                                draggable={!busy}
-                                onDragStart={(e) => handleDragStart(e, index)}
-                                onDragEnter={() => handleDragEnter(index)}
-                                onDragOver={handleDragOver}
-                                onDrop={(e) => handleDrop(e, index)}
-                                onDragEnd={handleDragEnd}
                                 className={`group relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 border transition-all select-none ${
                                     isDragging 
-                                        ? 'opacity-30 scale-95 ring-2 ring-purple-600 ring-offset-2 z-20' 
+                                        ? 'opacity-30 scale-95 ring-2 ring-purple-600 ring-offset-2 border-dashed border-purple-500 z-10' 
                                         : isDragOver
-                                            ? 'border-purple-600 scale-102 ring-2 ring-purple-400/60 shadow-lg z-10'
+                                            ? 'border-purple-600 scale-102 ring-4 ring-purple-400/50 shadow-xl z-20 bg-purple-50/20'
                                             : isPrimary
                                                 ? 'border-purple-300 ring-2 ring-purple-100 shadow-sm'
                                                 : 'border-slate-200/90 shadow-xs hover:border-purple-200'
@@ -401,12 +387,12 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
 
                                 {/* Badge de Foto de Perfil / Principal */}
                                 {isPrimary ? (
-                                    <div className="absolute top-2 left-2 flex items-center gap-1 bg-purple-600/95 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm pointer-events-none">
+                                    <div className="absolute top-2 left-2 flex items-center gap-1 bg-purple-600/95 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm pointer-events-none z-10">
                                         <Star size={11} className="fill-amber-300 text-amber-300" />
                                         <span>Perfil</span>
                                     </div>
                                 ) : (
-                                    <div className="absolute top-2 left-2 flex items-center justify-center bg-black/40 text-white text-[10px] font-bold h-5 w-5 rounded-full backdrop-blur-xs pointer-events-none">
+                                    <div className="absolute top-2 left-2 flex items-center justify-center bg-black/40 text-white text-[10px] font-bold h-5 w-5 rounded-full backdrop-blur-xs pointer-events-none z-10">
                                         {index + 1}
                                     </div>
                                 )}
@@ -442,17 +428,33 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
                                     </button>
                                 </div>
 
+                                {/* Overlay indicador de Soltar aqui (Drop Target) */}
+                                {isDragOver && (
+                                    <div className="absolute inset-0 bg-purple-600/20 backdrop-blur-xs flex items-center justify-center z-10 pointer-events-none animate-in fade-in duration-150">
+                                        <div className="bg-purple-900/90 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg border border-white/20 flex items-center gap-1">
+                                            {index === 0 ? <Star size={13} className="fill-amber-300 text-amber-300" /> : null}
+                                            <span>{index === 0 ? 'Nova Foto de Perfil' : `Mover para Posição ${index + 1}`}</span>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Ações do Rodapé do Card */}
                                 <div className="absolute bottom-2 inset-x-2 flex items-center justify-between z-10 gap-1">
-                                    {/* Handle de Arraste (Pointer touch no mobile e visual no desktop) */}
+                                    {/* Handle de Arraste Universal com Pointer Capture */}
                                     <div
-                                        onPointerDown={(e) => handlePointerDown(e, index)}
-                                        aria-label="Arraste para mover"
-                                        title="Segure e arraste para mudar a ordem"
-                                        className="flex h-7 px-2 items-center justify-center rounded-lg bg-black/45 hover:bg-black/60 active:bg-purple-600 text-white backdrop-blur-xs text-[10px] font-medium transition-all cursor-grab active:cursor-grabbing gap-0.5"
+                                        role="button"
+                                        tabIndex={0}
+                                        onPointerDown={(e) => startPointerDrag(e, index)}
+                                        onPointerMove={handlePointerMove}
+                                        onPointerUp={handlePointerUp}
+                                        onPointerCancel={handlePointerCancel}
+                                        style={{ touchAction: 'none' }}
+                                        aria-label="Segure e arraste para mover"
+                                        title="Clique/toque e arraste para mudar a posição"
+                                        className="touch-none select-none flex h-7 px-2.5 items-center justify-center rounded-lg bg-black/60 hover:bg-purple-600 active:bg-purple-700 text-white backdrop-blur-xs text-[10px] font-bold transition-all cursor-grab active:cursor-grabbing gap-1 shadow-sm"
                                     >
                                         <GripVertical size={13} />
-                                        <span className="hidden sm:inline">Mover</span>
+                                        <span>Mover</span>
                                     </div>
 
                                     {/* Ação rápida para Fotos Secundárias: Definir como foto de perfil ou setas */}
@@ -528,6 +530,30 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
                         )}
                     </button>
                 </div>
+            )}
+
+            {/* Ghost Preview Flutuante que acompanha o cursor ou toque */}
+            {typeof document !== 'undefined' && dragPosition && draggedIndex !== null && orderedItems[draggedIndex] && createPortal(
+                <div 
+                    style={{
+                        position: 'fixed',
+                        left: `${dragPosition.x}px`,
+                        top: `${dragPosition.y}px`,
+                        transform: 'translate(-50%, -50%) rotate(2deg) scale(1.08)',
+                        pointerEvents: 'none',
+                        zIndex: 99999,
+                        touchAction: 'none',
+                    }}
+                    className="w-24 sm:w-28 aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl ring-4 ring-purple-600 border-2 border-white bg-slate-900 transition-transform select-none"
+                >
+                    <img 
+                        src={orderedItems[draggedIndex].imageUrl} 
+                        alt="Foto sendo movida" 
+                        className="w-full h-full object-cover pointer-events-none"
+                    />
+                    <div className="absolute inset-0 bg-purple-600/10 pointer-events-none" />
+                </div>,
+                document.body
             )}
         </section>
     );
