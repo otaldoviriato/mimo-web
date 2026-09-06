@@ -245,7 +245,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                 birthDate: birthDate ? new Date(birthDate).toISOString() : null,
                 city: city ? city.trim() : '',
                 state: state ? state.trim() : '',
-                hideFromExplore
+                ...(profileIsProfessional ? { hideFromExplore } : {})
             };
 
             if (userData?.isProfessional) {
@@ -420,7 +420,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
         phone !== initialPhone ||
         city !== initialCity ||
         state !== initialState ||
-        hideFromExplore !== (userData?.hideFromExplore === true) ||
+        (profileIsProfessional && hideFromExplore !== (userData?.hideFromExplore === true)) ||
         (profileIsProfessional && bio !== initialBio);
 
     const initialSubscriptionPrice = userData?.subscriptionPrice ?? 0;
@@ -730,7 +730,8 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                         </div>
 
                         {/* ── SEÇÃO: PRIVACIDADE ── */}
-                        <div>
+                        {profileIsProfessional && (
+                            <div>
                             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Privacidade</p>
                             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col divide-y divide-gray-50">
                                 
@@ -770,8 +771,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                 </div>
                             </div>
                         </div>
-
-
+                        )}
 
                         {/* ── SEÇÃO: PREFERÊNCIAS DO DISPOSITIVO ── */}
                         {mounted && (notificationPermission !== 'granted' || (isInstallable && !isStandalone)) && (

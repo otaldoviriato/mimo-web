@@ -4,8 +4,6 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useMyProfile } from '@/hooks/useQueries';
-import { BalanceDisplay } from '@/components/BalanceDisplay';
-import { Avatar } from '@/components/Avatar';
 import { useUser } from '@clerk/nextjs';
 import { PWAPromoModal } from '@/components/PWAPromoModal';
 import { NotifPromoModal } from '@/components/NotifPromoModal';
@@ -16,7 +14,6 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
     const router = useRouter();
     const { data: userData } = useMyProfile();
     const { user } = useUser();
-    const balance = userData?.balance ?? 0;
 
     const isProfessional = !!userData?.isProfessional;
     const isTeam = !!userData?.isTeam;
@@ -144,30 +141,8 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                     })}
                 </nav>
 
-                {/* Balance + User */}
-                <div className="px-4 pb-5 border-t border-gray-100 pt-4 flex flex-col gap-3">
-                    {!isTeam && (
-                        <BalanceDisplay balance={balance} size="md" />
-                    )}
-                    <div className="flex items-center gap-2 px-1">
-                        <Avatar uri={userData?.photoUrl} size={32} />
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-gray-800 truncate flex items-center gap-1">
-                                {userData?.name || userData?.username || user?.username || ''}
-                            </p>
-                            {isTeam ? (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md mt-0.5">
-                                    <ShieldCheck size={11} className="text-emerald-600" />
-                                    {userData?.teamTitle || 'Equipe Mimo ✓'}
-                                </span>
-                            ) : (
-                                <p className="text-xs text-gray-400 truncate">
-                                    @{userData?.username || ''}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                    {userData?.isAdmin && (
+                {userData?.isAdmin && (
+                    <div className="px-4 pb-5 border-t border-gray-100 pt-4">
                         <button
                             onClick={() => router.push('/admin')}
                             className="flex items-center justify-between w-full px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl transition-all font-semibold text-xs border border-purple-200/60 cursor-pointer"
@@ -179,8 +154,8 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                             </div>
                             <span className="text-[10px] bg-purple-600 text-white font-bold px-1.5 py-0.5 rounded uppercase shrink-0">Admin</span>
                         </button>
-                    )}
-                </div>
+                    </div>
+                )}
             </aside>
 
             {/* Main content */}
