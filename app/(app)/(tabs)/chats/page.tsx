@@ -886,7 +886,7 @@ export default function ChatsPage() {
                                                                 : 'text-purple-500 italic font-medium'
                                                     }`}>
                                                         {(() => {
-                                                            const isPendingPrompt = room.lastMessage?.includes('Recarregue para visualizar') || room.lastMessage?.includes('Recarregue');
+                                                            const isPendingPrompt = room.lastMessage?.includes('Recarregue para visualizar') || room.lastMessage?.includes('Recarregue') || room.lastMessage?.includes('Aguardando saldo');
                                                             if (myProfile?.isProfessional && isPendingPrompt) {
                                                                 return (
                                                                     <span className="text-amber-700 italic font-medium inline-flex items-center gap-1">
@@ -895,7 +895,15 @@ export default function ChatsPage() {
                                                                     </span>
                                                                 );
                                                             }
-                                                            return room.lastMessage || 'Toque para iniciar a conversa! ✨';
+                                                            if (!myProfile?.isProfessional && isPendingPrompt) {
+                                                                return (
+                                                                    <span className="text-amber-700 font-medium inline-flex items-center gap-1">
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                                                                        Aguardando saldo para liberar
+                                                                    </span>
+                                                                );
+                                                            }
+                                                            return room.lastMessage || 'Toque para iniciar a conversa!';
                                                         })()}
                                                     </span>
                                                 )}

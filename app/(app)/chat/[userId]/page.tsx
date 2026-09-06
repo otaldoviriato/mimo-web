@@ -1422,9 +1422,15 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 return old.map((r: any) => {
                     const rId = r.roomId ?? [...r.participants].sort().join('_');
                     if (rId === roomId) {
+                        const isPending = data.message?.billingStatus === 'pending' || data.message?.isContentLocked;
+                        const isMe = data.message?.senderId === user?.id;
+                        let safeText = data.message.content.substring(0, 100);
+                        if (isPending) {
+                            safeText = isMe ? 'Aguardando saldo do cliente' : 'Recarregue para visualizar esta mensagem.';
+                        }
                         return {
                             ...r,
-                            lastMessage: data.message.content.substring(0, 100),
+                            lastMessage: safeText,
                             lastMessageTime: data.message.timestamp,
                             updatedAt: data.message.timestamp,
                             unreadCount: {
