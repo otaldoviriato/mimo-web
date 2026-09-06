@@ -18,7 +18,7 @@ export async function GET() {
 
         await connectToDatabase();
 
-        const allItems = await GalleryItem.find({ ownerId: userId }).sort({ createdAt: -1 });
+        const allItems = await GalleryItem.find({ ownerId: userId }).sort({ order: 1, createdAt: -1 });
         const publicItems = allItems.filter(item => !item.galleryType || item.galleryType === 'public');
         const privateItems = allItems.filter(item => item.galleryType === 'private');
 

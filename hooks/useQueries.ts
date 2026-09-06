@@ -565,6 +565,30 @@ export function useUpdateGalleryItemVisibility() {
     });
 }
 
+export function useReorderGallery() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (itemIds: string[]) => {
+            const response = await fetch('/api/users/me/gallery/reorder', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ itemIds }),
+            });
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Erro ao reordenar fotos');
+            }
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['gallery', 'me'] });
+            queryClient.invalidateQueries({ queryKey: QueryKeys.me });
+        },
+    });
+}
+
 export function useSubscribe() {
     const queryClient = useQueryClient();
     return useMutation({

@@ -50,7 +50,7 @@ export async function GET(
             }
         }
 
-        const allItems = await GalleryItem.find({ ownerId }).sort({ createdAt: -1 });
+        const allItems = await GalleryItem.find({ ownerId }).sort({ order: 1, createdAt: -1 });
 
         const publicItems = allItems.filter(item => !item.galleryType || item.galleryType === 'public');
         const privateItems = allItems.filter(item => item.galleryType === 'private');

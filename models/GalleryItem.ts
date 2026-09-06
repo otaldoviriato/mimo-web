@@ -6,6 +6,7 @@ export interface IGalleryItem extends Document {
     visibility: 'public' | 'subscribers';
     galleryType: 'public' | 'private';
     mediaType: 'photo' | 'video';
+    order?: number;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -34,6 +35,11 @@ const GalleryItemSchema = new Schema<IGalleryItem>({
         type: String,
         enum: ['photo', 'video'],
         default: 'photo',
+    },
+    order: {
+        type: Number,
+        default: 0,
+        index: true,
     },
 }, {
     timestamps: true,
