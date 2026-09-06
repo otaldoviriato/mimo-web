@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { LockKeyhole, Clock, Play } from 'lucide-react';
+import { Clock, Play } from 'lucide-react';
 
 interface PendingReceiptBalloonProps {
     item: {
@@ -44,10 +44,20 @@ export const PendingReceiptBalloon: React.FC<PendingReceiptBalloonProps> = ({
         <button
             type="button"
             onClick={handleClick}
-            className="group relative block w-fit min-w-[170px] max-w-[78%] cursor-pointer text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600 rounded-2xl rounded-bl-sm bg-white border border-slate-200/90 shadow-xs overflow-hidden transition-all active:scale-[0.99] hover:border-purple-300 px-3.5 pt-2.5 pb-1.5"
-            aria-label={`Mensagem recebida bloqueada por saldo. Valor: ${formattedPrice}. Toque para liberar.`}
+            className="group relative block w-fit min-w-[165px] max-w-[78%] cursor-pointer text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600 rounded-2xl rounded-bl-sm bg-white border border-slate-200/90 shadow-xs overflow-hidden transition-all active:scale-[0.99] hover:border-purple-300 px-3.5 pt-2 pb-1.5"
+            aria-label={`Mensagem recebida com saldo insuficiente. Valor: ${formattedPrice}. Toque para liberar.`}
         >
-            {/* Conteúdo com blur real: sem caixas ou molduras extras */}
+            {/* Cabeçalho sutil no mesmo padrão da profissional: status e valor */}
+            <div className="flex items-center justify-between gap-3 pb-1 mb-1 border-b border-slate-100 text-[10.5px] select-none">
+                <span className="font-medium text-slate-500 tracking-tight">
+                    Saldo insuficiente
+                </span>
+                <span className="font-semibold text-purple-700">
+                    {formattedPrice}
+                </span>
+            </div>
+
+            {/* Conteúdo com blur real: 100% estático, sem shimmer ou skeleton pulsante */}
             {item.isAudio ? (
                 <div className="select-none filter blur-[3.5px] opacity-40 flex items-center gap-2 pointer-events-none py-1 mb-1">
                     <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center shrink-0">
@@ -67,28 +77,15 @@ export const PendingReceiptBalloon: React.FC<PendingReceiptBalloonProps> = ({
                     </div>
                 </div>
             ) : (
-                <div className="select-none filter blur-[4px] text-sm text-slate-800 leading-relaxed whitespace-pre-wrap break-words pointer-events-none mb-1 pr-1">
+                <div className="select-none filter blur-[3.8px] text-sm text-slate-800 leading-relaxed whitespace-pre-wrap break-words pointer-events-none mb-0.5 pr-1">
                     {item.content || 'Mensagem reservada'}
                 </div>
             )}
 
-            {/* Shimmer sweep suave percorrendo o balão */}
-            <div 
-                aria-hidden="true" 
-                className="pointer-events-none absolute inset-0 -translate-x-full animate-shimmer-sweep bg-gradient-to-r from-transparent via-white/50 to-transparent" 
-            />
-
-            {/* Linha de rodapé fluida e integrada, sem divisores pesados nem excesso de cores */}
-            <div className="flex items-center justify-between gap-4 mt-0.5 text-slate-500 select-none">
-                <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 group-hover:text-purple-700 transition-colors">
-                    <LockKeyhole size={11} className="text-slate-400 group-hover:text-purple-600 shrink-0" strokeWidth={2.4} />
-                    <span>{formattedPrice}</span>
-                </div>
-
-                <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                    <time>{formattedTime}</time>
-                    <Clock size={10.5} className="text-amber-500/90 animate-pulse shrink-0" strokeWidth={2.2} />
-                </div>
+            {/* Rodapé: Horário com reloginho neutro (sem laranja, sem salada visual) */}
+            <div className="flex items-center justify-end gap-1 mt-0.5 text-[10px] text-slate-400 select-none">
+                <time>{formattedTime}</time>
+                <Clock size={11} className="text-slate-400 shrink-0" strokeWidth={2} />
             </div>
         </button>
     );
