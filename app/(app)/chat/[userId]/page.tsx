@@ -97,6 +97,17 @@ function formatMediaDuration(durationInSeconds?: number) {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
+function getReplyPreviewContent(msg: Message | null | undefined): string {
+    if (!msg) return '';
+    if (msg.isContentLocked) return '🔒 Mensagem bloqueada';
+    if (msg.isGift) return '🎁 Presente';
+    if (msg.isLockedImage) return '📸 Imagem bloqueada';
+    if (msg.originalImageUrl) return '📸 Imagem';
+    if (msg.isVideo) return '🎥 Vídeo';
+    if (msg.audioUrl) return '🎵 Mensagem de voz';
+    return msg.content || '';
+}
+
 function LockedMediaTypeBadge({ isVideo, duration }: { isVideo?: boolean; duration?: number }) {
     const formattedDuration = isVideo ? formatMediaDuration(duration) : '';
 
@@ -491,6 +502,13 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const [messageText, setMessageText] = useState('');
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
     const [monetizationDisabled, setMonetizationDisabled] = useState(false);
+
+    // Se por qualquer eventualidade uma mensagem bloqueada entrar em resposta, anula o estado
+    useEffect(() => {
+        if (replyingTo?.isContentLocked) {
+            setReplyingTo(null);
+        }
+    }, [replyingTo]);
     const [audioRecordingStatus, setAudioRecordingStatus] = useState<AudioRecorderStatus>('idle');
 
     // Refs para o gesto de swipe para responder
@@ -1896,6 +1914,16 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
 
     const handleStartPress = (msg: Message, e: React.TouchEvent | React.MouseEvent) => {
         longPressActivated.current = false;
+
+        // Mensagens bloqueadas (aguardando saldo) não podem ser respondidas
+        if (msg.isContentLocked) {
+            swipingMessage.current = null;
+            swipingElement.current = null;
+            swipeDistance.current = 0;
+            swipeTriggered.current = false;
+            return;
+        }
+
         swipingMessage.current = msg;
         swipingElement.current = e.currentTarget.querySelector('.reply-swipe-balloon') as HTMLElement;
         swipeDistance.current = 0;
@@ -2017,7 +2045,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 replyIcon.style.transform = 'translateY(-50%) scale(0.75)';
             }
 
-            if (swipeDistance.current >= 45 && swipingMessage.current) {
+            if (swipeDistance.current >= 45 && swipingMessage.current && !swipingMessage.current.isContentLocked) {
                 setReplyingTo(swipingMessage.current);
                 setTimeout(() => {
                     inputRef.current?.focus();
@@ -2032,7 +2060,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     };
 
     const handleMessageDoubleClick = (msg: Message, e: React.MouseEvent) => {
-        if (selectedMessageIds.size > 0) return;
+        if (selectedMessageIds.size > 0 || msg.isContentLocked) return;
         e.stopPropagation();
         setReplyingTo(msg);
         setTimeout(() => {
@@ -2185,7 +2213,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             status: 'sending',
             ...(replyingTo ? {
                 replyToId: replyingTo._id,
-                replyToContent: replyingTo.isGift ? '🎁 Presente' : (replyingTo.isLockedImage ? '📸 Imagem bloqueada' : (replyingTo.originalImageUrl ? '📸 Imagem' : (replyingTo.isVideo ? '🎥 Vídeo' : replyingTo.content))),
+                replyToContent: getReplyPreviewContent(replyingTo),
                 replyToSenderId: replyingTo.senderId
             } : {})
         };
@@ -2205,7 +2233,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             roomId,
             tempId,
             replyingTo?._id,
-            replyingTo ? (replyingTo.isGift ? '🎁 Presente' : (replyingTo.isLockedImage ? '📸 Imagem bloqueada' : (replyingTo.originalImageUrl ? '📸 Imagem' : (replyingTo.isVideo ? '🎥 Vídeo' : replyingTo.content)))) : undefined,
+            replyingTo ? getReplyPreviewContent(replyingTo) : undefined,
             replyingTo?.senderId
         );
         decrementLocalBalance(costInCents);
@@ -2943,14 +2971,16 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                 onDoubleClick={(e) => handleMessageDoubleClick(item, e)}
                             >
                                 {/* Ícone de resposta revelado pelo swipe */}
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center justify-center opacity-0 scale-75 transition-all duration-150 reply-icon-indicator pointer-events-none z-0">
-                                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 shadow-sm border border-gray-200">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                            <polyline points="9 17 4 12 9 7" />
-                                            <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
-                                        </svg>
+                                {!item.isContentLocked && (
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center justify-center opacity-0 scale-75 transition-all duration-150 reply-icon-indicator pointer-events-none z-0">
+                                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 shadow-sm border border-gray-200">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="9 17 4 12 9 7" />
+                                                <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+                                            </svg>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
 
                                 {item.isGift ? (
                                     <div
@@ -3075,7 +3105,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                             />
                                         )}
                                         <div
-                                            className={`reply-swipe-balloon relative z-10 max-w-[75%] ${isLocked || item.originalImageUrl || item.isVideo || item.isExpired || item.isContentLocked ? 'p-0 bg-transparent shadow-none' : (isAudio ? 'p-3' : 'px-3 py-1.5')} rounded-2xl ${
+                                            className={`${item.isContentLocked ? '' : 'reply-swipe-balloon'} relative z-10 max-w-[75%] ${isLocked || item.originalImageUrl || item.isVideo || item.isExpired || item.isContentLocked ? 'p-0 bg-transparent shadow-none' : (isAudio ? 'p-3' : 'px-3 py-1.5')} rounded-2xl ${
                                             (!isLocked && !item.originalImageUrl && !item.isVideo && !item.isExpired && !item.isContentLocked) 
                                         ? (isMine 
                                             ? (item.billingStatus === 'pending' 
@@ -3546,7 +3576,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                 Respondendo a {replyingTo.senderId === user?.id ? 'Você' : (receiver?.name || receiver?.username || 'Usuário')}
                             </p>
                             <p className="text-xs text-gray-600 truncate">
-                                {replyingTo.isGift ? '🎁 Presente' : (replyingTo.isLockedImage ? '📸 Imagem bloqueada' : (replyingTo.originalImageUrl ? '📸 Imagem' : (replyingTo.isVideo ? '🎥 Vídeo' : replyingTo.content)))}
+                                {getReplyPreviewContent(replyingTo)}
                             </p>
                         </div>
                         <button 
