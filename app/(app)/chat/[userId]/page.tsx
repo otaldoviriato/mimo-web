@@ -800,27 +800,13 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             };
         }
 
-        const attempts: { firstMessageAt: Date; lastMessageAt: Date; usedChars: number }[] = [];
-        for (const item of proMsgsSinceClient) {
-            if (attempts.length === 0) {
-                attempts.push({ firstMessageAt: item.timestamp, lastMessageAt: item.timestamp, usedChars: item.chars });
-            } else {
-                const cur = attempts[attempts.length - 1];
-                if (item.timestamp.getTime() - cur.lastMessageAt.getTime() >= intervalMs) {
-                    attempts.push({ firstMessageAt: item.timestamp, lastMessageAt: item.timestamp, usedChars: item.chars });
-                } else {
-                    cur.lastMessageAt = item.timestamp;
-                    cur.usedChars += item.chars;
-                }
-            }
-        }
-
-        const lastAttempt = attempts[attempts.length - 1];
+        const attemptsCount = proMsgsSinceClient.length;
+        const lastMsg = proMsgsSinceClient[proMsgsSinceClient.length - 1];
         const nowMs = Date.now();
-        const timeSinceLastMsg = nowMs - lastAttempt.lastMessageAt.getTime();
+        const timeSinceLastMsg = nowMs - lastMsg.timestamp.getTime();
 
         if (timeSinceLastMsg >= intervalMs) {
-            if (attempts.length < followUpMaxAttempts) {
+            if (attemptsCount < followUpMaxAttempts) {
                 return {
                     canSend: true,
                     isLimitReached: false,
@@ -829,7 +815,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     totalProCharsSinceClient,
                     maxBillableChars,
                     maxOnlineCumulativeChars,
-                    attemptNumber: attempts.length + 1,
+                    attemptNumber: attemptsCount + 1,
                     maxAttempts: followUpMaxAttempts,
                     isExhausted: false,
                     msUntilNextAttempt: 0,
@@ -843,7 +829,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     totalProCharsSinceClient,
                     maxBillableChars,
                     maxOnlineCumulativeChars,
-                    attemptNumber: attempts.length,
+                    attemptNumber: attemptsCount,
                     maxAttempts: followUpMaxAttempts,
                     isExhausted: true,
                     msUntilNextAttempt: 0,
@@ -851,25 +837,9 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             }
         }
 
-        const usedInCurrent = lastAttempt.usedChars;
-        if (usedInCurrent < maxBillableChars) {
-            return {
-                canSend: true,
-                isLimitReached: false,
-                limitType: 'none' as const,
-                remainingChars: Math.max(0, maxBillableChars - usedInCurrent),
-                totalProCharsSinceClient,
-                maxBillableChars,
-                maxOnlineCumulativeChars,
-                attemptNumber: attempts.length,
-                maxAttempts: followUpMaxAttempts,
-                isExhausted: false,
-                msUntilNextAttempt: 0,
-            };
-        }
-
-        const msUntilNextAttempt = Math.max(0, (lastAttempt.lastMessageAt.getTime() + intervalMs) - nowMs);
-        const isExhausted = attempts.length >= followUpMaxAttempts;
+        // Ainda dentro do intervalo de 24h desde a última mensagem enviada:
+        const msUntilNextAttempt = Math.max(0, (lastMsg.timestamp.getTime() + intervalMs) - nowMs);
+        const isExhausted = attemptsCount >= followUpMaxAttempts;
 
         return {
             canSend: false,
@@ -879,7 +849,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             totalProCharsSinceClient,
             maxBillableChars,
             maxOnlineCumulativeChars,
-            attemptNumber: attempts.length,
+            attemptNumber: attemptsCount,
             maxAttempts: followUpMaxAttempts,
             isExhausted,
             msUntilNextAttempt,
@@ -2280,6 +2250,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     };
 
     const handleSendAudio = async (audioBlob: Blob, durationInSeconds: number) => {
+        if (userData?.isProfessional && !receiver?.isProfessional && !isClientActiveInConversation) {
+            toast.error('Mensagens de áudio não são permitidas para clientes ausentes.');
+            return;
+        }
+
         if (offlineTurnStats.isLimitReached) {
             const partnerName = receiver?.name || receiver?.username || 'o cliente';
             if (offlineTurnStats.limitType === 'online') {
@@ -3669,7 +3644,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                         <div className="relative shrink-0">
                             <button
                                 onClick={() => setAttachMenuVisible(!attachMenuVisible)}
-                                disabled={!connected || !!selectedFile || offlineTurnStats.isLimitReached}
+                                disabled={!connected || !!selectedFile || offlineTurnStats.isLimitReached || (userData?.isProfessional && !receiver?.isProfessional && !isClientActiveInConversation)}
                                 className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shrink-0 ${
                                     attachMenuVisible ? 'bg-purple-600 text-white rotate-45' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                                 }`}
@@ -3841,7 +3816,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                         </div>
                     )}
                     
-                    {(audioRecordingStatus === 'idle' && (messageText.trim() || selectedFile)) ? (
+                    {(audioRecordingStatus === 'idle' && (messageText.trim() || selectedFile || (userData?.isProfessional && !receiver?.isProfessional && !isClientActiveInConversation))) ? (
                         <button
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
