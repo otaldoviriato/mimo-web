@@ -3827,7 +3827,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                 ) : (() => {
                                     const maxOnline = offlineTurnStats.maxOnlineCumulativeChars;
                                     const totalProOnlineChars = (offlineTurnStats.totalProCharsSinceClient || 0) + charCount;
-                                    const warningThreshold = Math.max(0, maxOnline - 50); // exibe a partir de 450 caracteres
+                                    const warningThreshold = Math.floor(maxOnline * 0.9); // Exibe quando faltar 10% para atingir o limite
                                     if (totalProOnlineChars < warningThreshold) return null;
                                     return (
                                         <div className="flex items-center justify-end w-full pt-0.5 select-none text-[11px] tabular-nums animate-in fade-in duration-150">
