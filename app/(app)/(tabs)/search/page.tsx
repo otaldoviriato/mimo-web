@@ -5,6 +5,7 @@ import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { userApi } from '@/services/api';
 import { useMyProfile, useFeaturedUsers } from '@/hooks/useQueries';
 import { Search, X } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { trackAcquisitionEvent } from '@/lib/clientAcquisitionAnalytics';
 
 const calculateAge = (birthDateString?: string | Date) => {
@@ -67,9 +68,11 @@ const formatOnlineStatus = (
 
 export default function SearchPage() {
     const router = useTransitionRouter();
-    const { data: userData } = useMyProfile();
+    const { data: userData, isLoading: loadingProfile } = useMyProfile();
     const [username, setUsername] = useState('');
     const [loading, setLoading] = useState(false);
+    const [openingProfileId, setOpeningProfileId] = useState<string | null>(null);
+    const openingProfileRef = useRef(false);
     const [foundUsers, setFoundUsers] = useState<any[]>([]);
     const {
         data: featuredUsers = [],
@@ -146,7 +149,10 @@ export default function SearchPage() {
         return () => observer.disconnect();
     }, [fetchNextPage, hasNextPage, isFetchingNextPage, username]);
 
-    const handleOpenChat = (user: any) => {
+    const handleOpenProfile = async (user: { clerkId: string; username: string }) => {
+        if (loadingProfile || openingProfileRef.current) return;
+        openingProfileRef.current = true;
+        setOpeningProfileId(user.clerkId);
         const isDirectSearch = Boolean(username.trim());
         if (!isDirectSearch) {
             trackAcquisitionEvent({
@@ -154,8 +160,28 @@ export default function SearchPage() {
                 professionalId: user.clerkId,
             });
         }
-        // Ao clicar, leva imediatamente para o chat com a criadora com dados pré-carregados
-        router.push(`/chat/${user.clerkId}`, { initialUser: user });
+        try {
+            let hasMessages = false;
+            if (userData?.clerkId) {
+                const roomId = [userData.clerkId, user.clerkId].sort().join('_');
+                const search = new URLSearchParams({ roomId, limit: '1' });
+                const response = await fetch(`/api/rooms/${userData.clerkId}/messages?${search}`, { cache: 'no-store' });
+                if (!response.ok) throw new Error('Falha ao consultar conversa');
+                const messages = await response.json();
+                if (!Array.isArray(messages)) throw new Error('Histórico inválido');
+                hasMessages = messages.length > 0;
+            }
+            if (hasMessages) {
+                router.push(`/chat/${user.clerkId}`, { initialUser: user });
+            } else {
+                router.push(`/${encodeURIComponent(user.username)}`);
+            }
+        } catch {
+            toast.error('Não foi possível abrir agora. Tente novamente.');
+        } finally {
+            openingProfileRef.current = false;
+            setOpeningProfileId(null);
+        }
     };
 
     useEffect(() => {
@@ -199,11 +225,15 @@ export default function SearchPage() {
         const status = formatOnlineStatus(user.lastSeen || user.lastActiveTime, user.isOnline);
 
         return (
-            <div
+            <button
+                type="button"
                 key={user.clerkId}
                 data-explore-professional-id={!username.trim() ? user.clerkId : undefined}
-                onClick={() => handleOpenChat(user)}
-                className="relative aspect-[3/4] rounded-2xl overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 cursor-pointer active:scale-[0.98] border border-slate-200/80 bg-slate-100 group"
+                onClick={() => void handleOpenProfile(user)}
+                disabled={loadingProfile || openingProfileId !== null}
+                aria-busy={openingProfileId === user.clerkId}
+                aria-label={`Abrir ${user.name || user.username}`}
+                className="relative aspect-[3/4] rounded-2xl overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 cursor-pointer active:scale-[0.98] border border-slate-200/80 bg-slate-100 group text-left disabled:cursor-wait focus-visible:outline-2 focus-visible:outline-purple-600 focus-visible:outline-offset-2"
             >
                 {/* Imagem de fundo */}
                 <img
@@ -250,8 +280,9 @@ export default function SearchPage() {
                     <h3 className="text-sm sm:text-base font-black tracking-tight leading-tight truncate drop-shadow-sm">
                         {displayName}
                     </h3>
+                    {openingProfileId === user.clerkId && <span className="text-xs font-medium">Abrindo...</span>}
                 </div>
-            </div>
+            </button>
         );
     };
 
