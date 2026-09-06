@@ -5,9 +5,10 @@ import { createPortal } from 'react-dom';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
+import { ProfessionalProfilePresentation, type ProfileGalleryItem } from '@/components/ProfessionalProfilePresentation';
 import { SubscribeModal } from '@/components/SubscribeModal';
 import { useUserByUsername, usePublicGallery, useSubscribe, useMyProfile } from '@/hooks/useQueries';
-import { UserX, Camera, Lock, Eye, EyeOff, X, ChevronLeft, ChevronRight, ShieldCheck, Gift } from 'lucide-react';
+import { UserX, Lock, Eye, X, ChevronLeft, ChevronRight, ShieldCheck, Gift } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { trackAcquisitionEvent } from '@/lib/clientAcquisitionAnalytics';
 
@@ -19,18 +20,11 @@ interface UserProfilePageProps {
     isClosing?: boolean;
 }
 
-interface PublicProfileGalleryItem {
-    _id: string;
-    imageUrl: string;
-    mediaType?: 'image' | 'video' | string;
-    visibility?: 'public' | 'subscribers';
-    galleryType?: 'public' | 'private';
-}
+type PublicProfileGalleryItem = ProfileGalleryItem;
 
-export default function UserProfilePage({ params, username: propUsername, onBack, isSubPage = false, isClosing = false }: UserProfilePageProps) {
+export default function UserProfilePage({ params, username: propUsername, onBack, isSubPage = false }: UserProfilePageProps) {
     const router = useTransitionRouter();
-    const [activeGalleryTab, setActiveGalleryTab] = useState<'public' | 'private'>('public');
-    const [revealedItems, setRevealedItems] = useState<Record<string, boolean>>({});
+    const [viewerItems, setViewerItems] = useState<PublicProfileGalleryItem[]>([]);
     const [activeViewerIndex, setActiveViewerIndex] = useState<number | null>(null);
     const [isSubscribeModalOpen, setIsSubscribeModalOpen] = useState(false);
     const [viewerDragOffset, setViewerDragOffset] = useState(0);
@@ -71,7 +65,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
     const subscribeMutation = useSubscribe();
 
     const isSubscriber = galleryData?.isSubscriber;
-    const isOwner = galleryData?.isOwner;
+    const isOwner = galleryData?.isOwner || (!!me?.clerkId && me.clerkId === user?.clerkId);
     const hasChat = !!galleryData?.hasChat;
     // Um usuário nunca pode conversar consigo mesmo, nem com outro usuário do mesmo tipo.
     // Profissionais só podem conversar com clientes se a conversa já tiver sido iniciada pelo cliente.
@@ -133,13 +127,25 @@ export default function UserProfilePage({ params, username: propUsername, onBack
         router.push(`/chat/${user.clerkId}`, { initialUser: user });
     };
 
-    const currentGalleryItems = useMemo<PublicProfileGalleryItem[]>(() => {
-        const items = activeGalleryTab === 'public'
-            ? (galleryData?.items ?? [])
-            : (galleryData?.privateItems ?? []);
+    const publicGalleryItems = useMemo<PublicProfileGalleryItem[]>(() => {
+        const items: PublicProfileGalleryItem[] = Array.isArray(galleryData?.items) ? galleryData.items : [];
+        const photos = items.filter(item => item.visibility !== 'subscribers' && item.galleryType !== 'private' && item.mediaType !== 'video' && item.imageUrl);
+        const candidates = user?.photoUrl ? [{ _id: 'profile-photo', imageUrl: user.photoUrl }, ...photos] : photos;
+        const seen = new Set<string>();
+        return candidates.filter(item => {
+            if (seen.has(item.imageUrl)) return false;
+            seen.add(item.imageUrl);
+            return true;
+        });
+    }, [galleryData?.items, user?.photoUrl]);
 
-        return Array.isArray(items) ? items as PublicProfileGalleryItem[] : [];
-    }, [activeGalleryTab, galleryData?.items, galleryData?.privateItems]);
+    const exclusiveGalleryItems = useMemo<PublicProfileGalleryItem[]>(() => {
+        const items: PublicProfileGalleryItem[] = Array.isArray(galleryData?.items) ? galleryData.items : [];
+        const privateItems: PublicProfileGalleryItem[] = (isSubscriber || isOwner) && Array.isArray(galleryData?.privateItems) ? galleryData.privateItems : [];
+        return [...items.filter(item => item.visibility === 'subscribers' || item.galleryType === 'private'), ...privateItems];
+    }, [galleryData?.items, galleryData?.privateItems, isSubscriber, isOwner]);
+
+    const currentGalleryItems = viewerItems;
 
     const activeViewerItem = activeViewerIndex !== null ? currentGalleryItems[activeViewerIndex] : null;
     const hasPreviousViewerItem = activeViewerIndex !== null && activeViewerIndex > 0;
@@ -148,15 +154,13 @@ export default function UserProfilePage({ params, username: propUsername, onBack
     const nextViewerItem = hasNextViewerItem ? currentGalleryItems[activeViewerIndex + 1] : null;
     const viewerTransitionMs = 220;
     const isGalleryItemLocked = useCallback((item: PublicProfileGalleryItem | null) => {
-        return !!item && item.visibility === 'subscribers' && !isSubscriber && !isOwner;
+        return !!item && (item.visibility === 'subscribers' || item.galleryType === 'private') && !isSubscriber && !isOwner;
     }, [isOwner, isSubscriber]);
 
-    const openViewer = useCallback((itemId: string) => {
-        const index = currentGalleryItems.findIndex((item) => item._id === itemId);
-        if (index >= 0) {
-            setActiveViewerIndex(index);
-        }
-    }, [currentGalleryItems]);
+    const openViewer = useCallback((items: PublicProfileGalleryItem[], index: number) => {
+        setViewerItems(items);
+        setActiveViewerIndex(index);
+    }, []);
 
     const closeViewer = useCallback(() => {
         setActiveViewerIndex(null);
@@ -304,9 +308,8 @@ export default function UserProfilePage({ params, username: propUsername, onBack
     if (isLoading) {
         return (
             <div className={`flex flex-col bg-white animate-pulse ${layoutClass} ${animationClass}`}>
-                <div className="h-48 bg-gray-200" />
-                <div className="px-6 -mt-12 flex flex-col items-center">
-                    <div className="w-24 h-24 rounded-full bg-gray-300 border-4 border-white shadow-lg" />
+                <div className="h-[min(52svh,440px)] min-h-56 shrink-0 bg-gray-200" />
+                <div className="mx-auto w-full max-w-2xl px-6 py-4">
                     <div className="mt-4 h-8 w-48 bg-gray-200 rounded-lg" />
                     <div className="mt-2 h-4 w-32 bg-gray-100 rounded-lg" />
                 </div>
@@ -332,27 +335,33 @@ export default function UserProfilePage({ params, username: propUsername, onBack
         );
     }
 
-    const relationshipStats = (user as any).relationshipStats;
+    const relationshipStats = user.relationshipStats as {
+        totalSpent?: number;
+        hasEverSentGift?: boolean;
+        messageOpenRate90?: number;
+        last10MessagesSentCount?: number;
+    } | undefined;
 
 
 
     return (
-        <div className={`flex flex-col bg-slate-50 overflow-y-auto overflow-x-hidden pb-28 no-scrollbar relative ${layoutClass} ${animationClass}`}>
-            {/* Efeito de Fundo Aurora (Esferas Desfocadas Modernas) */}
-            <div className="absolute top-[-10%] left-[-20%] w-[350px] h-[350px] rounded-full bg-purple-400/15 blur-[100px] pointer-events-none select-none z-0" />
-            <div className="absolute top-[35%] right-[-15%] w-[300px] h-[300px] rounded-full bg-pink-400/12 blur-[90px] pointer-events-none select-none z-0" />
-            <div className="absolute bottom-[15%] left-[-15%] w-[280px] h-[280px] rounded-full bg-indigo-400/10 blur-[100px] pointer-events-none select-none z-0" />
-            
-            {/* Textura Geométrica Discreta (Bolinhas Lavanda) */}
-            <div 
-                className="absolute inset-0 pointer-events-none select-none z-0" 
-                style={{ 
-                    backgroundImage: 'radial-gradient(#E9D5FF 1.5px, transparent 1.5px)', 
-                    backgroundSize: '20px 20px',
-                    opacity: 0.4
-                }} 
-            />
-
+        <div className={`flex flex-col bg-slate-50 overflow-y-auto overflow-x-hidden pb-[calc(7rem+env(safe-area-inset-bottom))] no-scrollbar relative ${layoutClass} ${animationClass}`}>
+            {user.isProfessional ? (
+                <ProfessionalProfilePresentation
+                    key={user.clerkId}
+                    user={user}
+                    publicItems={publicGalleryItems}
+                    exclusiveItems={exclusiveGalleryItems}
+                    privateCount={(galleryData?.privatePhotosCount ?? 0) + (galleryData?.privateVideosCount ?? 0)}
+                    isSubscriber={!!isSubscriber}
+                    isOwner={!!isOwner}
+                    loadingGallery={loadingGallery}
+                    subscribing={subscribeMutation.isPending}
+                    onBack={handleBack}
+                    onSubscribe={handleSubscribe}
+                    onOpen={openViewer}
+                />
+            ) : <>
             {/* Cover and Header */}
             <div className="relative shrink-0 z-10">
                 <div className="relative h-44 w-full overflow-hidden bg-purple-50 shadow-inner">
@@ -494,235 +503,20 @@ export default function UserProfilePage({ params, username: propUsername, onBack
 
 
 
-                {/* Biografia do usuário */}
-                {user.isProfessional && user.bio && (
-                    <p className="mt-4 px-6 text-center text-xs text-slate-600 leading-relaxed max-w-sm italic font-medium z-10 animate-in fade-in duration-300">
-                        "{user.bio}"
-                    </p>
-                )}
-
-
-
-
             </div>
+            </>}
 
-            {/* Seletor de Abas da Galeria (apenas para o dono ou se for assinante e o recurso estiver habilitado) */}
-            {user?.isProfessional && (isOwner || isSubscriber) ? (
-                <div className="flex border-b border-purple-100/50 mb-2.5 px-6 shrink-0 z-10">
-                    <button
-                        onClick={() => setActiveGalleryTab('public')}
-                        className={`flex-1 pb-2 text-xs font-black uppercase tracking-wider transition-all border-b-2 text-center ${
-                            activeGalleryTab === 'public'
-                                ? 'border-purple-600 text-purple-600 font-bold'
-                                : 'border-transparent text-gray-400'
-                        }`}
-                    >
-                        Galeria Pública ({galleryData?.items?.length ?? 0})
-                    </button>
-                    <button
-                        onClick={() => setActiveGalleryTab('private')}
-                        className={`flex-1 pb-2 text-xs font-black uppercase tracking-wider transition-all border-b-2 text-center ${
-                            activeGalleryTab === 'private'
-                                ? 'border-purple-600 text-purple-600 font-bold'
-                                : 'border-transparent text-gray-400'
-                        }`}
-                    >
-                        Galeria Privada ({galleryData?.privateItems?.length ?? 0})
-                    </button>
-                </div>
-            ) : null}
-
-            {/* Gallery section */}
-            {user?.isProfessional && (
-                <div className="mt-2 w-full shrink-0 z-10">
-                    {loadingGallery ? (
-                        <div className="grid grid-cols-3 gap-0.5 animate-pulse px-0.5">
-                            {[1, 2, 3, 4, 5, 6].map(i => (
-                                <div key={i} className="aspect-square bg-gray-100" />
-                            ))}
-                        </div>
-                    ) : activeGalleryTab === 'public' ? (
-                        (galleryData?.items?.length ?? 0) === 0 ? (
-                            <div className="bg-white/50 rounded-2xl p-8 border border-dashed border-gray-200 flex flex-col items-center justify-center text-center mx-6 mt-4 gap-1.5">
-                                <Camera className="w-6 h-6 text-gray-300" />
-                                <p className="text-xs text-gray-400 font-medium">Nenhuma foto na galeria ainda</p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-3 gap-0.5 px-0.5">
-                                {currentGalleryItems.map((item) => {
-                                    const isLocked = item.visibility === 'subscribers' && !isSubscriber && !isOwner;
-                                    const isOwnerSubscribersOnly = item.visibility === 'subscribers' && isOwner;
-                                    const isOwnerLocked = isOwnerSubscribersOnly && !revealedItems[item._id];
-                                    return (
-                                        <div key={item._id} className="relative aspect-square overflow-hidden bg-gray-100 group">
-                                            {isLocked || isOwnerLocked ? (
-                                                <div 
-                                                    onClick={() => {
-                                                        if (isOwnerLocked) {
-                                                            openViewer(item._id);
-                                                        } else {
-                                                            handleSubscribe();
-                                                        }
-                                                    }}
-                                                    className="absolute inset-0 bg-gradient-to-br from-purple-600 via-indigo-600 to-pink-500 flex flex-col items-center justify-center p-2.5 text-center select-none cursor-pointer"
-                                                >
-                                                    {/* Textura geométrica de bolinhas */}
-                                                    <div 
-                                                        className="absolute inset-0 opacity-[0.15]" 
-                                                        style={{ 
-                                                            backgroundImage: 'radial-gradient(#fff 1.5px, transparent 1.5px)', 
-                                                            backgroundSize: '10px 10px' 
-                                                        }} 
-                                                    />
-                                                    {/* Textura geométrica de linhas diagonais */}
-                                                    <div 
-                                                        className="absolute inset-0 opacity-[0.08] bg-[linear-gradient(45deg,_rgba(255,255,255,0.15)_25%,_transparent_25%,_transparent_50%,_rgba(255,255,255,0.15)_50%,_rgba(255,255,255,0.15)_75%,_transparent_75%,_transparent)] bg-[size:16px_16px]" 
-                                                    />
-                                                    
-                                                    {isOwnerLocked && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setRevealedItems(prev => ({ ...prev, [item._id]: true }));
-                                                            }}
-                                                            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/25 hover:bg-white/35 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-md transition-all active:scale-90 z-20"
-                                                            title="Revelar foto na galeria"
-                                                        >
-                                                            <Eye className="w-4 h-4 text-white" />
-                                                        </button>
-                                                    )}
-                                                    
-                                                    <div className="relative z-10 flex flex-col items-center gap-1">
-                                                        <div className="w-7 h-7 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-md">
-                                                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                                                                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                                                            </svg>
-                                                        </div>
-                                                        <span className="text-[9px] font-black text-white uppercase tracking-widest leading-none">
-                                                            Exclusivo
-                                                        </span>
-                                                        <span className="text-[7.5px] font-bold text-purple-100 uppercase tracking-wider leading-none block mt-0.5">
-                                                            para assinantes
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div 
-                                                    className="w-full h-full relative cursor-pointer"
-                                                    onClick={() => openViewer(item._id)}
-                                                >
-                                                    <img
-                                                        src={item.imageUrl}
-                                                        alt="Gallery item"
-                                                        className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
-                                                    />
-                                                    {isOwnerSubscribersOnly && revealedItems[item._id] && (
-                                                        <>
-                                                            <div className="absolute bottom-2 left-2 bg-purple-600/90 text-[8px] font-black uppercase text-white px-1.5 py-0.5 rounded-md backdrop-blur-xs flex items-center gap-1 shadow-md z-10">
-                                                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                                                                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                                                                </svg>
-                                                                <span>Exclusivo</span>
-                                                            </div>
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setRevealedItems(prev => ({ ...prev, [item._id]: false }));
-                                                                }}
-                                                                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md flex items-center justify-center border border-white/10 shadow-md transition-all active:scale-90 z-20"
-                                                                title="Ocultar foto na galeria"
-                                                            >
-                                                                <EyeOff className="w-4 h-4 text-white" />
-                                                            </button>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )
-                    ) : (
-                        (galleryData?.privateItems?.length ?? 0) === 0 ? (
-                            <div className="bg-white/50 rounded-2xl p-8 border border-dashed border-gray-200 flex flex-col items-center justify-center text-center mx-6 mt-4 gap-1.5">
-                                <Lock className="w-6 h-6 text-gray-300" />
-                                <p className="text-xs text-gray-400 font-medium">Nenhuma mídia privada ainda</p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-3 gap-0.5 px-0.5">
-                                {currentGalleryItems.map((item) => (
-                                    <div
-                                        key={item._id}
-                                        className="relative aspect-square overflow-hidden bg-gray-100 group cursor-pointer"
-                                        onClick={() => openViewer(item._id)}
-                                    >
-                                        {item.mediaType === 'video' ? (
-                                            <div className="w-full h-full relative">
-                                                <video src={item.imageUrl} preload="metadata" className="w-full h-full object-cover" />
-                                                <div className="absolute inset-0 flex items-center justify-center bg-black/15">
-                                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="white" className="opacity-80 drop-shadow-md">
-                                                        <polygon points="5 3 19 12 5 21 5 3"/>
-                                                    </svg>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="w-full h-full">
-                                                <img
-                                                    src={item.imageUrl}
-                                                    alt="Private Gallery item"
-                                                    className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )
-                    )}
-                </div>
-            )}
-
-            {/* O banner discretizado antigo foi removido por ter sido integrado ao bloco superior */}
-
-            {/* Barra de Ações Flutuante no Rodapé */}
-            {(showSubscribeButton || canMessage) && (
-                <div className="fixed bottom-6 left-4 right-4 z-30 flex justify-center pointer-events-none">
-                    <div className="w-full max-w-md flex gap-3 px-2 pointer-events-auto">
-                        {showSubscribeButton && (
-                            <button
-                                onClick={handleSubscribe}
-                                disabled={subscribeMutation.isPending}
-                                className={`${canMessage ? 'flex-[3]' : 'w-full'} py-3.5 px-4 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 active:scale-[0.98] text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-xl shadow-purple-600/30`}
-                            >
-                                <span>Assinar por R$ {user.subscriptionPrice?.toFixed(2)}</span>
-                            </button>
-                        )}
-                        {canMessage && (
-                            <button
-                                onClick={handleMessageClick}
-                                disabled={startingTeamChat || isBlockedByOtherTeamMember}
-                                title={isBlockedByOtherTeamMember ? `Em atendimento por ${teamActivationContact?.assignedTeamMemberName || 'outro membro da equipe'}` : undefined}
-                                className={isBlockedByOtherTeamMember
-                                    ? `${showSubscribeButton ? 'flex-[2]' : 'w-full'} py-3.5 px-4 bg-gray-100 text-gray-400 border border-gray-200 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-none cursor-not-allowed`
-                                    : showSubscribeButton
-                                        ? "flex-[2] py-3.5 px-4 bg-white/95 hover:bg-gray-50 active:scale-[0.98] text-gray-800 border border-gray-200/80 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-black/5"
-                                        : "w-full py-3.5 px-4 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 active:scale-[0.98] text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-xl shadow-purple-600/30"}
-                            >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                                </svg>
-                                <span>
-                                    {isBlockedByOtherTeamMember
-                                        ? 'Em atendimento'
-                                        : startingTeamChat
-                                            ? 'Abrindo...'
-                                            : showSubscribeButton ? 'Mensagem' : 'Enviar Mensagem'}
-                                </span>
-                            </button>
-                        )}
+            {canMessage && (
+                <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-100 bg-white/95 px-5 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-sm">
+                    <div className="mx-auto w-full max-w-2xl">
+                        <Button
+                            title={isBlockedByOtherTeamMember ? 'Em atendimento' : startingTeamChat ? 'Abrindo...' : 'Conversar'}
+                            onClick={handleMessageClick}
+                            disabled={startingTeamChat || isBlockedByOtherTeamMember}
+                            size="lg"
+                            className="w-full"
+                        />
+                        {isBlockedByOtherTeamMember && <p className="mt-2 text-center text-xs text-slate-500">Em atendimento por {teamActivationContact?.assignedTeamMemberName || 'outro membro da equipe'}</p>}
                     </div>
                 </div>
             )}
@@ -733,6 +527,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                     className="fixed inset-0 z-[9999] bg-black animate-in fade-in duration-200 select-none"
                     role="dialog"
                     aria-modal="true"
+                    aria-label="Visualizador de fotos"
                     onClick={closeViewer}
                 >
                     <div

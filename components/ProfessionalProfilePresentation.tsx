@@ -1,0 +1,152 @@
+'use client';
+
+import { useEffect, useId, useRef, useState } from 'react';
+import Image from 'next/image';
+import { ChevronLeft, ChevronRight, Eye, EyeOff, Lock, ShieldCheck } from 'lucide-react';
+import { Avatar } from '@/components/Avatar';
+import { Button } from '@/components/Button';
+
+export interface ProfileGalleryItem {
+    _id: string;
+    imageUrl: string;
+    mediaType?: string;
+    visibility?: 'public' | 'subscribers';
+    galleryType?: 'public' | 'private';
+}
+
+interface Props {
+    user: {
+        name?: string;
+        username: string;
+        photoUrl?: string;
+        bio?: string;
+        identityStatus?: string | null;
+        messagesLastWeekCount?: number;
+        isSubscriptionEnabled?: boolean;
+        subscriptionPrice?: number;
+    };
+    publicItems: ProfileGalleryItem[];
+    exclusiveItems: ProfileGalleryItem[];
+    privateCount: number;
+    isSubscriber: boolean;
+    isOwner: boolean;
+    loadingGallery: boolean;
+    subscribing: boolean;
+    onBack: () => void;
+    onSubscribe: () => void;
+    onOpen: (items: ProfileGalleryItem[], index: number) => void;
+}
+
+function ProfilePhoto({ src, alt, priority = false, className = 'object-cover' }: { src: string; alt: string; priority?: boolean; className?: string }) {
+    const [failed, setFailed] = useState(false);
+
+    return src && !failed ? (
+        <Image src={src} alt={alt} fill unoptimized priority={priority} sizes="(max-width: 640px) 100vw, 640px" className={className} onError={() => setFailed(true)} />
+    ) : (
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-100"><Avatar size={88} /></div>
+    );
+}
+
+export function ProfessionalProfilePresentation({ user, publicItems, exclusiveItems, privateCount, isSubscriber, isOwner, loadingGallery, subscribing, onBack, onSubscribe, onOpen }: Props) {
+    const [photoIndex, setPhotoIndex] = useState(0);
+    const [expanded, setExpanded] = useState(false);
+    const [revealed, setRevealed] = useState<Record<string, boolean>>({});
+    const galleryRef = useRef<HTMLDivElement>(null);
+    const bioId = useId();
+    const bioRef = useRef<HTMLParagraphElement>(null);
+    const [bioOverflows, setBioOverflows] = useState(false);
+    const bio = user.bio?.trim();
+    const hasExclusive = exclusiveItems.length > 0 || privateCount > 0;
+    const name = user.name || `@${user.username}`;
+    const canAccess = isSubscriber || isOwner;
+
+    useEffect(() => {
+        const element = bioRef.current;
+        if (!element || expanded) return;
+        const observer = new ResizeObserver(() => setBioOverflows(element.scrollHeight > element.clientHeight + 1));
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, [bio, expanded]);
+
+    const moveToPhoto = (index: number) => {
+        galleryRef.current?.scrollTo({ left: index * galleryRef.current.clientWidth, behavior: 'smooth' });
+    };
+
+    return (
+        <div className="mx-auto w-full max-w-2xl shrink-0 bg-white sm:mt-6 sm:overflow-hidden sm:rounded-3xl">
+            <section aria-label="Fotos públicas" aria-roledescription="carrossel" className="relative bg-slate-100">
+                <div ref={galleryRef} className={`flex min-h-56 snap-x snap-mandatory overflow-x-auto no-scrollbar ${publicItems.length ? 'h-[min(52svh,440px)]' : 'h-56'}`} onScroll={(event) => {
+                    const element = event.currentTarget;
+                    setPhotoIndex(Math.round(element.scrollLeft / element.clientWidth));
+                }}>
+                    {publicItems.length ? publicItems.map((item, index) => (
+                        <button key={item._id} type="button" onClick={() => onOpen(publicItems, index)} aria-label={`Abrir foto ${index + 1} de ${name}`} className="relative h-full w-full shrink-0 snap-center focus-visible:outline-4 focus-visible:-outline-offset-4 focus-visible:outline-purple-600">
+                            <ProfilePhoto src={item.imageUrl} alt={`${name}, foto ${index + 1}`} priority={index === 0} className="object-cover sm:object-contain" />
+                        </button>
+                    )) : (
+                        <div className="flex w-full items-center justify-center"><Avatar size={96} /></div>
+                    )}
+                </div>
+                <button type="button" onClick={onBack} aria-label="Voltar" className="absolute left-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/60"><ChevronLeft size={23} /></button>
+                {publicItems.length > 1 && (
+                    <>
+                        <div className="absolute inset-x-4 top-1/2 flex -translate-y-1/2 justify-between pointer-events-none">
+                            <button type="button" disabled={photoIndex === 0} onClick={() => moveToPhoto(photoIndex - 1)} aria-label="Foto anterior" className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-black/35 text-white disabled:invisible"><ChevronLeft size={22} /></button>
+                            <button type="button" disabled={photoIndex >= publicItems.length - 1} onClick={() => moveToPhoto(photoIndex + 1)} aria-label="Próxima foto" className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-black/35 text-white disabled:invisible"><ChevronRight size={22} /></button>
+                        </div>
+                        <div aria-live="polite" aria-atomic="true" className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/45 px-3 py-1 text-xs font-medium text-white">{photoIndex + 1} / {publicItems.length}</div>
+                    </>
+                )}
+            </section>
+
+            <div className="space-y-7 px-5 py-6 sm:px-8 sm:py-8">
+                <section aria-label="Apresentação">
+                    <div className="flex items-center gap-2">
+                        <h1 className="min-w-0 break-words text-3xl font-bold tracking-tight text-slate-900">{name}</h1>
+                        {user.identityStatus === 'approved' && <ShieldCheck aria-label="Identidade verificada" className="h-6 w-6 shrink-0 text-purple-600" />}
+                    </div>
+                    <p className="mt-1 break-all text-sm text-slate-500">@{user.username}</p>
+                    {(user.messagesLastWeekCount ?? 0) > 0 && <p className="mt-3 text-xs text-slate-500">Atividade nos últimos 7 dias</p>}
+                    {bio && (
+                        <div className="mt-5">
+                            <p id={bioId} ref={bioRef} className={`whitespace-pre-line break-words text-base leading-7 text-slate-600 ${expanded ? '' : 'line-clamp-4'}`}>{bio}</p>
+                            {(bioOverflows || expanded) && <button type="button" aria-expanded={expanded} aria-controls={bioId} onClick={() => setExpanded(!expanded)} className="mt-2 min-h-11 text-sm font-semibold text-purple-600 hover:text-purple-800">{expanded ? 'Mostrar menos' : 'Ler mais'}</button>}
+                        </div>
+                    )}
+                </section>
+
+                {(user.isSubscriptionEnabled || isSubscriber) && (
+                    <section aria-label="Assinatura" className="rounded-2xl border border-purple-100 bg-purple-50/40 p-5">
+                        <p className="text-xs font-semibold text-purple-600">{isSubscriber ? 'Você é assinante' : isOwner ? 'Sua assinatura' : 'Assinatura'}</p>
+                        <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-900">Prioridade nas respostas</h2>
+                        {hasExclusive && <p className="mt-2 text-sm leading-6 text-slate-600">Inclui acesso às fotos exclusivas para assinantes.</p>}
+                        {typeof user.subscriptionPrice === 'number' && <p className="mt-4 text-2xl font-bold tracking-tight text-slate-900">{user.subscriptionPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}<span className="text-sm font-normal tracking-normal text-slate-500"> / 30 dias</span></p>}
+                        {!isSubscriber && !isOwner && user.isSubscriptionEnabled && <Button title="Assinar perfil" variant="outline" onClick={onSubscribe} loading={subscribing || loadingGallery} className="mt-4 w-full" />}
+                        {isSubscriber && <p className="mt-3 text-sm font-medium text-purple-700">Assinatura ativa</p>}
+                        <p className="mt-4 text-xs leading-5 text-slate-500">A assinatura não inclui o custo das mensagens, cobrado separadamente.</p>
+                    </section>
+                )}
+
+                {hasExclusive && (
+                    <section aria-label="Conteúdo para assinantes" className="border-t border-slate-100 pt-6">
+                        <div className="mb-4 flex items-center gap-2"><Lock size={16} className="text-purple-600" /><h2 className="text-lg font-semibold text-slate-900">Fotos para assinantes</h2></div>
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                            {exclusiveItems.map((item, index) => {
+                                const hidden = !canAccess || (isOwner && item.visibility === 'subscribers' && !revealed[item._id]);
+                                return (
+                                    <div key={item._id} className="relative aspect-[3/4] overflow-hidden rounded-xl bg-slate-100">
+                                        <button type="button" aria-label={hidden ? 'Conteúdo exclusivo para assinantes' : `Abrir conteúdo exclusivo ${index + 1}`} disabled={!canAccess && !user.isSubscriptionEnabled} onClick={() => canAccess ? onOpen(exclusiveItems, index) : onSubscribe()} className="absolute inset-0 h-full w-full">
+                                            {hidden ? <div className="flex h-full flex-col items-center justify-center gap-2 bg-purple-50 text-purple-600"><Lock size={22} /><span className="text-xs font-medium">Exclusivo</span></div> : item.mediaType === 'video' ? <video src={item.imageUrl} preload="metadata" className="h-full w-full object-cover" /> : <ProfilePhoto src={item.imageUrl} alt={`Foto exclusiva ${index + 1}`} />}
+                                        </button>
+                                        {isOwner && item.visibility === 'subscribers' && <button type="button" aria-label={hidden ? 'Revelar foto na galeria' : 'Ocultar foto na galeria'} onClick={() => setRevealed(previous => ({ ...previous, [item._id]: !previous[item._id] }))} className="absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-purple-700">{hidden ? <Eye size={18} /> : <EyeOff size={18} />}</button>}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        {!canAccess && privateCount > 0 && <button type="button" onClick={onSubscribe} disabled={!user.isSubscriptionEnabled} className="mt-3 flex min-h-28 w-full flex-col items-center justify-center gap-2 rounded-xl bg-purple-50 px-4 py-5 text-purple-700"><Lock size={22} /><span className="text-sm">{privateCount} {privateCount === 1 ? 'conteúdo exclusivo' : 'conteúdos exclusivos'}</span><span className="text-xs text-slate-500">Disponível para assinantes</span></button>}
+                    </section>
+                )}
+            </div>
+        </div>
+    );
+}
