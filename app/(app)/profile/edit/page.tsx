@@ -1,117 +1,96 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
-import { useMyProfile, useUpdateProfile, useReorderGallery, QueryKeys } from '@/hooks/useQueries';
+import { useMyProfile, useUpdateProfile, QueryKeys } from '@/hooks/useQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { ProfilePhotosEditor } from '@/components/ProfilePhotosEditor';
 import { PrivateGalleryEditor } from '@/components/PrivateGalleryEditor';
-import { ArrowLeft, AlertCircle, RefreshCw, Settings, Check } from 'lucide-react';
+import { ArrowLeft, Settings, Check, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function EditProfilePage() {
     const { user } = useUser();
     const router = useTransitionRouter();
     const queryClient = useQueryClient();
-    const { data: userData, isLoading: loadingProfile } = useMyProfile();
+    const { data: userData } = useMyProfile();
     const updateProfileMutation = useUpdateProfile();
-    const reorderGalleryMutation = useReorderGallery();
 
     const [bio, setBio] = useState('');
-    const [pendingPhotoIds, setPendingPhotoIds] = useState<string[] | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [saveError, setSaveError] = useState('');
+    const [savedBio, setSavedBio] = useState('');
+    const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
     const hasPopulated = useRef(false);
-    const [showDiscardModal, setShowDiscardModal] = useState(false);
-    const isLeavingRef = useRef(false);
+    const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+    // Inicializa a biografia com os dados do usuário
     useEffect(() => {
         if (userData && !hasPopulated.current) {
-            setBio(userData.bio || '');
+            const initialBio = userData.bio || '';
+            setBio(initialBio);
+            setSavedBio(initialBio);
             hasPopulated.current = true;
         }
     }, [userData]);
 
+    // Limpa o timer ao desmontar
+    useEffect(() => {
+        return () => {
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+            }
+        };
+    }, []);
+
     const profileIsProfessional = !!userData?.isProfessional;
 
-    const hasBioChanges = hasPopulated.current && bio !== (userData?.bio || '');
-    const hasPhotoChanges = pendingPhotoIds !== null;
-    const hasChanges = hasBioChanges || hasPhotoChanges;
+    // Salvamento otimista da biografia com reversão em caso de erro
+    const saveBioOptimistic = useCallback(async (newBio: string) => {
+        const trimmed = newBio.trim();
+        if (trimmed === savedBio.trim()) return;
 
-    useEffect(() => {
-        if (!hasChanges) return;
-
-        window.history.pushState({ editProfileGuard: true }, '', window.location.href);
-
-        const handlePopState = () => {
-            if (isLeavingRef.current) return;
-            setShowDiscardModal(true);
-            window.history.pushState({ editProfileGuard: true }, '', window.location.href);
-        };
-
-        window.addEventListener('popstate', handlePopState);
-        return () => {
-            window.removeEventListener('popstate', handlePopState);
-        };
-    }, [hasChanges]);
-
-    useEffect(() => {
-        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-            if (hasChanges && !isLeavingRef.current) {
-                e.preventDefault();
-                e.returnValue = '';
-            }
-        };
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    }, [hasChanges]);
-
-    const handleBack = () => {
-        if (hasChanges) {
-            setShowDiscardModal(true);
-        } else {
-            isLeavingRef.current = true;
-            router.back();
-        }
-    };
-
-    const handleConfirmDiscard = () => {
-        setShowDiscardModal(false);
-        isLeavingRef.current = true;
-        router.back();
-    };
-
-    const handleSave = async () => {
-        setLoading(true);
-        setSaveError('');
+        const previousBio = savedBio;
+        setSavedBio(trimmed);
+        setSaveStatus('saving');
 
         try {
-            const promises: Promise<any>[] = [];
-
-            if (hasPhotoChanges && pendingPhotoIds && pendingPhotoIds.length > 0) {
-                promises.push(reorderGalleryMutation.mutateAsync(pendingPhotoIds));
-            }
-
-            if (hasBioChanges) {
-                promises.push(updateProfileMutation.mutateAsync({ bio }));
-            }
-
-            if (promises.length > 0) {
-                await Promise.all(promises);
-                await queryClient.invalidateQueries({ queryKey: QueryKeys.me });
-                await queryClient.invalidateQueries({ queryKey: ['gallery', 'me'] });
-            }
-
-            toast.success('Perfil atualizado com sucesso!');
-            isLeavingRef.current = true;
-            router.back();
+            await updateProfileMutation.mutateAsync({ bio: trimmed });
+            setSaveStatus('saved');
+            queryClient.invalidateQueries({ queryKey: QueryKeys.me });
+            setTimeout(() => {
+                setSaveStatus(prev => prev === 'saved' ? 'idle' : prev);
+            }, 2500);
         } catch (error: any) {
-            setSaveError(error?.message || 'Erro ao salvar alterações.');
-        } finally {
-            setLoading(false);
+            // Reversão otimista
+            setBio(previousBio);
+            setSavedBio(previousBio);
+            setSaveStatus('idle');
+            toast.error('Erro ao salvar biografia. Alteração desfeita.');
         }
+    }, [savedBio, updateProfileMutation, queryClient]);
+
+    const handleBioChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const val = e.target.value;
+        setBio(val);
+
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+        }
+        debounceTimerRef.current = setTimeout(() => {
+            saveBioOptimistic(val);
+        }, 1000);
+    };
+
+    const handleBioBlur = () => {
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+        }
+        saveBioOptimistic(bio);
+    };
+
+    const handleBack = () => {
+        router.back();
     };
 
     return (
@@ -133,18 +112,25 @@ export default function EditProfilePage() {
             <div className="p-4 flex flex-col gap-4 max-w-md w-full mx-auto">
                 {profileIsProfessional ? (
                     <>
-                        {/* ── SEÇÃO 1: FOTOS DO PERFIL (PÚBLICAS COM DRAG & DROP) ── */}
-                        <ProfilePhotosEditor 
-                            photoUrl={userData?.photoUrl} 
-                            onOrderChange={(newIds, changed) => {
-                                setPendingPhotoIds(changed ? newIds : null);
-                            }}
-                        />
+                        {/* ── SEÇÃO 1: FOTOS DO PERFIL (PÚBLICAS COM REORDENAÇÃO OTIMISTA) ── */}
+                        <ProfilePhotosEditor photoUrl={userData?.photoUrl} />
 
-                        {/* ── SEÇÃO 2: BIOGRAFIA ── */}
+                        {/* ── SEÇÃO 2: BIOGRAFIA COM AUTO-SAVE OTIMISTA ── */}
                         <section aria-label="Biografia" className="rounded-2xl border border-slate-100 bg-white p-4 shadow-xs space-y-2">
                             <div className="flex items-center justify-between">
-                                <h2 className="text-sm font-bold text-slate-900">Biografia</h2>
+                                <div className="flex items-center gap-2">
+                                    <h2 className="text-sm font-bold text-slate-900">Biografia</h2>
+                                    {saveStatus === 'saving' && (
+                                        <span className="text-[11px] font-medium text-purple-600 flex items-center gap-1 animate-in fade-in duration-200">
+                                            <Loader2 className="w-3 h-3 animate-spin" /> Salvando...
+                                        </span>
+                                    )}
+                                    {saveStatus === 'saved' && (
+                                        <span className="text-[11px] font-medium text-emerald-600 flex items-center gap-1 animate-in fade-in duration-200">
+                                            <Check className="w-3 h-3" /> Salvo
+                                        </span>
+                                    )}
+                                </div>
                                 <span className="text-[10px] font-semibold text-slate-400 tabular-nums">
                                     {bio.length}/300
                                 </span>
@@ -155,33 +141,13 @@ export default function EditProfilePage() {
                                 rows={4}
                                 maxLength={300}
                                 value={bio}
-                                onChange={(e) => setBio(e.target.value)}
+                                onChange={handleBioChange}
+                                onBlur={handleBioBlur}
                             />
                         </section>
 
                         {/* ── SEÇÃO 3: GALERIA PRIVADA ── */}
                         <PrivateGalleryEditor />
-
-                        {/* Botão de Salvar Alterações (Biografia) */}
-                        <div className="mt-2 flex flex-col gap-2">
-                            {saveError && (
-                                <div className="flex items-center gap-2 px-3.5 py-2.5 bg-rose-50 border border-rose-100 rounded-xl">
-                                    <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
-                                    <p className="text-xs text-rose-600 font-medium">{saveError}</p>
-                                </div>
-                            )}
-                            <button
-                                onClick={handleSave}
-                                disabled={loading || !hasChanges}
-                                className="w-full h-11 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition-all shadow-sm active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
-                            >
-                                {loading ? (
-                                    <RefreshCw className="animate-spin w-4 h-4 text-white" />
-                                ) : (
-                                    <span>Salvar Alterações</span>
-                                )}
-                            </button>
-                        </div>
                     </>
                 ) : (
                     /* Para usuários que não são profissionais */
@@ -205,39 +171,6 @@ export default function EditProfilePage() {
                     </div>
                 )}
             </div>
-
-            {/* Modal de Aviso de Alterações Não Salvas */}
-            {showDiscardModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
-                    <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
-                        <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-4 border border-amber-100">
-                            <AlertCircle className="w-6 h-6" />
-                        </div>
-                        <h3 className="text-lg font-bold text-slate-900 mb-1.5">
-                            Descartar alterações?
-                        </h3>
-                        <p className="text-xs text-slate-500 leading-relaxed mb-6">
-                            Você fez alterações na sua biografia que ainda não foram salvas. Se sair agora, essas modificações serão perdidas.
-                        </p>
-                        <div className="flex flex-col gap-2 w-full">
-                            <button
-                                type="button"
-                                onClick={() => setShowDiscardModal(false)}
-                                className="w-full h-11 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold transition-all cursor-pointer active:scale-[0.98]"
-                            >
-                                Continuar editando
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleConfirmDiscard}
-                                className="w-full h-11 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition-all cursor-pointer active:scale-[0.98]"
-                            >
-                                Descartar e sair
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

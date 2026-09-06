@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
-import { Plus, Trash2, Loader2, Lock, Sparkles, Video } from 'lucide-react';
+import { Plus, Trash2, Loader2, Lock, Video } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { QueryKeys, useMyGallery, useUploadToGallery, useDeleteFromGallery } from '@/hooks/useQueries';

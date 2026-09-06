@@ -10,7 +10,8 @@ import {
     QueryKeys, 
     useMyGallery, 
     useUploadToGallery, 
-    useDeleteFromGallery 
+    useDeleteFromGallery,
+    useReorderGallery 
 } from '@/hooks/useQueries';
 import type { ProfileGalleryItem } from '@/components/ProfessionalProfilePresentation';
 
@@ -24,6 +25,7 @@ export function ProfilePhotosEditor({ photoUrl, onOrderChange }: Props) {
     const { data: gallery, isLoading, isError } = useMyGallery();
     const uploadGallery = useUploadToGallery();
     const deletePhoto = useDeleteFromGallery();
+    const reorderGallery = useReorderGallery();
 
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -48,7 +50,7 @@ export function ProfilePhotosEditor({ photoUrl, onOrderChange }: Props) {
         element: HTMLElement;
     } | null>(null);
 
-    const busy = uploadGallery.isPending || deletePhoto.isPending || uploading;
+    const busy = uploadGallery.isPending || deletePhoto.isPending || reorderGallery.isPending || uploading;
 
     // Lista de fotos públicas do servidor
     const serverPublicItems = useMemo<ProfileGalleryItem[]>(() => {
@@ -78,8 +80,8 @@ export function ProfilePhotosEditor({ photoUrl, onOrderChange }: Props) {
         }
     }, [serverPublicItems]);
 
-    // Reordenação estritamente no Front-End (sem fazer requisição)
-    const applyReorder = (fromIndex: number, toIndex: number) => {
+    // Reordenação otimista imediata com persistência automática
+    const applyReorder = async (fromIndex: number, toIndex: number) => {
         if (
             fromIndex === toIndex || 
             fromIndex < 0 || 
@@ -90,21 +92,33 @@ export function ProfilePhotosEditor({ photoUrl, onOrderChange }: Props) {
             return;
         }
 
+        const previousItems = [...orderedItems];
         const nextItems = [...orderedItems];
         const [moved] = nextItems.splice(fromIndex, 1);
         nextItems.splice(toIndex, 0, moved);
 
+        // Atualização otimista imediata na interface
         setOrderedItems(nextItems);
 
         const currentIds = nextItems
             .map(item => item._id)
             .filter(id => id && id !== 'profile-photo');
 
-        const isChanged = 
-            currentIds.length !== initialIdsRef.current.length ||
-            currentIds.some((id, i) => id !== initialIdsRef.current[i]);
+        onOrderChange?.(currentIds, true);
 
-        onOrderChange?.(currentIds, isChanged);
+        try {
+            await reorderGallery.mutateAsync(currentIds);
+            initialIdsRef.current = currentIds;
+            await queryClient.invalidateQueries({ queryKey: QueryKeys.me });
+            await queryClient.invalidateQueries({ queryKey: ['gallery', 'me'] });
+            toast.success('Ordem das fotos atualizada!');
+            onOrderChange?.(currentIds, false);
+        } catch (error: any) {
+            // Reversão otimista em caso de falha
+            setOrderedItems(previousItems);
+            onOrderChange?.(initialIdsRef.current, false);
+            toast.error('Erro ao salvar nova ordem. Alteração desfeita.');
+        }
     };
 
     // Upload de nova foto
