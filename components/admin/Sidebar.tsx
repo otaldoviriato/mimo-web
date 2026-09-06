@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
     LayoutDashboard,
@@ -9,7 +10,6 @@ import {
     UserCheck,
     MessageSquare,
     DollarSign,
-    ShieldAlert,
     LifeBuoy,
     Mail,
     X,
@@ -33,14 +33,17 @@ interface SidebarProps {
     onClose?: () => void;
 }
 
+interface MenuItem {
+    href: string;
+    label: string;
+    icon: React.ElementType;
+    exact?: boolean;
+    badgeKey?: 'verifications' | 'audits' | 'tickets';
+}
+
 interface MenuSection {
     title: string;
-    items: {
-        href: string;
-        label: string;
-        icon: React.ElementType;
-        exact?: boolean;
-    }[];
+    items: MenuItem[];
 }
 
 const MENU_SECTIONS: MenuSection[] = [
@@ -48,7 +51,15 @@ const MENU_SECTIONS: MenuSection[] = [
         title: 'Visão Geral',
         items: [
             { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-            { href: '/admin/campaigns', label: 'Campanhas', icon: Megaphone },
+            { href: '/admin/campaigns', label: 'Campanhas e Funil', icon: Megaphone },
+        ],
+    },
+    {
+        title: 'Ações da Equipe',
+        items: [
+            { href: '/admin/identity-verifications', label: 'Verificação de Selos', icon: ShieldCheck, badgeKey: 'verifications' },
+            { href: '/admin/rooms', label: 'Auditoria de Conversas', icon: MessageSquare, badgeKey: 'audits' },
+            { href: '/admin/help-tickets', label: 'Tickets de Ajuda', icon: LifeBuoy, badgeKey: 'tickets' },
         ],
     },
     {
@@ -57,15 +68,6 @@ const MENU_SECTIONS: MenuSection[] = [
             { href: '/admin/clients', label: 'Clientes', icon: Users },
             { href: '/admin/professionals', label: 'Profissionais', icon: UserCheck },
             { href: '/admin/team', label: 'Equipe', icon: ShieldCheck },
-            { href: '/admin/identity-verifications', label: 'Verificação de Selos', icon: ShieldCheck },
-        ],
-    },
-    {
-        title: 'Operações & Suporte',
-        items: [
-            { href: '/admin/rooms', label: 'Conversas', icon: MessageSquare },
-            { href: '/admin/help-tickets', label: 'Tickets de Ajuda', icon: LifeBuoy },
-            { href: '/admin/institutional-emails', label: 'E-mails Institucionais', icon: Mail },
         ],
     },
     {
@@ -77,6 +79,7 @@ const MENU_SECTIONS: MenuSection[] = [
     {
         title: 'Configurações do Sistema',
         items: [
+            { href: '/admin/institutional-emails', label: 'E-mails Institucionais', icon: Mail },
             { href: '/admin/settings/platform', label: 'Plataforma & Operação', icon: Globe },
             { href: '/admin/settings/alerts', label: 'Alertas & Notificações', icon: Bell },
             { href: '/admin/settings/chat', label: 'Chat & Sessões', icon: Clock },
@@ -92,6 +95,33 @@ const MENU_SECTIONS: MenuSection[] = [
 
 export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     const pathname = usePathname();
+    const [pendingCounts, setPendingCounts] = useState<{
+        verifications: number;
+        audits: number;
+        tickets: number;
+    }>({ verifications: 0, audits: 0, tickets: 0 });
+
+    const fetchPendingCounts = useCallback(async () => {
+        try {
+            const res = await fetch('/api/admin/pending-actions');
+            if (res.ok) {
+                const data = await res.json();
+                setPendingCounts({
+                    verifications: Number(data.verifications) || 0,
+                    audits: Number(data.audits) || 0,
+                    tickets: Number(data.tickets) || 0,
+                });
+            }
+        } catch {
+            // Silencioso em caso de falha de conexão transitória
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchPendingCounts();
+        const interval = setInterval(fetchPendingCounts, 30_000);
+        return () => clearInterval(interval);
+    }, [fetchPendingCounts, pathname]);
 
     const isLinkActive = (href: string, exact?: boolean) => {
         if (exact) {
@@ -119,10 +149,10 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
             `}>
                 {/* Header / Logo */}
                 <div className="p-6 border-b border-slate-800 flex items-center gap-3 shrink-0">
-                    <div className="bg-purple-600 p-2.5 rounded-xl shadow-lg shadow-purple-500/20 text-white flex items-center justify-center">
-                        <ShieldAlert size={22} className="animate-pulse" />
+                    <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700/80 p-2 flex items-center justify-center shrink-0 shadow-md">
+                        <Image src="/Logo.svg" alt="MimoChat" width={28} height={28} className="w-full h-full object-contain" />
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                         <h2 className="font-bold text-lg leading-tight tracking-wide bg-linear-to-r from-white via-purple-100 to-purple-400 bg-clip-text text-transparent">
                             MimoAdmin
                         </h2>
@@ -147,6 +177,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                             {section.items.map((item) => {
                                 const Icon = item.icon;
                                 const active = isLinkActive(item.href, item.exact);
+                                const badgeCount = item.badgeKey ? pendingCounts[item.badgeKey] : 0;
 
                                 return (
                                     <Link
@@ -166,7 +197,16 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                                             }`}
                                         />
                                         <span className="truncate">{item.label}</span>
-                                        {active && (
+                                        {badgeCount > 0 && (
+                                            <span className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 tracking-tight transition-all ${
+                                                active
+                                                    ? 'bg-white text-purple-900 shadow-xs'
+                                                    : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                            }`}>
+                                                {badgeCount > 99 ? '99+' : badgeCount}
+                                            </span>
+                                        )}
+                                        {active && (!badgeCount || badgeCount <= 0) && (
                                             <span className="ml-auto w-1.5 h-1.5 rounded-full bg-white shrink-0" />
                                         )}
                                     </Link>

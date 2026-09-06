@@ -33,13 +33,24 @@ export function billableReceivedCharacters(count: number, cap = 50, usedInTurn =
     return Math.min(count, remainingCap);
 }
 
-// Independent random characters, never a reversible substitution cipher.
+function pseudoRandomByte(seed: string, index: number): number {
+    let h = 0x811c9dc5;
+    const str = `${seed}:${index}`;
+    for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 0x01000193);
+    }
+    return Math.abs(h);
+}
+
+// Independent deterministic pseudo-random characters per message, never a reversible substitution cipher.
 // Only whitespace, length and letter case are intentionally disclosed.
-export function lockedMessagePreview(content: string): string {
-    return Array.from(content, (character) => {
+export function lockedMessagePreview(content: string, seed: string = ''): string {
+    const effectiveSeed = seed || 'mimo_preview_seed';
+    return Array.from(content, (character, index) => {
         if (/\s/u.test(character)) return character;
-        const random = crypto.getRandomValues(new Uint32Array(1))[0];
-        const letter = String.fromCharCode(97 + random % 26);
+        const random = pseudoRandomByte(effectiveSeed, index);
+        const letter = String.fromCharCode(97 + (random % 26));
         return /\p{Lu}/u.test(character) ? letter.toUpperCase() : letter;
     }).join('');
 }
@@ -47,6 +58,7 @@ export function lockedMessagePreview(content: string): string {
 // Never send pending content, audio URLs or quoted text to the paying recipient.
 export function messageForViewer<T extends Record<string, any>>(message: T, viewerId?: string): T {
     if (message.billingStatus !== 'pending' || viewerId === message.senderId) return message;
-    return { ...message, content: message.isAudio ? '' : lockedMessagePreview(String(message.content ?? '')), audioUrl: undefined,
+    const seed = String(message._id || message.tempId || message.timestamp || '');
+    return { ...message, content: message.isAudio ? '' : lockedMessagePreview(String(message.content ?? ''), seed), audioUrl: undefined,
         replyToContent: null, replyToId: null, replyToSenderId: null, isContentLocked: true };
 }

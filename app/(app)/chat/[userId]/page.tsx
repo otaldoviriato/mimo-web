@@ -1197,10 +1197,23 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     if (prev.length === 0) {
                         return res.data;
                     }
+                    const prevMap = new Map(prev.map((m: any) => [m._id, m]));
+                    const normalizedHttp = res.data.map((newMsg: any) => {
+                        const prevMsg = prevMap.get(newMsg._id);
+                        if (prevMsg && newMsg.isContentLocked && prevMsg.isContentLocked && prevMsg.content) {
+                            return { ...newMsg, content: prevMsg.content };
+                        }
+                        return newMsg;
+                    });
                     const existingIds = new Set(prev.map(m => m._id));
-                    const newFromHttp = res.data.filter((m: any) => !existingIds.has(m._id));
-                    if (newFromHttp.length === 0) return prev;
-                    return [...res.data, ...prev.filter(m => !res.data.some((h: any) => h._id === m._id))].sort(
+                    const newFromHttp = normalizedHttp.filter((m: any) => !existingIds.has(m._id));
+                    if (newFromHttp.length === 0) {
+                        return prev.map((m) => {
+                            const updated = normalizedHttp.find((h: any) => h._id === m._id);
+                            return updated || m;
+                        });
+                    }
+                    return [...normalizedHttp, ...prev.filter(m => !normalizedHttp.some((h: any) => h._id === m._id))].sort(
                         (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
                     );
                 });
@@ -1305,7 +1318,17 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         socketService.joinRoom(user.id, otherUserId);
 
         socket.on('room_joined', (data: { messages: Message[]; monetizationDisabled?: boolean }) => {
-            setMessages([...data.messages]);
+            setMessages((prev) => {
+                if (!prev || prev.length === 0) return [...data.messages];
+                const prevMap = new Map(prev.map(m => [m._id, m]));
+                return data.messages.map((newMsg) => {
+                    const prevMsg = prevMap.get(newMsg._id);
+                    if (prevMsg && newMsg.isContentLocked && prevMsg.isContentLocked && prevMsg.content) {
+                        return { ...newMsg, content: prevMsg.content };
+                    }
+                    return newMsg;
+                });
+            });
             setLoadingMessages(false);
             if (data.monetizationDisabled !== undefined) {
                 setMonetizationDisabled(data.monetizationDisabled);
