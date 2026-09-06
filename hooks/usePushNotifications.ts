@@ -35,9 +35,10 @@ export const usePushNotifications = () => {
               registration.showNotification(title || "Nova mensagem", {
                 body: body,
                 icon: "/icon-192x192.png",
-                badge: "/icon-192x192.png",
+                badge: "/notification-badge.png",
                 tag: 'mimo-foreground-notification',
-                renotify: true
+                renotify: true,
+                data: payload.data || {},
               } as any);
             });
           }

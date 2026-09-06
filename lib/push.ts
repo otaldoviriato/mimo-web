@@ -86,6 +86,8 @@ async function sendFcmPushNotifications(tokens: string[], title: string, body: s
         return { successCount: 0, failureCount: tokens.length, tokensToRemove: [] as string[] };
     }
 
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.mimochat.com.br').replace(/\/$/, '');
+
     const response = await adminMessaging.sendEachForMulticast({
         tokens,
         notification: {
@@ -97,13 +99,13 @@ async function sendFcmPushNotifications(tokens: string[], title: string, body: s
             notification: {
                 title,
                 body,
-                icon: '/icon-192x192.png',
-                badge: '/notification-badge.png',
+                icon: `${appUrl}/icon-192x192.png`,
+                badge: `${appUrl}/notification-badge.png`,
                 tag: 'mimo-message',
                 vibrate: [200, 100, 200],
             },
             fcmOptions: {
-                link: typeof data?.url === 'string' ? data.url : 'https://www.mimochat.com.br/chats',
+                link: typeof data?.url === 'string' ? data.url : `${appUrl}/chats`,
             }
         }
     });

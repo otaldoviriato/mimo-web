@@ -77,25 +77,28 @@ async function optimizeGift() {
 }
 
 async function optimizeNotificationBadge() {
+    const svgPath = path.join(publicDir, 'Logo.svg');
     const badgePath = path.join(publicDir, 'notification-badge.png');
-    if (fs.existsSync(badgePath)) {
-        const tempPath = path.join(publicDir, 'temp_notification-badge.png');
+    if (fs.existsSync(svgPath)) {
         try {
-            console.log('Otimizando notification-badge.png...');
-            await sharp(badgePath)
-                .resize(256, 256, {
-                    fit: 'inside'
+            console.log('Gerando notification-badge.png a partir de Logo.svg...');
+            let svg = fs.readFileSync(svgPath, 'utf8');
+            svg = svg.replace(/fill="[^"]*"/g, 'fill="#FFFFFF"');
+            await sharp(Buffer.from(svg))
+                .resize(72, 72, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+                .extend({
+                    top: 12,
+                    bottom: 12,
+                    left: 12,
+                    right: 12,
+                    background: { r: 0, g: 0, b: 0, alpha: 0 }
                 })
-                .png({ compressionLevel: 9, quality: 80 })
-                .toFile(tempPath);
-            
-            fs.unlinkSync(badgePath);
-            fs.renameSync(tempPath, badgePath);
+                .png({ compressionLevel: 9 })
+                .toFile(badgePath);
             const stats = fs.statSync(badgePath);
-            console.log(`✓ Otimizado: notification-badge.png (${(stats.size / 1024).toFixed(2)} KB)`);
+            console.log(`✓ Gerado notification-badge.png (${(stats.size / 1024).toFixed(2)} KB)`);
         } catch (err) {
-            console.error('Erro ao otimizar notification-badge.png:', err);
-            if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+            console.error('Erro ao gerar notification-badge.png:', err);
         }
     }
 }
