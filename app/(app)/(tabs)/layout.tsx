@@ -160,8 +160,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
 
             {/* Main content */}
             <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
-                {/* Header Superior Persistente — oculto na aba Perfil apenas para o perfil feminino (profissional) */}
-                {!(pathname === '/profile' && isProfessional) && (
+                {/* Header Superior Persistente — padrão em todas as abas */}
                 <div className="shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between z-30 sticky top-0 shadow-md">
                     <div className="flex items-center gap-3">
                         <img
@@ -202,7 +201,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                                 <Search className="w-5 h-5 text-white" />
                             </button>
                         )}
-                        {pathname === '/profile' && (
+                        {pathname === '/profile' && !isProfessional && (
                             <button
                                 onClick={() => router.push('/profile/edit')}
                                 className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center cursor-pointer"
@@ -223,7 +222,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                                 </span>
                             </button>
                         )}
-                        {pathname === '/profile' && (
+                        {pathname === '/profile' && !isProfessional && (
                             <button
                                 onClick={() => router.push('/settings')}
                                 className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center cursor-pointer"
@@ -234,7 +233,6 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                         )}
                     </div>
                 </div>
-                )}
 
                 {children}
             </div>

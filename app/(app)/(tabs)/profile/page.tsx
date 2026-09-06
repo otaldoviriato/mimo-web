@@ -347,40 +347,6 @@ export default function ProfilePage() {
     if (isProfessional) {
         return (
             <div className="flex flex-col h-full bg-slate-50 relative overflow-y-auto no-scrollbar max-w-full pb-24">
-                {/* Header com Compartilhar, Editar Perfil e Configurações */}
-                <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 px-5 py-3 flex items-center justify-between shadow-xs">
-                    <button
-                        type="button"
-                        onClick={handleShare}
-                        aria-label="Compartilhar perfil"
-                        className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-purple-600 hover:bg-purple-50 transition-colors shadow-xs border border-slate-200/60 cursor-pointer"
-                        title="Compartilhar perfil"
-                    >
-                        <Share2 size={20} />
-                    </button>
-                    
-                    <div className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={() => router.push('/profile/edit')}
-                            aria-label="Editar perfil e fotos"
-                            title="Editar perfil e fotos"
-                            className="flex h-11 w-11 items-center justify-center rounded-full bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors shadow-xs border border-purple-100 cursor-pointer"
-                        >
-                            <Pencil size={20} />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => router.push('/settings')}
-                            aria-label="Configurações"
-                            title="Configurações"
-                            className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-600 hover:bg-slate-100 transition-colors shadow-xs border border-slate-200/60 cursor-pointer"
-                        >
-                            <Settings size={20} />
-                        </button>
-                    </div>
-                </div>
-
                 <PullToRefresh onRefresh={onRefreshCreator} className="no-scrollbar">
                     <ProfessionalProfilePresentation
                         key={userData?.id || 'creator-profile'}
@@ -403,6 +369,40 @@ export default function ProfilePage() {
                         isOwner={true}
                         loadingGallery={loadingProfile}
                         subscribing={false}
+                        headerActions={
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={handleShare}
+                                    aria-label="Compartilhar perfil"
+                                    className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-slate-700 backdrop-blur-md hover:bg-white hover:text-purple-600 transition-all active:scale-95 shadow-md cursor-pointer"
+                                    title="Compartilhar perfil"
+                                >
+                                    <Share2 size={20} />
+                                </button>
+                                
+                                <div className="flex items-center gap-2 pointer-events-auto">
+                                    <button
+                                        type="button"
+                                        onClick={() => router.push('/profile/edit')}
+                                        aria-label="Editar perfil e fotos"
+                                        title="Editar perfil e fotos"
+                                        className="flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-purple-700 backdrop-blur-md hover:bg-white hover:text-purple-800 transition-all active:scale-95 shadow-md cursor-pointer"
+                                    >
+                                        <Pencil size={20} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => router.push('/settings')}
+                                        aria-label="Configurações"
+                                        title="Configurações"
+                                        className="flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-slate-700 backdrop-blur-md hover:bg-white hover:text-purple-600 transition-all active:scale-95 shadow-md cursor-pointer"
+                                    >
+                                        <Settings size={20} />
+                                    </button>
+                                </div>
+                            </>
+                        }
                         onOpen={(items, index) => {
                             setSelectedItem(items[index]);
                         }}
