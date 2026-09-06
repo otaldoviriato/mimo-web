@@ -1,15 +1,20 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { AppSettings } from '@/models/AppSettings';
 import { ModerationReview } from '@/models/ModerationReview';
 import { Message } from '@/models/Message';
 import { User } from '@/models/User';
+import { detectViolations } from '@/lib/moderationRules';
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+function escapeRegex(text: string) {
+    return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+}
 
 async function checkIsAdmin(userId: string) {
     const settings = await AppSettings.findOne({ key: 'global' }).select('adminClerkIds').lean();
@@ -35,10 +40,47 @@ export async function GET(
             return NextResponse.json({ error: 'Registro de moderação não encontrado' }, { status: 404 });
         }
 
-        // Determina a mensagem suspeita principal
-        const targetMessageId = review.messageIds?.[review.messageIds.length - 1];
-        let targetMsg = targetMessageId ? await Message.findById(targetMessageId).lean() as any : null;
+        // Determina a mensagem suspeita principal de forma precisa
+        const candidateIds = review.messageIds || [];
+        const candidateMsgs = candidateIds.length > 0
+            ? await Message.find({ _id: { $in: candidateIds } }).lean() as any[]
+            : [];
 
+        let targetMsg: any = null;
+
+        // 1. Procura mensagem cujo conteúdo contenha o trecho detectado (excerpt)
+        if (review.excerpts?.length) {
+            for (const excerpt of review.excerpts) {
+                if (!excerpt) continue;
+                const cleanExcerpt = excerpt.trim().toLowerCase();
+                targetMsg = candidateMsgs.find(m => m.content && m.content.toLowerCase().includes(cleanExcerpt));
+                if (targetMsg) break;
+
+                if (review.roomId) {
+                    targetMsg = await Message.findOne({
+                        roomId: review.roomId,
+                        content: { $regex: escapeRegex(excerpt.trim().slice(0, 50)), $options: 'i' }
+                    }).lean();
+                    if (targetMsg) break;
+                }
+            }
+        }
+
+        // 2. Se não achou pelo excerpt, procura mensagem candidata que dispara alguma regra
+        if (!targetMsg && candidateMsgs.length > 0) {
+            targetMsg = candidateMsgs.find(m => detectViolations(m.content).length > 0);
+        }
+
+        // 3. Se ainda não achou, varre mensagens recentes da sala para encontrar a violação
+        if (!targetMsg && review.roomId) {
+            const roomMsgs = await Message.find({ roomId: review.roomId }).sort({ timestamp: -1 }).limit(100).lean() as any[];
+            targetMsg = roomMsgs.find(m => detectViolations(m.content).length > 0);
+        }
+
+        // 4. Fallback se nada foi encontrado
+        if (!targetMsg && candidateMsgs.length > 0) {
+            targetMsg = candidateMsgs[candidateMsgs.length - 1];
+        }
         if (!targetMsg && review.roomId) {
             targetMsg = await Message.findOne({ roomId: review.roomId }).sort({ timestamp: -1 }).lean() as any;
         }

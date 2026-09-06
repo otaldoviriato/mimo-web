@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { AppSettings } from '@/models/AppSettings';
@@ -75,8 +75,23 @@ export async function GET(request: NextRequest) {
         const usersById = new Map(users.map(u => [u.clerkId, u]));
 
         const enriched = reviews.map(review => {
-            const rawMsgId = review.messageIds?.[review.messageIds.length - 1];
-            const targetMessage = rawMsgId ? messagesById.get(rawMsgId) : null;
+            // Procura a mensagem que realmente contém o trecho (excerpt) ou viola regras
+            const candidateMsgs = (review.messageIds || [])
+                .map((mId: string) => messagesById.get(mId))
+                .filter(Boolean);
+
+            let targetMessage: any = null;
+            if (review.excerpts?.[0]) {
+                const cleanExcerpt = review.excerpts[0].trim().toLowerCase();
+                targetMessage = candidateMsgs.find((m: any) => m.content && m.content.toLowerCase().includes(cleanExcerpt));
+            }
+            if (!targetMessage) {
+                targetMessage = candidateMsgs.find((m: any) => detectViolations(m.content).length > 0);
+            }
+            if (!targetMessage && candidateMsgs.length > 0) {
+                targetMessage = candidateMsgs[candidateMsgs.length - 1];
+            }
+
             const senderUser = targetMessage ? usersById.get(targetMessage.senderId) : null;
             const receiverUser = targetMessage ? usersById.get(targetMessage.receiverId) : null;
             
@@ -94,7 +109,7 @@ export async function GET(request: NextRequest) {
                 reviewedAt: review.reviewedAt,
                 reviewerId: review.reviewerId,
                 decisionReason: review.decisionReason,
-                createdAt: review.createdAt,
+                createdAt: targetMessage?.timestamp || review.createdAt,
                 updatedAt: review.updatedAt,
                 targetMessage: targetMessage ? {
                     id: targetMessage._id.toString(),
@@ -102,8 +117,8 @@ export async function GET(request: NextRequest) {
                     timestamp: targetMessage.timestamp,
                     senderId: targetMessage.senderId,
                 } : null,
-                sender: senderUser || null,
-                receiver: receiverUser || null,
+                sender: senderUser || userA || null,
+                receiver: receiverUser || userB || null,
                 userA: userA || null,
                 userB: userB || null,
             };
