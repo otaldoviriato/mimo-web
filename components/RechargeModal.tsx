@@ -93,6 +93,8 @@ interface CachedProfile {
 }
 
 interface DepositTransaction {
+    amount?: number;
+    status?: string;
     source?: string;
     type?: string;
     metadata?: {
@@ -110,6 +112,20 @@ const FIXED_OPTIONS = [
     { label: 'R$ 50', value: 50 },
     { label: 'R$ 100', value: 100 },
 ];
+
+function getLastRechargeAmount(): number | null {
+    if (typeof window === 'undefined') return null;
+    try {
+        const saved = localStorage.getItem('mimo_last_recharge_amount');
+        if (saved) {
+            const num = parseFloat(saved);
+            if (!isNaN(num) && num > 0) return num;
+        }
+    } catch {
+        return null;
+    }
+    return null;
+}
 
 function detectCardBrand(number: string): string {
     const clean = number.replace(/\s/g, '');
@@ -178,10 +194,13 @@ export function RechargeModal({
 }: RechargeModalProps) {
     const queryClient = useQueryClient();
     const { user } = useUser();
+    const initialAmount = getLastRechargeAmount() ?? 10;
+    const isInitialCustom = !FIXED_OPTIONS.some((o) => o.value === initialAmount);
+
     const [step, setStep] = useState<Step>('amount_and_method');
-    const [selectedAmount, setSelectedAmount] = useState<number | null>(100);
-    const [isCustomAmount, setIsCustomAmount] = useState(false);
-    const [customAmountText, setCustomAmountText] = useState('');
+    const [selectedAmount, setSelectedAmount] = useState<number | null>(initialAmount);
+    const [isCustomAmount, setIsCustomAmount] = useState(isInitialCustom);
+    const [customAmountText, setCustomAmountText] = useState(isInitialCustom ? String(initialAmount) : '');
     const [selectedMethod, setSelectedMethod] = useState<string>('pix');
     const [loading, setLoading] = useState(false);
     const [pixData, setPixData] = useState<PixPaymentData | null>(null);
@@ -257,11 +276,38 @@ export function RechargeModal({
                             setSelectedSavedCardId('');
                         }
                     }
-                } else {
-                    const cachedData = queryClient.getQueryData<DepositHistoryCache>(['deposit', 'history']);
-                    const txs = cachedData?.transactions || [];
+                }
 
-                    const applyLastTx = (transactions: DepositTransaction[]) => {
+                const applyLastRechargeAmount = (transactions: DepositTransaction[]) => {
+                    const lastRechargeTx = transactions.find(
+                        (t) => t.source === 'recharge' && (t.status === 'PAID' || !t.status)
+                    );
+                    if (lastRechargeTx && typeof lastRechargeTx.amount === 'number' && lastRechargeTx.amount > 0) {
+                        const amount = lastRechargeTx.amount;
+                        localStorage.setItem('mimo_last_recharge_amount', String(amount));
+                        if (FIXED_OPTIONS.some((o) => o.value === amount)) {
+                            setSelectedAmount(amount);
+                            setIsCustomAmount(false);
+                            setCustomAmountText('');
+                        } else {
+                            setSelectedAmount(amount);
+                            setIsCustomAmount(true);
+                            setCustomAmountText(String(amount));
+                        }
+                    } else {
+                        const localSaved = getLastRechargeAmount();
+                        if (!localSaved) {
+                            setSelectedAmount(10);
+                            setIsCustomAmount(false);
+                            setCustomAmountText('');
+                        }
+                    }
+                };
+
+                const applyLastTx = (transactions: DepositTransaction[]) => {
+                    applyLastRechargeAmount(transactions);
+
+                    if (!localLastMethod) {
                         if (transactions.length > 0) {
                             const lastTx = transactions[0];
                             const method = lastTx.source === 'gift' ? 'coupon' : lastTx.type === 'CC' ? 'card' : 'pix';
@@ -280,20 +326,28 @@ export function RechargeModal({
                         } else {
                             setSelectedMethod('pix');
                         }
-                    };
-
-                    if (txs.length > 0) {
-                        applyLastTx(txs);
-                    } else {
-                        fetch('/api/users/me/balance/pix')
-                            .then(r => r.json())
-                            .then(data => {
-                                applyLastTx(data?.transactions || []);
-                            })
-                            .catch(() => {
-                                setSelectedMethod('pix');
-                            });
                     }
+                };
+
+                const cachedData = queryClient.getQueryData<DepositHistoryCache>(['deposit', 'history']);
+                const txs = cachedData?.transactions || [];
+
+                if (txs.length > 0) {
+                    applyLastTx(txs);
+                } else {
+                    fetch('/api/users/me/balance/pix')
+                        .then(r => r.json())
+                        .then(data => {
+                            applyLastTx(data?.transactions || []);
+                        })
+                        .catch(() => {
+                            if (!localLastMethod) {
+                                setSelectedMethod('pix');
+                            }
+                            if (!getLastRechargeAmount()) {
+                                setSelectedAmount(10);
+                            }
+                        });
                 }
             })
             .catch(() => undefined)
@@ -310,9 +364,17 @@ export function RechargeModal({
 
     const resetState = () => {
         setStep('amount_and_method');
-        setSelectedAmount(100);
-        setIsCustomAmount(false);
-        setCustomAmountText('');
+        const last = getLastRechargeAmount();
+        const initialAmount = last ?? 10;
+        if (FIXED_OPTIONS.some((o) => o.value === initialAmount)) {
+            setSelectedAmount(initialAmount);
+            setIsCustomAmount(false);
+            setCustomAmountText('');
+        } else {
+            setSelectedAmount(initialAmount);
+            setIsCustomAmount(true);
+            setCustomAmountText(String(initialAmount));
+        }
         setLoading(false);
         setPixData(null);
         setCcTransactionId('');
@@ -393,6 +455,7 @@ export function RechargeModal({
     const handleConfirm = async () => {
         const amount = getFinalAmount();
         if (amount <= 0) return;
+        localStorage.setItem('mimo_last_recharge_amount', String(amount));
         if (selectedMethod === 'pix' && onGeneratePix) {
             setLoading(true);
             try {
@@ -446,6 +509,7 @@ export function RechargeModal({
             if (response?.status === 'PAID') {
                 localStorage.setItem('mimo_last_payment_method', 'card');
                 localStorage.setItem('mimo_last_saved_card_id', selectedSavedCardId || '');
+                localStorage.setItem('mimo_last_recharge_amount', String(amount));
                 handleClose(true);
                 return;
             }
@@ -453,6 +517,7 @@ export function RechargeModal({
             if (response?.transactionId) {
                 localStorage.setItem('mimo_last_payment_method', 'card');
                 localStorage.setItem('mimo_last_saved_card_id', selectedSavedCardId || '');
+                localStorage.setItem('mimo_last_recharge_amount', String(amount));
                 setCcTransactionId(response.transactionId);
                 setStep('processing_payment');
             }
