@@ -733,6 +733,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 isLimitReached: false,
                 limitType: 'none' as 'none' | 'online' | 'offline',
                 remainingChars: maxBillableChars,
+                totalProCharsSinceClient: 0,
                 maxBillableChars,
                 maxOnlineCumulativeChars,
                 attemptNumber: 1,
@@ -771,6 +772,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 isLimitReached,
                 limitType: isLimitReached ? ('online' as const) : ('none' as const),
                 remainingChars: Math.max(0, maxOnlineCumulativeChars - totalProCharsSinceClient),
+                totalProCharsSinceClient,
                 maxBillableChars,
                 maxOnlineCumulativeChars,
                 attemptNumber: 1,
@@ -788,6 +790,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 isLimitReached: false,
                 limitType: 'none' as const,
                 remainingChars: maxBillableChars,
+                totalProCharsSinceClient: 0,
                 maxBillableChars,
                 maxOnlineCumulativeChars,
                 attemptNumber: 1,
@@ -823,6 +826,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     isLimitReached: false,
                     limitType: 'none' as const,
                     remainingChars: maxBillableChars,
+                    totalProCharsSinceClient,
                     maxBillableChars,
                     maxOnlineCumulativeChars,
                     attemptNumber: attempts.length + 1,
@@ -836,6 +840,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                     isLimitReached: true,
                     limitType: 'offline' as const,
                     remainingChars: 0,
+                    totalProCharsSinceClient,
                     maxBillableChars,
                     maxOnlineCumulativeChars,
                     attemptNumber: attempts.length,
@@ -853,6 +858,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 isLimitReached: false,
                 limitType: 'none' as const,
                 remainingChars: Math.max(0, maxBillableChars - usedInCurrent),
+                totalProCharsSinceClient,
                 maxBillableChars,
                 maxOnlineCumulativeChars,
                 attemptNumber: attempts.length,
@@ -870,6 +876,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             isLimitReached: true,
             limitType: 'offline' as const,
             remainingChars: 0,
+            totalProCharsSinceClient,
             maxBillableChars,
             maxOnlineCumulativeChars,
             attemptNumber: attempts.length,
@@ -3802,24 +3809,34 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                     </span>
                                 </div>
                             )}
-                            {userData?.isProfessional && !receiver?.isProfessional && !offlineTurnStats.isLimitReached && (isInputFocused || charCount > 0) && (
+                            {userData?.isProfessional && !receiver?.isProfessional && !offlineTurnStats.isLimitReached && (
                                 !isClientActiveInConversation ? (
-                                    <div className="flex items-center justify-between w-full pt-1 select-none text-[11px] leading-tight animate-in fade-in duration-150">
-                                        <span className="font-medium text-amber-700/90 flex items-center gap-1">
-                                            <Clock className="w-3 h-3 text-amber-600 shrink-0" />
-                                            usuário ausente
-                                        </span>
-                                        <span className={`font-semibold tabular-nums ${
-                                            charCount >= offlineTurnStats.remainingChars ? 'text-amber-600 font-bold' : 'text-gray-500'
-                                        }`}>
-                                            {charCount}/{offlineTurnStats.remainingChars} caracteres
-                                        </span>
-                                    </div>
-                                ) : charCount > 0 ? (
-                                    <div className="flex items-center justify-end w-full pt-0.5 select-none text-[10px] text-gray-400 tabular-nums animate-in fade-in duration-150">
-                                        <span>{charCount}/{offlineTurnStats.remainingChars} caracteres</span>
-                                    </div>
-                                ) : null
+                                    (isInputFocused || charCount > 0) ? (
+                                        <div className="flex items-center justify-between w-full pt-1 select-none text-[11px] leading-tight animate-in fade-in duration-150">
+                                            <span className="font-medium text-amber-700/90 flex items-center gap-1">
+                                                <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+                                                usuário ausente
+                                            </span>
+                                            <span className={`font-semibold tabular-nums ${
+                                                charCount >= offlineTurnStats.remainingChars ? 'text-amber-600 font-bold' : 'text-gray-500'
+                                            }`}>
+                                                {charCount}/{offlineTurnStats.remainingChars} caracteres
+                                            </span>
+                                        </div>
+                                    ) : null
+                                ) : (() => {
+                                    const maxOnline = offlineTurnStats.maxOnlineCumulativeChars;
+                                    const totalProOnlineChars = (offlineTurnStats.totalProCharsSinceClient || 0) + charCount;
+                                    const warningThreshold = Math.max(0, maxOnline - 50); // exibe a partir de 450 caracteres
+                                    if (totalProOnlineChars < warningThreshold) return null;
+                                    return (
+                                        <div className="flex items-center justify-end w-full pt-0.5 select-none text-[11px] tabular-nums animate-in fade-in duration-150">
+                                            <span className={totalProOnlineChars >= maxOnline ? 'font-semibold text-amber-600 font-bold' : 'font-medium text-amber-700/80'}>
+                                                {totalProOnlineChars}/{maxOnline} caracteres
+                                            </span>
+                                        </div>
+                                    );
+                                })()
                             )}
                         </div>
                     )}
