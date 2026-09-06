@@ -24,6 +24,8 @@ interface Props {
         messagesLastWeekCount?: number;
         isSubscriptionEnabled?: boolean;
         subscriptionPrice?: number;
+        chargePerCharSubscribers?: number;
+        chargePerCharNonSubscribers?: number;
     };
     publicItems: ProfileGalleryItem[];
     exclusiveItems: ProfileGalleryItem[];
@@ -61,6 +63,12 @@ export function ProfessionalProfilePresentation({ user, publicItems, exclusiveIt
     const hasExclusive = exclusiveItems.length > 0 || privateCount > 0;
     const name = user.name || `@${user.username}`;
     const canAccess = isSubscriber || isOwner;
+    const regularRate = user.chargePerCharNonSubscribers;
+    const subscriberRate = user.chargePerCharSubscribers;
+    const discountPercentage = typeof regularRate === 'number' && regularRate > 0
+        && typeof subscriberRate === 'number' && subscriberRate >= 0 && subscriberRate < regularRate
+        ? Math.round((1 - subscriberRate / regularRate) * 100)
+        : 0;
 
     useEffect(() => {
         const gallery = galleryRef.current;
@@ -142,7 +150,7 @@ export function ProfessionalProfilePresentation({ user, publicItems, exclusiveIt
                     {(user.messagesLastWeekCount ?? 0) > 0 && <p className="mt-3 text-xs text-slate-500">Atividade nos últimos 7 dias</p>}
                     {bio && (
                         <div className="mt-5">
-                            <p id={bioId} ref={bioRef} className={`whitespace-pre-line break-words text-base leading-7 text-slate-600 ${expanded ? '' : 'line-clamp-4'}`}>{bio}</p>
+                            <p id={bioId} ref={bioRef} className={`whitespace-pre-line break-words text-base leading-6 text-slate-600 ${expanded ? '' : 'line-clamp-4'}`}>{bio}</p>
                             {(bioOverflows || expanded) && <button type="button" aria-expanded={expanded} aria-controls={bioId} onClick={() => setExpanded(!expanded)} className="mt-2 min-h-11 text-sm font-semibold text-purple-600 hover:text-purple-800">{expanded ? 'Mostrar menos' : 'Ler mais'}</button>}
                         </div>
                     )}
@@ -152,6 +160,7 @@ export function ProfessionalProfilePresentation({ user, publicItems, exclusiveIt
                     <section aria-label="Assinatura" className="rounded-2xl border border-purple-100 bg-purple-50/40 p-5">
                         <p className="text-xs font-semibold text-purple-600">{isSubscriber ? 'Você é assinante' : isOwner ? 'Sua assinatura' : 'Assinatura'}</p>
                         <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-900">Prioridade nas respostas</h2>
+                        {discountPercentage > 0 && <p className="mt-2 text-sm font-medium leading-6 text-purple-700">{discountPercentage}% de desconto no custo das mensagens.</p>}
                         {hasExclusive && <p className="mt-2 text-sm leading-6 text-slate-600">Inclui acesso às fotos exclusivas para assinantes.</p>}
                         {typeof user.subscriptionPrice === 'number' && <p className="mt-4 text-2xl font-bold tracking-tight text-slate-900">{user.subscriptionPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}<span className="text-sm font-normal tracking-normal text-slate-500"> / 30 dias</span></p>}
                         {!isSubscriber && !isOwner && user.isSubscriptionEnabled && <Button title="Assinar perfil" variant="outline" onClick={onSubscribe} loading={subscribing || loadingGallery} className="mt-4 w-full" />}
