@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
-import { useMyProfile, useUpdateProfile } from '@/hooks/useQueries';
+import { useMyProfile, useUpdateProfile, useReorderGallery, QueryKeys } from '@/hooks/useQueries';
+import { useQueryClient } from '@tanstack/react-query';
 import { ProfilePhotosEditor } from '@/components/ProfilePhotosEditor';
 import { PrivateGalleryEditor } from '@/components/PrivateGalleryEditor';
 import { ArrowLeft, AlertCircle, RefreshCw, Settings, Check } from 'lucide-react';
@@ -12,10 +13,13 @@ import toast from 'react-hot-toast';
 export default function EditProfilePage() {
     const { user } = useUser();
     const router = useTransitionRouter();
+    const queryClient = useQueryClient();
     const { data: userData, isLoading: loadingProfile } = useMyProfile();
     const updateProfileMutation = useUpdateProfile();
+    const reorderGalleryMutation = useReorderGallery();
 
     const [bio, setBio] = useState('');
+    const [pendingPhotoIds, setPendingPhotoIds] = useState<string[] | null>(null);
     const [loading, setLoading] = useState(false);
     const [saveError, setSaveError] = useState('');
 
@@ -32,7 +36,9 @@ export default function EditProfilePage() {
 
     const profileIsProfessional = !!userData?.isProfessional;
 
-    const hasChanges = hasPopulated.current && bio !== (userData?.bio || '');
+    const hasBioChanges = hasPopulated.current && bio !== (userData?.bio || '');
+    const hasPhotoChanges = pendingPhotoIds !== null;
+    const hasChanges = hasBioChanges || hasPhotoChanges;
 
     useEffect(() => {
         if (!hasChanges) return;
@@ -82,12 +88,27 @@ export default function EditProfilePage() {
         setSaveError('');
 
         try {
-            await updateProfileMutation.mutateAsync({ bio });
+            const promises: Promise<any>[] = [];
+
+            if (hasPhotoChanges && pendingPhotoIds && pendingPhotoIds.length > 0) {
+                promises.push(reorderGalleryMutation.mutateAsync(pendingPhotoIds));
+            }
+
+            if (hasBioChanges) {
+                promises.push(updateProfileMutation.mutateAsync({ bio }));
+            }
+
+            if (promises.length > 0) {
+                await Promise.all(promises);
+                await queryClient.invalidateQueries({ queryKey: QueryKeys.me });
+                await queryClient.invalidateQueries({ queryKey: ['gallery', 'me'] });
+            }
+
             toast.success('Perfil atualizado com sucesso!');
             isLeavingRef.current = true;
             router.back();
         } catch (error: any) {
-            setSaveError(error?.message || 'Erro ao salvar alterações da biografia.');
+            setSaveError(error?.message || 'Erro ao salvar alterações.');
         } finally {
             setLoading(false);
         }
@@ -113,7 +134,12 @@ export default function EditProfilePage() {
                 {profileIsProfessional ? (
                     <>
                         {/* ── SEÇÃO 1: FOTOS DO PERFIL (PÚBLICAS COM DRAG & DROP) ── */}
-                        <ProfilePhotosEditor photoUrl={userData?.photoUrl} />
+                        <ProfilePhotosEditor 
+                            photoUrl={userData?.photoUrl} 
+                            onOrderChange={(newIds, changed) => {
+                                setPendingPhotoIds(changed ? newIds : null);
+                            }}
+                        />
 
                         {/* ── SEÇÃO 2: BIOGRAFIA ── */}
                         <section aria-label="Biografia" className="rounded-2xl border border-slate-100 bg-white p-4 shadow-xs space-y-2">

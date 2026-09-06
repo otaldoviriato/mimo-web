@@ -3,53 +3,42 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
-import { 
-    Plus, 
-    Trash2, 
-    Loader2, 
-    Star, 
-    GripVertical, 
-    Camera, 
-    ChevronLeft, 
-    ChevronRight 
-} from 'lucide-react';
+import { Plus, Trash2, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { 
     QueryKeys, 
     useMyGallery, 
-    useUploadPhoto, 
     useUploadToGallery, 
-    useDeleteFromGallery, 
-    useReorderGallery 
+    useDeleteFromGallery 
 } from '@/hooks/useQueries';
 import type { ProfileGalleryItem } from '@/components/ProfessionalProfilePresentation';
 
 interface Props {
     photoUrl?: string;
+    onOrderChange?: (orderedIds: string[], hasChanged: boolean) => void;
 }
 
-export function ProfilePhotosEditor({ photoUrl }: Props) {
+export function ProfilePhotosEditor({ photoUrl, onOrderChange }: Props) {
     const queryClient = useQueryClient();
     const { data: gallery, isLoading, isError } = useMyGallery();
-    const uploadPhoto = useUploadPhoto();
     const uploadGallery = useUploadToGallery();
     const deletePhoto = useDeleteFromGallery();
-    const reorderGallery = useReorderGallery();
 
     const [uploading, setUploading] = useState(false);
-    const [replaceTargetId, setReplaceTargetId] = useState<string | null>(null);
-
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const replaceFileInputRef = useRef<HTMLInputElement>(null);
 
-    // Estado local para permitir feedback imediato no drag and drop
+    // Estado local das fotos para reordenação puramente no front-end
     const [orderedItems, setOrderedItems] = useState<ProfileGalleryItem[]>([]);
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
     const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
     const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null);
 
-    // Pointer events para suporte fluido e infalível em desktop e touch mobile
+    // Guarda os IDs iniciais do servidor para saber se houve alteração
+    const initialIdsRef = useRef<string[]>([]);
+    const hasInitializedRef = useRef(false);
+
+    // Pointer events para arrastar tocando/clicando em qualquer lugar da foto
     const pointerDragRef = useRef<{
         startX: number;
         startY: number;
@@ -59,14 +48,9 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
         element: HTMLElement;
     } | null>(null);
 
-    const busy = 
-        uploadPhoto.isPending || 
-        uploadGallery.isPending || 
-        deletePhoto.isPending || 
-        reorderGallery.isPending || 
-        uploading;
+    const busy = uploadGallery.isPending || deletePhoto.isPending || uploading;
 
-    // Constrói lista de fotos públicas unindo os itens do servidor
+    // Lista de fotos públicas do servidor
     const serverPublicItems = useMemo<ProfileGalleryItem[]>(() => {
         const rawItems: ProfileGalleryItem[] = Array.isArray(gallery?.publicItems) 
             ? gallery.publicItems 
@@ -83,22 +67,25 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
         return [];
     }, [gallery?.publicItems, gallery?.items, photoUrl]);
 
-    // Sincroniza o estado local quando os itens do servidor mudam (a menos que esteja arrastando)
+    // Inicializa a lista e guarda os IDs originais
     useEffect(() => {
-        if (draggedIndex === null) {
+        if (!hasInitializedRef.current && serverPublicItems.length > 0) {
+            setOrderedItems(serverPublicItems);
+            initialIdsRef.current = serverPublicItems.map(item => item._id).filter(Boolean);
+            hasInitializedRef.current = true;
+        } else if (!hasInitializedRef.current) {
             setOrderedItems(serverPublicItems);
         }
-    }, [serverPublicItems, draggedIndex]);
+    }, [serverPublicItems]);
 
-    // Reordena e persiste no servidor
-    const applyReorder = async (fromIndex: number, toIndex: number) => {
+    // Reordenação estritamente no Front-End (sem fazer requisição)
+    const applyReorder = (fromIndex: number, toIndex: number) => {
         if (
             fromIndex === toIndex || 
             fromIndex < 0 || 
             toIndex < 0 || 
             fromIndex >= orderedItems.length || 
-            toIndex >= orderedItems.length ||
-            busy
+            toIndex >= orderedItems.length
         ) {
             return;
         }
@@ -109,26 +96,15 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
 
         setOrderedItems(nextItems);
 
-        const validIds = nextItems
+        const currentIds = nextItems
             .map(item => item._id)
             .filter(id => id && id !== 'profile-photo');
 
-        if (validIds.length > 0) {
-            try {
-                await reorderGallery.mutateAsync(validIds);
-                await queryClient.invalidateQueries({ queryKey: QueryKeys.me });
-                await queryClient.invalidateQueries({ queryKey: ['gallery', 'me'] });
+        const isChanged = 
+            currentIds.length !== initialIdsRef.current.length ||
+            currentIds.some((id, i) => id !== initialIdsRef.current[i]);
 
-                if (toIndex === 0) {
-                    toast.success('Foto de perfil atualizada!');
-                } else {
-                    toast.success('Ordem das fotos atualizada!');
-                }
-            } catch (err: any) {
-                toast.error('Erro ao salvar nova ordem das fotos.');
-                setOrderedItems(serverPublicItems);
-            }
-        }
+        onOrderChange?.(currentIds, isChanged);
     };
 
     // Upload de nova foto
@@ -150,60 +126,14 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
 
         try {
             await uploadGallery.mutateAsync(data);
+            hasInitializedRef.current = false;
             await queryClient.invalidateQueries({ queryKey: QueryKeys.me });
             await queryClient.invalidateQueries({ queryKey: ['gallery', 'me'] });
-            toast.success('Foto adicionada ao perfil!');
+            toast.success('Foto adicionada!');
         } catch (error: any) {
             toast.error(error?.message || 'Falha ao enviar foto.');
         } finally {
             setUploading(false);
-        }
-    };
-
-    // Substituição de foto específica
-    const handleReplaceClick = (item: ProfileGalleryItem) => {
-        setReplaceTargetId(item._id);
-        replaceFileInputRef.current?.click();
-    };
-
-    const handleReplaceFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        e.target.value = '';
-        if (!file) return;
-
-        if (file.size > 10 * 1024 * 1024) {
-            toast.error('A foto deve ter no máximo 10 MB.');
-            setReplaceTargetId(null);
-            return;
-        }
-
-        setUploading(true);
-        const data = new FormData();
-        data.append('photo', file);
-        data.append('galleryType', 'public');
-        data.append('visibility', 'public');
-        if (replaceTargetId && replaceTargetId !== 'profile-photo') {
-            data.append('replaceItemId', replaceTargetId);
-        }
-
-        try {
-            await uploadGallery.mutateAsync(data);
-
-            // Se era a primeira foto ou o id temporário profile-photo, atualiza também a foto de perfil
-            if (!replaceTargetId || replaceTargetId === 'profile-photo' || replaceTargetId === orderedItems[0]?._id) {
-                const photoData = new FormData();
-                photoData.append('photo', file);
-                await uploadPhoto.mutateAsync(photoData).catch(() => {});
-            }
-
-            await queryClient.invalidateQueries({ queryKey: QueryKeys.me });
-            await queryClient.invalidateQueries({ queryKey: ['gallery', 'me'] });
-            toast.success('Foto substituída com sucesso!');
-        } catch (error: any) {
-            toast.error(error?.message || 'Falha ao substituir foto.');
-        } finally {
-            setUploading(false);
-            setReplaceTargetId(null);
         }
     };
 
@@ -215,15 +145,16 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
             if (item._id && item._id !== 'profile-photo') {
                 await deletePhoto.mutateAsync(item._id);
             }
+            hasInitializedRef.current = false;
             await queryClient.invalidateQueries({ queryKey: QueryKeys.me });
             await queryClient.invalidateQueries({ queryKey: ['gallery', 'me'] });
-            toast.success('Foto removida do perfil!');
+            toast.success('Foto removida!');
         } catch (error: any) {
             toast.error(error?.message || 'Erro ao remover foto.');
         }
     };
 
-    // ─── POINTER CAPTURE DRAG & DROP (UNIVERSAL: DESKTOP + TOUCH) ───
+    // ─── POINTER EVENTS: CLICAR E ARRASTAR EM QUALQUER LUGAR DA FOTO ───
     const startPointerDrag = (e: React.PointerEvent<HTMLElement>, index: number) => {
         if (e.button !== 0 || busy) return;
 
@@ -249,8 +180,8 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
         const dy = e.clientY - pointerDragRef.current.startY;
         const dist = Math.hypot(dx, dy);
 
-        // Ativa o arraste quando move mais de 4px
-        if (!pointerDragRef.current.active && dist > 4) {
+        // Ativa o modo de arraste assim que mover mais de 5 pixels
+        if (!pointerDragRef.current.active && dist > 5) {
             pointerDragRef.current.active = true;
             setDraggedIndex(pointerDragRef.current.index);
         }
@@ -258,7 +189,7 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
         if (pointerDragRef.current.active) {
             setDragPosition({ x: e.clientX, y: e.clientY });
 
-            // Identifica o card sob o ponteiro
+            // Identifica qual card está sob o ponteiro
             const elements = document.elementsFromPoint(e.clientX, e.clientY);
             for (const el of elements) {
                 const card = el.closest('[data-photo-index]');
@@ -307,12 +238,12 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
 
     return (
         <section aria-label="Fotos do Perfil" className="rounded-2xl border border-slate-100 bg-white p-4 shadow-xs space-y-3">
-            {/* Header com resumo */}
+            {/* Header limpo */}
             <div className="flex items-center justify-between">
                 <div>
                     <h2 className="text-sm font-bold text-slate-900">Fotos do Perfil</h2>
-                    <p className="text-[11px] text-slate-500">
-                        A primeira foto é a sua foto de perfil. Puxe pelo botão Mover para trocar de lugar.
+                    <p className="text-[11px] text-slate-400">
+                        Toque e arraste para reorganizar as fotos. A 1ª foto será o seu perfil.
                     </p>
                 </div>
                 {orderedItems.length > 0 && (
@@ -322,22 +253,13 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
                 )}
             </div>
 
-            {/* Inputs ocultos de upload */}
+            {/* Input oculto de upload */}
             <input
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
                 className="hidden"
                 onChange={handleFileSelect}
-                disabled={busy}
-            />
-
-            <input
-                ref={replaceFileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleReplaceFileSelect}
                 disabled={busy}
             />
 
@@ -354,7 +276,6 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
             ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {orderedItems.map((item, index) => {
-                        const isPrimary = index === 0;
                         const isDragging = draggedIndex === index;
                         const isDragOver = dragOverIndex === index && draggedIndex !== index;
 
@@ -362,13 +283,18 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
                             <div
                                 key={item._id || `photo-${index}`}
                                 data-photo-index={index}
-                                className={`group relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 border transition-all select-none ${
+                                onPointerDown={(e) => startPointerDrag(e, index)}
+                                onPointerMove={handlePointerMove}
+                                onPointerUp={handlePointerUp}
+                                onPointerCancel={handlePointerCancel}
+                                style={{ touchAction: 'none' }}
+                                className={`group relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 border transition-all select-none touch-none cursor-grab active:cursor-grabbing ${
                                     isDragging 
-                                        ? 'opacity-30 scale-95 ring-2 ring-purple-600 ring-offset-2 border-dashed border-purple-500 z-10' 
+                                        ? 'opacity-20 scale-95 ring-2 ring-purple-600 ring-offset-2 border-dashed border-purple-500 z-10' 
                                         : isDragOver
                                             ? 'border-purple-600 scale-102 ring-4 ring-purple-400/50 shadow-xl z-20 bg-purple-50/20'
-                                            : isPrimary
-                                                ? 'border-purple-300 ring-2 ring-purple-100 shadow-sm'
+                                            : index === 0
+                                                ? 'border-purple-300 ring-2 ring-purple-100/80 shadow-xs'
                                                 : 'border-slate-200/90 shadow-xs hover:border-purple-200'
                                 }`}
                             >
@@ -382,128 +308,26 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
                                     className="object-cover pointer-events-none"
                                 />
 
-                                {/* Gradiente escuro para legibilidade dos botões e badges */}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none" />
-
-                                {/* Badge de Foto de Perfil / Principal */}
-                                {isPrimary ? (
-                                    <div className="absolute top-2 left-2 flex items-center gap-1 bg-purple-600/95 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm pointer-events-none z-10">
-                                        <Star size={11} className="fill-amber-300 text-amber-300" />
-                                        <span>Perfil</span>
-                                    </div>
-                                ) : (
-                                    <div className="absolute top-2 left-2 flex items-center justify-center bg-black/40 text-white text-[10px] font-bold h-5 w-5 rounded-full backdrop-blur-xs pointer-events-none z-10">
-                                        {index + 1}
-                                    </div>
-                                )}
-
-                                {/* Ações do Topo: Botão de Substituir e Excluir */}
-                                <div className="absolute top-2 right-2 flex items-center gap-1.5 z-10">
-                                    <button
-                                        type="button"
-                                        disabled={busy}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleReplaceClick(item);
-                                        }}
-                                        aria-label="Substituir foto"
-                                        title="Substituir esta foto por outra"
-                                        className="flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-slate-700 hover:bg-white hover:text-purple-700 backdrop-blur-xs shadow-sm transition-all active:scale-95 cursor-pointer"
-                                    >
-                                        <Camera size={13} />
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        disabled={busy}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDeleteItem(item);
-                                        }}
-                                        aria-label="Excluir foto"
-                                        title="Excluir foto"
-                                        className="flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-slate-700 hover:bg-rose-600 hover:text-white backdrop-blur-xs shadow-sm transition-all active:scale-95 cursor-pointer"
-                                    >
-                                        <Trash2 size={13} />
-                                    </button>
+                                {/* Indicador sutil da posição numérica */}
+                                <div className="absolute top-2 left-2 flex items-center justify-center bg-black/40 text-white text-[10px] font-bold h-5 w-5 rounded-full backdrop-blur-xs pointer-events-none z-10">
+                                    {index + 1}
                                 </div>
 
-                                {/* Overlay indicador de Soltar aqui (Drop Target) */}
-                                {isDragOver && (
-                                    <div className="absolute inset-0 bg-purple-600/20 backdrop-blur-xs flex items-center justify-center z-10 pointer-events-none animate-in fade-in duration-150">
-                                        <div className="bg-purple-900/90 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg border border-white/20 flex items-center gap-1">
-                                            {index === 0 ? <Star size={13} className="fill-amber-300 text-amber-300" /> : null}
-                                            <span>{index === 0 ? 'Nova Foto de Perfil' : `Mover para Posição ${index + 1}`}</span>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Ações do Rodapé do Card */}
-                                <div className="absolute bottom-2 inset-x-2 flex items-center justify-between z-10 gap-1">
-                                    {/* Handle de Arraste Universal com Pointer Capture */}
-                                    <div
-                                        role="button"
-                                        tabIndex={0}
-                                        onPointerDown={(e) => startPointerDrag(e, index)}
-                                        onPointerMove={handlePointerMove}
-                                        onPointerUp={handlePointerUp}
-                                        onPointerCancel={handlePointerCancel}
-                                        style={{ touchAction: 'none' }}
-                                        aria-label="Segure e arraste para mover"
-                                        title="Clique/toque e arraste para mudar a posição"
-                                        className="touch-none select-none flex h-7 px-2.5 items-center justify-center rounded-lg bg-black/60 hover:bg-purple-600 active:bg-purple-700 text-white backdrop-blur-xs text-[10px] font-bold transition-all cursor-grab active:cursor-grabbing gap-1 shadow-sm"
-                                    >
-                                        <GripVertical size={13} />
-                                        <span>Mover</span>
-                                    </div>
-
-                                    {/* Ação rápida para Fotos Secundárias: Definir como foto de perfil ou setas */}
-                                    {!isPrimary && (
-                                        <div className="flex items-center gap-1">
-                                            <button
-                                                type="button"
-                                                disabled={busy}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    applyReorder(index, 0);
-                                                }}
-                                                aria-label="Tornar foto de perfil"
-                                                title="Definir como Foto de Perfil principal"
-                                                className="flex h-7 px-2 items-center justify-center rounded-lg bg-white/95 hover:bg-purple-600 hover:text-white text-purple-700 text-[10px] font-bold backdrop-blur-xs shadow-sm transition-all active:scale-95 cursor-pointer gap-1"
-                                            >
-                                                <Star size={11} className="fill-purple-600 group-hover:fill-white text-purple-600" />
-                                                <span>Principal</span>
-                                            </button>
-
-                                            <div className="hidden sm:flex items-center gap-0.5 bg-black/45 rounded-lg p-0.5">
-                                                <button
-                                                    type="button"
-                                                    disabled={busy || index === 0}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        applyReorder(index, index - 1);
-                                                    }}
-                                                    title="Mover para esquerda"
-                                                    className="flex h-6 w-5 items-center justify-center text-white hover:bg-white/20 rounded disabled:opacity-30 cursor-pointer"
-                                                >
-                                                    <ChevronLeft size={12} />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    disabled={busy || index === orderedItems.length - 1}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        applyReorder(index, index + 1);
-                                                    }}
-                                                    title="Mover para direita"
-                                                    className="flex h-6 w-5 items-center justify-center text-white hover:bg-white/20 rounded disabled:opacity-30 cursor-pointer"
-                                                >
-                                                    <ChevronRight size={12} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
+                                {/* Botão de Excluir Foto no topo direito */}
+                                <button
+                                    type="button"
+                                    disabled={busy}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteItem(item);
+                                    }}
+                                    aria-label="Excluir foto"
+                                    title="Excluir foto"
+                                    className="absolute top-2 right-2 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white hover:bg-rose-600 backdrop-blur-xs shadow-sm transition-all active:scale-90 cursor-pointer"
+                                >
+                                    <Trash2 size={13} />
+                                </button>
                             </div>
                         );
                     })}
@@ -539,7 +363,7 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
                         position: 'fixed',
                         left: `${dragPosition.x}px`,
                         top: `${dragPosition.y}px`,
-                        transform: 'translate(-50%, -50%) rotate(2deg) scale(1.08)',
+                        transform: 'translate(-50%, -50%) rotate(2deg) scale(1.06)',
                         pointerEvents: 'none',
                         zIndex: 99999,
                         touchAction: 'none',
@@ -551,7 +375,6 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
                         alt="Foto sendo movida" 
                         className="w-full h-full object-cover pointer-events-none"
                     />
-                    <div className="absolute inset-0 bg-purple-600/10 pointer-events-none" />
                 </div>,
                 document.body
             )}
