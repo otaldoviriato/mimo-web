@@ -15,6 +15,7 @@ import { AudioRecorder, type AudioRecorderStatus } from '@/components/AudioRecor
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { MediaComposerSheet } from '@/components/MediaComposerSheet';
 import { PendingReceiptBalloon } from '@/components/PendingReceiptBalloon';
+import { LargeMessageConfirmModal } from '@/components/LargeMessageConfirmModal';
 import { AlertTriangle, ShieldCheck, Wallet, Clock, MessageCircle, LockKeyhole } from 'lucide-react';
 
 interface Message {
@@ -522,6 +523,9 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     const [messageText, setMessageText] = useState('');
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
     const [monetizationDisabled, setMonetizationDisabled] = useState(false);
+    const [largeMessageThreshold, setLargeMessageThreshold] = useState(100);
+    const [pendingLongMessageToConfirm, setPendingLongMessageToConfirm] = useState<Message | null>(null);
+    const declinedLongMessageIdsRef = useRef<Set<string>>(new Set());
 
     // Se por qualquer eventualidade uma mensagem bloqueada entrar em resposta, anula o estado
     useEffect(() => {
@@ -766,151 +770,20 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     }, []);
 
     const offlineTurnStats = React.useMemo(() => {
-        const maxBillableChars = chatPricing?.maxBillableMessageChars ?? 50;
-        const maxOnlineCumulativeChars = chatPricing?.maxOnlineCumulativeChars ?? 500;
-        const followUpIntervalHours = chatPricing?.offlineFollowUpIntervalHours ?? 24;
-        const followUpMaxAttempts = chatPricing?.offlineFollowUpMaxAttempts ?? 3;
-        const intervalMs = followUpIntervalHours * 60 * 60 * 1000;
-
-        if (!userData?.isProfessional) {
-            return {
-                canSend: true,
-                isLimitReached: false,
-                limitType: 'none' as 'none' | 'online' | 'offline',
-                remainingChars: maxBillableChars,
-                totalProCharsSinceClient: 0,
-                maxBillableChars,
-                maxOnlineCumulativeChars,
-                attemptNumber: 1,
-                maxAttempts: followUpMaxAttempts,
-                isExhausted: false,
-                msUntilNextAttempt: 0,
-            };
-        }
-
-        const proMsgsSinceClient: Array<{ timestamp: Date; chars: number }> = [];
-        for (let i = messages.length - 1; i >= 0; i--) {
-            const m = messages[i];
-            if (m.senderId === otherUserId) {
-                break;
-            }
-            if (m.senderId === user?.id) {
-                const chars = m.equivalentCharCount ?? (m.charCount > 0 ? m.charCount : 0);
-                if (chars > 0) {
-                    proMsgsSinceClient.push({
-                        timestamp: m.timestamp ? new Date(m.timestamp) : new Date(0),
-                        chars,
-                    });
-                }
-            }
-        }
-        proMsgsSinceClient.reverse();
-
-        const totalProCharsSinceClient = proMsgsSinceClient.reduce((acc, item) => acc + item.chars, 0);
-
-        // 1. Conversa Ativa (cliente online ou interagiu nos últimos 5 min):
-        // Aplica limite cumulativo contínuo parametrizado (default 500 chars)
-        if (isClientActiveInConversation) {
-            const isLimitReached = totalProCharsSinceClient >= maxOnlineCumulativeChars;
-            return {
-                canSend: !isLimitReached,
-                isLimitReached,
-                limitType: isLimitReached ? ('online' as const) : ('none' as const),
-                remainingChars: Math.max(0, maxOnlineCumulativeChars - totalProCharsSinceClient),
-                totalProCharsSinceClient,
-                maxBillableChars,
-                maxOnlineCumulativeChars,
-                attemptNumber: 1,
-                maxAttempts: followUpMaxAttempts,
-                isExhausted: false,
-                msUntilNextAttempt: 0,
-            };
-        }
-
-        // 2. Cliente ausente/offline:
-        // Aplica janelas de follow-up com cotas de 50 caracteres
-        if (proMsgsSinceClient.length === 0) {
-            return {
-                canSend: true,
-                isLimitReached: false,
-                limitType: 'none' as const,
-                remainingChars: maxBillableChars,
-                totalProCharsSinceClient: 0,
-                maxBillableChars,
-                maxOnlineCumulativeChars,
-                attemptNumber: 1,
-                maxAttempts: followUpMaxAttempts,
-                isExhausted: false,
-                msUntilNextAttempt: 0,
-            };
-        }
-
-        const attemptsCount = proMsgsSinceClient.length;
-        const lastMsg = proMsgsSinceClient[proMsgsSinceClient.length - 1];
-        const nowMs = Date.now();
-        const timeSinceLastMsg = nowMs - lastMsg.timestamp.getTime();
-
-        if (timeSinceLastMsg >= intervalMs) {
-            if (attemptsCount < followUpMaxAttempts) {
-                return {
-                    canSend: true,
-                    isLimitReached: false,
-                    limitType: 'none' as const,
-                    remainingChars: maxBillableChars,
-                    totalProCharsSinceClient,
-                    maxBillableChars,
-                    maxOnlineCumulativeChars,
-                    attemptNumber: attemptsCount + 1,
-                    maxAttempts: followUpMaxAttempts,
-                    isExhausted: false,
-                    msUntilNextAttempt: 0,
-                };
-            } else {
-                return {
-                    canSend: false,
-                    isLimitReached: true,
-                    limitType: 'offline' as const,
-                    remainingChars: 0,
-                    totalProCharsSinceClient,
-                    maxBillableChars,
-                    maxOnlineCumulativeChars,
-                    attemptNumber: attemptsCount,
-                    maxAttempts: followUpMaxAttempts,
-                    isExhausted: true,
-                    msUntilNextAttempt: 0,
-                };
-            }
-        }
-
-        // Ainda dentro do intervalo de 24h desde a última mensagem enviada:
-        const msUntilNextAttempt = Math.max(0, (lastMsg.timestamp.getTime() + intervalMs) - nowMs);
-        const isExhausted = attemptsCount >= followUpMaxAttempts;
-
         return {
-            canSend: false,
-            isLimitReached: true,
-            limitType: 'offline' as const,
-            remainingChars: 0,
-            totalProCharsSinceClient,
-            maxBillableChars,
-            maxOnlineCumulativeChars,
-            attemptNumber: attemptsCount,
-            maxAttempts: followUpMaxAttempts,
-            isExhausted,
-            msUntilNextAttempt,
+            canSend: true,
+            isLimitReached: false,
+            limitType: 'none' as const,
+            remainingChars: 10000,
+            totalProCharsSinceClient: 0,
+            maxBillableChars: 10000,
+            maxOnlineCumulativeChars: 10000,
+            attemptNumber: 1,
+            maxAttempts: 99,
+            isExhausted: false,
+            msUntilNextAttempt: 0,
         };
-    }, [
-        userData?.isProfessional,
-        chatPricing?.maxBillableMessageChars,
-        chatPricing?.maxOnlineCumulativeChars,
-        chatPricing?.offlineFollowUpIntervalHours,
-        chatPricing?.offlineFollowUpMaxAttempts,
-        messages,
-        otherUserId,
-        user?.id,
-        isClientActiveInConversation,
-        timerTick,
-    ]);
+    }, []);
 
     // Lista derivada das mídias históricas carregadas combinadas com as mídias das mensagens locais
     const mediaItems = React.useMemo(() => {
@@ -1317,7 +1190,12 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
         socketService.joinRoom(user.id, otherUserId);
 
-        socket.on('room_joined', (data: { messages: Message[]; monetizationDisabled?: boolean }) => {
+        socket.on('room_joined', (data: { messages: Message[]; monetizationDisabled?: boolean; largeMessageThreshold?: number }) => {
+            if (data.largeMessageThreshold) {
+                setLargeMessageThreshold(data.largeMessageThreshold);
+            }
+            const currentThreshold = data.largeMessageThreshold || largeMessageThreshold;
+
             setMessages((prev) => {
                 if (!prev || prev.length === 0) return [...data.messages];
                 const prevMap = new Map(prev.map(m => [m._id, m]));
@@ -1329,6 +1207,20 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     return newMsg;
                 });
             });
+
+            // Se o usuário logado for o cliente e houver mensagens pendentes longas que não foram recusadas:
+            if (!userData?.isProfessional) {
+                const pendingLong = data.messages.find(m =>
+                    m.receiverId === user?.id &&
+                    m.billingStatus === 'pending' &&
+                    ((m.equivalentCharCount ?? m.charCount ?? 0) > currentThreshold) &&
+                    !declinedLongMessageIdsRef.current.has(m._id)
+                );
+                if (pendingLong) {
+                    setPendingLongMessageToConfirm(pendingLong);
+                }
+            }
+
             setLoadingMessages(false);
             if (data.monetizationDisabled !== undefined) {
                 setMonetizationDisabled(data.monetizationDisabled);
@@ -1406,6 +1298,15 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
         socketService.onNewMessage((data: { message: Message; tempId?: string }) => {
             if ([data.message.senderId, data.message.receiverId].sort().join('_') !== roomId) return;
+
+            // Se for recebida para o usuário atual e estiver pendente:
+            if (data.message.receiverId === user?.id && data.message.billingStatus === 'pending') {
+                const charTotal = data.message.equivalentCharCount ?? data.message.charCount ?? 0;
+                if (charTotal > largeMessageThreshold && !declinedLongMessageIdsRef.current.has(data.message._id)) {
+                    setPendingLongMessageToConfirm(data.message);
+                }
+            }
+
             setMessages((prev) => {
                 // Se for uma mensagem que nós enviamos (tem tempId), atualiza a mensagem otimista
                 if (data.tempId) {
@@ -1449,7 +1350,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         const isMe = data.message?.senderId === user?.id;
                         let safeText = data.message.content.substring(0, 100);
                         if (isPending) {
-                            safeText = isMe ? 'Aguardando saldo do cliente' : 'Recarregue para visualizar esta mensagem.';
+                            safeText = isMe ? 'Aguardando saldo do cliente' : (data.message.isAudio ? '🎙️ Nova mensagem de áudio' : 'Nova mensagem');
                         }
                         return {
                             ...r,
@@ -1477,6 +1378,26 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 old ? { ...old, balance: data.balance } : old
             );
             queryClient.invalidateQueries({ queryKey: ['earnings', 'recent'] });
+
+            // Se for cliente e tiver saldo novo > 0:
+            if (!userData?.isProfessional && data.balance > 0) {
+                // Notifica o servidor para liquidar mensagens curtas pendentes:
+                socket.emit('confirm_view_messages', { roomId });
+
+                // E se houver mensagem longa pendente não recusada, abre a modal de confirmação:
+                setMessages((currentMsgs) => {
+                    const pendingLong = currentMsgs.find(m =>
+                        m.receiverId === user?.id &&
+                        m.billingStatus === 'pending' &&
+                        ((m.equivalentCharCount ?? m.charCount ?? 0) > largeMessageThreshold) &&
+                        !declinedLongMessageIdsRef.current.has(m._id)
+                    );
+                    if (pendingLong) {
+                        setPendingLongMessageToConfirm(pendingLong);
+                    }
+                    return currentMsgs;
+                });
+            }
         });
 
         socket.on('message_error', (data: { error: string }) => {
@@ -2230,6 +2151,48 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         }
     };
 
+    const handleConfirmLongMessage = (msg: Message) => {
+        if (!socket || !roomId || !msg._id) return;
+        socket.emit('confirm_view_messages', {
+            roomId,
+            messageIds: [msg._id],
+        });
+        setPendingLongMessageToConfirm(null);
+    };
+
+    const handleDeclineLongMessage = (msgId?: string) => {
+        if (msgId) {
+            declinedLongMessageIdsRef.current.add(msgId);
+        }
+        setPendingLongMessageToConfirm(null);
+    };
+
+    const handleUnlockPendingMessage = (item: Message) => {
+        const cost = item.receiptChargeCents ?? 0;
+        const charTotal = item.equivalentCharCount ?? item.charCount ?? 0;
+        const isLong = charTotal > largeMessageThreshold;
+
+        if (balance < cost) {
+            openRechargeModal({
+                currentBalanceInCents: balance,
+                requiredAmountInCents: cost,
+            });
+            return;
+        }
+
+        if (isLong) {
+            setPendingLongMessageToConfirm(item);
+        } else {
+            // Mensagem curta com saldo suficiente: liquida e visualiza imediatamente
+            if (socket && roomId && item._id) {
+                socket.emit('confirm_view_messages', {
+                    roomId,
+                    messageIds: [item._id],
+                });
+            }
+        }
+    };
+
     const handleSend = async () => {
         console.log('[handleSend] Tentando enviar mensagem. Texto:', messageText.trim().substring(0, 20), 'sending:', sending, 'socket:', !!socket);
         if (!messageText.trim() || sending || !socket) {
@@ -2237,31 +2200,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             return;
         }
 
-        if (offlineTurnStats.isLimitReached) {
-            const partnerName = receiver?.name || receiver?.username || 'o cliente';
-            if (offlineTurnStats.limitType === 'online') {
-                toast.error(`Você atingiu o limite máximo de mensagens sem uma resposta do cliente. Aguarde a resposta de ${partnerName}.`);
-            } else if (offlineTurnStats.isExhausted) {
-                toast.error(`Você atingiu o limite de ${offlineTurnStats.maxAttempts} tentativas para clientes ausentes. Aguarde a resposta de ${partnerName}.`);
-            } else {
-                toast.error(`Você poderá mandar uma nova mensagem de ${offlineTurnStats.maxBillableChars} caracteres em ${formatFollowUpCountdown(offlineTurnStats.msUntilNextAttempt)} (tentativa ${offlineTurnStats.attemptNumber + 1} de ${offlineTurnStats.maxAttempts}). Aguarde a resposta de ${partnerName}.`);
-            }
-            return;
-        }
-        
         const charCount = messageText.trim().length;
-
-        if (userData?.isProfessional && !receiver?.isProfessional) {
-            if (!isClientActiveInConversation && charCount > offlineTurnStats.remainingChars) {
-                toast.error(`O cliente está ausente. Esta mensagem pode ter no máximo ${offlineTurnStats.remainingChars} caracteres.`);
-                return;
-            }
-            if (isClientActiveInConversation && charCount > offlineTurnStats.remainingChars) {
-                toast.error(`Limite da conversa atingido. Você pode enviar até ${offlineTurnStats.remainingChars} caracteres.`);
-                return;
-            }
-        }
-
         const costInCents = 0;
 
         const tempId = `temp-${Date.now()}`;
@@ -2324,22 +2263,6 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     };
 
     const handleSendAudio = async (audioBlob: Blob, durationInSeconds: number) => {
-        if (userData?.isProfessional && !receiver?.isProfessional && !isClientActiveInConversation) {
-            toast.error('Mensagens de áudio não são permitidas para clientes ausentes.');
-            return;
-        }
-
-        if (offlineTurnStats.isLimitReached) {
-            const partnerName = receiver?.name || receiver?.username || 'o cliente';
-            if (offlineTurnStats.limitType === 'online') {
-                toast.error(`Você atingiu o limite máximo de mensagens sem uma resposta do cliente. Aguarde a resposta de ${partnerName}.`);
-            } else if (offlineTurnStats.isExhausted) {
-                toast.error(`Você atingiu o limite de ${offlineTurnStats.maxAttempts} tentativas para clientes ausentes. Aguarde a resposta de ${partnerName}.`);
-            } else {
-                toast.error(`Você poderá mandar um novo áudio/mensagem em ${formatFollowUpCountdown(offlineTurnStats.msUntilNextAttempt)} (tentativa ${offlineTurnStats.attemptNumber + 1} de ${offlineTurnStats.maxAttempts}). Aguarde a resposta de ${partnerName}.`);
-            }
-            return;
-        }
         const tempId = `temp-audio-${Date.now()}`;
         const previewUrl = URL.createObjectURL(audioBlob);
 
@@ -2395,17 +2318,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     };
 
     const handleTyping = (text: string) => {
-        let newText = text;
-        if (userData?.isProfessional && !receiver?.isProfessional && !offlineTurnStats.isLimitReached) {
-            const max = offlineTurnStats.remainingChars;
-            if (newText.length > max) {
-                newText = newText.slice(0, max);
-                if (!isClientActiveInConversation) {
-                    toast.error(`Cliente ausente: mensagem limitada a ${max} caracteres.`, { id: 'offline-char-limit' });
-                }
-            }
-        }
-        setMessageText(newText);
+        setMessageText(text);
         if (socket) {
             socket.emit('typing', { roomId, isTyping: true, receiverId: otherUserId });
             if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -3233,6 +3146,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                     requiredAmountInCents: requiredCents,
                                                 })
                                             }
+                                            onClickUnlock={handleUnlockPendingMessage}
                                         />
                                     ) : isLocked || item.originalImageUrl || item.isVideo || isAudio || item.isExpired ? (
                                         <>
@@ -3684,30 +3598,9 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                             setPreviewUrl(null);
                         }}
                         onConfirm={(price, isTemp, expiry, coverFrame) => {
-                            sendSelectedMedia(price, isTemp, expiry, coverFrame);
+                                                            sendSelectedMedia(price, isTemp, expiry, coverFrame);
                         }}
                     />
-                )}
-
-                {offlineTurnStats.isLimitReached && (
-                    <div className="mb-2.5 px-4 py-2.5 bg-amber-50 border border-amber-200/80 rounded-2xl flex items-center gap-3 shadow-xs select-none animate-in fade-in slide-in-from-bottom-2 duration-200">
-                        <Clock className="w-4 h-4 text-amber-600 shrink-0" />
-                        <p className="text-xs text-amber-900 font-medium leading-relaxed">
-                            {offlineTurnStats.limitType === 'online' ? (
-                                <>
-                                    Você atingiu o limite máximo de mensagens sem uma resposta do cliente. Aguarde a resposta de <span className="font-bold">{receiver?.name || receiver?.username || 'cliente'}</span> para continuar conversando.
-                                </>
-                            ) : offlineTurnStats.isExhausted ? (
-                                <>
-                                    Você atingiu o limite máximo de {offlineTurnStats.maxAttempts} tentativas para clientes ausentes. Aguarde a resposta de <span className="font-bold">{receiver?.name || receiver?.username || 'cliente'}</span> para continuar conversando.
-                                </>
-                            ) : (
-                                <>
-                                    Você poderá mandar uma nova mensagem de {offlineTurnStats.maxBillableChars} caracteres em <span className="font-bold">{formatFollowUpCountdown(offlineTurnStats.msUntilNextAttempt)}</span> (tentativa {offlineTurnStats.attemptNumber + 1} de {offlineTurnStats.maxAttempts}) ou aguarde a resposta de <span className="font-bold">{receiver?.name || receiver?.username || 'cliente'}</span>.
-                                </>
-                            )}
-                        </p>
-                    </div>
                 )}
 
                 <div className="flex items-end gap-3">
@@ -3715,7 +3608,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         <div className="relative shrink-0">
                             <button
                                 onClick={() => setAttachMenuVisible(!attachMenuVisible)}
-                                disabled={!connected || !!selectedFile || offlineTurnStats.isLimitReached || (userData?.isProfessional && !receiver?.isProfessional && !isClientActiveInConversation)}
+                                disabled={!connected || !!selectedFile}
                                 className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shrink-0 ${
                                     attachMenuVisible ? 'bg-purple-600 text-white rotate-45' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                                 }`}
@@ -3739,53 +3632,30 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                             }}
                                             className="flex items-center gap-3 w-full px-4 py-3.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors border-b border-gray-50"
                                         >
-                                            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
-                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                                                    <path d="M4 16L8.586 11.414C8.96106 11.0391 9.46967 10.8284 10 10.8284C10.5303 10.8284 11.0389 11.0391 11.414 11.414L16 16M14 14L15.586 12.414C15.9611 12.0391 16.4697 11.8284 17 11.8284C17.5303 11.8284 18.0389 12.0391 18.414 12.414L20 14M14 8H14.01M6 20H18C18.5304 20 19.0391 19.7893 19.4142 19.4142C19.7893 19.0391 20 18.5304 20 18V6C20 5.46957 19.7893 4.96086 19.4142 4.58579C19.0391 4.21071 18.5304 4 18 4H6C5.46957 4 4.96086 4.21071 4.58579 4.58579C4.21071 4.96086 4 5.46957 4 6V18C4 18.5304 4.21071 19.4142 4.58579 19.4142C4.96086 19.7893 5.304 20 6 20Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                                    <circle cx="8.5" cy="8.5" r="1.5" />
+                                                    <path d="M21 15l-5-5L5 21" />
                                                 </svg>
                                             </div>
-                                            <div>
-                                                <p className="font-bold text-gray-900">Enviar Foto</p>
-                                                <p className="text-[10px] text-gray-500">Galeria ou Câmera</p>
-                                            </div>
+                                            <span className="font-semibold text-xs">Enviar Foto</span>
                                         </button>
                                         <button
                                             onClick={() => {
                                                 setAttachMenuVisible(false);
                                                 videoFileInputRef.current?.click();
                                             }}
-                                            className={`flex items-center gap-3 w-full px-4 py-3.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors ${!userData?.isProfessional ? 'border-b border-gray-50' : ''}`}
+                                            className="flex items-center gap-3 w-full px-4 py-3.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                                         >
-                                            <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center text-rose-500">
-                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                                     <path d="M23 7l-7 5 7 5V7z" />
                                                     <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
                                                 </svg>
                                             </div>
-                                            <div>
-                                                <p className="font-bold text-gray-900">Enviar Vídeo</p>
-                                                <p className="text-[10px] text-gray-500">Galeria ou Arquivos</p>
-                                            </div>
+                                            <span className="font-semibold text-xs">Enviar Vídeo</span>
                                         </button>
-                                        {!userData?.isProfessional && (
-                                            <button
-                                                onClick={() => {
-                                                    setAttachMenuVisible(false);
-                                                    setGiftModalVisible(true);
-                                                }}
-                                                className="flex items-center gap-3 w-full px-4 py-3.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                            >
-                                                <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
-                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                                                        <path d="M20 12V22H4V12M2 7H22V12H2V7ZM12 22V7M12 7C12 7 9.5 3 6.5 3C3.5 3 3.5 7 6.5 7H12ZM12 7H17.5C20.5 7 20.5 3 17.5 3C14.5 3 12 7 12 7Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                                    </svg>
-                                                </div>
-                                                <div>
-                                                    <p className="font-bold text-gray-900">Enviar Mimo</p>
-                                                    <p className="text-[10px] text-gray-500">Presente em dinheiro</p>
-                                                </div>
-                                            </button>
-                                        )}
                                     </div>
                                 </>
                             )}
@@ -3804,31 +3674,16 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     )}
 
                     {audioRecordingStatus === 'idle' && (
-                        <div className={`flex-1 min-w-0 flex flex-col justify-center rounded-2xl px-3.5 py-2 min-h-[44px] max-h-[140px] transition-all ${
-                            offlineTurnStats.isLimitReached ? 'bg-gray-50 border border-amber-200/60' : 'bg-gray-100'
-                        }`}>
+                        <div className="flex-1 min-w-0 flex flex-col justify-center rounded-2xl px-3.5 py-2 min-h-[44px] max-h-[140px] transition-all bg-gray-100">
                             <textarea
                                 ref={inputRef}
                                 value={selectedFile ? "Mídia selecionada para envio..." : messageText}
-                                disabled={!!selectedFile || offlineTurnStats.isLimitReached}
+                                disabled={!!selectedFile}
                                 onChange={(e) => handleTyping(e.target.value)}
                                 onKeyDown={handleKeyDown}
                                 onFocus={() => setIsInputFocused(true)}
                                 onBlur={() => setIsInputFocused(false)}
-                                placeholder={
-                                    offlineTurnStats.isLimitReached
-                                        ? (offlineTurnStats.limitType === 'online'
-                                            ? `Bloqueado: aguarde a resposta de ${receiver?.name || receiver?.username || 'cliente'}...`
-                                            : (offlineTurnStats.isExhausted
-                                                ? "Bloqueado: aguarde a resposta para continuar..."
-                                                : `Bloqueado (libera em ${formatFollowUpCountdown(offlineTurnStats.msUntilNextAttempt)})...`))
-                                        : "Digite sua mensagem..."
-                                }
-                                maxLength={
-                                    userData?.isProfessional && !receiver?.isProfessional && !offlineTurnStats.isLimitReached
-                                        ? offlineTurnStats.remainingChars
-                                        : undefined
-                                }
+                                placeholder="Digite sua mensagem..."
                                 rows={1}
                                 className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none leading-5 py-0.5 disabled:text-gray-400 disabled:cursor-not-allowed"
                                 style={{ maxHeight: '96px' }}
@@ -3855,43 +3710,13 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                     </span>
                                 </div>
                             )}
-                            {userData?.isProfessional && !receiver?.isProfessional && !offlineTurnStats.isLimitReached && (
-                                !isClientActiveInConversation ? (
-                                    (isInputFocused || charCount > 0) ? (
-                                        <div className="flex items-center justify-between w-full pt-1 select-none text-[11px] leading-tight animate-in fade-in duration-150">
-                                            <span className="font-medium text-amber-700/90 flex items-center gap-1">
-                                                <Clock className="w-3 h-3 text-amber-600 shrink-0" />
-                                                usuário ausente
-                                            </span>
-                                            <span className={`font-semibold tabular-nums ${
-                                                charCount >= offlineTurnStats.remainingChars ? 'text-amber-600 font-bold' : 'text-gray-500'
-                                            }`}>
-                                                {charCount}/{offlineTurnStats.remainingChars} caracteres
-                                            </span>
-                                        </div>
-                                    ) : null
-                                ) : (() => {
-                                    const maxOnline = offlineTurnStats.maxOnlineCumulativeChars;
-                                    const totalProOnlineChars = (offlineTurnStats.totalProCharsSinceClient || 0) + charCount;
-                                    const warningThreshold = Math.floor(maxOnline * 0.9); // Exibe quando faltar 10% para atingir o limite
-                                    if (totalProOnlineChars < warningThreshold) return null;
-                                    return (
-                                        <div className="flex items-center justify-end w-full pt-0.5 select-none text-[11px] tabular-nums animate-in fade-in duration-150">
-                                            <span className={totalProOnlineChars >= maxOnline ? 'font-semibold text-amber-600 font-bold' : 'font-medium text-amber-700/80'}>
-                                                {totalProOnlineChars}/{maxOnline} caracteres
-                                            </span>
-                                        </div>
-                                    );
-                                })()
-                            )}
                         </div>
                     )}
                     
-                    {(audioRecordingStatus === 'idle' && (messageText.trim() || selectedFile || (userData?.isProfessional && !receiver?.isProfessional && !isClientActiveInConversation))) ? (
+                    {(audioRecordingStatus === 'idle' && (messageText.trim() || selectedFile)) ? (
                         <button
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
-                                if (offlineTurnStats.isLimitReached) return;
                                 if (selectedFile) {
                                     sendSelectedMedia(0, false, 60);
                                 } else if (charCount > 0 && !userData?.isProfessional && receiver?.isProfessional && !monetizationDisabled && currentRate > 0 && balance < estimatedCostInCents) {
@@ -3903,9 +3728,9 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                     handleSend();
                                 }
                             }}
-                            disabled={(!messageText.trim() && !selectedFile) || !connected || offlineTurnStats.isLimitReached}
+                            disabled={(!messageText.trim() && !selectedFile) || !connected}
                             className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shrink-0 select-none ${
-                                (messageText.trim() || selectedFile) && connected && !offlineTurnStats.isLimitReached
+                                (messageText.trim() || selectedFile) && connected
                                     ? 'bg-purple-600 hover:bg-purple-700 shadow-sm text-white'
                                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                             }`}
@@ -3923,7 +3748,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         </button>
                     ) : (
                         <AudioRecorder
-                            connected={connected && userData !== undefined && !offlineTurnStats.isLimitReached}
+                            connected={connected && userData !== undefined}
                             onSendAudio={handleSendAudio}
                             onStatusChange={setAudioRecordingStatus}
                             maxDurationSeconds={maxAudioDurationSeconds}
@@ -4514,6 +4339,32 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     </div>
                 </div>
             )}
+
+            <LargeMessageConfirmModal
+                isOpen={Boolean(pendingLongMessageToConfirm)}
+                onClose={() => handleDeclineLongMessage(pendingLongMessageToConfirm?._id)}
+                onConfirm={() => {
+                    if (pendingLongMessageToConfirm) {
+                        handleConfirmLongMessage(pendingLongMessageToConfirm);
+                    }
+                }}
+                onRecharge={() => {
+                    if (pendingLongMessageToConfirm) {
+                        const cost = pendingLongMessageToConfirm.receiptChargeCents ?? 0;
+                        handleDeclineLongMessage(pendingLongMessageToConfirm._id);
+                        openRechargeModal({
+                            currentBalanceInCents: balance,
+                            requiredAmountInCents: cost,
+                        });
+                    }
+                }}
+                senderName={receiver?.name || receiver?.username || 'Criadora'}
+                isAudio={Boolean(pendingLongMessageToConfirm?.isAudio || pendingLongMessageToConfirm?.audioUrl)}
+                audioDuration={pendingLongMessageToConfirm?.audioDuration}
+                charCount={pendingLongMessageToConfirm?.equivalentCharCount || pendingLongMessageToConfirm?.charCount || 0}
+                costInCents={pendingLongMessageToConfirm?.receiptChargeCents || 0}
+                userBalanceInCents={balance}
+            />
         </div>
     );
 }

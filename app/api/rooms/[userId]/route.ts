@@ -151,13 +151,15 @@ export async function GET(
             );
 
             if (isClientLatestPending) {
-                sanitizedLastMessage = PENDING_MESSAGE_LABEL;
+                const isAudio = room.lastMessage?.includes('🎙️') || room.lastMessage?.toLowerCase().includes('áudio') || room.lastMessage?.toLowerCase().includes('audio');
+                sanitizedLastMessage = isAudio ? '🎙️ Nova mensagem de áudio' : PENDING_MESSAGE_LABEL;
             } else if (
                 isProLatestPending ||
                 (currentUser?.isProfessional && (
                     room.lastMessage === PENDING_MESSAGE_LABEL ||
                     room.lastMessage?.includes('Recarregue para visualizar') ||
-                    room.lastMessage?.includes('Recarregue')
+                    room.lastMessage?.includes('Recarregue') ||
+                    room.lastMessage?.includes('Aguardando saldo')
                 ))
             ) {
                 sanitizedLastMessage = 'Aguardando saldo do cliente';

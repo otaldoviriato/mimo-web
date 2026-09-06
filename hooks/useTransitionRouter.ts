@@ -52,7 +52,8 @@ export function useTransitionRouter() {
             const cleanedPath = href.replace(/^\//, '');
             if (!isReservedRoute(href) && cleanedPath.length > 0) {
                 const username = cleanedPath.replace(/^@/, '');
-                stackNav.pushVirtual('profile', { username });
+                const initialUser = meta?.initialUser ?? (meta && !meta.giftCode ? meta : undefined);
+                stackNav.pushVirtual('profile', { username, initialUser });
                 return;
             }
 

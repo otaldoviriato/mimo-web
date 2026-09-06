@@ -54,11 +54,13 @@ export interface IAppSettings extends Document {
     offlineFollowUpIntervalHours: number;
     offlineFollowUpMaxAttempts: number;
     maxOnlineCumulativeChars: number;
+    largeMessageWarningThresholdChars?: number;
     createdAt: Date;
     updatedAt: Date;
 }
 
 const AppSettingsSchema = new Schema<IAppSettings>({
+    largeMessageWarningThresholdChars: { type: Number, default: 100, min: 20, max: 10000 },
     maxBillableMessageChars: { type: Number, default: 50, min: 1, max: 10000 },
     maxOnlineCumulativeChars: { type: Number, default: 500, min: 10, max: 20000 },
     offlineFollowUpIntervalHours: { type: Number, default: 24, min: 1, max: 720 },

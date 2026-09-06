@@ -10,15 +10,20 @@ interface PendingReceiptBalloonProps {
         receiptChargeCents?: number;
         timestamp: string | Date;
         content?: string;
+        charCount?: number;
+        equivalentCharCount?: number;
+        audioDuration?: number;
     };
     currentBalanceInCents: number;
     onOpenRecharge: (requiredAmountInCents: number) => void;
+    onClickUnlock?: (item: any) => void;
 }
 
 export const PendingReceiptBalloon: React.FC<PendingReceiptBalloonProps> = ({
     item,
     currentBalanceInCents,
     onOpenRecharge,
+    onClickUnlock,
 }) => {
     const requiredCents = item.receiptChargeCents ?? 0;
     const formattedPrice = requiredCents > 0
@@ -37,7 +42,11 @@ export const PendingReceiptBalloon: React.FC<PendingReceiptBalloonProps> = ({
     }, [item.timestamp]);
 
     const handleClick = () => {
-        onOpenRecharge(requiredCents);
+        if (onClickUnlock) {
+            onClickUnlock(item);
+        } else {
+            onOpenRecharge(requiredCents);
+        }
     };
 
     return (

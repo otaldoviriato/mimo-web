@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { userApi } from '@/services/api';
-import { useMyProfile, useFeaturedUsers } from '@/hooks/useQueries';
+import { useMyProfile, useFeaturedUsers, QueryKeys } from '@/hooks/useQueries';
 import { Search, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { trackAcquisitionEvent } from '@/lib/clientAcquisitionAnalytics';
@@ -68,11 +69,10 @@ const formatOnlineStatus = (
 
 export default function SearchPage() {
     const router = useTransitionRouter();
+    const queryClient = useQueryClient();
     const { data: userData, isLoading: loadingProfile } = useMyProfile();
     const [username, setUsername] = useState('');
     const [loading, setLoading] = useState(false);
-    const [openingProfileId, setOpeningProfileId] = useState<string | null>(null);
-    const openingProfileRef = useRef(false);
     const [foundUsers, setFoundUsers] = useState<any[]>([]);
     const {
         data: featuredUsers = [],
@@ -149,39 +149,32 @@ export default function SearchPage() {
         return () => observer.disconnect();
     }, [fetchNextPage, hasNextPage, isFetchingNextPage, username]);
 
-    const handleOpenProfile = async (user: { clerkId: string; username: string }) => {
-        if (loadingProfile || openingProfileRef.current) return;
-        openingProfileRef.current = true;
-        setOpeningProfileId(user.clerkId);
+    const handleOpenProfile = (user: { clerkId: string; username: string; [key: string]: any }) => {
         const isDirectSearch = Boolean(username.trim());
-        if (!isDirectSearch) {
+        if (!isDirectSearch && user.clerkId) {
             trackAcquisitionEvent({
                 eventType: 'explore_profile_viewed',
                 professionalId: user.clerkId,
             });
         }
         try {
-            let hasMessages = false;
-            if (userData?.clerkId) {
-                const roomId = [userData.clerkId, user.clerkId].sort().join('_');
-                const search = new URLSearchParams({ roomId, limit: '1' });
-                const response = await fetch(`/api/rooms/${userData.clerkId}/messages?${search}`, { cache: 'no-store' });
-                if (!response.ok) throw new Error('Falha ao consultar conversa');
-                const messages = await response.json();
-                if (!Array.isArray(messages)) throw new Error('Histórico inválido');
-                hasMessages = messages.length > 0;
+            if (user.username) {
+                queryClient.setQueryData(['user', 'username', user.username], (prev: any) => prev || user);
             }
-            if (hasMessages) {
-                router.push(`/chat/${user.clerkId}`, { initialUser: user });
-            } else {
-                router.push(`/${encodeURIComponent(user.username)}`);
+            if (user.clerkId) {
+                queryClient.setQueryData(QueryKeys.userById(user.clerkId), (prev: any) => prev || user);
+                if (typeof window !== 'undefined') {
+                    try {
+                        localStorage.setItem(`mimo_user_${user.clerkId}`, JSON.stringify(user));
+                    } catch {
+                        // ignore
+                    }
+                }
             }
         } catch {
-            toast.error('Não foi possível abrir agora. Tente novamente.');
-        } finally {
-            openingProfileRef.current = false;
-            setOpeningProfileId(null);
+            // ignore
         }
+        router.push(`/${encodeURIComponent(user.username)}`, { initialUser: user });
     };
 
     useEffect(() => {
@@ -229,11 +222,9 @@ export default function SearchPage() {
                 type="button"
                 key={user.clerkId}
                 data-explore-professional-id={!username.trim() ? user.clerkId : undefined}
-                onClick={() => void handleOpenProfile(user)}
-                disabled={loadingProfile || openingProfileId !== null}
-                aria-busy={openingProfileId === user.clerkId}
+                onClick={() => handleOpenProfile(user)}
                 aria-label={`Abrir ${user.name || user.username}`}
-                className="relative aspect-[3/4] rounded-2xl overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 cursor-pointer active:scale-[0.98] border border-slate-200/80 bg-slate-100 group text-left disabled:cursor-wait focus-visible:outline-2 focus-visible:outline-purple-600 focus-visible:outline-offset-2"
+                className="relative aspect-[3/4] rounded-2xl overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 cursor-pointer active:scale-[0.98] border border-slate-200/80 bg-slate-100 group text-left focus-visible:outline-2 focus-visible:outline-purple-600 focus-visible:outline-offset-2"
             >
                 {/* Imagem de fundo */}
                 <img
@@ -280,7 +271,6 @@ export default function SearchPage() {
                     <h3 className="text-sm sm:text-base font-black tracking-tight leading-tight truncate drop-shadow-sm">
                         {displayName}
                     </h3>
-                    {openingProfileId === user.clerkId && <span className="text-xs font-medium">Abrindo...</span>}
                 </div>
             </button>
         );

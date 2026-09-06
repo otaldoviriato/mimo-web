@@ -1,6 +1,6 @@
 export const RECEIPT_TERMS_VERSION = 'receipt-2026-09-05';
 export const RECEIPT_TERMS_EFFECTIVE_DATE = new Date('2026-09-05T00:00:00.000Z');
-export const PENDING_MESSAGE_LABEL = 'Recarregue para visualizar esta mensagem.';
+export const PENDING_MESSAGE_LABEL = 'Nova mensagem';
 
 export function requiresReceiptConsent(user: {
     isProfessional?: boolean;

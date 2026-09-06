@@ -603,6 +603,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                         {screen.type === 'profile' && (
                             <UserProfilePage
                                 username={screen.params.username}
+                                initialUser={screen.params.initialUser}
                                 isSubPage={true}
                                 isClosing={isClosing}
                                 onBack={popVirtual}

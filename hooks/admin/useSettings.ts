@@ -25,6 +25,7 @@ interface SettingsSnapshot {
     activeUserThresholdDays: number;
     defaultPricePerCharSubscribers: number;
     defaultPricePerCharNonSubscribers: number;
+    largeMessageWarningThresholdChars: number;
     maxBillableMessageChars: number;
     maxOnlineCumulativeChars: number;
     offlineFollowUpIntervalHours: number;
@@ -75,6 +76,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     const [activeUserThresholdDays, setActiveUserThresholdDays] = useState(7);
     const [defaultPricePerCharSubscribers, setDefaultPricePerCharSubscribers] = useState(0.04);
     const [defaultPricePerCharNonSubscribers, setDefaultPricePerCharNonSubscribers] = useState(0.05);
+    const [largeMessageWarningThresholdChars, setLargeMessageWarningThresholdChars] = useState(100);
     const [maxBillableMessageChars, setMaxBillableMessageChars] = useState(50);
     const [maxOnlineCumulativeChars, setMaxOnlineCumulativeChars] = useState(500);
     const [offlineFollowUpIntervalHours, setOfflineFollowUpIntervalHours] = useState(24);
@@ -125,6 +127,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         activeUserThresholdDays: s.activeUserThresholdDays ?? 7,
         defaultPricePerCharSubscribers: s.defaultPricePerCharSubscribers ?? 0.04,
         defaultPricePerCharNonSubscribers: s.defaultPricePerCharNonSubscribers ?? 0.05,
+        largeMessageWarningThresholdChars: s.largeMessageWarningThresholdChars ?? 100,
         maxBillableMessageChars: s.maxBillableMessageChars ?? 50,
         maxOnlineCumulativeChars: s.maxOnlineCumulativeChars ?? 500,
         offlineFollowUpIntervalHours: s.offlineFollowUpIntervalHours ?? 24,
@@ -185,6 +188,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     setActiveUserThresholdDays(s.activeUserThresholdDays ?? 7);
                     setDefaultPricePerCharSubscribers(s.defaultPricePerCharSubscribers ?? 0.04);
                     setDefaultPricePerCharNonSubscribers(s.defaultPricePerCharNonSubscribers ?? 0.05);
+                    setLargeMessageWarningThresholdChars(s.largeMessageWarningThresholdChars ?? 100);
                     setAudioPriceMultiplier(s.audioPriceMultiplier ?? 5);
                     setMaxBillableMessageChars(s.maxBillableMessageChars ?? 50);
                     setMaxOnlineCumulativeChars(s.maxOnlineCumulativeChars ?? 500);
@@ -287,6 +291,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     activeUserThresholdDays,
                     defaultPricePerCharSubscribers,
                     defaultPricePerCharNonSubscribers,
+                    largeMessageWarningThresholdChars,
                     maxBillableMessageChars,
                     maxOnlineCumulativeChars,
                     offlineFollowUpIntervalHours,
@@ -325,6 +330,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                 setActiveUserThresholdDays(s.activeUserThresholdDays ?? 7);
                 setDefaultPricePerCharSubscribers(s.defaultPricePerCharSubscribers ?? 0.04);
                 setDefaultPricePerCharNonSubscribers(s.defaultPricePerCharNonSubscribers ?? 0.05);
+                setLargeMessageWarningThresholdChars(s.largeMessageWarningThresholdChars ?? 100);
                 setAudioPriceMultiplier(s.audioPriceMultiplier ?? 5);
                 setMaxBillableMessageChars(s.maxBillableMessageChars ?? 50);
                 setMaxOnlineCumulativeChars(s.maxOnlineCumulativeChars ?? 500);
@@ -394,6 +400,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         subscriberDiscountPercentage !== savedSnapshot.subscriberDiscountPercentage ||
         defaultPricePerCharSubscribers !== savedSnapshot.defaultPricePerCharSubscribers ||
         defaultPricePerCharNonSubscribers !== savedSnapshot.defaultPricePerCharNonSubscribers ||
+        largeMessageWarningThresholdChars !== savedSnapshot.largeMessageWarningThresholdChars ||
         maxBillableMessageChars !== savedSnapshot.maxBillableMessageChars ||
         maxOnlineCumulativeChars !== savedSnapshot.maxOnlineCumulativeChars ||
         offlineFollowUpIntervalHours !== savedSnapshot.offlineFollowUpIntervalHours ||
@@ -451,6 +458,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         activeUserThresholdDays, setActiveUserThresholdDays,
         defaultPricePerCharSubscribers, setDefaultPricePerCharSubscribers,
         defaultPricePerCharNonSubscribers, setDefaultPricePerCharNonSubscribers,
+        largeMessageWarningThresholdChars, setLargeMessageWarningThresholdChars,
         maxBillableMessageChars, setMaxBillableMessageChars,
         maxOnlineCumulativeChars, setMaxOnlineCumulativeChars,
         offlineFollowUpIntervalHours, setOfflineFollowUpIntervalHours,

@@ -7,7 +7,7 @@ import { useMyProfile } from '@/hooks/useQueries';
 import { useUser } from '@clerk/nextjs';
 import { PWAPromoModal } from '@/components/PWAPromoModal';
 import { NotifPromoModal } from '@/components/NotifPromoModal';
-import { Settings, ShieldAlert, Search, Pencil, UserCheck, ShieldCheck, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Settings, ShieldAlert, Search, Pencil, UserCheck, ShieldCheck, Menu } from 'lucide-react';
 
 export default function TabsLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
@@ -129,7 +129,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
             }`}>
                 <div className="w-64 flex flex-col h-full">
                     {/* Brand */}
-                    <div className="flex items-center justify-between px-5 py-5 border-b border-gray-100">
+                    <div className="flex items-center px-5 py-5 border-b border-gray-100">
                         <div className="flex items-center gap-3">
                             <div className="flex w-9 h-9 items-center justify-center bg-linear-to-br from-purple-600 to-purple-700 rounded-xl shrink-0">
                                 <img
@@ -140,14 +140,6 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                             </div>
                             <span className="text-lg font-bold text-gray-900">MimoChat</span>
                         </div>
-                        <button
-                            onClick={toggleSidebar}
-                            className="p-1.5 hover:bg-gray-100 active:bg-gray-200 text-gray-400 hover:text-gray-700 rounded-lg transition-colors cursor-pointer"
-                            title="Fechar menu lateral"
-                            aria-label="Fechar menu lateral"
-                        >
-                            <PanelLeftClose className="w-5 h-5" />
-                        </button>
                     </div>
 
                     {/* Nav */}
@@ -197,18 +189,14 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                 {/* Header Superior Persistente — padrão em todas as abas */}
                 <div className="shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between z-30 sticky top-0 shadow-md">
                     <div className="flex items-center gap-2.5">
-                        {/* Botão para alternar a sidebar no desktop */}
+                        {/* Botão de três traços horizontais para alternar a sidebar no desktop */}
                         <button
                             onClick={toggleSidebar}
                             className="hidden md:flex p-2 hover:bg-white/10 active:bg-white/20 rounded-xl transition-all text-white items-center justify-center cursor-pointer -ml-1.5"
-                            title={isSidebarCollapsed ? "Abrir menu lateral" : "Fechar menu lateral"}
-                            aria-label={isSidebarCollapsed ? "Abrir menu lateral" : "Fechar menu lateral"}
+                            title={isSidebarCollapsed ? "Abrir menu lateral" : "Recolher menu lateral"}
+                            aria-label={isSidebarCollapsed ? "Abrir menu lateral" : "Recolher menu lateral"}
                         >
-                            {isSidebarCollapsed ? (
-                                <PanelLeftOpen className="w-5 h-5" />
-                            ) : (
-                                <PanelLeftClose className="w-5 h-5" />
-                            )}
+                            <Menu className="w-5 h-5" />
                         </button>
 
                         <img

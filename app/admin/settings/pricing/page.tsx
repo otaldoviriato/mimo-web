@@ -21,14 +21,8 @@ export default function AdminSettingsPricingPage() {
             setMaxSubscriptionPrice={settings.setMaxSubscriptionPrice}
             subscriberDiscountPercentage={settings.subscriberDiscountPercentage}
             setSubscriberDiscountPercentage={settings.setSubscriberDiscountPercentage}
-            maxBillableMessageChars={settings.maxBillableMessageChars}
-            setMaxBillableMessageChars={settings.setMaxBillableMessageChars}
-            maxOnlineCumulativeChars={settings.maxOnlineCumulativeChars}
-            setMaxOnlineCumulativeChars={settings.setMaxOnlineCumulativeChars}
-            offlineFollowUpIntervalHours={settings.offlineFollowUpIntervalHours}
-            setOfflineFollowUpIntervalHours={settings.setOfflineFollowUpIntervalHours}
-            offlineFollowUpMaxAttempts={settings.offlineFollowUpMaxAttempts}
-            setOfflineFollowUpMaxAttempts={settings.setOfflineFollowUpMaxAttempts}
+            largeMessageWarningThresholdChars={settings.largeMessageWarningThresholdChars}
+            setLargeMessageWarningThresholdChars={settings.setLargeMessageWarningThresholdChars}
             audioPriceMultiplier={settings.audioPriceMultiplier}
             setAudioPriceMultiplier={settings.setAudioPriceMultiplier}
             isDirtyPricing={settings.isDirtyPricing}

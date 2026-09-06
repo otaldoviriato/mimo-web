@@ -39,6 +39,7 @@ async function getOrCreateSettings() {
             newProfileDaysThreshold: 15,
             onlineDelayMinutes: 2,
             activeUserThresholdDays: 7,
+            largeMessageWarningThresholdChars: 100,
         });
     } else {
         // Garantir que novos campos sejam populados se não existirem
@@ -75,6 +76,7 @@ async function getOrCreateSettings() {
         if (settings.offlineFollowUpMaxAttempts === undefined) { settings.offlineFollowUpMaxAttempts = 3; updated = true; }
         if (settings.onlineDelayMinutes === undefined) { settings.onlineDelayMinutes = 2; updated = true; }
         if (settings.activeUserThresholdDays === undefined) { settings.activeUserThresholdDays = 7; updated = true; }
+        if (settings.largeMessageWarningThresholdChars === undefined) { settings.largeMessageWarningThresholdChars = 100; updated = true; }
         if (updated) {
             await settings.save();
         }
@@ -191,6 +193,7 @@ export async function PUT(request: NextRequest) {
             activeUnrechargedClientHoursThreshold,
             onlineDelayMinutes,
             activeUserThresholdDays,
+            largeMessageWarningThresholdChars,
         } = body;
 
         // Validações básicas
@@ -363,6 +366,10 @@ export async function PUT(request: NextRequest) {
             settings.conversationPricePerEquivalentCharCents = Math.round(val * 100);
         }
 
+        if (largeMessageWarningThresholdChars !== undefined) {
+            if (!Number.isSafeInteger(largeMessageWarningThresholdChars) || largeMessageWarningThresholdChars < 20 || largeMessageWarningThresholdChars > 10000) return NextResponse.json({ error: 'Limite de caracteres para confirmação de mensagem longa deve ser inteiro entre 20 e 10000.' }, { status: 400 });
+            settings.largeMessageWarningThresholdChars = largeMessageWarningThresholdChars;
+        }
         if (maxBillableMessageChars !== undefined) {
             if (!Number.isSafeInteger(maxBillableMessageChars) || maxBillableMessageChars < 1 || maxBillableMessageChars > 10000) return NextResponse.json({ error: 'Limite de caracteres deve ser inteiro entre 1 e 10000.' }, { status: 400 });
             settings.maxBillableMessageChars = maxBillableMessageChars;

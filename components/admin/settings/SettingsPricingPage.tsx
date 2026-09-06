@@ -12,10 +12,7 @@ type Props = Pick<UseSettingsReturn,
     | 'minSubscriptionPrice' | 'setMinSubscriptionPrice'
     | 'maxSubscriptionPrice' | 'setMaxSubscriptionPrice'
     | 'subscriberDiscountPercentage' | 'setSubscriberDiscountPercentage'
-    | 'maxBillableMessageChars' | 'setMaxBillableMessageChars'
-    | 'maxOnlineCumulativeChars' | 'setMaxOnlineCumulativeChars'
-    | 'offlineFollowUpIntervalHours' | 'setOfflineFollowUpIntervalHours'
-    | 'offlineFollowUpMaxAttempts' | 'setOfflineFollowUpMaxAttempts'
+    | 'largeMessageWarningThresholdChars' | 'setLargeMessageWarningThresholdChars'
     | 'audioPriceMultiplier' | 'setAudioPriceMultiplier'
     | 'isDirtyPricing' | 'saving' | 'saveSettings'
 >;
@@ -41,10 +38,7 @@ export function SettingsPricingPage({
     minSubscriptionPrice, setMinSubscriptionPrice,
     maxSubscriptionPrice, setMaxSubscriptionPrice,
     subscriberDiscountPercentage, setSubscriberDiscountPercentage,
-    maxBillableMessageChars, setMaxBillableMessageChars,
-    maxOnlineCumulativeChars, setMaxOnlineCumulativeChars,
-    offlineFollowUpIntervalHours, setOfflineFollowUpIntervalHours,
-    offlineFollowUpMaxAttempts, setOfflineFollowUpMaxAttempts,
+    largeMessageWarningThresholdChars, setLargeMessageWarningThresholdChars,
     audioPriceMultiplier, setAudioPriceMultiplier,
     isDirtyPricing, saving, saveSettings,
 }: Props) {
@@ -108,20 +102,20 @@ export function SettingsPricingPage({
                     />
                 </SettingField>
 
-                <SettingField title="Limite de caracteres com cliente ausente/offline (por tentativa)" description="Textos e áudios enviados consecutivamente pelo profissional para cliente ausente são limitados a este valor acumulado por tentativa." unit="caracteres">
-                    <input type="number" min={1} max={10000} step={1} value={maxBillableMessageChars} onChange={e => setMaxBillableMessageChars(Number(e.target.value))} className={inputCls} />
-                </SettingField>
-
-                <SettingField title="Limite cumulativo de caracteres com cliente online" description="Textos e áudios enviados consecutivamente pela profissional com o cliente ativo/online são limitados a este total de caracteres. Quando o cliente responde qualquer mensagem, o limite zera e recomeça. Ao atingir este limite sem resposta do cliente, o chat é bloqueado com aviso explicativo." unit="caracteres">
-                    <input type="number" min={10} max={20000} step={10} value={maxOnlineCumulativeChars} onChange={e => setMaxOnlineCumulativeChars(Number(e.target.value))} className={inputCls} />
-                </SettingField>
-
-                <SettingField title="Intervalo para nova tentativa com cliente ausente" description="Tempo mínimo de espera em horas para liberar uma nova cota de caracteres e permitir que a criadora chame a atenção do cliente ausente novamente caso ele ainda não tenha respondido." unit="horas">
-                    <input type="number" min={1} max={720} step={1} value={offlineFollowUpIntervalHours} onChange={e => setOfflineFollowUpIntervalHours(Number(e.target.value))} className={inputCls} />
-                </SettingField>
-
-                <SettingField title="Máximo de tentativas com cliente ausente" description="Quantidade máxima de tentativas consecutivas de follow-up que a criadora pode realizar para um cliente ausente antes de bloquear o chat até que ele responda." unit="vezes">
-                    <input type="number" min={1} max={20} step={1} value={offlineFollowUpMaxAttempts} onChange={e => setOfflineFollowUpMaxAttempts(Number(e.target.value))} className={inputCls} />
+                <SettingField
+                    title="Limite de Alerta para Mensagens Longas"
+                    description="Mensagens de texto ou áudio que excederem esta quantidade de caracteres não são debitadas automaticamente. O cliente visualiza uma modal informando o tamanho e o valor exato em R$ antes de autorizar a cobrança e visualização."
+                    unit="caracteres"
+                >
+                    <input
+                        type="number"
+                        min={20}
+                        max={10000}
+                        step={10}
+                        value={largeMessageWarningThresholdChars}
+                        onChange={(e) => setLargeMessageWarningThresholdChars(Number(e.target.value))}
+                        className={inputCls}
+                    />
                 </SettingField>
                 <SettingField
                     title="Multiplicador de Preço do Áudio"

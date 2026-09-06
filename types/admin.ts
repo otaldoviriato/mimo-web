@@ -27,6 +27,7 @@ export interface SettingsData {
     defaultPricePerCharNonSubscribers: number;
     maxBillableMessageChars?: number;
     maxOnlineCumulativeChars?: number;
+    largeMessageWarningThresholdChars?: number;
     offlineFollowUpIntervalHours?: number;
     offlineFollowUpMaxAttempts?: number;
     audioPriceMultiplier: number;
