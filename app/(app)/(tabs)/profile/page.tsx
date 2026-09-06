@@ -10,7 +10,7 @@ import { ImageCropper } from '@/components/ImageCropper';
 import { usePayment } from '@/context/PaymentContext';
 import { PullToRefresh } from '@/components';
 import { ProfessionalProfilePresentation, type ProfileGalleryItem } from '@/components/ProfessionalProfilePresentation';
-import { Settings, Share2, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, ShieldAlert, Heart, Globe, Crown, Camera, Gift, CreditCard, QrCode, Star, X, MoreVertical, ChevronLeft, ChevronRight, ExternalLink, CalendarClock, AlertCircle, Pencil } from 'lucide-react';
+import { Share2, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, ShieldAlert, Heart, Globe, Crown, Camera, Gift, CreditCard, QrCode, Star, X, MoreVertical, ChevronLeft, ChevronRight, ExternalLink, CalendarClock, AlertCircle, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { buildProfileShareUrl } from '@/lib/referral';
 import { recordLinkShared } from '@/lib/clientAcquisitionAnalytics';
@@ -381,26 +381,15 @@ export default function ProfilePage() {
                                     <Share2 size={20} />
                                 </button>
                                 
-                                <div className="flex items-center gap-2 pointer-events-auto">
-                                    <button
-                                        type="button"
-                                        onClick={() => router.push('/profile/edit')}
-                                        aria-label="Editar perfil e fotos"
-                                        title="Editar perfil e fotos"
-                                        className="flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-purple-700 backdrop-blur-md hover:bg-white hover:text-purple-800 transition-all active:scale-95 shadow-md cursor-pointer"
-                                    >
-                                        <Pencil size={20} />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => router.push('/settings')}
-                                        aria-label="Configurações"
-                                        title="Configurações"
-                                        className="flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-slate-700 backdrop-blur-md hover:bg-white hover:text-purple-600 transition-all active:scale-95 shadow-md cursor-pointer"
-                                    >
-                                        <Settings size={20} />
-                                    </button>
-                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => router.push('/profile/edit')}
+                                    aria-label="Editar perfil e fotos"
+                                    title="Editar perfil e fotos"
+                                    className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-purple-700 backdrop-blur-md hover:bg-white hover:text-purple-800 transition-all active:scale-95 shadow-md cursor-pointer"
+                                >
+                                    <Pencil size={20} />
+                                </button>
                             </>
                         }
                         onOpen={(items, index) => {

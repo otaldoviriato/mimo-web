@@ -222,7 +222,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                                 </span>
                             </button>
                         )}
-                        {pathname === '/profile' && !isProfessional && (
+                        {pathname === '/profile' && (
                             <button
                                 onClick={() => router.push('/settings')}
                                 className="p-2 hover:bg-white/10 active:bg-white/20 rounded-full transition-all text-white flex items-center justify-center cursor-pointer"
