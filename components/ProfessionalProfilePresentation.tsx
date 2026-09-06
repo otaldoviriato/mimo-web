@@ -109,6 +109,46 @@ export function ProfessionalProfilePresentation({ user, publicItems, exclusiveIt
         galleryRef.current?.scrollTo({ left: index * galleryRef.current.clientWidth, behavior: 'smooth' });
     };
 
+    useEffect(() => {
+        if (!publicItems.length || publicItems.length <= 1) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const activeEl = document.activeElement;
+            if (
+                activeEl instanceof HTMLInputElement ||
+                activeEl instanceof HTMLTextAreaElement ||
+                activeEl?.getAttribute('contenteditable') === 'true'
+            ) {
+                return;
+            }
+
+            if (document.querySelector('.fixed.z-\\[9999\\]') || document.querySelector('[role="dialog"]')) {
+                return;
+            }
+
+            const current = photoIndexRef.current;
+
+            if (e.key === 'ArrowRight' && current < publicItems.length - 1) {
+                e.preventDefault();
+                setAutoplayStopped(true);
+                const next = current + 1;
+                photoIndexRef.current = next;
+                setPhotoIndex(next);
+                moveToPhoto(next);
+            } else if (e.key === 'ArrowLeft' && current > 0) {
+                e.preventDefault();
+                setAutoplayStopped(true);
+                const prev = current - 1;
+                photoIndexRef.current = prev;
+                setPhotoIndex(prev);
+                moveToPhoto(prev);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [publicItems.length]);
+
     const stopAutoplay = (event: { target: EventTarget }) => {
         if (event.target instanceof Element && event.target.closest('[data-autoplay-control]')) return;
         setAutoplayStopped(true);

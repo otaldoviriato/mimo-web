@@ -7,7 +7,7 @@ import { useMyProfile } from '@/hooks/useQueries';
 import { useUser } from '@clerk/nextjs';
 import { PWAPromoModal } from '@/components/PWAPromoModal';
 import { NotifPromoModal } from '@/components/NotifPromoModal';
-import { Settings, ShieldAlert, Search, Pencil, UserCheck, ShieldCheck } from 'lucide-react';
+import { Settings, ShieldAlert, Search, Pencil, UserCheck, ShieldCheck, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 export default function TabsLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
@@ -18,6 +18,26 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
     const isProfessional = !!userData?.isProfessional;
     const isTeam = !!userData?.isTeam;
     const [unviewedCount, setUnviewedCount] = useState(0);
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('mimo:sidebar-collapsed');
+            if (saved === 'true') {
+                setIsSidebarCollapsed(true);
+            }
+        }
+    }, []);
+
+    const toggleSidebar = () => {
+        setIsSidebarCollapsed(prev => {
+            const next = !prev;
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('mimo:sidebar-collapsed', String(next));
+            }
+            return next;
+        });
+    };
 
     useEffect(() => {
         if (isTeam) {
@@ -104,65 +124,93 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
     return (
         <div className="flex h-screen bg-gray-50">
             {/* Sidebar (desktop) */}
-            <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 shrink-0">
-                {/* Brand */}
-                <div className="flex items-center gap-3 px-5 py-5 border-b border-gray-100">
-                    <div className="flex w-9 h-9 items-center justify-center bg-linear-to-br from-purple-600 to-purple-700 rounded-xl shrink-0">
-                        <img
-                            src="/Logo.svg"
-                            alt="MimoChat"
-                            className="w-6 h-6 object-contain"
-                        />
-                    </div>
-                    <span className="text-lg font-bold text-gray-900">MimoChat</span>
-                </div>
-
-                {/* Nav */}
-                <nav className="flex-1 px-3 py-4">
-                    {resolvedTabs.map((tab) => {
-                        const isActive = pathname === tab.href || (tab.href === '/chats' && pathname === '/');
-                        return (
-                            <Link
-                                key={tab.href}
-                                href={tab.href}
-                                replace={tab.href !== '/chats'}
-                                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl mb-1 transition-all font-medium text-sm
-                                    ${isActive
-                                        ? 'bg-purple-100 text-purple-700'
-                                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                                    }`}
-                            >
-                                <span className={`relative ${isActive ? 'text-purple-600' : 'text-gray-400'}`}>
-                                    {tab.icon(isActive)}
-                                </span>
-                                {tab.label}
-                            </Link>
-                        );
-                    })}
-                </nav>
-
-                {userData?.isAdmin && (
-                    <div className="px-4 pb-5 border-t border-gray-100 pt-4">
-                        <button
-                            onClick={() => router.push('/admin')}
-                            className="flex items-center justify-between w-full px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl transition-all font-semibold text-xs border border-purple-200/60 cursor-pointer"
-                            title="Acessar Back-office"
-                        >
-                            <div className="flex items-center gap-2 min-w-0">
-                                <ShieldAlert className="w-4 h-4 text-purple-600 shrink-0" />
-                                <span className="truncate">{userData?.email || user?.primaryEmailAddress?.emailAddress || 'Back-office'}</span>
+            <aside className={`hidden md:flex flex-col bg-white border-r border-gray-200 shrink-0 transition-all duration-300 ease-in-out overflow-hidden ${
+                isSidebarCollapsed ? 'w-0 border-r-0 opacity-0 pointer-events-none' : 'w-64 opacity-100'
+            }`}>
+                <div className="w-64 flex flex-col h-full">
+                    {/* Brand */}
+                    <div className="flex items-center justify-between px-5 py-5 border-b border-gray-100">
+                        <div className="flex items-center gap-3">
+                            <div className="flex w-9 h-9 items-center justify-center bg-linear-to-br from-purple-600 to-purple-700 rounded-xl shrink-0">
+                                <img
+                                    src="/Logo.svg"
+                                    alt="MimoChat"
+                                    className="w-6 h-6 object-contain"
+                                />
                             </div>
-                            <span className="text-[10px] bg-purple-600 text-white font-bold px-1.5 py-0.5 rounded uppercase shrink-0">Admin</span>
+                            <span className="text-lg font-bold text-gray-900">MimoChat</span>
+                        </div>
+                        <button
+                            onClick={toggleSidebar}
+                            className="p-1.5 hover:bg-gray-100 active:bg-gray-200 text-gray-400 hover:text-gray-700 rounded-lg transition-colors cursor-pointer"
+                            title="Fechar menu lateral"
+                            aria-label="Fechar menu lateral"
+                        >
+                            <PanelLeftClose className="w-5 h-5" />
                         </button>
                     </div>
-                )}
+
+                    {/* Nav */}
+                    <nav className="flex-1 px-3 py-4">
+                        {resolvedTabs.map((tab) => {
+                            const isActive = pathname === tab.href || (tab.href === '/chats' && pathname === '/');
+                            return (
+                                <Link
+                                    key={tab.href}
+                                    href={tab.href}
+                                    replace={tab.href !== '/chats'}
+                                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl mb-1 transition-all font-medium text-sm
+                                        ${isActive
+                                            ? 'bg-purple-100 text-purple-700'
+                                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                        }`}
+                                >
+                                    <span className={`relative ${isActive ? 'text-purple-600' : 'text-gray-400'}`}>
+                                        {tab.icon(isActive)}
+                                    </span>
+                                    {tab.label}
+                                </Link>
+                            );
+                        })}
+                    </nav>
+
+                    {userData?.isAdmin && (
+                        <div className="px-4 pb-5 border-t border-gray-100 pt-4">
+                            <button
+                                onClick={() => router.push('/admin')}
+                                className="flex items-center justify-between w-full px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl transition-all font-semibold text-xs border border-purple-200/60 cursor-pointer"
+                                title="Acessar Back-office"
+                            >
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <ShieldAlert className="w-4 h-4 text-purple-600 shrink-0" />
+                                    <span className="truncate">{userData?.email || user?.primaryEmailAddress?.emailAddress || 'Back-office'}</span>
+                                </div>
+                                <span className="text-[10px] bg-purple-600 text-white font-bold px-1.5 py-0.5 rounded uppercase shrink-0">Admin</span>
+                            </button>
+                        </div>
+                    )}
+                </div>
             </aside>
 
             {/* Main content */}
             <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
                 {/* Header Superior Persistente — padrão em todas as abas */}
                 <div className="shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between z-30 sticky top-0 shadow-md">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5">
+                        {/* Botão para alternar a sidebar no desktop */}
+                        <button
+                            onClick={toggleSidebar}
+                            className="hidden md:flex p-2 hover:bg-white/10 active:bg-white/20 rounded-xl transition-all text-white items-center justify-center cursor-pointer -ml-1.5"
+                            title={isSidebarCollapsed ? "Abrir menu lateral" : "Fechar menu lateral"}
+                            aria-label={isSidebarCollapsed ? "Abrir menu lateral" : "Fechar menu lateral"}
+                        >
+                            {isSidebarCollapsed ? (
+                                <PanelLeftOpen className="w-5 h-5" />
+                            ) : (
+                                <PanelLeftClose className="w-5 h-5" />
+                            )}
+                        </button>
+
                         <img
                             src="/Logo.svg"
                             alt="MimoChat"
