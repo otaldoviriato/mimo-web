@@ -7,8 +7,8 @@ interface DescubraPageProps {
 }
 
 export const metadata = {
-    title: 'MimoChat | Elas ganham para conversar com você',
-    description: 'Mulheres reais sem robôs ou inteligência artificial. Converse de graça, dê mimos e desbloqueie fotos e vídeos exclusivos.',
+    title: 'MimoChat | Conversas reais. Sem fake ou IA.',
+    description: 'Elas ganham pra te responder. Mande um oi de graça, dê mimos pras que você curtir e receba fotos e vídeos exclusivos.',
 };
 
 export default async function DescubraPage({ searchParams }: DescubraPageProps) {

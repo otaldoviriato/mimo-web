@@ -217,21 +217,16 @@ export function NetflixStyleLanding({
                 <div className="w-full max-w-xl mx-auto sm:mx-0 text-left space-y-5 sm:space-y-6">
                     {/* Título Principal de Impacto: Escala Perfeita em Telas Pequenas */}
                     <h1 className="text-[2.5rem] sm:text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 tracking-[-0.035em] leading-[0.98] sm:leading-[1.05]">
-                        <span className="block">Elas ganham para</span>
+                        <span className="block">Conversas reais.</span>
                         <span className="mt-1.5 block text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-600">
-                            conversar com você.
+                            Sem fake ou IA.
                         </span>
                     </h1>
 
-                    {/* Proposta com apelo emocional e exclusividade */}
-                    <div className="space-y-2 max-w-md">
-                        <p className="text-base sm:text-lg lg:text-xl text-slate-800 font-bold leading-snug">
-                            Zero robôs ou inteligência artificial.
-                        </p>
-                        <p className="text-sm sm:text-base text-slate-600 font-medium leading-relaxed">
-                            Converse de graça, dê mimos para suas favoritas e desbloqueie fotos e vídeos que ninguém mais tem acesso.
-                        </p>
-                    </div>
+                    {/* Subtexto */}
+                    <p className="text-sm sm:text-base lg:text-lg text-slate-600 font-medium leading-relaxed max-w-md">
+                        Elas ganham pra te responder. Mande um oi de graça, dê mimos pras que você curtir e receba fotos e vídeos exclusivos.
+                    </p>
 
                     {/* Botão de Chamada para Ação */}
                     <div className="pt-1 sm:pt-2 max-w-sm mx-auto sm:mx-0 space-y-2.5 text-left">
@@ -245,7 +240,7 @@ export function NetflixStyleLanding({
                         </Link>
 
                         <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
-                            100% real e discreto • Envio grátis • Sem assinatura
+                            Mulheres reais • Envio grátis • 100% no sigilo
                         </p>
                     </div>
                 </div>
