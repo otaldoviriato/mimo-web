@@ -672,7 +672,8 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     };
     useEffect(() => () => { nameResolution.current?.(false); }, []);
     const { data: receiver } = useUserById(otherUserId);
-    const { data: chatPricing } = useChatPricing(receiver?.isProfessional ? receiver.clerkId : undefined);
+    const targetProfessionalId = userData?.isProfessional ? (userData.clerkId || user?.id) : (receiver?.isProfessional ? receiver.clerkId : undefined);
+    const { data: chatPricing } = useChatPricing(targetProfessionalId);
     const balance = userData?.balance ?? 0;
     const formattedBalance = (balance / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     const cachedRoom = user?.id
@@ -1428,7 +1429,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         });
 
         socket.on('message_error', (data: { error: string }) => {
-            alert(data.error);
+            toast.error(data.error);
             setSending(false);
             queryClient.invalidateQueries({ queryKey: QueryKeys.me });
         });
@@ -1899,7 +1900,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             }
             
             // Exibir alerta explicativo do erro
-            alert(`Falha no envio de mídia: ${errMsg}`);
+            toast.error(`Falha no envio de mídia: ${errMsg}`);
 
             setUploadTasks(prev => {
                 if (!prev[tempId]) return prev;
@@ -2198,6 +2199,18 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         
         if (!await ensureClientName()) return;
         const charCount = messageText.trim().length;
+
+        if (userData?.isProfessional && !receiver?.isProfessional) {
+            if (!isClientActiveInConversation && charCount > offlineTurnStats.remainingChars) {
+                toast.error(`O cliente está ausente. Esta mensagem pode ter no máximo ${offlineTurnStats.remainingChars} caracteres.`);
+                return;
+            }
+            if (isClientActiveInConversation && charCount > offlineTurnStats.remainingChars) {
+                toast.error(`Limite da conversa atingido. Você pode enviar até ${offlineTurnStats.remainingChars} caracteres.`);
+                return;
+            }
+        }
+
         const costInCents = 0;
 
         const tempId = `temp-${Date.now()}`;
@@ -2321,13 +2334,23 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                         : 'Você não tem saldo suficiente para enviar esta mensagem de áudio. Por favor, recarregue sua carteira.'
                 );
             } else {
-                alert(`Falha ao enviar mensagem de áudio: ${serverError || e.message || 'Erro de rede'}`);
+                toast.error(`Falha ao enviar mensagem de áudio: ${serverError || e.message || 'Erro de rede'}`);
             }
         }
     };
 
     const handleTyping = (text: string) => {
-        setMessageText(text);
+        let newText = text;
+        if (userData?.isProfessional && !receiver?.isProfessional && !offlineTurnStats.isLimitReached) {
+            const max = offlineTurnStats.remainingChars;
+            if (newText.length > max) {
+                newText = newText.slice(0, max);
+                if (!isClientActiveInConversation) {
+                    toast.error(`Cliente ausente: mensagem limitada a ${max} caracteres.`, { id: 'offline-char-limit' });
+                }
+            }
+        }
+        setMessageText(newText);
         if (socket) {
             socket.emit('typing', { roomId, isTyping: true, receiverId: otherUserId });
             if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -2450,11 +2473,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 setMessages(prev => prev.map(m => m._id === messageId ? data.message : m));
                 return true;
             } else {
-                alert(data.error || 'Erro ao desbloquear conteúdo');
+                toast.error(data.error || 'Erro ao desbloquear conteúdo');
                 return false;
             }
         } catch (e) {
-            alert('Erro na requisição');
+            toast.error('Erro na requisição');
             return false;
         } finally {
             setUnlocking(false);
@@ -2539,11 +2562,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                             : 'Você não tem saldo suficiente para enviar este presente. Por favor, recarregue sua carteira.'
                     );
                 } else {
-                    alert(data.error || 'Erro ao enviar presente');
+                    toast.error(data.error || 'Erro ao enviar presente');
                 }
             }
         } catch (e) {
-            alert('Erro de conexão');
+            toast.error('Erro de conexão');
         } finally {
             setSendingGift(false);
         }
@@ -3746,7 +3769,14 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                             : (offlineTurnStats.isExhausted
                                                 ? "Aguarde a resposta para continuar a conversa..."
                                                 : `Nova mensagem liberada em ${formatFollowUpCountdown(offlineTurnStats.msUntilNextAttempt)}...`))
-                                        : "Digite sua mensagem..."
+                                        : (userData?.isProfessional && !receiver?.isProfessional && !isClientActiveInConversation
+                                            ? `Usuário ausente (até ${offlineTurnStats.remainingChars} caracteres)...`
+                                            : "Digite sua mensagem...")
+                                }
+                                maxLength={
+                                    userData?.isProfessional && !receiver?.isProfessional && !offlineTurnStats.isLimitReached
+                                        ? offlineTurnStats.remainingChars
+                                        : undefined
                                 }
                                 rows={1}
                                 className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none leading-5 py-0.5 disabled:text-gray-400 disabled:cursor-not-allowed"
@@ -3773,6 +3803,25 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                         R$ {(estimatedCostInCents / 100).toFixed(2).replace('.', ',')}
                                     </span>
                                 </div>
+                            )}
+                            {userData?.isProfessional && !receiver?.isProfessional && !offlineTurnStats.isLimitReached && (
+                                !isClientActiveInConversation ? (
+                                    <div className="flex items-center justify-between w-full pt-1 select-none text-[11px] leading-tight animate-in fade-in duration-150">
+                                        <span className="font-medium text-amber-700/90 flex items-center gap-1">
+                                            <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+                                            usuário ausente
+                                        </span>
+                                        <span className={`font-semibold tabular-nums ${
+                                            charCount >= offlineTurnStats.remainingChars ? 'text-amber-600 font-bold' : 'text-gray-500'
+                                        }`}>
+                                            {charCount}/{offlineTurnStats.remainingChars} caracteres
+                                        </span>
+                                    </div>
+                                ) : charCount > 0 ? (
+                                    <div className="flex items-center justify-end w-full pt-0.5 select-none text-[10px] text-gray-400 tabular-nums animate-in fade-in duration-150">
+                                        <span>{charCount}/{offlineTurnStats.remainingChars} caracteres</span>
+                                    </div>
+                                ) : null
                             )}
                         </div>
                     )}
