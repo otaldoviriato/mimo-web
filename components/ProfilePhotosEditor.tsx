@@ -4,7 +4,8 @@ import { useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { Plus, Trash2, Loader2, Lock, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useMyGallery, useUploadPhoto, useUploadToGallery, useDeleteFromGallery, useUpdateGalleryItemVisibility } from '@/hooks/useQueries';
+import { useQueryClient } from '@tanstack/react-query';
+import { QueryKeys, useMyGallery, useUploadPhoto, useUploadToGallery, useDeleteFromGallery, useUpdateGalleryItemVisibility } from '@/hooks/useQueries';
 import type { ProfileGalleryItem } from '@/components/ProfessionalProfilePresentation';
 
 interface Props {
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export function ProfilePhotosEditor({ photoUrl }: Props) {
+    const queryClient = useQueryClient();
     const { data: gallery, isLoading, isError } = useMyGallery();
     const uploadPhoto = useUploadPhoto();
     const uploadGallery = useUploadToGallery();
@@ -77,6 +79,9 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
                 await uploadPhoto.mutateAsync(photoData).catch(() => {});
             }
 
+            await queryClient.invalidateQueries({ queryKey: QueryKeys.me });
+            await queryClient.invalidateQueries({ queryKey: ['gallery', 'me'] });
+
             toast.success(tab === 'public' ? 'Foto adicionada ao perfil!' : 'Mídia exclusiva adicionada!');
         } catch (error: any) {
             toast.error(error?.message || 'Falha ao enviar foto. Tente novamente.');
@@ -95,6 +100,8 @@ export function ProfilePhotosEditor({ photoUrl }: Props) {
                 await deletePhoto.mutateAsync(item._id);
                 toast.success('Foto removida do perfil!');
             }
+            await queryClient.invalidateQueries({ queryKey: QueryKeys.me });
+            await queryClient.invalidateQueries({ queryKey: ['gallery', 'me'] });
         } catch (error: any) {
             toast.error(error?.message || 'Erro ao remover foto.');
         }

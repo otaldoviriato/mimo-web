@@ -34,9 +34,10 @@ interface Props {
     isOwner: boolean;
     loadingGallery: boolean;
     subscribing: boolean;
-    onBack: () => void;
-    onSubscribe: () => void;
+    onBack?: () => void;
+    onSubscribe?: () => void;
     onOpen: (items: ProfileGalleryItem[], index: number) => void;
+    headerActions?: React.ReactNode;
 }
 
 export function ProfilePhoto({ src, alt, priority = false, ambient = false }: { src: string; alt: string; priority?: boolean; ambient?: boolean }) {
@@ -52,7 +53,7 @@ export function ProfilePhoto({ src, alt, priority = false, ambient = false }: { 
     );
 }
 
-export function ProfessionalProfilePresentation({ user, publicItems, exclusiveItems, privateCount, isSubscriber, isOwner, loadingGallery, subscribing, onBack, onSubscribe, onOpen }: Props) {
+export function ProfessionalProfilePresentation({ user, publicItems, exclusiveItems, privateCount, isSubscriber, isOwner, loadingGallery, subscribing, onBack, onSubscribe, onOpen, headerActions }: Props) {
     const [photoIndex, setPhotoIndex] = useState(0);
     const [expanded, setExpanded] = useState(false);
     const [revealed, setRevealed] = useState<Record<string, boolean>>({});
