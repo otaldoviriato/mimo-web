@@ -2550,14 +2550,23 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const maxAudioDurationSeconds = (audioCostPerSecondInCents > 0 && !isTeamMemberInvolved)
         ? Math.floor(balance / audioCostPerSecondInCents)
         : undefined;
+    // Se o saldo for > 0, exibe quando estiver abaixo do limite configurado.
+    // Se o saldo for == 0, só exibe quando houver pelo menos uma mensagem da profissional recebida ou bloqueada (pois agora há motivo para recarregar).
+    const hasProfessionalMessage = messages.some(
+        (m) => (!m.isSystem && m.senderId === otherUserId) || m.isContentLocked
+    );
+
+    const isBalanceLowOrZeroWithReason = balance > 0
+        ? balance <= lowBalanceThresholdInCents
+        : hasProfessionalMessage;
+
     const shouldShowLowBalanceAlert = !userData?.isProfessional &&
         !userData?.isTeam &&
         !receiver?.isTeam &&
         receiver?.isProfessional &&
         !monetizationDisabled &&
         lowBalanceThresholdInCents > 0 &&
-        balance > 0 &&
-        balance <= lowBalanceThresholdInCents;
+        isBalanceLowOrZeroWithReason;
 
     const isClosingOrLeaving = isClosing || isLeaving;
 
@@ -2812,9 +2821,13 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                         <AlertTriangle size={13} strokeWidth={2.2} />
                     </span>
                     <span className="min-w-0 flex-1">
-                        <span className="block text-xs font-semibold leading-4">Saldo baixo</span>
+                        <span className="block text-xs font-semibold leading-4">
+                            {balance === 0 ? 'Sem saldo' : 'Saldo baixo'}
+                        </span>
                         <span className="block whitespace-normal text-[11px] font-medium leading-3.5 text-amber-800">
-                            Saldo atual: {formattedBalance}. Toque para recarregar.
+                            {balance === 0
+                                ? 'Você possui mensagens para liberar nesta conversa. Toque para recarregar.'
+                                : `Saldo atual: ${formattedBalance}. Toque para recarregar.`}
                         </span>
                     </span>
                 </button>
