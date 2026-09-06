@@ -223,13 +223,13 @@ export function NetflixStyleLanding({
                         </span>
                     </h1>
 
-                    {/* Proposta e dinâmica transparente */}
+                    {/* Proposta com apelo emocional e exclusividade */}
                     <div className="space-y-2 max-w-md">
                         <p className="text-base sm:text-lg lg:text-xl text-slate-800 font-bold leading-snug">
-                            Por isso elas estão disponíveis para conversar.
+                            Zero robôs ou inteligência artificial.
                         </p>
                         <p className="text-sm sm:text-base text-slate-600 font-medium leading-relaxed">
-                            Você envia mensagens gratuitamente e só paga pelas que receber. Sem assinaturas, sem mensalidade e sem precisar de match.
+                            Converse de graça, dê mimos para suas favoritas e desbloqueie fotos e vídeos que ninguém mais tem acesso.
                         </p>
                     </div>
 
@@ -245,7 +245,7 @@ export function NetflixStyleLanding({
                         </Link>
 
                         <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
-                            100% discreto • Envio gratuito • Sem mensalidade
+                            100% real e discreto • Envio grátis • Sem assinatura
                         </p>
                     </div>
                 </div>
