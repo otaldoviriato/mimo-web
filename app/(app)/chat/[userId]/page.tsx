@@ -16,6 +16,7 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { MediaComposerSheet } from '@/components/MediaComposerSheet';
 import { PendingReceiptBalloon } from '@/components/PendingReceiptBalloon';
 import { LargeMessageConfirmModal } from '@/components/LargeMessageConfirmModal';
+import { decryptMessageText } from '@/lib/messageCipher';
 import { AlertTriangle, ShieldCheck, Wallet, Clock, MessageCircle, LockKeyhole } from 'lucide-react';
 
 interface Message {
@@ -23,6 +24,8 @@ interface Message {
     senderId: string;
     receiverId: string;
     content: string;
+    encryptedContent?: string;
+    encryptedAudioUrl?: string;
     charCount: number;
     equivalentCharCount?: number;
     billingStatus?: 'free' | 'pending' | 'paid';
@@ -108,6 +111,46 @@ function getReplyPreviewContent(msg: Message | null | undefined): string {
     if (msg.isVideo) return '🎥 Vídeo';
     if (msg.audioUrl) return '🎵 Mensagem de voz';
     return msg.content || '';
+}
+
+function unlockMessageIfEligible(
+    msg: Message,
+    currentUserId: string,
+    currentBalance: number,
+    currentThreshold: number,
+    roomId: string,
+    declinedMessageIds?: Set<string>
+): Message {
+    if (
+        msg.billingStatus === 'pending' &&
+        msg.receiverId === currentUserId &&
+        (msg.encryptedContent || msg.encryptedAudioUrl)
+    ) {
+        const requiredCost = msg.receiptChargeCents || 0;
+        const charTotal = msg.equivalentCharCount ?? msg.charCount ?? 0;
+        const isLong = charTotal > currentThreshold;
+        const wasDeclined = declinedMessageIds?.has(msg._id);
+
+        // Se tem saldo suficiente e não é mensagem longa pendente de confirmação (ou já confirmada):
+        if (currentBalance >= requiredCost && (!isLong || wasDeclined === false)) {
+            const seed = String(msg._id || msg.tempId || msg.timestamp || '');
+            const decryptedContent = msg.encryptedContent
+                ? decryptMessageText(msg.encryptedContent, roomId, seed)
+                : msg.content;
+            const decryptedAudioUrl = msg.encryptedAudioUrl
+                ? decryptMessageText(msg.encryptedAudioUrl, roomId, seed)
+                : msg.audioUrl;
+
+            return {
+                ...msg,
+                content: decryptedContent || msg.content,
+                audioUrl: decryptedAudioUrl || msg.audioUrl,
+                billingStatus: 'paid',
+                isContentLocked: false,
+            };
+        }
+    }
+    return msg;
 }
 
 function LockedMediaTypeBadge({ isVideo, duration }: { isVideo?: boolean; duration?: number }) {
@@ -1046,7 +1089,10 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 try {
                     const parsed = JSON.parse(cached);
                     if (Array.isArray(parsed) && parsed.length > 0) {
-                        setMessages(parsed);
+                        const normalized = parsed.map((m: any) =>
+                            unlockMessageIfEligible(m, user.id, balance, largeMessageThreshold, currentRoomId, declinedLongMessageIdsRef.current)
+                        );
+                        setMessages(normalized);
                         setLoadingMessages(false);
                     }
                 } catch (e) {
@@ -1054,7 +1100,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 }
             }
         }
-    }, [user?.id, otherUserId]);
+    }, [user?.id, otherUserId, balance, largeMessageThreshold]);
 
     // Fallback HTTP para carregar mensagens da API se o socket atrasar ou falhar
     useEffect(() => {
@@ -1067,17 +1113,18 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         .then((res) => {
             if (Array.isArray(res.data)) {
                 setMessages((prev) => {
-                    if (prev.length === 0) {
-                        return res.data;
-                    }
-                    const prevMap = new Map(prev.map((m: any) => [m._id, m]));
-                    const normalizedHttp = res.data.map((newMsg: any) => {
-                        const prevMsg = prevMap.get(newMsg._id);
-                        if (prevMsg && newMsg.isContentLocked && prevMsg.isContentLocked && prevMsg.content) {
-                            return { ...newMsg, content: prevMsg.content };
+                    const rawList: any[] = res.data;
+                    const normalizedHttp = rawList.map((newMsg: any) => {
+                        const unlocked = unlockMessageIfEligible(newMsg, user.id, balance, largeMessageThreshold, currentRoomId, declinedLongMessageIdsRef.current);
+                        const prevMsg = prev.find((m: any) => m._id === newMsg._id);
+                        if (prevMsg && unlocked.isContentLocked && prevMsg.isContentLocked && prevMsg.content) {
+                            return { ...unlocked, content: prevMsg.content };
                         }
-                        return newMsg;
+                        return unlocked;
                     });
+                    if (prev.length === 0) {
+                        return normalizedHttp;
+                    }
                     const existingIds = new Set(prev.map(m => m._id));
                     const newFromHttp = normalizedHttp.filter((m: any) => !existingIds.has(m._id));
                     if (newFromHttp.length === 0) {
@@ -1099,7 +1146,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         .finally(() => {
             setLoadingMessages(false);
         });
-    }, [user?.id, otherUserId]);
+    }, [user?.id, otherUserId, balance, largeMessageThreshold]);
 
     // Salva apenas as últimas 50 mensagens no cache local para não sobrecarregar o armazenamento
     useEffect(() => {
@@ -1197,15 +1244,15 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             const currentThreshold = data.largeMessageThreshold || largeMessageThreshold;
 
             setMessages((prev) => {
-                if (!prev || prev.length === 0) return [...data.messages];
-                const prevMap = new Map(prev.map(m => [m._id, m]));
-                return data.messages.map((newMsg) => {
-                    const prevMsg = prevMap.get(newMsg._id);
-                    if (prevMsg && newMsg.isContentLocked && prevMsg.isContentLocked && prevMsg.content) {
-                        return { ...newMsg, content: prevMsg.content };
+                const unlockedMessages = data.messages.map((newMsg) => {
+                    const unlocked = unlockMessageIfEligible(newMsg, user.id, balance, currentThreshold, roomId, declinedLongMessageIdsRef.current);
+                    const prevMsg = prev.find(m => m._id === newMsg._id);
+                    if (prevMsg && unlocked.isContentLocked && prevMsg.isContentLocked && prevMsg.content) {
+                        return { ...unlocked, content: prevMsg.content };
                     }
-                    return newMsg;
+                    return unlocked;
                 });
+                return unlockedMessages;
             });
 
             // Se o usuário logado for o cliente e houver mensagens pendentes longas que não foram recusadas:
@@ -1299,11 +1346,13 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         socketService.onNewMessage((data: { message: Message; tempId?: string }) => {
             if ([data.message.senderId, data.message.receiverId].sort().join('_') !== roomId) return;
 
-            // Se for recebida para o usuário atual e estiver pendente:
-            if (data.message.receiverId === user?.id && data.message.billingStatus === 'pending') {
-                const charTotal = data.message.equivalentCharCount ?? data.message.charCount ?? 0;
-                if (charTotal > largeMessageThreshold && !declinedLongMessageIdsRef.current.has(data.message._id)) {
-                    setPendingLongMessageToConfirm(data.message);
+            const processedMsg = unlockMessageIfEligible(data.message, user.id, balance, largeMessageThreshold, roomId, declinedLongMessageIdsRef.current);
+
+            // Se for recebida para o usuário atual e ainda estiver pendente (ex: mensagem longa):
+            if (processedMsg.receiverId === user?.id && processedMsg.billingStatus === 'pending') {
+                const charTotal = processedMsg.equivalentCharCount ?? processedMsg.charCount ?? 0;
+                if (charTotal > largeMessageThreshold && !declinedLongMessageIdsRef.current.has(processedMsg._id)) {
+                    setPendingLongMessageToConfirm(processedMsg);
                 }
             }
 
@@ -1313,11 +1362,11 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     const index = prev.findIndex(m => m.tempId === data.tempId || m._id === data.tempId);
                     if (index !== -1) {
                         const newMessages = [...prev];
-                        newMessages[index] = { ...data.message, status: 'sent' as const };
-                        if (data.message._id) {
+                        newMessages[index] = { ...processedMsg, status: 'sent' as const };
+                        if (processedMsg._id) {
                             setNewIncomingMessageIds((prevIds) => {
                                 const nextIds = new Set(prevIds);
-                                nextIds.add(data.message._id);
+                                nextIds.add(processedMsg._id);
                                 return nextIds;
                             });
                         }
@@ -1325,15 +1374,20 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     }
                 }
 
-                // Se a mensagem já existe (evitar duplicatas), não faz nada
-                if (prev.find(m => m._id === data.message._id)) return prev;
+                // Se a mensagem já existe (evitar duplicatas), atualiza com processedMsg
+                const existingIndex = prev.findIndex(m => m._id === processedMsg._id);
+                if (existingIndex !== -1) {
+                    const newMessages = [...prev];
+                    newMessages[existingIndex] = { ...processedMsg, status: 'sent' as const };
+                    return newMessages;
+                }
 
-                const newMessages = [...prev, { ...data.message, status: 'sent' as const }];
-                if (data.message.receiverId === user?.id) {
+                const newMessages = [...prev, { ...processedMsg, status: 'sent' as const }];
+                if (processedMsg.receiverId === user?.id) {
                     socket.emit('mark_as_read', { roomId });
                     setNewIncomingMessageIds((prevIds) => {
                         const nextIds = new Set(prevIds);
-                        nextIds.add(data.message._id);
+                        nextIds.add(processedMsg._id);
                         return nextIds;
                     });
                 }
@@ -2152,12 +2206,30 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     };
 
     const handleConfirmLongMessage = (msg: Message) => {
-        if (!socket || !roomId || !msg._id) return;
-        socket.emit('confirm_view_messages', {
-            roomId,
-            messageIds: [msg._id],
-        });
+        if (!roomId || !msg._id) return;
+        if (socket) {
+            socket.emit('confirm_view_messages', {
+                roomId,
+                messageIds: [msg._id],
+            });
+        }
         setPendingLongMessageToConfirm(null);
+        if (msg.encryptedContent || msg.encryptedAudioUrl) {
+            const seed = String(msg._id || msg.tempId || msg.timestamp || '');
+            const decryptedContent = msg.encryptedContent
+                ? decryptMessageText(msg.encryptedContent, roomId, seed)
+                : msg.content;
+            const decryptedAudioUrl = msg.encryptedAudioUrl
+                ? decryptMessageText(msg.encryptedAudioUrl, roomId, seed)
+                : msg.audioUrl;
+            setMessages(prev => prev.map(m => m._id === msg._id ? {
+                ...m,
+                content: decryptedContent || m.content,
+                audioUrl: decryptedAudioUrl || m.audioUrl,
+                billingStatus: 'paid',
+                isContentLocked: false,
+            } : m));
+        }
     };
 
     const handleDeclineLongMessage = (msgId?: string) => {
@@ -2189,6 +2261,22 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     roomId,
                     messageIds: [item._id],
                 });
+            }
+            if (item.encryptedContent || item.encryptedAudioUrl) {
+                const seed = String(item._id || item.tempId || item.timestamp || '');
+                const decryptedContent = item.encryptedContent
+                    ? decryptMessageText(item.encryptedContent, roomId, seed)
+                    : item.content;
+                const decryptedAudioUrl = item.encryptedAudioUrl
+                    ? decryptMessageText(item.encryptedAudioUrl, roomId, seed)
+                    : item.audioUrl;
+                setMessages(prev => prev.map(m => m._id === item._id ? {
+                    ...m,
+                    content: decryptedContent || m.content,
+                    audioUrl: decryptedAudioUrl || m.audioUrl,
+                    billingStatus: 'paid',
+                    isContentLocked: false,
+                } : m));
             }
         }
     };

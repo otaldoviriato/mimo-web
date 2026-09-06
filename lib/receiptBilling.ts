@@ -55,10 +55,28 @@ export function lockedMessagePreview(content: string, seed: string = ''): string
     }).join('');
 }
 
-// Never send pending content, audio URLs or quoted text to the paying recipient.
+import { encryptMessageText } from './messageCipher';
+
+// Never send plain pending content, audio URLs or quoted text to the paying recipient.
+// Send encryptedContent and encryptedAudioUrl so the client can decrypt instantly upon payment/balance.
 export function messageForViewer<T extends Record<string, any>>(message: T, viewerId?: string): T {
     if (message.billingStatus !== 'pending' || viewerId === message.senderId) return message;
     const seed = String(message._id || message.tempId || message.timestamp || '');
-    return { ...message, content: message.isAudio ? '' : lockedMessagePreview(String(message.content ?? ''), seed), audioUrl: undefined,
-        replyToContent: null, replyToId: null, replyToSenderId: null, isContentLocked: true };
+    const roomId = String(message.roomId || '');
+    const rawContent = String(message.content ?? '');
+
+    const encryptedContent = rawContent ? encryptMessageText(rawContent, roomId, seed) : undefined;
+    const encryptedAudioUrl = message.audioUrl ? encryptMessageText(String(message.audioUrl), roomId, seed) : undefined;
+
+    return {
+        ...message,
+        content: message.isAudio ? '' : lockedMessagePreview(rawContent, seed),
+        encryptedContent,
+        encryptedAudioUrl,
+        audioUrl: undefined,
+        replyToContent: null,
+        replyToId: null,
+        replyToSenderId: null,
+        isContentLocked: true
+    };
 }
