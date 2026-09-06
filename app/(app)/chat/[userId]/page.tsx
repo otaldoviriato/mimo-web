@@ -1473,6 +1473,13 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                             return nextIds;
                         });
                     }
+                    if (oldMsg.billingStatus === 'pending' && data.message.billingStatus === 'paid' && oldMsg.senderId === user?.id) {
+                        setNewIncomingMessageIds((prevIds) => {
+                            const nextIds = new Set(prevIds);
+                            nextIds.add(data.message._id);
+                            return nextIds;
+                        });
+                    }
                 }
                 return prev.map(m => m._id === data.message._id ? data.message : m);
             });
@@ -3048,9 +3055,6 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                 isNew={newUnlockedMediaIds.has(item._id)}
                                             />
                                         )}
-                                        {isMine && userData?.isProfessional && item.billingStatus === 'pending' && (
-                                            <span className="self-end mb-1 mr-1.5 text-[11px] font-medium text-amber-700 select-none">Pendente</span>
-                                        )}
                                         {isMine && userData?.isProfessional && item.billingStatus === 'paid' && (
                                             <EarningsIndicator
                                                 messageId={item._id}
@@ -3064,7 +3068,11 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                         <div
                                             className={`reply-swipe-balloon relative z-10 max-w-[75%] ${isLocked || item.originalImageUrl || item.isVideo || item.isExpired || item.isContentLocked ? 'p-0 bg-transparent shadow-none' : (isAudio ? 'p-3' : 'px-3 py-1.5')} rounded-2xl ${
                                             (!isLocked && !item.originalImageUrl && !item.isVideo && !item.isExpired && !item.isContentLocked) 
-                                        ? (isMine ? 'bg-purple-600 text-white rounded-br-sm' : 'bg-white text-gray-900 shadow-sm rounded-bl-sm')
+                                        ? (isMine 
+                                            ? (item.billingStatus === 'pending' 
+                                                ? 'bg-purple-600/80 border border-purple-400/35 text-white/95 shadow-xs backdrop-blur-xs' 
+                                                : 'bg-purple-600 text-white') + ' rounded-br-sm' 
+                                            : 'bg-white text-gray-900 shadow-sm rounded-bl-sm')
                                                 : (isMine ? 'rounded-br-sm' : 'rounded-bl-sm')
                                             }`}
                                         >
@@ -3119,22 +3127,33 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                     <span className="text-[9px] text-slate-400 text-center px-4 leading-tight">Esta mídia temporária não está mais disponível.</span>
                                                 </div>
                                             ) : isAudio ? (
-                                                <AudioPlayer
-                                                    src={item.audioUrl!}
-                                                    duration={item.audioDuration}
-                                                    isMine={isMine}
-                                                    timestamp={(() => {
-                                                        try {
-                                                            return new Date(item.timestamp).toLocaleTimeString('pt-BR', {
-                                                                hour: '2-digit',
-                                                                minute: '2-digit',
-                                                            });
-                                                        } catch { return undefined; }
-                                                    })()}
-                                                    isRead={item.isRead}
-                                                    isDelivered={item.isDelivered}
-                                                    status={item.status}
-                                                />
+                                                <div>
+                                                    {isMine && item.billingStatus === 'pending' && (
+                                                        <div className="flex items-center gap-1.5 text-[10px] font-medium text-purple-200/90 pb-1 mb-1.5 border-b border-purple-400/25 select-none">
+                                                            <span className="relative flex h-1.5 w-1.5 shrink-0">
+                                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-300 opacity-75" />
+                                                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-400" />
+                                                            </span>
+                                                            <span>Aguardando saldo do cliente</span>
+                                                        </div>
+                                                    )}
+                                                    <AudioPlayer
+                                                        src={item.audioUrl!}
+                                                        duration={item.audioDuration}
+                                                        isMine={isMine}
+                                                        timestamp={(() => {
+                                                            try {
+                                                                return new Date(item.timestamp).toLocaleTimeString('pt-BR', {
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit',
+                                                                });
+                                                            } catch { return undefined; }
+                                                        })()}
+                                                        isRead={item.isRead}
+                                                        isDelivered={item.isDelivered}
+                                                        status={item.status}
+                                                    />
+                                                </div>
                                             ) : isLocked ? (
                                                 <div className="relative w-60 h-60 rounded-2xl overflow-hidden cursor-pointer bg-gray-200 shadow-sm flex items-center justify-center" onClick={() => {
                                                     if (!isMine) {
@@ -3407,6 +3426,15 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                         </>
                                     ) : (
                                         <div className="relative">
+                                            {isMine && item.billingStatus === 'pending' && (
+                                                <div className="flex items-center gap-1.5 text-[10px] font-medium text-purple-200/90 pb-1 mb-1 border-b border-purple-400/25 select-none">
+                                                    <span className="relative flex h-1.5 w-1.5 shrink-0">
+                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-300 opacity-75" />
+                                                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-400" />
+                                                    </span>
+                                                    <span>Aguardando saldo do cliente</span>
+                                                </div>
+                                            )}
                                             <CollapsibleTextMessage content={item.content} isMine={isMine} />
                                             <div className="inline-flex items-center gap-1.5 float-right mt-2 ml-2 mb-[-2px]">
                                                 <span className={`text-[10px] font-medium ${isMine ? 'text-purple-200/70' : 'text-gray-400'}`}>
@@ -3420,23 +3448,29 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                     })()}
                                                 </span>
                                                 {isMine && (
-                                                    <span className={`text-[11px] ${item.isRead ? 'text-blue-300' : (item.status === 'sending' ? 'text-purple-300 animate-pulse' : 'text-purple-300/80')}`}>
-                                                        {item.status === 'sending' ? (
-                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                                                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                                                            </svg>
-                                                        ) : item.isRead ? (
-                                                            <div className="inline-flex items-center">
-                                                                <span className="relative">✓</span>
-                                                                <span className="relative -ml-1.5">✓</span>
-                                                            </div>
-                                                        ) : item.isDelivered ? (
-                                                            <div className="inline-flex items-center">
-                                                                <span className="relative">✓</span>
-                                                                <span className="relative -ml-1.5">✓</span>
-                                                            </div>
-                                                        ) : '✓'}
-                                                    </span>
+                                                    item.billingStatus === 'pending' ? (
+                                                        <span className="inline-flex items-center text-[10px] text-amber-300/90 font-medium ml-0.5" title="Aguardando saldo do cliente para liberar">
+                                                            <Clock size={11} className="animate-pulse" />
+                                                        </span>
+                                                    ) : (
+                                                        <span className={`text-[11px] ${item.isRead ? 'text-blue-300' : (item.status === 'sending' ? 'text-purple-300 animate-pulse' : 'text-purple-300/80')}`}>
+                                                            {item.status === 'sending' ? (
+                                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                                                                </svg>
+                                                            ) : item.isRead ? (
+                                                                <div className="inline-flex items-center">
+                                                                    <span className="relative">✓</span>
+                                                                    <span className="relative -ml-1.5">✓</span>
+                                                                </div>
+                                                            ) : item.isDelivered ? (
+                                                                <div className="inline-flex items-center">
+                                                                    <span className="relative">✓</span>
+                                                                    <span className="relative -ml-1.5">✓</span>
+                                                                </div>
+                                                            ) : '✓'}
+                                                        </span>
+                                                    )
                                                 )}
                                             </div>
                                             <div className="clear-both" />

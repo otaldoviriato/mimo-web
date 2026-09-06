@@ -3,6 +3,8 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IRoom extends Document {
     participants: string[];
     lastMessage?: string;
+    lastMessageSenderId?: string;
+    lastMessageBillingStatus?: string;
     lastMessageTime?: Date;
     unreadCount?: Map<string, number>;
     deletedBy?: string[]; // clerkIds que excluíram esta conversa
@@ -21,6 +23,12 @@ const RoomSchema = new Schema<IRoom>({
         },
     },
     lastMessage: {
+        type: String,
+    },
+    lastMessageSenderId: {
+        type: String,
+    },
+    lastMessageBillingStatus: {
         type: String,
     },
     lastMessageTime: {
