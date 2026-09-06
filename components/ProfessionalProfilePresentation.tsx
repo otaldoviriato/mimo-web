@@ -39,11 +39,14 @@ interface Props {
     onOpen: (items: ProfileGalleryItem[], index: number) => void;
 }
 
-function ProfilePhoto({ src, alt, priority = false, className = 'object-cover' }: { src: string; alt: string; priority?: boolean; className?: string }) {
+export function ProfilePhoto({ src, alt, priority = false, ambient = false }: { src: string; alt: string; priority?: boolean; ambient?: boolean }) {
     const [failed, setFailed] = useState(false);
 
     return src && !failed ? (
-        <Image src={src} alt={alt} fill unoptimized priority={priority} sizes="(max-width: 640px) 100vw, 640px" className={className} onError={() => setFailed(true)} />
+        <div className="absolute inset-0 isolate overflow-hidden">
+            {ambient && <Image src={src} alt="" aria-hidden fill unoptimized sizes="100vw" className="pointer-events-none scale-110 object-cover blur-3xl brightness-[0.65]" draggable={false} />}
+            <Image src={src} alt={alt} fill unoptimized priority={priority} sizes="(min-width: 1024px) 50vw, 100vw" className={`relative ${ambient ? 'object-contain' : 'object-cover'}`} draggable={false} onError={() => setFailed(true)} />
+        </div>
     ) : (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-100"><Avatar size={88} /></div>
     );
@@ -121,7 +124,7 @@ export function ProfessionalProfilePresentation({ user, publicItems, exclusiveIt
                 }}>
                     {publicItems.length ? publicItems.map((item, index) => (
                         <button key={item._id} type="button" onClick={() => onOpen(publicItems, index)} aria-label={`Abrir foto ${index + 1} de ${name}`} className="relative h-full w-full shrink-0 snap-center focus-visible:outline-4 focus-visible:-outline-offset-4 focus-visible:outline-purple-600">
-                            <ProfilePhoto src={item.imageUrl} alt={`${name}, foto ${index + 1}`} priority={index === 0} className="object-cover sm:object-contain" />
+                            <ProfilePhoto src={item.imageUrl} alt={`${name}, foto ${index + 1}`} priority={index === 0} ambient />
                         </button>
                     )) : (
                         <div className="flex w-full items-center justify-center"><Avatar size={96} /></div>

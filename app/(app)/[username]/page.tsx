@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
-import { ProfessionalProfilePresentation, type ProfileGalleryItem } from '@/components/ProfessionalProfilePresentation';
+import { ProfessionalProfilePresentation, ProfilePhoto, type ProfileGalleryItem } from '@/components/ProfessionalProfilePresentation';
 import { SubscribeModal } from '@/components/SubscribeModal';
 import { useUserByUsername, usePublicGallery, useSubscribe, useMyProfile } from '@/hooks/useQueries';
 import { UserX, Lock, Eye, X, ChevronLeft, ChevronRight, ShieldCheck, Gift } from 'lucide-react';
@@ -596,12 +596,9 @@ export default function UserProfilePage({ params, username: propUsername, onBack
                                             className="h-screen w-screen object-contain bg-black"
                                         />
                                     ) : item ? (
-                                        <img
-                                            src={item.imageUrl}
-                                            alt="Midia da galeria em tela cheia"
-                                            className="h-screen w-screen object-contain pointer-events-none"
-                                            draggable={false}
-                                        />
+                                        <div className="relative h-screen w-screen pointer-events-none">
+                                            <ProfilePhoto src={item.imageUrl} alt="Midia da galeria em tela cheia" ambient />
+                                        </div>
                                     ) : null}
                                 </div>
                             ))}
