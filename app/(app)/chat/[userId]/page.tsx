@@ -3769,9 +3769,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                             : (offlineTurnStats.isExhausted
                                                 ? "Aguarde a resposta para continuar a conversa..."
                                                 : `Nova mensagem liberada em ${formatFollowUpCountdown(offlineTurnStats.msUntilNextAttempt)}...`))
-                                        : (userData?.isProfessional && !receiver?.isProfessional && !isClientActiveInConversation
-                                            ? `Usuário ausente (até ${offlineTurnStats.remainingChars} caracteres)...`
-                                            : "Digite sua mensagem...")
+                                        : "Digite sua mensagem..."
                                 }
                                 maxLength={
                                     userData?.isProfessional && !receiver?.isProfessional && !offlineTurnStats.isLimitReached
@@ -3804,7 +3802,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                     </span>
                                 </div>
                             )}
-                            {userData?.isProfessional && !receiver?.isProfessional && !offlineTurnStats.isLimitReached && (
+                            {userData?.isProfessional && !receiver?.isProfessional && !offlineTurnStats.isLimitReached && (isInputFocused || charCount > 0) && (
                                 !isClientActiveInConversation ? (
                                     <div className="flex items-center justify-between w-full pt-1 select-none text-[11px] leading-tight animate-in fade-in duration-150">
                                         <span className="font-medium text-amber-700/90 flex items-center gap-1">
