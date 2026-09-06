@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Avatar, TouchableRipple, PullToRefresh } from '@/components';
 import { useChatRooms, useMyProfile, QueryKeys } from '@/hooks/useQueries';
 import { useSocket } from '@/hooks/useSocket';
-import { CheckCircle2, X, WalletCards, Clock, AlertCircle, ChevronRight, MessageCircle, Trash2, ShieldCheck, Share2, Star } from 'lucide-react';
+import { CheckCircle2, X, WalletCards, Clock, AlertCircle, ChevronRight, MessageCircle, Trash2, ShieldCheck, Share2, Star, Lock } from 'lucide-react';
 import { Drawer } from 'vaul';
 import { buildProfileShareUrl } from '@/lib/referral';
 import { recordLinkShared } from '@/lib/clientAcquisitionAnalytics';
@@ -883,27 +883,19 @@ export default function ChatsPage() {
                                                             ? 'font-semibold text-gray-950' 
                                                             : room.lastMessage 
                                                                 ? 'text-gray-500' 
-                                                                : 'text-purple-500 italic font-medium'
+                                                                : 'text-slate-400'
                                                     }`}>
                                                         {(() => {
-                                                            const isPendingPrompt = room.lastMessage?.includes('Recarregue para visualizar') || room.lastMessage?.includes('Recarregue') || room.lastMessage?.includes('Aguardando saldo');
-                                                            if (myProfile?.isProfessional && isPendingPrompt) {
+                                                            const isPendingPrompt = room.lastMessage?.includes('Recarregue para visualizar') || room.lastMessage?.includes('Recarregue') || room.lastMessage?.includes('Aguardando saldo') || room.lastMessage?.includes('Conteúdo bloqueado');
+                                                            if (isPendingPrompt) {
                                                                 return (
-                                                                    <span className="text-amber-700 italic font-medium inline-flex items-center gap-1">
-                                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
-                                                                        Aguardando saldo do cliente
+                                                                    <span className="text-slate-500 inline-flex items-center gap-1 font-normal">
+                                                                        <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                                                        Conteúdo bloqueado
                                                                     </span>
                                                                 );
                                                             }
-                                                            if (!myProfile?.isProfessional && isPendingPrompt) {
-                                                                return (
-                                                                    <span className="text-amber-700 font-medium inline-flex items-center gap-1">
-                                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
-                                                                        Aguardando saldo para liberar
-                                                                    </span>
-                                                                );
-                                                            }
-                                                            return room.lastMessage || 'Toque para iniciar a conversa!';
+                                                            return room.lastMessage || 'Sem mensagens';
                                                         })()}
                                                     </span>
                                                 )}
