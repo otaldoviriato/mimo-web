@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import Image from 'next/image';
-import { ChevronLeft, ChevronRight, Eye, EyeOff, Lock, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Eye, EyeOff, Lock, Pause, Play, ShieldCheck } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 
@@ -52,6 +52,8 @@ export function ProfessionalProfilePresentation({ user, publicItems, exclusiveIt
     const [expanded, setExpanded] = useState(false);
     const [revealed, setRevealed] = useState<Record<string, boolean>>({});
     const galleryRef = useRef<HTMLDivElement>(null);
+    const photoIndexRef = useRef(0);
+    const [autoplayStopped, setAutoplayStopped] = useState(false);
     const bioId = useId();
     const bioRef = useRef<HTMLParagraphElement>(null);
     const [bioOverflows, setBioOverflows] = useState(false);
@@ -59,6 +61,29 @@ export function ProfessionalProfilePresentation({ user, publicItems, exclusiveIt
     const hasExclusive = exclusiveItems.length > 0 || privateCount > 0;
     const name = user.name || `@${user.username}`;
     const canAccess = isSubscriber || isOwner;
+
+    useEffect(() => {
+        const gallery = galleryRef.current;
+        if (!gallery) return;
+        const observer = new ResizeObserver(() => {
+            gallery.scrollLeft = photoIndexRef.current * gallery.clientWidth;
+        });
+        observer.observe(gallery);
+        return () => observer.disconnect();
+    }, []);
+
+    useEffect(() => {
+        if (autoplayStopped || publicItems.length < 2) return;
+        const desktop = window.matchMedia('(min-width: 1024px)');
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+        const timer = window.setInterval(() => {
+            const gallery = galleryRef.current;
+            if (!gallery || !desktop.matches || reducedMotion.matches || document.hidden) return;
+            const nextIndex = (photoIndexRef.current + 1) % publicItems.length;
+            gallery.scrollTo({ left: nextIndex * gallery.clientWidth, behavior: 'smooth' });
+        }, 5000);
+        return () => window.clearInterval(timer);
+    }, [autoplayStopped, publicItems.length]);
 
     useEffect(() => {
         const element = bioRef.current;
@@ -72,12 +97,19 @@ export function ProfessionalProfilePresentation({ user, publicItems, exclusiveIt
         galleryRef.current?.scrollTo({ left: index * galleryRef.current.clientWidth, behavior: 'smooth' });
     };
 
+    const stopAutoplay = (event: { target: EventTarget }) => {
+        if (event.target instanceof Element && event.target.closest('[data-autoplay-control]')) return;
+        setAutoplayStopped(true);
+    };
+
     return (
-        <div className="mx-auto w-full max-w-2xl shrink-0 bg-white sm:mt-6 sm:overflow-hidden sm:rounded-3xl">
-            <section aria-label="Fotos públicas" aria-roledescription="carrossel" className="relative bg-slate-100">
-                <div ref={galleryRef} className={`flex min-h-56 snap-x snap-mandatory overflow-x-auto no-scrollbar ${publicItems.length ? 'h-[min(52svh,440px)]' : 'h-56'}`} onScroll={(event) => {
+        <div onPointerDownCapture={stopAutoplay} onKeyDownCapture={stopAutoplay} onFocusCapture={stopAutoplay} onWheelCapture={stopAutoplay} className="mx-auto w-full max-w-2xl shrink-0 bg-white sm:mt-6 sm:overflow-hidden sm:rounded-3xl lg:mt-0 lg:grid lg:h-full lg:min-h-0 lg:max-w-none lg:grid-cols-2 lg:rounded-none">
+            <section aria-label="Fotos públicas" aria-roledescription="carrossel" className="relative min-w-0 bg-slate-100 lg:h-full lg:min-h-0 lg:bg-slate-950">
+                <div ref={galleryRef} className={`flex min-h-56 snap-x snap-mandatory overflow-x-auto no-scrollbar lg:h-full lg:min-h-0 ${publicItems.length ? 'h-[min(52svh,440px)]' : 'h-56'}`} onScroll={(event) => {
                     const element = event.currentTarget;
-                    setPhotoIndex(Math.round(element.scrollLeft / element.clientWidth));
+                    const index = Math.round(element.scrollLeft / element.clientWidth);
+                    photoIndexRef.current = index;
+                    setPhotoIndex(index);
                 }}>
                     {publicItems.length ? publicItems.map((item, index) => (
                         <button key={item._id} type="button" onClick={() => onOpen(publicItems, index)} aria-label={`Abrir foto ${index + 1} de ${name}`} className="relative h-full w-full shrink-0 snap-center focus-visible:outline-4 focus-visible:-outline-offset-4 focus-visible:outline-purple-600">
@@ -94,12 +126,13 @@ export function ProfessionalProfilePresentation({ user, publicItems, exclusiveIt
                             <button type="button" disabled={photoIndex === 0} onClick={() => moveToPhoto(photoIndex - 1)} aria-label="Foto anterior" className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-black/35 text-white disabled:invisible"><ChevronLeft size={22} /></button>
                             <button type="button" disabled={photoIndex >= publicItems.length - 1} onClick={() => moveToPhoto(photoIndex + 1)} aria-label="Próxima foto" className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-black/35 text-white disabled:invisible"><ChevronRight size={22} /></button>
                         </div>
-                        <div aria-live="polite" aria-atomic="true" className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/45 px-3 py-1 text-xs font-medium text-white">{photoIndex + 1} / {publicItems.length}</div>
+                        <div aria-live={autoplayStopped ? 'polite' : 'off'} aria-atomic="true" className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/45 px-3 py-1 text-xs font-medium text-white lg:bottom-8">{photoIndex + 1} / {publicItems.length}</div>
+                        <button type="button" data-autoplay-control onClick={() => setAutoplayStopped(!autoplayStopped)} aria-label={autoplayStopped ? 'Reproduzir fotos automaticamente' : 'Pausar troca automática de fotos'} className="absolute bottom-6 right-6 hidden h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white hover:bg-black/60 lg:flex motion-reduce:hidden">{autoplayStopped ? <Play size={17} /> : <Pause size={17} />}</button>
                     </>
                 )}
             </section>
 
-            <div className="space-y-7 px-5 py-6 sm:px-8 sm:py-8">
+            <div aria-label="Detalhes do perfil" tabIndex={0} className="min-w-0 space-y-7 px-5 py-6 sm:px-8 sm:py-8 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:px-10 lg:pt-12 lg:pb-[calc(7rem+env(safe-area-inset-bottom))] xl:px-16">
                 <section aria-label="Apresentação">
                     <div className="flex items-center gap-2">
                         <h1 className="min-w-0 break-words text-3xl font-bold tracking-tight text-slate-900">{name}</h1>

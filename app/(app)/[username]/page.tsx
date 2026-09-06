@@ -345,7 +345,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
 
 
     return (
-        <div className={`flex flex-col bg-slate-50 overflow-y-auto overflow-x-hidden pb-[calc(7rem+env(safe-area-inset-bottom))] no-scrollbar relative ${layoutClass} ${animationClass}`}>
+        <div className={`flex flex-col bg-slate-50 overflow-y-auto overflow-x-hidden pb-[calc(7rem+env(safe-area-inset-bottom))] no-scrollbar relative ${user.isProfessional ? 'lg:overflow-hidden lg:pb-0' : ''} ${layoutClass} ${animationClass}`}>
             {user.isProfessional ? (
                 <ProfessionalProfilePresentation
                     key={user.clerkId}
@@ -507,7 +507,7 @@ export default function UserProfilePage({ params, username: propUsername, onBack
             </>}
 
             {canMessage && (
-                <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-100 bg-white/95 px-5 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-sm">
+                <div className={`fixed bottom-0 left-0 right-0 z-30 border-t border-slate-100 bg-white/95 px-5 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-sm ${user.isProfessional ? 'lg:left-1/2 lg:px-10 lg:py-5 xl:px-16' : ''}`}>
                     <div className="mx-auto w-full max-w-2xl">
                         <Button
                             title={isBlockedByOtherTeamMember ? 'Em atendimento' : startingTeamChat ? 'Abrindo...' : 'Conversar'}
