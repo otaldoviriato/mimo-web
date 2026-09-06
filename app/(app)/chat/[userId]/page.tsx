@@ -2815,20 +2815,16 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                 <button
                     type="button"
                     onClick={() => openRechargeModal({ currentBalanceInCents: balance })}
-                    className="shrink-0 z-10 flex w-full items-center gap-2.5 border-b border-amber-100 bg-amber-50/80 px-4 py-2 text-left text-amber-950 transition-colors hover:bg-amber-50 active:bg-amber-100"
+                    className="shrink-0 z-10 flex w-full items-center justify-between gap-3 border-b border-amber-200/50 bg-amber-50/70 px-4 py-2 text-left text-amber-950 transition-colors hover:bg-amber-100/60 active:bg-amber-100"
                 >
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-100/80 text-amber-700 ring-1 ring-amber-200/70">
-                        <AlertTriangle size={13} strokeWidth={2.2} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                        <span className="block text-xs font-semibold leading-4">
-                            {balance === 0 ? 'Sem saldo' : 'Saldo baixo'}
+                    <div className="flex items-center gap-2 min-w-0">
+                        <AlertTriangle size={14} className="text-amber-600 shrink-0" strokeWidth={2.2} />
+                        <span className="text-xs font-semibold text-amber-900 truncate">
+                            {balance === 0 ? 'Sem saldo para liberar mensagens' : `Saldo baixo (${formattedBalance})`}
                         </span>
-                        <span className="block whitespace-normal text-[11px] font-medium leading-3.5 text-amber-800">
-                            {balance === 0
-                                ? 'Você possui mensagens para liberar nesta conversa. Toque para recarregar.'
-                                : `Saldo atual: ${formattedBalance}. Toque para recarregar.`}
-                        </span>
+                    </div>
+                    <span className="text-[11px] font-bold text-purple-700 bg-white border border-purple-200/80 px-2.5 py-0.5 rounded-full shadow-2xs shrink-0">
+                        Recarregar
                     </span>
                 </button>
             )}
