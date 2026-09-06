@@ -45,14 +45,20 @@ export const PendingReceiptBalloon: React.FC<PendingReceiptBalloonProps> = ({
             type="button"
             onClick={handleClick}
             className="group relative block w-fit min-w-[165px] max-w-[78%] cursor-pointer text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600 rounded-2xl rounded-bl-sm bg-white border border-slate-200/90 shadow-xs overflow-hidden transition-all active:scale-[0.99] hover:border-purple-300 px-3.5 pt-2 pb-1.5"
-            aria-label={`Mensagem recebida com saldo insuficiente. Valor: ${formattedPrice}. Toque para liberar.`}
+            aria-label={`Mensagem recebida aguardando saldo. Valor: ${formattedPrice}. Toque para liberar.`}
         >
-            {/* Cabeçalho sutil no mesmo padrão da profissional: status e valor */}
+            {/* Cabeçalho sutil no mesmo padrão da profissional: status com bolinha âmbar e valor */}
             <div className="flex items-center justify-between gap-3 pb-1 mb-1 border-b border-slate-100 text-[10.5px] select-none">
-                <span className="font-medium text-slate-500 tracking-tight">
-                    Saldo insuficiente
-                </span>
-                <span className="font-semibold text-purple-700">
+                <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="relative flex h-1.5 w-1.5 shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500" />
+                    </span>
+                    <span className="font-medium text-slate-500 tracking-tight truncate">
+                        Aguardando saldo
+                    </span>
+                </div>
+                <span className="font-semibold text-purple-700 shrink-0">
                     {formattedPrice}
                 </span>
             </div>
