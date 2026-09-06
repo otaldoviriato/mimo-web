@@ -331,13 +331,13 @@ export default function ProfilePage() {
             : Array.isArray(galleryData?.items) 
                 ? galleryData.items.filter((item: any) => item.galleryType !== 'private' && item.visibility !== 'subscribers' && item.mediaType !== 'video') 
                 : [];
-        const candidates = userData?.photoUrl ? [{ _id: 'profile-photo', imageUrl: userData.photoUrl }, ...rawItems] : rawItems;
-        const seen = new Set<string>();
-        return candidates.filter(item => {
-            if (seen.has(item.imageUrl)) return false;
-            seen.add(item.imageUrl);
-            return true;
-        });
+        if (rawItems.length > 0) {
+            return rawItems;
+        }
+        if (userData?.photoUrl) {
+            return [{ _id: 'profile-photo', imageUrl: userData.photoUrl }];
+        }
+        return [];
     }, [galleryData?.publicItems, galleryData?.items, userData?.photoUrl]);
 
     const exclusiveGalleryItems = React.useMemo<ProfileGalleryItem[]>(() => {

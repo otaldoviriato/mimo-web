@@ -18,6 +18,24 @@ export async function GET() {
 
         await connectToDatabase();
 
+        const currentUser = await User.findOne({ clerkId: userId });
+        if (currentUser?.photoUrl) {
+            const hasProfilePhoto = await GalleryItem.exists({
+                ownerId: userId,
+                imageUrl: currentUser.photoUrl,
+            });
+            if (!hasProfilePhoto) {
+                await GalleryItem.create({
+                    ownerId: userId,
+                    imageUrl: currentUser.photoUrl,
+                    visibility: 'public',
+                    galleryType: 'public',
+                    mediaType: 'photo',
+                    order: 0,
+                });
+            }
+        }
+
         const allItems = await GalleryItem.find({ ownerId: userId }).sort({ order: 1, createdAt: -1 });
         const publicItems = allItems.filter(item => !item.galleryType || item.galleryType === 'public');
         const privateItems = allItems.filter(item => item.galleryType === 'private');
@@ -47,6 +65,7 @@ export async function POST(request: NextRequest) {
         const file = formData.get('photo') as File;
         const galleryType = formData.get('galleryType') as 'public' | 'private' || 'public';
         let visibility = formData.get('visibility') as 'public' | 'subscribers' || 'public';
+        const replaceItemId = formData.get('replaceItemId') as string | null;
 
         if (!file) {
             return NextResponse.json({ error: 'Nenhum arquivo enviado' }, { status: 400 });
@@ -105,6 +124,27 @@ export async function POST(request: NextRequest) {
             imageUrl = await uploadBufferToGCS(processedBuffer, fileName, contentType);
         }
 
+        // Se for substituição de um item existente
+        if (replaceItemId) {
+            const existingItem = await GalleryItem.findOne({ _id: replaceItemId, ownerId: userId });
+            if (existingItem) {
+                existingItem.imageUrl = imageUrl;
+                await existingItem.save();
+
+                // Se o item substituído for o de ordem 0 ou foto de perfil, sincroniza photoUrl
+                if (existingItem.order === 0 || !existingItem.order) {
+                    await User.updateOne(
+                        { clerkId: userId },
+                        { $set: { photoUrl: imageUrl } }
+                    );
+                }
+
+                return NextResponse.json({ item: existingItem, replaced: true });
+            }
+        }
+
+        const currentCount = await GalleryItem.countDocuments({ ownerId: userId, galleryType });
+
         // Criar item na galeria
         const newItem = await GalleryItem.create({
             ownerId: userId,
@@ -112,7 +152,16 @@ export async function POST(request: NextRequest) {
             visibility,
             galleryType,
             mediaType: isVideo ? 'video' : 'photo',
+            order: currentCount,
         });
+
+        // Se for a primeira foto pública, atualiza também a photoUrl do usuário
+        if (galleryType === 'public' && currentCount === 0) {
+            await User.updateOne(
+                { clerkId: userId },
+                { $set: { photoUrl: imageUrl } }
+            );
+        }
 
         return NextResponse.json({ item: newItem });
     } catch (error: any) {
@@ -142,6 +191,21 @@ export async function DELETE(request: NextRequest) {
 
         if (!deletedItem) {
             return NextResponse.json({ error: 'Item não encontrado ou você não tem permissão' }, { status: 404 });
+        }
+
+        // Se a foto deletada era pública, sincroniza a photoUrl com a primeira foto pública restante
+        if (!deletedItem.galleryType || deletedItem.galleryType === 'public') {
+            const remainingPublicPhotos = await GalleryItem.find({ 
+                ownerId: userId, 
+                $or: [{ galleryType: 'public' }, { galleryType: { $exists: false } }] 
+            }).sort({ order: 1, createdAt: -1 });
+
+            if (remainingPublicPhotos.length > 0) {
+                await User.updateOne(
+                    { clerkId: userId },
+                    { $set: { photoUrl: remainingPublicPhotos[0].imageUrl } }
+                );
+            }
         }
 
         return NextResponse.json({ success: true, message: 'Item removido com sucesso' });
