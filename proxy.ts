@@ -24,7 +24,7 @@ export default clerkMiddleware(async (auth, req) => {
         const consentExempt = path === '/api/users/me' || path === '/api/users/me/receipt-consent' || path === '/api/settings/chat-pricing';
         if (path.startsWith('/api/') && !consentExempt) {
             await connectToDatabase();
-            const user = await User.findOne({ clerkId: userId }).select('isProfessional isTeam receiptTermsVersion receiptTermsAcceptedAt').lean();
+            const user = await User.findOne({ clerkId: userId }).select('isProfessional isTeam receiptTermsVersion receiptTermsAcceptedAt createdAt').lean();
             if (requiresReceiptConsent(user)) return NextResponse.json({ error: 'Aceite os termos atualizados para continuar.', code: 'RECEIPT_CONSENT_REQUIRED' }, { status: 403 });
         }
     }

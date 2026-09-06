@@ -1,5 +1,6 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import { calculateOnboardingStep } from '@/lib/onboarding';
+import { RECEIPT_TERMS_VERSION } from '@/lib/receiptBilling';
 
 export interface ICard {
     id: string;
@@ -89,8 +90,14 @@ const UserSchema = new Schema<IUser>({
         unique: true,
         index: true,
     },
-    receiptTermsVersion: { type: String },
-    receiptTermsAcceptedAt: { type: Date },
+    receiptTermsVersion: {
+        type: String,
+        default: RECEIPT_TERMS_VERSION,
+    },
+    receiptTermsAcceptedAt: {
+        type: Date,
+        default: Date.now,
+    },
     username: {
         type: String,
         required: true,

@@ -1,9 +1,28 @@
 export const RECEIPT_TERMS_VERSION = 'receipt-2026-09-05';
+export const RECEIPT_TERMS_EFFECTIVE_DATE = new Date('2026-09-05T00:00:00.000Z');
 export const PENDING_MESSAGE_LABEL = 'Recarregue para visualizar esta mensagem.';
 
-export function requiresReceiptConsent(user: { isProfessional?: boolean; isTeam?: boolean; receiptTermsVersion?: string | null; receiptTermsAcceptedAt?: unknown } | null | undefined): boolean {
+export function requiresReceiptConsent(user: {
+    isProfessional?: boolean;
+    isTeam?: boolean;
+    receiptTermsVersion?: string | null;
+    receiptTermsAcceptedAt?: unknown;
+    createdAt?: Date | string | null;
+} | null | undefined): boolean {
     if (!user || user.isTeam) return false;
-    return user.receiptTermsVersion !== RECEIPT_TERMS_VERSION || !user.receiptTermsAcceptedAt;
+
+    // Se o usuário já aceitou a versão vigente dos termos
+    if (user.receiptTermsVersion === RECEIPT_TERMS_VERSION && user.receiptTermsAcceptedAt) {
+        return false;
+    }
+
+    // Usuários novos (criados a partir da data de vigência do novo modelo) já concordam
+    // com os termos vigentes na tela de cadastro e não devem ver modal de atualização/transição
+    if (user.createdAt && new Date(user.createdAt).getTime() >= RECEIPT_TERMS_EFFECTIVE_DATE.getTime()) {
+        return false;
+    }
+
+    return true;
 }
 
 export function billableReceivedCharacters(count: number, cap = 50, usedInTurn = 0): number {

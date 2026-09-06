@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef, use } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { ClientNameModal } from '@/components/ClientNameModal';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useUser } from '@clerk/nextjs';
 import { useQueryClient } from '@tanstack/react-query';
@@ -30,6 +29,7 @@ interface Message {
     receiptChargeCents?: number;
     cost: number;
     timestamp: string;
+    settledAt?: string | Date;
     isRead?: boolean;
     isDelivered?: boolean;
     isLockedImage?: boolean;
@@ -66,6 +66,7 @@ interface UploadTask {
 interface ChatPageProps {
     params?: Promise<{ userId: string }>;
     userId?: string;
+    initialUser?: any;
     giftCode?: string;
     onBack?: () => void;
     isSubPage?: boolean;
@@ -241,21 +242,40 @@ interface EarningsIndicatorProps {
     cost: number;
     isSelected: boolean;
     isNew: boolean;
+    isSettled?: boolean;
     timestamp?: string;
+    settledAt?: string | Date;
 }
 
-function EarningsIndicator({ messageId, receiverEarnings, cost, isSelected, isNew, timestamp }: EarningsIndicatorProps) {
+function EarningsIndicator({
+    messageId,
+    receiverEarnings,
+    cost,
+    isSelected,
+    isNew,
+    isSettled,
+    timestamp,
+    settledAt,
+}: EarningsIndicatorProps) {
     const [shown, setShown] = useState(false);
 
+    // Se o valor de ganhos da profissional não estiver explícito, deriva a partir do custo (ex: 80% do valor cobrado)
+    const effectiveEarnings = (receiverEarnings && receiverEarnings > 0)
+        ? receiverEarnings
+        : (cost && cost > 0 ? Math.round(cost * 0.8) : 0);
+
     useEffect(() => {
-        // Se for nova mensagem ou enviada recentemente (últimos 25s)
+        // Dispara a animação se a mensagem acabou de ser cobrada/liquidada (isSettled),
+        // se o settledAt for recente (< 25s), se for nova mensagem (isNew) ou se o envio for recente (< 25s)
         const isRecent = timestamp ? (Date.now() - new Date(timestamp).getTime() < 25000) : false;
-        if (isNew || isRecent) {
+        const isSettledRecent = settledAt ? (Date.now() - new Date(settledAt).getTime() < 25000) : false;
+
+        if (isSettled || isSettledRecent || isNew || isRecent) {
             const enterTimer = setTimeout(() => {
                 setShown(true);
-            }, 50);
+            }, 60);
 
-            // Fica alguns segundos visível e volta deslizando para trás do balão
+            // Fica alguns segundos visível e volta deslizando suavemente para trás do balão
             const exitTimer = setTimeout(() => {
                 setShown(false);
             }, 3800);
@@ -265,11 +285,11 @@ function EarningsIndicator({ messageId, receiverEarnings, cost, isSelected, isNe
                 clearTimeout(exitTimer);
             };
         }
-    }, [isNew, timestamp]);
+    }, [isSettled, isNew, timestamp, settledAt]);
 
     const isVisible = isSelected || shown;
 
-    if (!receiverEarnings || receiverEarnings <= 0) return null;
+    if (!effectiveEarnings || effectiveEarnings <= 0) return null;
 
     return (
         <div
@@ -284,7 +304,7 @@ function EarningsIndicator({ messageId, receiverEarnings, cost, isSelected, isNe
                     isVisible ? 'translate-x-0' : 'translate-x-full'
                 } text-[11px] font-semibold text-emerald-500 whitespace-nowrap select-none`}
             >
-                + R$ {(receiverEarnings / 100).toFixed(2).replace('.', ',')}
+                + R$ {(effectiveEarnings / 100).toFixed(2).replace('.', ',')}
             </span>
         </div>
     );
@@ -486,7 +506,7 @@ function CollapsibleTextMessage({ content, isMine }: { content: string; isMine: 
     );
 }
 
-export default function ChatPage({ params, userId: propUserId, giftCode: propGiftCode, onBack, isSubPage = false, isClosing = false }: ChatPageProps) {
+export default function ChatPage({ params, userId: propUserId, initialUser: propInitialUser, giftCode: propGiftCode, onBack, isSubPage = false, isClosing = false }: ChatPageProps) {
     const resolvedParams = params ? use(params) : null;
     const otherUserId = propUserId || resolvedParams?.userId || '';
     const { openRechargeModal } = usePayment();
@@ -518,6 +538,30 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const swipeTriggered = useRef<boolean>(false);
     const [sending, setSending] = useState(false);
     const [newIncomingMessageIds, setNewIncomingMessageIds] = useState<Set<string>>(new Set());
+    const [justSettledMessageIds, setJustSettledMessageIds] = useState<Set<string>>(new Set());
+    const previousMessageStatusRef = useRef<Map<string, string>>(new Map());
+
+    // Detecta mensagens que transitam de 'pending' para 'paid' (quando o cliente recarrega o saldo)
+    useEffect(() => {
+        const newlySettled: string[] = [];
+        messages.forEach((msg) => {
+            const prevStatus = previousMessageStatusRef.current.get(msg._id);
+            if (prevStatus === 'pending' && msg.billingStatus === 'paid') {
+                newlySettled.push(msg._id);
+            }
+            if (msg._id && msg.billingStatus) {
+                previousMessageStatusRef.current.set(msg._id, msg.billingStatus);
+            }
+        });
+
+        if (newlySettled.length > 0) {
+            setJustSettledMessageIds((prev) => {
+                const next = new Set(prev);
+                newlySettled.forEach((id) => next.add(id));
+                return next;
+            });
+        }
+    }, [messages]);
     const [showNewMessagesBadge, setShowNewMessagesBadge] = useState(false);
     const [newUnlockedMediaIds, setNewUnlockedMediaIds] = useState<Set<string>>(new Set());
     const [isTyping, setIsTyping] = useState(false);
@@ -662,16 +706,17 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     const pendingMediaRef = useRef<{ file: File; isVideoFile: boolean } | null>(null);
 
     const { data: userData, refetch: refetchMyProfile } = useMyProfile();
-    const [showNameModal, setShowNameModal] = useState(false);
-    const nameResolution = useRef<((value: boolean) => void) | null>(null);
-    const ensureClientName = async () => {
-        if (userData?.isProfessional || userData?.isTeam || userData?.name?.trim()) return true;
-        if (nameResolution.current) return false;
-        setShowNameModal(true);
-        return new Promise<boolean>(resolve => { nameResolution.current = resolve; });
-    };
-    useEffect(() => () => { nameResolution.current?.(false); }, []);
-    const { data: receiver } = useUserById(otherUserId);
+    const { data: fetchedReceiver } = useUserById(otherUserId);
+    const receiver = fetchedReceiver || propInitialUser;
+
+    useEffect(() => {
+        if (propInitialUser && otherUserId) {
+            queryClient.setQueryData(QueryKeys.userById(otherUserId), (old: any) => ({
+                ...(old || {}),
+                ...propInitialUser,
+            }));
+        }
+    }, [propInitialUser, otherUserId, queryClient]);
     const targetProfessionalId = userData?.isProfessional ? (userData.clerkId || user?.id) : (receiver?.isProfessional ? receiver.clerkId : undefined);
     const { data: chatPricing } = useChatPricing(targetProfessionalId);
     const balance = userData?.balance ?? 0;
@@ -1469,7 +1514,12 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                             return nextIds;
                         });
                     }
-                    if (oldMsg.billingStatus === 'pending' && data.message.billingStatus === 'paid' && oldMsg.senderId === user?.id) {
+                    if (oldMsg.billingStatus === 'pending' && data.message.billingStatus === 'paid') {
+                        setJustSettledMessageIds((prevIds) => {
+                            const nextIds = new Set(prevIds);
+                            nextIds.add(data.message._id);
+                            return nextIds;
+                        });
                         setNewIncomingMessageIds((prevIds) => {
                             const nextIds = new Set(prevIds);
                             nextIds.add(data.message._id);
@@ -1729,10 +1779,6 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
         isTemporaryMedia: boolean = false,
         expiryMinutes: number = 0
     ) => {
-        if (!await ensureClientName()) {
-            setMessages(prev => prev.filter(message => message.tempId !== tempId));
-            return;
-        }
         setUploadTasks(prev => ({
             ...prev,
             [tempId]: { tempId, progress: 0, status: 'uploading' }
@@ -2174,7 +2220,6 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             return;
         }
         
-        if (!await ensureClientName()) return;
         const charCount = messageText.trim().length;
 
         if (userData?.isProfessional && !receiver?.isProfessional) {
@@ -2266,7 +2311,6 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             }
             return;
         }
-        if (!await ensureClientName()) return;
         const tempId = `temp-audio-${Date.now()}`;
         const previewUrl = URL.createObjectURL(audioBlob);
 
@@ -2408,7 +2452,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     // Usado pelo MediaComposerSheet (profissional configurou preço/duração) e pelo
     // fallback no compose bar (envio durante a janela em que userData ainda está carregando).
     const sendSelectedMedia = async (priceInCents: number, isTemporaryMedia: boolean, expiryMinutes: number, coverFrameDataUrl?: string) => {
-        if (!selectedFile || !await ensureClientName()) return;
+        if (!selectedFile) return;
 
         const file = selectedFile;
         const isVideoFile = isVideo;
@@ -2506,7 +2550,6 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
     };
 
     const handleSendGift = async () => {
-        if (!await ensureClientName()) return;
         if (!giftAmountStr || parseFloat(giftAmountStr) <= 0) return;
         
         const giftAmountInCents = parseFloat(giftAmountStr) * 100;
@@ -2643,9 +2686,6 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
             className={`flex flex-col bg-gray-50 overflow-hidden ${layoutClass} ${animationClass}`}
             style={{ ...viewportStyle, overscrollBehaviorY: 'none' }}
         >
-                    {showNameModal && <ClientNameModal onSaved={async () => {
-                await refetchMyProfile(); setShowNameModal(false); nameResolution.current?.(true); nameResolution.current = null;
-            }} onCancel={() => { setShowNameModal(false); nameResolution.current?.(false); nameResolution.current = null; }} />}
             {/* Header */}
             <div className="shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 z-20 sticky top-0 shadow-md flex items-center gap-2">
                 {selectedMessageIds.size > 0 ? (
@@ -2710,15 +2750,15 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                             <div className={`flex-1 min-w-0 ${!receiver ? 'animate-pulse' : ''}`}>
                                 <div className="flex items-center gap-1.5 min-w-0">
                                     <p className="text-base font-bold text-white truncate tracking-tight">
-                                        {receiver?.name || receiver?.username || (otherUserId ? `Usuário ${otherUserId.substring(0, 8)}` : 'Conversa')}
+                                        {receiver?.isDeleted ? 'Usuário Excluído' : (receiver?.name || receiver?.username || (otherUserId ? 'Usuário Excluído' : 'Conversa'))}
                                     </p>
-                                    {receiver?.isTeam && (
+                                    {!receiver?.isDeleted && receiver?.isTeam && (
                                         <span className="text-[10px] bg-emerald-500/90 text-white font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider shrink-0 flex items-center gap-1 border border-white/20">
                                             <ShieldCheck className="w-3 h-3 text-white" />
                                             Equipe Mimo ✓
                                         </span>
                                     )}
-                                    {receiver?.isProfessional && receiver?.identityStatus === 'approved' && (
+                                    {!receiver?.isDeleted && receiver?.isProfessional && receiver?.identityStatus === 'approved' && (
                                         <ShieldCheck className="w-4 h-4 text-white shrink-0" />
                                     )}
                                 </div>
@@ -2727,7 +2767,7 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                         <span className="text-[10px] text-white/50 font-bold uppercase tracking-widest">Conectando...</span>
                                     ) : isTyping ? (
                                         <span className="text-[11px] text-emerald-300 font-bold animate-pulse tracking-wide lowercase">digitando...</span>
-                                    ) : receiver?.isOnline ? (
+                                    ) : !receiver?.isDeleted && receiver?.isOnline ? (
                                         <span className="text-[11px] text-emerald-300 font-semibold tracking-wide lowercase">
                                             online
                                         </span>
@@ -3110,7 +3150,9 @@ export default function ChatPage({ params, userId: propUserId, giftCode: propGif
                                                 cost={item.cost}
                                                 isSelected={selectedMessageIds.has(item._id)}
                                                 isNew={newIncomingMessageIds.has(item._id)}
+                                                isSettled={justSettledMessageIds.has(item._id)}
                                                 timestamp={item.timestamp}
+                                                settledAt={item.settledAt}
                                             />
                                         )}
                                         <div

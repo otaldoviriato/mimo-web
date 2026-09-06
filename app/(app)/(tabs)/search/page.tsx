@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { userApi } from '@/services/api';
 import { useMyProfile, useFeaturedUsers } from '@/hooks/useQueries';
 import { Search, X } from 'lucide-react';
@@ -66,7 +66,7 @@ const formatOnlineStatus = (
 };
 
 export default function SearchPage() {
-    const router = useRouter();
+    const router = useTransitionRouter();
     const { data: userData } = useMyProfile();
     const [username, setUsername] = useState('');
     const [loading, setLoading] = useState(false);
@@ -154,8 +154,8 @@ export default function SearchPage() {
                 professionalId: user.clerkId,
             });
         }
-        // Ao clicar, leva imediatamente para o chat com a criadora
-        router.push(`/chat/${user.clerkId}`);
+        // Ao clicar, leva imediatamente para o chat com a criadora com dados pré-carregados
+        router.push(`/chat/${user.clerkId}`, { initialUser: user });
     };
 
     useEffect(() => {

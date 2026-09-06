@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth, clerkClient } from '@clerk/nextjs/server';
+import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { AppSettings } from '@/models/AppSettings';
@@ -57,25 +57,6 @@ export async function GET(
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        // Auto-popular name do Clerk se estiver vazio no banco
-        if (!user.name) {
-            try {
-                const client = await clerkClient();
-                const clerkUser = await client.users.getUser(user.clerkId);
-                const clerkName = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ');
-                
-                if (clerkName) {
-                    const updatedUser = await User.findOneAndUpdate(
-                        { clerkId: user.clerkId },
-                        { $set: { name: clerkName } },
-                        { new: true }
-                    );
-                    if (updatedUser) user = updatedUser;
-                }
-            } catch (clerkErr) {
-                console.warn('Could not fetch name from Clerk for user:', user.clerkId, clerkErr);
-            }
-        }
 
         // Verificar quem está visualizando
         const { userId: viewerClerkId } = await auth();

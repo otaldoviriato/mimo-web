@@ -471,11 +471,11 @@ export default function LoginPage() {
                                 className="w-full"
                             />
 
-                            {/* Mantém o desafio do Clerk dentro do cartão, abaixo do Google. */}
+                            {/* Mantém o desafio do Clerk dentro do cartão, abaixo do Google em formato normal/retangular */}
                             <div
                                 id="clerk-captcha"
-                                data-cl-size="compact"
-                                className="flex w-full justify-center empty:hidden"
+                                data-cl-size="normal"
+                                className="flex w-full justify-center items-center my-2 min-h-[65px] empty:hidden"
                             />
 
                             {/* Checkbox de Maioridade e Consentimento Legal */}

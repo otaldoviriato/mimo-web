@@ -36,6 +36,7 @@ interface Room {
         isHighSpender?: boolean;
         isOnline?: boolean;
         identityStatus?: 'pending' | 'approved' | 'rejected' | null;
+        isDeleted?: boolean;
     };
 }
 
@@ -415,9 +416,9 @@ export default function ChatsPage() {
         });
     }, [user?.id, queryClient]);
 
-    // Abre a tela de conversa física usando o roteador de transição
-    const handleOpenChat = (userId: string) => {
-        router.push(`/chat/${userId}`);
+    // Abre a tela de conversa física usando o roteador de transição com dados pré-carregados
+    const handleOpenChat = (userId: string, initialUser?: any) => {
+        router.push(`/chat/${userId}`, { initialUser });
     };
 
     const handleDeleteRoom = async (roomId: string) => {
@@ -801,7 +802,7 @@ export default function ChatsPage() {
 
                             const handleItemClick = () => {
                                 if (otherUserId) {
-                                    handleOpenChat(otherUserId);
+                                    handleOpenChat(otherUserId, room.otherUser);
                                 }
                             };
 
@@ -842,18 +843,20 @@ export default function ChatsPage() {
                                             <div className="flex items-center justify-between mb-1">
                                                 <div className="flex items-center min-w-0 gap-2">
                                                     <span className={`text-base truncate ${hasUnread ? 'font-bold text-gray-900' : 'font-semibold text-gray-800'}`}>
-                                                        {room.otherUser?.name || room.otherUser?.username || `Usuário ${otherUserId?.substring(0, 8)}`}
+                                                        {room.otherUser?.isDeleted
+                                                            ? 'Usuário Excluído'
+                                                            : (room.otherUser?.name || room.otherUser?.username || 'Usuário Excluído')}
                                                     </span>
-                                                    {room.otherUser?.isTeam && (
+                                                    {!room.otherUser?.isDeleted && room.otherUser?.isTeam && (
                                                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
                                                             <ShieldCheck className="w-3 h-3 text-emerald-600" />
                                                             Equipe Mimo ✓
                                                         </span>
                                                     )}
-                                                    {room.otherUser?.isProfessional && room.otherUser?.identityStatus === 'approved' && (
+                                                    {!room.otherUser?.isDeleted && room.otherUser?.isProfessional && room.otherUser?.identityStatus === 'approved' && (
                                                         <ShieldCheck className="w-4 h-4 text-purple-600 shrink-0" />
                                                     )}
-                                                    {myProfile?.isProfessional && room.otherUser?.isHighSpender && (
+                                                    {!room.otherUser?.isDeleted && myProfile?.isProfessional && room.otherUser?.isHighSpender && (
                                                         <span title="VIP" className="shrink-0 flex items-center justify-center">
                                                             <Star className="w-4 h-4 text-amber-500 fill-amber-400" />
                                                         </span>

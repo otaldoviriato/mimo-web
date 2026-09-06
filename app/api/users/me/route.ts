@@ -16,7 +16,8 @@ import { sendAdminAlert } from '@/lib/adminAlerts';
 import { sendNewProfessionalTeamAlert } from '@/lib/teamAlerts';
 import { getReferralFromRequestHeaders, getReferralFromUnsafeMetadata, type ReferralMetadata } from '@/lib/referral';
 import { calculateOnboardingStep } from '@/lib/onboarding';
-import { RECEIPT_TERMS_VERSION } from '@/lib/receiptBilling';
+import { RECEIPT_TERMS_VERSION, RECEIPT_TERMS_EFFECTIVE_DATE } from '@/lib/receiptBilling';
+import { generateUniqueAnonymousName } from '@/lib/anonymousName';
 import { autoHealUserBalanceIfDivergent } from '@/lib/wallet';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
@@ -110,11 +111,13 @@ export async function GET(request: NextRequest) {
                 const defaultNonSub = (settings?.conversationPricePerEquivalentCharCents ?? 5) / 100;
                 const defaultSub = defaultNonSub * (1 - (settings?.subscriberDiscountPercentage ?? 20) / 100);
 
+                const anonymousName = await generateUniqueAnonymousName();
+
                 const userFields: any = {
                     clerkId: userId,
                     email: email,
                     username: username,
-                    name: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' '),
+                    name: anonymousName,
                     balance: 0,
                     professionalStatus,
                     chargePerCharSubscribers: defaultSub,
@@ -143,6 +146,31 @@ export async function GET(request: NextRequest) {
                 } catch (saveProfessionalErr: any) {
                     console.error('[GET /api/users/me] Erro ao salvar isProfessional default:', saveProfessionalErr);
                     throw new Error(`Erro ao salvar isProfessional default no MongoDB: ${saveProfessionalErr.message || saveProfessionalErr}`);
+                }
+            }
+
+            // Usuários novos criados a partir da vigência dos termos atuais já nascem com termos aceitos no cadastro
+            if (!user.receiptTermsVersion && user.createdAt && new Date(user.createdAt).getTime() >= RECEIPT_TERMS_EFFECTIVE_DATE.getTime()) {
+                user.receiptTermsVersion = RECEIPT_TERMS_VERSION;
+                user.receiptTermsAcceptedAt = user.createdAt || new Date();
+                try {
+                    await User.updateOne(
+                        { _id: user._id },
+                        { $set: { receiptTermsVersion: RECEIPT_TERMS_VERSION, receiptTermsAcceptedAt: user.receiptTermsAcceptedAt } }
+                    );
+                } catch (updateTermsErr) {
+                    console.warn('[GET /api/users/me] Falha ao regularizar termos de usuário novo:', updateTermsErr);
+                }
+            }
+
+            // Se o usuário ainda não tiver nome (ou estiver vazio), atribui um nome anônimo padrão
+            if (!user.name || !user.name.trim()) {
+                const anonymousName = await generateUniqueAnonymousName();
+                user.name = anonymousName;
+                try {
+                    await User.updateOne({ _id: user._id }, { $set: { name: anonymousName } });
+                } catch (anonErr) {
+                    console.warn('[GET /api/users/me] Falha ao atribuir nome anônimo para usuário sem nome:', anonErr);
                 }
             }
 

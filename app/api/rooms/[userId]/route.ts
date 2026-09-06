@@ -49,21 +49,38 @@ export async function GET(
             let otherUser = null;
             if (otherParticipantId) {
                 const found = await User.findOne({ clerkId: otherParticipantId })
-                    .select('clerkId name username photoUrl isProfessional identityStatus balance isHighSpender isOnline isTeam teamTitle')
+                    .select('clerkId name username photoUrl isProfessional identityStatus balance isHighSpender isOnline isTeam teamTitle isSuspended')
                     .lean() as any;
                 if (found) {
+                    const isDeleted = Boolean(found.isSuspended);
                     otherUser = {
                         clerkId: found.clerkId,
-                        name: found.name,
-                        username: found.username,
-                        photoUrl: found.photoUrl,
-                        isProfessional: found.isProfessional,
-                        isTeam: Boolean(found.isTeam),
+                        name: isDeleted ? 'Usuário Excluído' : found.name,
+                        username: isDeleted ? 'usuario_excluido' : found.username,
+                        photoUrl: isDeleted ? '' : found.photoUrl,
+                        isProfessional: isDeleted ? false : found.isProfessional,
+                        isTeam: isDeleted ? false : Boolean(found.isTeam),
                         teamTitle: found.teamTitle || 'Equipe Mimo',
-                        identityStatus: found.identityStatus || null,
+                        identityStatus: isDeleted ? null : (found.identityStatus || null),
                         balance: found.balance,
                         isHighSpender: found.isHighSpender,
-                        isOnline: found.isOnline,
+                        isOnline: isDeleted ? false : found.isOnline,
+                        isDeleted,
+                    };
+                } else {
+                    otherUser = {
+                        clerkId: otherParticipantId,
+                        name: 'Usuário Excluído',
+                        username: 'usuario_excluido',
+                        photoUrl: '',
+                        isProfessional: false,
+                        isTeam: false,
+                        teamTitle: '',
+                        identityStatus: null,
+                        balance: 0,
+                        isHighSpender: false,
+                        isOnline: false,
+                        isDeleted: true,
                     };
                 }
             }

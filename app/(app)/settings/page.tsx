@@ -363,7 +363,12 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             }
 
             clearMimoClientSession(queryClient);
-            await signOut(() => router.replace('/login'));
+            try {
+                await signOut();
+            } catch (signOutErr) {
+                console.warn('Aviso no signOut pós-exclusão:', signOutErr);
+            }
+            router.replace('/login');
         } catch (error: any) {
             setAccountActionError(error.message || 'Não foi possível concluir a ação.');
         } finally {

@@ -588,6 +588,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                         {screen.type === 'chat' && (
                             <ChatPage
                                 userId={screen.params.userId}
+                                initialUser={screen.params.initialUser}
                                 giftCode={screen.params.giftCode}
                                 isSubPage={true}
                                 isClosing={isClosing}

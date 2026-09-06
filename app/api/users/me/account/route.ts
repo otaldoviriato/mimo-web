@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 
@@ -51,21 +51,21 @@ export async function DELETE() {
 
         await connectToDatabase();
 
-        const user = await User.findOneAndUpdate(
-            { clerkId: userId },
-            { $set: {
-                isSuspended: true,
-                suspendedAt: new Date(),
-                accountDeletionRequestedAt: new Date(),
-                isOnline: false,
-                fcmToken: '',
-                fcmTokens: [],
-            } },
-            { new: true },
-        );
-        if (!user) return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 404 });
+        // 1. Deletar do MongoDB (independentemente de ter saldo)
+        const deletedUser = await User.findOneAndDelete({ clerkId: userId });
+        if (!deletedUser) {
+            return NextResponse.json({ error: 'Usuario nao encontrado' }, { status: 404 });
+        }
 
-        return NextResponse.json({ success: true, retainedForAudit: true });
+        // 2. Deletar do Clerk para permitir que o usuário recrie conta caso queira
+        try {
+            const client = await clerkClient();
+            await client.users.deleteUser(userId);
+        } catch (clerkErr: any) {
+            console.warn('Falha ao excluir usuário do Clerk (pode já ter sido removido):', clerkErr);
+        }
+
+        return NextResponse.json({ success: true, message: 'Conta excluída com sucesso.' });
     } catch (error) {
         console.error('Error deleting user account:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

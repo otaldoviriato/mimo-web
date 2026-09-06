@@ -17,7 +17,7 @@ export function useTransitionRouter() {
         stackNav = null;
     }
 
-    const push = (href: string) => {
+    const push = (href: string, meta?: any) => {
         if (stackNav) {
             // 1. Verifica se é rota de informações do chat (/chat/userId/info)
             const chatInfoMatch = href.match(/^\/chat\/([^\/]+)\/info$/);
@@ -31,7 +31,19 @@ export function useTransitionRouter() {
             const chatMatch = href.match(/^\/chat\/([^\/]+)$/);
             if (chatMatch) {
                 const userId = chatMatch[1];
-                stackNav.pushVirtual('chat', { userId });
+                const initialUser = meta?.initialUser ?? (meta && !meta.giftCode ? meta : undefined);
+                if (initialUser && typeof window !== 'undefined') {
+                    try {
+                        localStorage.setItem(`mimo_user_${userId}`, JSON.stringify(initialUser));
+                    } catch {
+                        // ignore
+                    }
+                }
+                stackNav.pushVirtual('chat', {
+                    userId,
+                    initialUser,
+                    giftCode: meta?.giftCode,
+                });
                 return;
             }
 

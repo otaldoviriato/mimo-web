@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { clerkClient } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { AppSettings } from '@/models/AppSettings';
@@ -20,32 +19,37 @@ export async function GET(
         await connectToDatabase();
 
         let user = await User.findOne({ clerkId: id }).select(
-            'clerkId username name email photoUrl coverUrl isProfessional identityStatus subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers subscribers balance bio isOnline lastSeen avgResponseTimeMinutes birthDate city state isTeam teamTitle'
+            'clerkId username name email photoUrl coverUrl isProfessional identityStatus subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers subscribers balance bio isOnline lastSeen avgResponseTimeMinutes birthDate city state isTeam teamTitle isSuspended'
         );
 
-        if (!user) {
-            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        if (!user || user.isSuspended) {
+            return NextResponse.json({
+                user: {
+                    id: user?._id?.toString() || id,
+                    clerkId: id,
+                    username: 'usuario_excluido',
+                    name: 'Usuário Excluído',
+                    email: '',
+                    photoUrl: '',
+                    coverUrl: '',
+                    isProfessional: false,
+                    isTeam: false,
+                    teamTitle: '',
+                    identityStatus: null,
+                    balance: 0,
+                    subscriptionPrice: 0,
+                    chargePerCharSubscribers: 0,
+                    chargePerCharNonSubscribers: 0,
+                    audioPriceMultiplier: 0,
+                    subscribersCount: 0,
+                    isSubscribed: false,
+                    bio: '',
+                    isOnline: false,
+                    isDeleted: true,
+                }
+            });
         }
 
-        // Auto-popular name do Clerk se estiver vazio no banco
-        if (!user.name) {
-            try {
-                const client = await clerkClient();
-                const clerkUser = await client.users.getUser(id);
-                const clerkName = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ');
-                
-                if (clerkName) {
-                    const updatedUser = await User.findOneAndUpdate(
-                        { clerkId: id },
-                        { $set: { name: clerkName } },
-                        { new: true }
-                    );
-                    if (updatedUser) user = updatedUser;
-                }
-            } catch (clerkErr) {
-                console.warn('Could not fetch name from Clerk for user:', id, clerkErr);
-            }
-        }
 
         const settings = await AppSettings.findOne({ key: 'global' }).select('conversationPricePerEquivalentCharCents subscriberDiscountPercentage audioEquivalentCharsPerSecond').lean();
         const defaultNonSub = (settings?.conversationPricePerEquivalentCharCents ?? 5) / 100;

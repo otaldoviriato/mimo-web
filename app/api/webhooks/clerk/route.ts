@@ -9,6 +9,7 @@ import { Campaign } from '@/models/Campaign';
 import { CampaignVisit } from '@/models/CampaignVisit';
 
 import { RECEIPT_TERMS_VERSION } from '@/lib/receiptBilling';
+import { generateUniqueAnonymousName } from '@/lib/anonymousName';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
 const webhookSecret = process.env.CLERK_WEBHOOK_SECRET || '';
@@ -56,17 +57,21 @@ export async function POST(req: Request) {
         const { id, email_addresses, username, first_name, last_name, image_url, unsafe_metadata } = evt.data;
 
         const generatedUsername = username || email_addresses[0]?.email_address.split('@')[0];
-        const name = [first_name, last_name].filter(Boolean).join(' ');
+        // NUNCA puxar o nome real do Google/Clerk. O nome é definido pelo usuário no Mimo.
         const email = email_addresses[0]?.email_address?.toLowerCase()?.trim();
 
         const isProfessional = false;
         const professionalStatus = null; // Inicializa como null (verificação de identidade pendente de envio)
 
+        const anonymousName = await generateUniqueAnonymousName();
+
         const updateSet: any = {
             email: email_addresses[0]?.email_address,
             username: generatedUsername,
-            name,
+            name: anonymousName,
             professionalStatus,
+            receiptTermsVersion: RECEIPT_TERMS_VERSION,
+            receiptTermsAcceptedAt: new Date(),
             ...(image_url ? { photoUrl: image_url } : {}),
         };
         updateSet.isProfessional = isProfessional;
@@ -118,13 +123,12 @@ export async function POST(req: Request) {
     }
 
     if (eventType === 'user.updated') {
-        const { id, email_addresses, username, first_name, last_name, image_url } = evt.data;
+        const { id, email_addresses, username, image_url } = evt.data;
 
-        const name = [first_name, last_name].filter(Boolean).join(' ') || undefined;
+        // NUNCA sobrescrever o nome do usuário com dados do Clerk/Google
         const updateData: any = {
             email: email_addresses[0]?.email_address,
             username: username,
-            ...(name ? { name } : {}),
             ...(image_url ? { photoUrl: image_url } : {}),
         };
 
