@@ -883,7 +883,7 @@ export default function ChatsPage() {
                                                             ? 'font-semibold text-gray-950' 
                                                             : room.lastMessage 
                                                                 ? 'text-gray-500' 
-                                                                : 'text-slate-400'
+                                                                : 'text-purple-500 italic font-medium'
                                                     }`}>
                                                         {(() => {
                                                             const isPendingPrompt = room.lastMessage?.includes('Recarregue para visualizar') || room.lastMessage?.includes('Recarregue') || room.lastMessage?.includes('Aguardando saldo') || room.lastMessage?.includes('Conteúdo bloqueado');
@@ -895,7 +895,7 @@ export default function ChatsPage() {
                                                                     </span>
                                                                 );
                                                             }
-                                                            return room.lastMessage || 'Sem mensagens';
+                                                            return room.lastMessage || 'Toque para iniciar a conversa!';
                                                         })()}
                                                     </span>
                                                 )}
