@@ -258,10 +258,12 @@ export function useUpdateProfile() {
         }) => userApi.updateMe(data),
         onSuccess: (response) => {
             if (response?.user) {
-                queryClient.setQueryData(QueryKeys.me, response.user);
-            } else {
-                queryClient.invalidateQueries({ queryKey: QueryKeys.me });
+                queryClient.setQueryData(QueryKeys.me, (old: any) => ({
+                    ...(old || {}),
+                    ...response.user,
+                }));
             }
+            queryClient.invalidateQueries({ queryKey: QueryKeys.me });
         },
     });
 }

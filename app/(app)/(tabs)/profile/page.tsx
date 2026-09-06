@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { useUser } from '@clerk/nextjs';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Avatar } from '@/components/Avatar';
-import { useMyProfile, useUploadPhoto, useUploadCover, useMyGallery, useUploadToGallery, useDeleteFromGallery, useDepositHistory, useChatRooms, useUpdateGalleryItemVisibility, useMySubscriptions, useCancelSubscription, type MySubscription } from '@/hooks/useQueries';
+import { useMyProfile, useUploadPhoto, useMyGallery, useUploadToGallery, useDeleteFromGallery, useDepositHistory, useChatRooms, useUpdateGalleryItemVisibility, useMySubscriptions, useCancelSubscription, type MySubscription } from '@/hooks/useQueries';
 import { ImageCropper } from '@/components/ImageCropper';
 import { usePayment } from '@/context/PaymentContext';
 import { PullToRefresh } from '@/components';
@@ -20,14 +20,12 @@ export default function ProfilePage() {
     const { openRechargeModal } = usePayment();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const coverInputRef = useRef<HTMLInputElement>(null);
     const galleryInputRef = useRef<HTMLInputElement>(null);
     const privateGalleryInputRef = useRef<HTMLInputElement>(null);
 
     const { data: userData, isLoading: loadingProfile, refetch: refetchProfile } = useMyProfile();
     const { data: galleryData, refetch: refetchGallery } = useMyGallery();
     const uploadPhotoMutation = useUploadPhoto();
-    const uploadCoverMutation = useUploadCover();
     const uploadGalleryMutation = useUploadToGallery();
     const deleteGalleryMutation = useDeleteFromGallery();
     const updateGalleryItemVisibilityMutation = useUpdateGalleryItemVisibility();
@@ -60,7 +58,6 @@ export default function ProfilePage() {
     }, [refetchProfile, refetchRooms]);
 
     const [localPhotoUrl, setLocalPhotoUrl] = useState<string | undefined>(undefined);
-    const [localCoverUrl, setLocalCoverUrl] = useState<string | undefined>(undefined);
     const [activeGalleryTab, setActiveGalleryTab] = useState<'public' | 'private'>('public');
     const [uploadingGallery, setUploadingGallery] = useState(false);
     const [selectedVisibility, setSelectedVisibility] = useState<'public' | 'subscribers'>('public');
@@ -146,7 +143,6 @@ export default function ProfilePage() {
     useEffect(() => {
         if (userData) {
             if (userData.photoUrl) setLocalPhotoUrl(userData.photoUrl);
-            if (userData.coverUrl) setLocalCoverUrl(userData.coverUrl);
         }
     }, [userData]);
 
@@ -198,20 +194,6 @@ export default function ProfilePage() {
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
-    const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        const previewUrl = URL.createObjectURL(file);
-        setCropperState({
-            open: true,
-            imageSrc: previewUrl,
-            type: 'cover'
-        });
-        
-        if (coverInputRef.current) coverInputRef.current.value = '';
-    };
-
     const handleCropConfirm = async (croppedFile: File) => {
         if (!cropperState) return;
         
@@ -230,17 +212,6 @@ export default function ProfilePage() {
                 if (uploadResponse.photoUrl) setLocalPhotoUrl(uploadResponse.photoUrl);
             } catch {
                 if (userData?.photoUrl) setLocalPhotoUrl(userData.photoUrl);
-            }
-        } else if (type === 'cover') {
-            const previewUrl = URL.createObjectURL(croppedFile);
-            setLocalCoverUrl(previewUrl);
-            formData.append('cover', croppedFile);
-
-            try {
-                const uploadResponse = await uploadCoverMutation.mutateAsync(formData);
-                if (uploadResponse.coverUrl) setLocalCoverUrl(uploadResponse.coverUrl);
-            } catch {
-                if (userData?.coverUrl) setLocalCoverUrl(userData.coverUrl);
             }
         }
     };
@@ -357,64 +328,16 @@ export default function ProfilePage() {
         return (
             <div className="flex flex-col h-full bg-slate-50 relative overflow-hidden max-w-full">
                 <PullToRefresh onRefresh={onRefreshCreator} className="pb-28 no-scrollbar">
-                {/* Efeitos de Fundo Aurora */}
-                <div className="absolute top-[-10%] left-[-20%] w-[350px] h-[350px] rounded-full bg-purple-400/15 blur-[100px] pointer-events-none select-none z-0" />
-                <div className="absolute top-[35%] right-[-15%] w-[300px] h-[300px] rounded-full bg-pink-400/12 blur-[90px] pointer-events-none select-none z-0" />
-                <div className="absolute bottom-[15%] left-[-15%] w-[280px] h-[280px] rounded-full bg-indigo-400/10 blur-[100px] pointer-events-none select-none z-0" />
-
-                {/* Textura Geométrica Discreta (Bolinhas Lavanda) */}
-                <div
-                    className="absolute inset-0 pointer-events-none select-none z-0"
-                    style={{
-                        backgroundImage: 'radial-gradient(#E9D5FF 1.5px, transparent 1.5px)',
-                        backgroundSize: '20px 20px',
-                        opacity: 0.4
-                    }}
-                />
-
-                
-                {/* Capa e Avatar */}
-                <div className="relative shrink-0 z-10">
-                    <div className="relative h-44 w-full overflow-hidden bg-purple-50 shadow-inner">
-                        {localCoverUrl ? (
-                            <img src={localCoverUrl} alt="Foto de capa" className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-purple-600 to-fuchsia-500" />
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/25 to-transparent" />
-                        
-                        {/* Botão de Alterar Capa */}
-                        <button
-                            onClick={() => coverInputRef.current?.click()}
-                            disabled={uploadCoverMutation.isPending}
-                            className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/40 hover:bg-black/60 active:scale-90 active:bg-black/70 text-white text-[10px] font-bold rounded-xl border border-white/20 backdrop-blur-md transition-all duration-75 flex items-center gap-1.5"
-                        >
-                            <Camera className="w-3.5 h-3.5 text-white" />
-                            Alterar Capa
-                        </button>
-                        <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverChange} />
+                <div className="relative mx-auto w-full max-w-md px-5 pt-4">
+                    <div className="mb-6 flex items-center justify-between">
+                        <button type="button" onClick={handleShare} aria-label="Compartilhar perfil" className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-purple-600 hover:bg-purple-50"><Share2 size={20} /></button>
+                        <div className="flex items-center gap-2">
+                            <button type="button" onClick={() => router.push('/profile/edit')} aria-label="Editar perfil e fotos" title="Editar perfil e fotos" className="flex h-11 w-11 items-center justify-center rounded-full bg-purple-50 text-purple-600 hover:bg-purple-100"><Pencil size={20} /></button>
+                            <button type="button" onClick={() => router.push('/settings')} aria-label="Configurações" className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-600 hover:bg-slate-100"><Settings size={20} /></button>
+                        </div>
                     </div>
-
-                    {/* Compartilhar — canto superior esquerdo da capa */}
-                    <button
-                        onClick={handleShare}
-                        className="absolute top-4 left-4 w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/35 transition-all duration-75 active:scale-75 active:bg-black/40 z-20"
-                        title="Compartilhar perfil"
-                    >
-                        <Share2 className="w-5 h-5" />
-                    </button>
-
-                    {/* Configurações — canto superior direito da capa */}
-                    <button
-                        onClick={() => router.push('/settings')}
-                        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/35 transition-all duration-75 active:scale-75 active:bg-black/40 z-20"
-                        title="Configurações"
-                    >
-                        <Settings className="w-5 h-5" />
-                    </button>
-                    
                     {/* Avatar Centralizado e Upload */}
-                    <div className="px-6 -mt-14 flex flex-col items-center relative z-10 w-fit mx-auto pointer-events-none">
+                    <div className="px-6 flex flex-col items-center relative z-10 w-fit mx-auto pointer-events-none">
                         <button
                             onClick={() => fileInputRef.current?.click()}
                             disabled={uploadPhotoMutation.isPending}
@@ -460,19 +383,11 @@ export default function ProfilePage() {
 
                     {/* Biografia */}
                     {userData?.bio && (
-                        <p className="mt-4 px-4 text-center text-xs text-slate-600 leading-relaxed max-w-sm italic font-medium">
-                            "{userData.bio}"
+                        <p className="mt-4 whitespace-pre-line text-left text-sm text-slate-600 leading-6 max-w-sm">
+                            {userData.bio}
                         </p>
                     )}
 
-                    {/* Botão de Edição de Perfil */}
-                    <button
-                        onClick={() => router.push('/profile/edit')}
-                        className="mt-5 w-full max-w-xs h-9 bg-purple-50 hover:bg-purple-100/80 border border-purple-100/80 font-bold text-xs text-purple-700 rounded-xl transition-all duration-75 active:scale-95 active:bg-purple-200/50 flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                        <Pencil className="w-3.5 h-3.5 text-purple-500" />
-                        Editar Perfil
-                    </button>
 
                 </div>
 

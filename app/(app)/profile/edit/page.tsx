@@ -4,8 +4,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useMyProfile, useUpdateProfile } from '@/hooks/useQueries';
+import { ProfilePhotosEditor } from '@/components/ProfilePhotosEditor';
 import { formatCPF } from '@/components/RechargeModal';
 import { Lock, ArrowLeft, Check, AlertCircle, RefreshCw, ShieldCheck } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const formatDate = (dateString?: string | Date) => {
     if (!dateString) return '';
@@ -72,6 +74,8 @@ export default function EditProfilePage() {
     const [saveSuccess, setSaveSuccess] = useState(false);
 
     const hasPopulated = useRef(false);
+    const [showDiscardModal, setShowDiscardModal] = useState(false);
+    const isLeavingRef = useRef(false);
 
     useEffect(() => {
         if (userData && !hasPopulated.current) {
@@ -139,8 +143,9 @@ export default function EditProfilePage() {
             };
 
             await updateProfileMutation.mutateAsync(updateData);
-            setSaveSuccess(true);
-            setTimeout(() => setSaveSuccess(false), 3000);
+            toast.success('Perfil atualizado com sucesso!');
+            isLeavingRef.current = true;
+            router.back();
         } catch (error: any) {
             if (error.response?.status === 409) {
                 setSaveError('Nome de usuário já está em uso');
@@ -155,11 +160,56 @@ export default function EditProfilePage() {
     const profileIsProfessional = !!userData?.isProfessional;
 
     const hasChanges =
-        name !== (userData?.name || '') ||
-        username !== initialUsername ||
-        city !== (userData?.city || '') ||
-        state !== (userData?.state || '') ||
-        (profileIsProfessional && bio !== (userData?.bio || ''));
+        hasPopulated.current && (
+            name !== (userData?.name || '') ||
+            username !== initialUsername ||
+            city !== (userData?.city || '') ||
+            state !== (userData?.state || '') ||
+            (profileIsProfessional && bio !== (userData?.bio || ''))
+        );
+
+    useEffect(() => {
+        if (!hasChanges) return;
+
+        window.history.pushState({ editProfileGuard: true }, '', window.location.href);
+
+        const handlePopState = () => {
+            if (isLeavingRef.current) return;
+            setShowDiscardModal(true);
+            window.history.pushState({ editProfileGuard: true }, '', window.location.href);
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        return () => {
+            window.removeEventListener('popstate', handlePopState);
+        };
+    }, [hasChanges]);
+
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (hasChanges && !isLeavingRef.current) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [hasChanges]);
+
+    const handleBack = () => {
+        if (hasChanges) {
+            setShowDiscardModal(true);
+        } else {
+            isLeavingRef.current = true;
+            router.back();
+        }
+    };
+
+    const handleConfirmDiscard = () => {
+        setShowDiscardModal(false);
+        isLeavingRef.current = true;
+        router.back();
+    };
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col antialiased selection:bg-purple-100 selection:text-purple-900 pb-16">
@@ -167,7 +217,7 @@ export default function EditProfilePage() {
             <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between z-10 sticky top-0 shadow-md">
                 <div className="flex items-center gap-3">
                     <button
-                        onClick={() => router.push('/profile')}
+                        onClick={handleBack}
                         className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 active:bg-white/30 flex items-center justify-center text-white transition-all cursor-pointer"
                         title="Voltar ao perfil"
                     >
@@ -178,6 +228,7 @@ export default function EditProfilePage() {
             </div>
 
             <div className="p-4 flex flex-col gap-4 max-w-md w-full mx-auto">
+                {profileIsProfessional && <ProfilePhotosEditor photoUrl={userData?.photoUrl} />}
                 {/* Banner de Identidade Verificada */}
                 {profileIsProfessional && userData?.identityStatus === 'approved' && (
                     <div className="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200/80 rounded-2xl p-4 flex items-center gap-3.5 shadow-xs">
@@ -367,6 +418,39 @@ export default function EditProfilePage() {
                     </button>
                 </div>
             </div>
+
+            {/* Modal de Aviso de Alterações Não Salvas */}
+            {showDiscardModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
+                        <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-4 border border-amber-100">
+                            <AlertCircle className="w-6 h-6" />
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-900 mb-1.5">
+                            Descartar alterações?
+                        </h3>
+                        <p className="text-xs text-slate-500 leading-relaxed mb-6">
+                            Você fez alterações no seu perfil que ainda não foram salvas. Se sair agora, essas modificações serão perdidas.
+                        </p>
+                        <div className="flex flex-col gap-2 w-full">
+                            <button
+                                type="button"
+                                onClick={() => setShowDiscardModal(false)}
+                                className="w-full h-11 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold transition-all cursor-pointer active:scale-[0.98]"
+                            >
+                                Continuar editando
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmDiscard}
+                                className="w-full h-11 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition-all cursor-pointer active:scale-[0.98]"
+                            >
+                                Descartar e sair
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

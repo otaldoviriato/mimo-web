@@ -206,7 +206,7 @@ export default function ChatsPage() {
         // Se estiver pendente
         if (myProfile.identityStatus === 'pending') {
             return (
-                <div className="mx-4 mt-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-3 md:p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="mx-4 mt-2 sm:mt-3 bg-white/95 backdrop-blur-md border border-amber-200/90 rounded-2xl p-3 md:p-4 shadow-lg shadow-amber-500/5 animate-in fade-in slide-in-from-top-2 duration-300 pointer-events-auto">
                     <div className="flex items-center gap-3">
                         <div className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600 animate-pulse">
                             <Clock className="w-4.5 h-4.5" />
@@ -225,7 +225,7 @@ export default function ChatsPage() {
         // Se for recusado
         if (myProfile.identityStatus === 'rejected') {
             return (
-                <div className="mx-4 mt-4 bg-gradient-to-r from-red-50 to-rose-50/50 border border-red-200 rounded-2xl p-3 md:p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="mx-4 mt-2 sm:mt-3 bg-white/95 backdrop-blur-md border border-red-200/90 rounded-2xl p-3 md:p-4 shadow-lg shadow-red-500/5 animate-in fade-in slide-in-from-top-2 duration-300 pointer-events-auto">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="flex items-start gap-3">
                             <div className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-600">
@@ -255,7 +255,7 @@ export default function ChatsPage() {
         // Se não for aprovado e nem pendente, e não estiver ocultado temporariamente
         if (myProfile.identityStatus !== 'approved' && !hideIdentityPrompt) {
             return (
-                <div className="mx-4 mt-4 bg-gradient-to-r from-purple-50 via-indigo-50/50 to-purple-50/30 border border-purple-100 rounded-2xl p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300 relative">
+                <div className="mx-4 mt-2 sm:mt-3 bg-white/95 backdrop-blur-md border border-purple-200/90 rounded-2xl p-4 shadow-lg shadow-purple-500/10 animate-in fade-in slide-in-from-top-2 duration-300 relative pointer-events-auto">
                     <button 
                         onClick={() => {
                             setHideIdentityPrompt(true);
@@ -552,7 +552,10 @@ export default function ChatsPage() {
     return (
         <div className="relative flex flex-col h-full">
 
-            {renderVerificationBanner()}
+            {/* Banner de verificação flutuando sobre a lista */}
+            <div className="absolute top-0 inset-x-0 z-20 pointer-events-none">
+                {renderVerificationBanner()}
+            </div>
 
             {/* Modal de crédito promocional */}
             {giftModal && (
