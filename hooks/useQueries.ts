@@ -255,6 +255,8 @@ export function useUpdateProfile() {
             birthDate?: string | Date | null;
             city?: string;
             state?: string;
+            hideFromExplore?: boolean;
+            isAvailable?: boolean;
         }) => userApi.updateMe(data),
         onSuccess: (response) => {
             if (response?.user) {
@@ -264,6 +266,7 @@ export function useUpdateProfile() {
                 }));
             }
             queryClient.invalidateQueries({ queryKey: QueryKeys.me });
+            queryClient.invalidateQueries({ queryKey: ['users', 'featured'] });
         },
     });
 }

@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { ShieldCheck, RefreshCw, AlertCircle, Lock, Pencil, ChevronRight, CircleDollarSign, Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { clearMimoClientSession } from '@/lib/clientSession';
+import toast from 'react-hot-toast';
 
 function SkeletonField() {
     return (
@@ -110,6 +111,7 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const [isSubscriptionEnabled, setIsSubscriptionEnabled] = useState(false);
     const [bio, setBio] = useState('');
     const [hideFromExplore, setHideFromExplore] = useState(false);
+    const [savingHideFromExplore, setSavingHideFromExplore] = useState(false);
     
     const [loading, setLoading] = useState(false);
     const [saveError, setSaveError] = useState('');
@@ -183,8 +185,11 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             if (userData.newUserNotificationsEnabled !== undefined) {
                 setNewUserNotificationsEnabled(userData.newUserNotificationsEnabled);
             }
+            if (userData.hideFromExplore !== undefined) {
+                setHideFromExplore(userData.hideFromExplore === true);
+            }
         }
-    }, [userData?.emailNotificationsEnabled, userData?.newUserNotificationsEnabled]);
+    }, [userData?.emailNotificationsEnabled, userData?.newUserNotificationsEnabled, userData?.hideFromExplore]);
 
     useEffect(() => {
         if (!state) {
@@ -870,10 +875,22 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                     <button
                                         id="show-in-explore-toggle"
                                         type="button"
-                                        onClick={() => {
-                                            setHideFromExplore(!hideFromExplore);
+                                        onClick={async () => {
+                                            const newValue = !hideFromExplore;
+                                            setHideFromExplore(newValue);
+                                            setSavingHideFromExplore(true);
+                                            try {
+                                                await updateProfileMutation.mutateAsync({ hideFromExplore: newValue });
+                                                toast.success(newValue ? 'Perfil ocultado do explorar' : 'Perfil visível no explorar');
+                                            } catch {
+                                                setHideFromExplore(!newValue);
+                                                toast.error('Erro ao atualizar privacidade');
+                                            } finally {
+                                                setSavingHideFromExplore(false);
+                                            }
                                         }}
-                                        className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${
+                                        disabled={savingHideFromExplore}
+                                        className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-60 ${
                                             hideFromExplore ? 'bg-purple-600' : 'bg-gray-200'
                                         }`}
                                         aria-label="Ocultar meu perfil do explorar"

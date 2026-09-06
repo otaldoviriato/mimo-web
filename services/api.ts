@@ -70,6 +70,11 @@ export const userApi = {
         birthDate?: string | Date | null;
         city?: string;
         state?: string;
+        emailNotificationsEnabled?: boolean;
+        newUserNotificationsEnabled?: boolean;
+        hideFromExplore?: boolean;
+        bio?: string;
+        isAvailable?: boolean;
     }) => {
         const response = await api.patch('/api/users/me', data);
         return response.data;
