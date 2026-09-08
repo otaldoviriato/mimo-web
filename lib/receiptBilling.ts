@@ -9,7 +9,7 @@ export function requiresReceiptConsent(user: {
     receiptTermsAcceptedAt?: unknown;
     createdAt?: Date | string | null;
 } | null | undefined): boolean {
-    if (!user || user.isTeam) return false;
+    if (!user || user.isProfessional || user.isTeam) return false;
 
     // Se o usuário já aceitou a versão vigente dos termos
     if (user.receiptTermsVersion === RECEIPT_TERMS_VERSION && user.receiptTermsAcceptedAt) {

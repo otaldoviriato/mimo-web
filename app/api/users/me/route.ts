@@ -163,6 +163,20 @@ export async function GET(request: NextRequest) {
                 }
             }
 
+            // Profissionais já operam em conformidade com o novo modelo e são regularizadas automaticamente
+            if (user.isProfessional && (!user.receiptTermsVersion || !user.receiptTermsAcceptedAt)) {
+                user.receiptTermsVersion = RECEIPT_TERMS_VERSION;
+                user.receiptTermsAcceptedAt = user.receiptTermsAcceptedAt || user.createdAt || new Date();
+                try {
+                    await User.updateOne(
+                        { _id: user._id },
+                        { $set: { receiptTermsVersion: RECEIPT_TERMS_VERSION, receiptTermsAcceptedAt: user.receiptTermsAcceptedAt } }
+                    );
+                } catch (updateTermsErr) {
+                    console.warn('[GET /api/users/me] Falha ao regularizar termos de profissional:', updateTermsErr);
+                }
+            }
+
             // Se o usuário ainda não tiver nome (ou estiver vazio), atribui um nome anônimo padrão
             if (!user.name || !user.name.trim()) {
                 const anonymousName = await generateUniqueAnonymousName();
