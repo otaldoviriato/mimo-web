@@ -59,6 +59,8 @@ interface Message {
     expiresAt?: string | Date;
     expiryMinutes?: number;
     isExpired?: boolean;
+    awaitingBalance?: boolean;
+    viewAttemptedAt?: string | Date;
 }
 
 interface UploadTask {
@@ -1429,10 +1431,12 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         // Preservar monotonicidade: estado mais avançado sempre prevalece
                         const isRead = !!(existing.isRead || processedMsg.isRead);
                         const isDelivered = !!(isRead || existing.isDelivered || processedMsg.isDelivered);
+                        const awaitingBalance = !!(existing.awaitingBalance || processedMsg.awaitingBalance);
                         newMessages[index] = {
                             ...processedMsg,
                             isRead,
                             isDelivered,
+                            awaitingBalance,
                             status: 'sent' as const,
                         };
                         if (processedMsg._id) {
@@ -1453,10 +1457,12 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     const newMessages = [...prev];
                     const isRead = !!(existing.isRead || processedMsg.isRead);
                     const isDelivered = !!(isRead || existing.isDelivered || processedMsg.isDelivered);
+                    const awaitingBalance = !!(existing.awaitingBalance || processedMsg.awaitingBalance);
                     newMessages[existingIndex] = {
                         ...processedMsg,
                         isRead,
                         isDelivered,
+                        awaitingBalance,
                         status: 'sent' as const,
                     };
                     return newMessages;
@@ -1585,6 +1591,17 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             }
         });
 
+        socket.on('messages_awaiting_balance', (data: { roomId: string; clientId: string; messageIds?: string[] }) => {
+            if (data.roomId === roomId) {
+                setMessages((prev) => prev.map((msg) => {
+                    if (msg.billingStatus === 'pending' && (!data.messageIds || data.messageIds.includes(msg._id))) {
+                        return { ...msg, awaitingBalance: true };
+                    }
+                    return msg;
+                }));
+            }
+        });
+
         socket.on('message_updated', (data: { message: Message }) => {
             setMessages((prev) => {
                 const oldMsg = prev.find(m => m._id === data.message._id);
@@ -1647,6 +1664,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             socket.off('user_typing');
             socket.off('messages_read');
             socket.off('messages_delivered');
+            socket.off('messages_awaiting_balance');
             socket.off('message_updated');
             socket.off('message_deleted');
             socket.off('room_read');
@@ -2325,6 +2343,9 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         const isLong = charTotal > largeMessageThreshold;
 
         if (balance < cost) {
+            if (socket && roomId) {
+                socket.emit('report_view_attempt', { roomId, messageId: item._id });
+            }
             openRechargeModal({
                 currentBalanceInCents: balance,
                 requiredAmountInCents: cost,
@@ -3343,11 +3364,11 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                         <div
                                             className={`${item.isContentLocked ? '' : 'reply-swipe-balloon'} relative z-10 max-w-[75%] ${isLocked || item.originalImageUrl || item.isVideo || item.isExpired || item.isContentLocked ? 'p-0 bg-transparent shadow-none' : (isAudio ? 'p-3' : 'px-3 py-1.5')} rounded-2xl ${
                                             (!isLocked && !item.originalImageUrl && !item.isVideo && !item.isExpired && !item.isContentLocked) 
-                                        ? (isMine 
-                                            ? (item.billingStatus === 'pending' 
-                                                ? 'bg-purple-600/80 border border-purple-400/35 text-white/95 shadow-xs backdrop-blur-xs' 
-                                                : 'bg-purple-600 text-white') + ' rounded-br-sm' 
-                                            : 'bg-white text-gray-900 shadow-sm rounded-bl-sm')
+                                         ? (isMine 
+                                             ? (item.billingStatus === 'pending' && item.awaitingBalance 
+                                                 ? 'bg-purple-600/80 border border-purple-400/35 text-white/95 shadow-xs backdrop-blur-xs' 
+                                                 : 'bg-purple-600 text-white') + ' rounded-br-sm' 
+                                             : 'bg-white text-gray-900 shadow-sm rounded-bl-sm')
                                                 : (isMine ? 'rounded-br-sm' : 'rounded-bl-sm')
                                             }`}
                                         >
@@ -3404,7 +3425,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                 </div>
                                             ) : isAudio ? (
                                                 <div>
-                                                     {isMine && userData?.isProfessional && item.billingStatus === 'pending' && (
+                                                     {isMine && userData?.isProfessional && item.billingStatus === 'pending' && item.awaitingBalance && (
                                                          <div className="flex items-center gap-1.5 text-[10px] font-medium text-purple-200/90 pb-1 mb-1.5 border-b border-purple-400/25 select-none">
                                                              <span className="relative flex h-2 w-2 shrink-0">
                                                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
@@ -3691,7 +3712,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                         </>
                                     ) : (
                                         <div className="relative">
-                                            {isMine && userData?.isProfessional && item.billingStatus === 'pending' && (
+                                            {isMine && userData?.isProfessional && item.billingStatus === 'pending' && item.awaitingBalance && (
                                                 <div className="flex items-center gap-1.5 text-[10px] font-medium text-purple-200/90 pb-1 mb-1 border-b border-purple-400/25 select-none">
                                                     <span className="relative flex h-2 w-2 shrink-0">
                                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />

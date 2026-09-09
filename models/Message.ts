@@ -44,6 +44,8 @@ export interface IMessage extends Document {
     qualificationAttemptId?: mongoose.Types.ObjectId;
     qualifiedConversationId?: mongoose.Types.ObjectId;
     pricingSnapshot?: Record<string, unknown>;
+    awaitingBalance?: boolean;
+    viewAttemptedAt?: Date;
 }
 
 const MessageSchema = new Schema<IMessage>({
@@ -217,6 +219,14 @@ const MessageSchema = new Schema<IMessage>({
     },
     pricingSnapshot: {
         type: Schema.Types.Mixed,
+    },
+    awaitingBalance: {
+        type: Boolean,
+        default: false,
+        index: true,
+    },
+    viewAttemptedAt: {
+        type: Date,
     },
 });
 
