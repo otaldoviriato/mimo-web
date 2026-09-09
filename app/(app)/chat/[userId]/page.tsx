@@ -153,6 +153,19 @@ function unlockMessageIfEligible(
     return msg;
 }
 
+function sortMessagesStable(msgs: Message[]): Message[] {
+    return [...msgs].sort((a, b) => {
+        const timeA = new Date(a.timestamp).getTime();
+        const timeB = new Date(b.timestamp).getTime();
+        if (timeA !== timeB) {
+            return timeA - timeB;
+        }
+        if (!a.tempId && b.tempId) return -1;
+        if (a.tempId && !b.tempId) return 1;
+        return String(a._id).localeCompare(String(b._id));
+    });
+}
+
 function LockedMediaTypeBadge({ isVideo, duration }: { isVideo?: boolean; duration?: number }) {
     const formattedDuration = isVideo ? formatMediaDuration(duration) : '';
 
@@ -956,6 +969,19 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     const typingTimeoutRef = useRef<any>(null);
     const partnerTypingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+    // Fila serial de envio para garantir ordem cronológica rigorosa e evitar que mensagens sumam
+    const lastSentTimestampRef = useRef<number>(0);
+    const sendQueueRef = useRef<Array<{
+        content: string;
+        otherUserId: string;
+        roomId: string;
+        tempId: string;
+        replyToId?: string;
+        replyToContent?: string;
+        replyToSenderId?: string;
+    }>>([]);
+    const isProcessingQueueRef = useRef<boolean>(false);
+
     const [couponClaimModal, setCouponClaimModal] = useState(false);
     const [couponClaimAmount, setCouponClaimAmount] = useState<number | null>(null);
     const couponClaimedRef = useRef(false);
@@ -1080,7 +1106,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
     const roomId = [user?.id, otherUserId].sort().join('_');
 
-    // Carrega mensagens do cache local no primeiro render
+    // Carrega mensagens do cache local APENAS no primeiro render da sala e preserva se já houver mensagens
     useEffect(() => {
         if (typeof window !== 'undefined' && user?.id && otherUserId) {
             const currentRoomId = [user.id, otherUserId].sort().join('_');
@@ -1089,10 +1115,14 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 try {
                     const parsed = JSON.parse(cached);
                     if (Array.isArray(parsed) && parsed.length > 0) {
-                        const normalized = parsed.map((m: any) =>
-                            unlockMessageIfEligible(m, user.id, balance, largeMessageThreshold, currentRoomId, declinedLongMessageIdsRef.current)
-                        );
-                        setMessages(normalized);
+                        setMessages((prev) => {
+                            // Se já houver mensagens em memória (inclusive otimistas), NÃO sobrescreve
+                            if (prev.length > 0) return prev;
+                            const normalized = parsed.map((m: any) =>
+                                unlockMessageIfEligible(m, user.id, balance, largeMessageThreshold, currentRoomId, declinedLongMessageIdsRef.current)
+                            );
+                            return normalized;
+                        });
                         setLoadingMessages(false);
                     }
                 } catch (e) {
@@ -1100,9 +1130,9 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 }
             }
         }
-    }, [user?.id, otherUserId, balance, largeMessageThreshold]);
+    }, [roomId, user?.id, otherUserId]);
 
-    // Fallback HTTP para carregar mensagens da API se o socket atrasar ou falhar
+    // Fallback HTTP para carregar mensagens da API se o socket atrasar ou falhar (executa apenas ao montar a sala)
     useEffect(() => {
         if (!user?.id || !otherUserId) return;
 
@@ -1122,20 +1152,18 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         }
                         return unlocked;
                     });
+
+                    // PRESERVAR mensagens locais/otimistas que estão sendo enviadas
+                    const pendingOptimistic = prev.filter(m => m.status === 'sending' || (m.tempId && !rawList.some(r => r.tempId === m.tempId || r._id === m.tempId)));
+
                     if (prev.length === 0) {
-                        return normalizedHttp;
+                        return sortMessagesStable([...normalizedHttp, ...pendingOptimistic]);
                     }
-                    const existingIds = new Set(prev.map(m => m._id));
-                    const newFromHttp = normalizedHttp.filter((m: any) => !existingIds.has(m._id));
-                    if (newFromHttp.length === 0) {
-                        return prev.map((m) => {
-                            const updated = normalizedHttp.find((h: any) => h._id === m._id);
-                            return updated || m;
-                        });
-                    }
-                    return [...normalizedHttp, ...prev.filter(m => !normalizedHttp.some((h: any) => h._id === m._id))].sort(
-                        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-                    );
+
+                    const existingIds = new Set(normalizedHttp.map(m => m._id));
+                    const remainingPrev = prev.filter(m => !existingIds.has(m._id) && !m.tempId);
+
+                    return sortMessagesStable([...normalizedHttp, ...remainingPrev, ...pendingOptimistic]);
                 });
                 setLoadingMessages(false);
             }
@@ -1146,14 +1174,34 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         .finally(() => {
             setLoadingMessages(false);
         });
-    }, [user?.id, otherUserId, balance, largeMessageThreshold]);
+    }, [roomId, user?.id, otherUserId]);
 
-    // Salva apenas as últimas 50 mensagens no cache local para não sobrecarregar o armazenamento
+    // Atualiza apenas o destrancamento em memória quando o saldo ou o limite de caracteres muda (SEM resetar cache ou estado)
+    useEffect(() => {
+        if (!user?.id) return;
+        setMessages((prev) => {
+            let changed = false;
+            const updated = prev.map((msg) => {
+                const rechecked = unlockMessageIfEligible(msg, user.id, balance, largeMessageThreshold, roomId, declinedLongMessageIdsRef.current);
+                if (rechecked.isContentLocked !== msg.isContentLocked || rechecked.billingStatus !== msg.billingStatus) {
+                    changed = true;
+                    return rechecked;
+                }
+                return msg;
+            });
+            return changed ? updated : prev;
+        });
+    }, [balance, largeMessageThreshold, user?.id, roomId]);
+
+    // Salva apenas as últimas 50 mensagens confirmadas no cache local para não sobrecarregar o armazenamento
     useEffect(() => {
         if (typeof window !== 'undefined' && user?.id && otherUserId && !loadingMessages) {
             const currentRoomId = [user.id, otherUserId].sort().join('_');
-            const recentMessages = messages.slice(-50);
-            localStorage.setItem(`mimo_messages_${currentRoomId}`, JSON.stringify(recentMessages));
+            const confirmedMessages = messages.filter(m => !m.tempId && m.status !== 'sending');
+            const recentMessages = confirmedMessages.slice(-50);
+            if (recentMessages.length > 0) {
+                localStorage.setItem(`mimo_messages_${currentRoomId}`, JSON.stringify(recentMessages));
+            }
         }
     }, [messages, user?.id, otherUserId, loadingMessages]);
 
@@ -1252,7 +1300,21 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     }
                     return unlocked;
                 });
-                return unlockedMessages;
+
+                // PRESERVA mensagens otimistas que ainda não foram confirmadas pelo servidor
+                const pendingOptimistic = prev.filter(
+                    m => m.status === 'sending' || 
+                    (m.tempId && !data.messages.some(dbM => dbM.tempId === m.tempId || dbM._id === m.tempId))
+                );
+
+                if (pendingOptimistic.length === 0) {
+                    return unlockedMessages;
+                }
+
+                const existingIds = new Set(unlockedMessages.map(m => m._id));
+                const uniquePending = pendingOptimistic.filter(m => !existingIds.has(m._id));
+
+                return sortMessagesStable([...unlockedMessages, ...uniquePending]);
             });
 
             // Se o usuário logado for o cliente e houver mensagens pendentes longas que não foram recusadas:
@@ -1382,7 +1444,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     return newMessages;
                 }
 
-                const newMessages = [...prev, { ...processedMsg, status: 'sent' as const }];
+                const newMessages = sortMessagesStable([...prev, { ...processedMsg, status: 'sent' as const }]);
                 if (processedMsg.receiverId === user?.id) {
                     socket.emit('mark_as_read', { roomId });
                     setNewIncomingMessageIds((prevIds) => {
@@ -1576,7 +1638,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 partnerTypingTimeoutRef.current = null;
             }
         };
-    }, [socket, socketVersion, roomId, otherUserId, user?.id, receiver, queryClient]);
+    }, [socket, socketVersion, roomId, otherUserId, user?.id, queryClient]);
 
     // Handles the edge case where the user selects a file before userData finishes
     // loading. Once userData is available we decide: auto-send (non-professional)
@@ -2281,26 +2343,77 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         }
     };
 
+    const processSendQueue = async () => {
+        if (isProcessingQueueRef.current) return;
+        isProcessingQueueRef.current = true;
+
+        try {
+            while (sendQueueRef.current.length > 0) {
+                const item = sendQueueRef.current.shift();
+                if (!item) break;
+
+                socketService.sendMessage(
+                    item.content,
+                    item.otherUserId,
+                    item.roomId,
+                    item.tempId,
+                    item.replyToId,
+                    item.replyToContent,
+                    item.replyToSenderId
+                );
+
+                // Pequeno intervalo entre envios seriais para o WebSocket não congestionar o servidor
+                if (sendQueueRef.current.length > 0) {
+                    await new Promise(resolve => setTimeout(resolve, 40));
+                }
+            }
+        } finally {
+            isProcessingQueueRef.current = false;
+        }
+    };
+
+    const handleRetryMessage = (msg: Message) => {
+        if (msg.status !== 'error' || !msg.content) return;
+
+        setMessages(prev => prev.map(m => (m._id === msg._id || m.tempId === msg.tempId) ? { ...m, status: 'sending' as const } : m));
+
+        sendQueueRef.current.push({
+            content: msg.content,
+            otherUserId,
+            roomId,
+            tempId: msg.tempId || msg._id,
+            replyToId: msg.replyToId || undefined,
+            replyToContent: msg.replyToContent || undefined,
+            replyToSenderId: msg.replyToSenderId || undefined
+        });
+
+        processSendQueue();
+    };
+
     const handleSend = async () => {
-        console.log('[handleSend] Tentando enviar mensagem. Texto:', messageText.trim().substring(0, 20), 'sending:', sending, 'socket:', !!socket);
-        if (!messageText.trim() || sending || !socket) {
-            console.warn('[handleSend] Retorno antecipado (condição inválida). Texto vazio, sending true ou socket nulo.');
+        const text = messageText.trim();
+        if (!text || sending) {
             return;
         }
 
-        const charCount = messageText.trim().length;
+        const charCount = text.length;
         const costInCents = 0;
 
-        const tempId = `temp-${Date.now()}`;
+        // Timestamp estritamente crescente para ordem cronológica consistente
+        const safeTimestampMs = Math.max(Date.now(), (lastSentTimestampRef.current || 0) + 1);
+        lastSentTimestampRef.current = safeTimestampMs;
+        const timestampIso = new Date(safeTimestampMs).toISOString();
+
+        const tempId = `temp-${safeTimestampMs}-${Math.random().toString(36).slice(2, 7)}`;
         const newMsg: Message = {
             _id: tempId,
             tempId: tempId,
             senderId: user?.id ?? '',
             receiverId: otherUserId,
-            content: messageText.trim(),
+            content: text,
             charCount: charCount,
             cost: costInCents,
-            timestamp: new Date().toISOString(),
+            timestamp: timestampIso,
             status: 'sending',
             ...(replyingTo ? {
                 replyToId: replyingTo._id,
@@ -2309,27 +2422,45 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             } : {})
         };
 
-        console.log('[handleSend] Inserindo mensagem otimista e limpando input. tempId:', tempId);
-        setMessages(prev => [...prev, newMsg]);
+        // UI Otimista Imediata: entra instantaneamente na lista e limpa o input
+        setMessages(prev => sortMessagesStable([...prev, newMsg]));
         setMessageText('');
         if (inputRef.current) {
             inputRef.current.style.height = 'auto';
         }
         inputRef.current?.focus();
-        
-        // setSending(true); // Removido para permitir múltiplas mensagens rápidas
-        socketService.sendMessage(
-            messageText.trim(),
+
+        decrementLocalBalance(costInCents);
+        const replySnapshot = replyingTo;
+        setReplyingTo(null);
+
+        // Enfileira para despacho serial garantido
+        sendQueueRef.current.push({
+            content: text,
             otherUserId,
             roomId,
             tempId,
-            replyingTo?._id,
-            replyingTo ? getReplyPreviewContent(replyingTo) : undefined,
-            replyingTo?.senderId
-        );
-        decrementLocalBalance(costInCents);
-        setReplyingTo(null);
-        socket.emit('mark_as_read', { roomId });
+            replyToId: replySnapshot?._id,
+            replyToContent: replySnapshot ? getReplyPreviewContent(replySnapshot) : undefined,
+            replyToSenderId: replySnapshot?.senderId
+        });
+
+        processSendQueue();
+
+        if (socket) {
+            socket.emit('mark_as_read', { roomId });
+        }
+
+        // Timeout fail-safe de 15 segundos para falha de rede
+        setTimeout(() => {
+            setMessages(prev => {
+                const target = prev.find(m => m.tempId === tempId || m._id === tempId);
+                if (target && target.status === 'sending') {
+                    return prev.map(m => (m.tempId === tempId || m._id === tempId) ? { ...m, status: 'error' as const } : m);
+                }
+                return prev;
+            });
+        }, 15000);
 
         // Atualiza cache local de rooms
         queryClient.setQueryData(QueryKeys.rooms(user?.id ?? ''), (old: any) => {
@@ -2339,9 +2470,9 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 if (rId === roomId) {
                     return {
                         ...r,
-                        lastMessage: messageText.trim().substring(0, 100),
-                        lastMessageTime: new Date().toISOString(),
-                        updatedAt: new Date().toISOString(),
+                        lastMessage: text.substring(0, 100),
+                        lastMessageTime: timestampIso,
+                        updatedAt: timestampIso,
                         unreadCount: { ...r.unreadCount, [user?.id ?? '']: 0 }
                     };
                 }
@@ -3514,11 +3645,27 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                         })()}
                                                     </span>
                                                     {isMine && (
-                                                        <span className={`text-[11px] ${item.isRead ? 'text-blue-300' : (item.status === 'sending' ? 'text-purple-300 animate-pulse' : 'text-purple-300/80')}`}>
+                                                        <span className={`text-[11px] ${item.isRead ? 'text-blue-300' : (item.status === 'sending' ? 'text-purple-300 animate-pulse' : item.status === 'error' ? 'text-red-300' : 'text-purple-300/80')}`}>
                                                             {item.status === 'sending' ? (
                                                                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                                                     <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                                                                 </svg>
+                                                            ) : item.status === 'error' ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleRetryMessage(item);
+                                                                    }}
+                                                                    className="inline-flex items-center gap-0.5 text-red-300 hover:text-white cursor-pointer"
+                                                                    title="Falha ao enviar. Clique para tentar novamente."
+                                                                >
+                                                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                                                        <circle cx="12" cy="12" r="10" />
+                                                                        <line x1="12" y1="8" x2="12" y2="12" />
+                                                                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                                                                    </svg>
+                                                                </button>
                                                             ) : item.isRead ? (
                                                                 <div className="inline-flex items-center">
                                                                     <span className="relative">✓</span>
@@ -3551,11 +3698,27 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                     })()}
                                                 </span>
                                                 {isMine && (
-                                                    <span className={`text-[11px] ${item.isRead ? 'text-blue-300' : (item.status === 'sending' ? 'text-purple-300 animate-pulse' : 'text-purple-300/80')}`}>
+                                                    <span className={`text-[11px] ${item.isRead ? 'text-blue-300' : (item.status === 'sending' ? 'text-purple-300 animate-pulse' : item.status === 'error' ? 'text-red-300' : 'text-purple-300/80')}`}>
                                                         {item.status === 'sending' ? (
                                                             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                                                 <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                                                             </svg>
+                                                        ) : item.status === 'error' ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleRetryMessage(item);
+                                                                }}
+                                                                className="inline-flex items-center gap-0.5 text-red-300 hover:text-white cursor-pointer"
+                                                                title="Falha ao enviar. Clique para tentar novamente."
+                                                            >
+                                                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                                                    <circle cx="12" cy="12" r="10" />
+                                                                    <line x1="12" y1="8" x2="12" y2="12" />
+                                                                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                                                                </svg>
+                                                            </button>
                                                         ) : item.isRead ? (
                                                             <div className="inline-flex items-center">
                                                                 <span className="relative">✓</span>
