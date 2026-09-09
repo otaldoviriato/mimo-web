@@ -5,12 +5,12 @@ import { createPortal } from 'react-dom';
 import { useUser } from '@clerk/nextjs';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Avatar } from '@/components/Avatar';
-import { useMyProfile, useUploadPhoto, useMyGallery, useUploadToGallery, useDeleteFromGallery, useDepositHistory, useChatRooms, useUpdateGalleryItemVisibility, useMySubscriptions, useCancelSubscription, type MySubscription } from '@/hooks/useQueries';
+import { useMyProfile, useUploadPhoto, useMyGallery, useUploadToGallery, useDeleteFromGallery, useDepositHistory, useChatRooms, useUpdateGalleryItemVisibility, useMySubscriptions, useCancelSubscription, useResumeSubscription, type MySubscription } from '@/hooks/useQueries';
 import { ImageCropper } from '@/components/ImageCropper';
 import { usePayment } from '@/context/PaymentContext';
 import { PullToRefresh } from '@/components';
 import { ProfessionalProfilePresentation, type ProfileGalleryItem } from '@/components/ProfessionalProfilePresentation';
-import { Share2, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, ShieldAlert, Heart, Globe, Crown, Camera, Gift, CreditCard, QrCode, Star, X, MoreVertical, ChevronLeft, ChevronRight, ExternalLink, CalendarClock, AlertCircle, Pencil } from 'lucide-react';
+import { Share2, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, ShieldAlert, Heart, Globe, Crown, Camera, Gift, CreditCard, QrCode, Star, X, MoreVertical, ChevronLeft, ChevronRight, ExternalLink, CalendarClock, AlertCircle, Pencil, MessageCircle, RotateCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { buildProfileShareUrl } from '@/lib/referral';
 import { recordLinkShared } from '@/lib/clientAcquisitionAnalytics';
@@ -34,6 +34,7 @@ export default function ProfilePage() {
     const { refetch: refetchRooms } = useChatRooms();
     const { data: subscriptionsData, refetch: refetchSubscriptions } = useMySubscriptions();
     const cancelSubscriptionMutation = useCancelSubscription();
+    const resumeSubscriptionMutation = useResumeSubscription();
 
     const onRefreshCreator = useCallback(async () => {
         await Promise.all([
@@ -620,70 +621,142 @@ export default function ProfilePage() {
                     </>
                 )}
 
-                {/* Card de Assinaturas Ativas */}
+                {/* Card de Minhas Assinaturas (Sempre visível para o cliente) */}
                 {!isTeam && (() => {
                     const mySubscriptions = subscriptionsData?.subscriptions ?? [];
-                    if (mySubscriptions.length === 0) return null;
                     return (
                         <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs flex flex-col gap-3">
-                            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5">Minhas Assinaturas</h3>
-                            <div className="flex flex-col gap-2">
-                                {mySubscriptions.map((sub) => {
-                                    const prof = sub.professional;
-                                    const renewsAt = new Date(sub.expiresAt);
-                                    const daysLeft = Math.max(0, Math.ceil((renewsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
-                                    const isExpiringSoon = daysLeft <= 3;
-                                    const renewalCanceled = Boolean(sub.cancelAtPeriodEnd);
-                                    return (
-                                        <button
-                                            key={sub._id}
-                                            onClick={() => setManagingSubscription(sub)}
-                                            className="w-full flex items-center gap-3 p-3 rounded-2xl border border-slate-100 hover:bg-slate-50 active:bg-slate-100 transition-all duration-75 active:scale-[0.98] text-left cursor-pointer"
-                                        >
-                                            {/* Avatar */}
-                                            <div className="relative shrink-0">
-                                                {prof?.photoUrl ? (
-                                                    <img src={prof.photoUrl} alt={prof.name || prof.username} className="w-10 h-10 rounded-full object-cover" />
-                                                ) : (
-                                                    <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
-                                                        <Crown className="w-4 h-4 text-purple-500" />
-                                                    </div>
-                                                )}
-                                                <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white" />
-                                            </div>
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                                    Minhas Assinaturas
+                                </h3>
+                                {mySubscriptions.length > 0 && (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                                        {mySubscriptions.length} {mySubscriptions.length === 1 ? 'assinatura' : 'assinaturas'}
+                                    </span>
+                                )}
+                            </div>
 
-                                            {/* Info */}
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-xs font-bold text-slate-900 truncate">{prof?.name || `@${prof?.username}`}</p>
-                                                <p className="text-[10px] text-slate-400 font-medium">@{prof?.username}</p>
-                                                <div className={`flex items-center gap-1 mt-1 ${isExpiringSoon || renewalCanceled ? 'text-amber-600' : 'text-slate-400'}`}>
-                                                    {isExpiringSoon || renewalCanceled ? (
-                                                        <AlertCircle className="w-3 h-3 shrink-0" />
-                                                    ) : (
-                                                        <CalendarClock className="w-3 h-3 shrink-0" />
-                                                    )}
-                                                    <span className="text-[10px] font-medium">
-                                                        {renewalCanceled
-                                                            ? `Expira em ${daysLeft} dia${daysLeft !== 1 ? 's' : ''}`
-                                                            : isExpiringSoon
-                                                            ? `Expira em ${daysLeft} dia${daysLeft !== 1 ? 's' : ''}`
-                                                            : `Renova em ${renewsAt.toLocaleDateString('pt-BR')}`
-                                                        }
+                            {mySubscriptions.length === 0 ? (
+                                <div className="rounded-xl bg-slate-50 border border-dashed border-slate-200 p-4 text-center flex flex-col items-center gap-2">
+                                    <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center">
+                                        <Crown className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-800">Apoie suas criadoras favoritas</p>
+                                        <p className="text-[11px] text-slate-500 max-w-xs mt-0.5">
+                                            Assinantes têm respostas prioritárias no chat e acesso exclusivo a conteúdos.
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => router.push('/search')}
+                                        className="mt-1 text-xs font-bold text-purple-600 hover:text-purple-700 active:scale-95 transition-all cursor-pointer"
+                                    >
+                                        Explorar perfis →
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col gap-2">
+                                    {mySubscriptions.map((sub) => {
+                                        const prof = sub.professional;
+                                        const renewsAt = new Date(sub.expiresAt);
+                                        const daysLeft = Math.max(0, Math.ceil((renewsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+                                        const isPastDue = sub.status === 'PAST_DUE';
+                                        const isExpired = sub.status === 'EXPIRED';
+                                        const renewalCanceled = Boolean(sub.cancelAtPeriodEnd);
+                                        const isExpiringSoon = !isPastDue && !isExpired && daysLeft <= 3;
+
+                                        return (
+                                            <button
+                                                key={sub._id}
+                                                type="button"
+                                                onClick={() => setManagingSubscription(sub)}
+                                                className={`w-full flex items-center gap-3 p-3 rounded-2xl border transition-all duration-75 active:scale-[0.98] text-left cursor-pointer ${
+                                                    isPastDue
+                                                        ? 'border-amber-200 bg-amber-50/40 hover:bg-amber-50/70'
+                                                        : isExpired
+                                                        ? 'border-slate-200 bg-slate-50/60 opacity-80'
+                                                        : 'border-slate-100 hover:bg-slate-50'
+                                                }`}
+                                            >
+                                                {/* Avatar */}
+                                                <div className="relative shrink-0 flex flex-col items-center">
+                                                    <div className={`relative rounded-full p-0.5 ${isPastDue ? 'ring-2 ring-amber-400 bg-white' : 'ring-2 ring-black bg-white'}`}>
+                                                        {prof?.photoUrl ? (
+                                                            <img src={prof.photoUrl} alt={prof.name || prof.username} className="w-10 h-10 rounded-full object-cover" />
+                                                        ) : (
+                                                            <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                                                                <Crown className="w-4 h-4 text-purple-500" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <span className={`absolute -bottom-1.5 z-10 px-1 py-0.2 rounded-full text-[8px] font-black uppercase tracking-wider scale-90 border shadow-2xs ${
+                                                        isPastDue
+                                                            ? 'bg-amber-500 text-white border-amber-600'
+                                                            : isExpired
+                                                            ? 'bg-slate-400 text-white border-slate-500'
+                                                            : 'bg-black text-white border-slate-900'
+                                                    }`}>
+                                                        {isPastDue ? 'Pendente' : isExpired ? 'Expirada' : 'Assinante'}
                                                     </span>
                                                 </div>
-                                            </div>
 
-                                            {/* Preço */}
-                                            <div className="shrink-0 text-right">
-                                                <span className="text-xs font-black text-purple-700">
-                                                    {(sub.priceInCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                                </span>
-                                                <p className="text-[9px] text-slate-400">/mês</p>
-                                            </div>
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                                                {/* Info */}
+                                                <div className="flex-1 min-w-0 ml-1">
+                                                    <p className="text-xs font-bold text-slate-900 truncate">{prof?.name || `@${prof?.username}`}</p>
+                                                    <p className="text-[10px] text-slate-400 font-medium truncate">@{prof?.username}</p>
+
+                                                    <div className="flex items-center gap-1 mt-1">
+                                                        {isPastDue ? (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700">
+                                                                <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+                                                                Saldo insuficiente • {sub.daysLeftInGrace ?? 3}d restantes
+                                                            </span>
+                                                        ) : isExpired ? (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500">
+                                                                <AlertCircle className="w-3 h-3 text-slate-400 shrink-0" />
+                                                                Expirada em {renewsAt.toLocaleDateString('pt-BR')}
+                                                            </span>
+                                                        ) : renewalCanceled ? (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600">
+                                                                <AlertCircle className="w-3 h-3 shrink-0" />
+                                                                Expira em {daysLeft} dia{daysLeft !== 1 ? 's' : ''} (sem renovação)
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500">
+                                                                <CalendarClock className="w-3 h-3 text-purple-600 shrink-0" />
+                                                                Renova em {renewsAt.toLocaleDateString('pt-BR')}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Preço e Ação Rápida */}
+                                                <div className="shrink-0 text-right flex flex-col items-end gap-1">
+                                                    <span className="text-xs font-black text-purple-700">
+                                                        {(sub.priceInCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                    </span>
+                                                    {isPastDue ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                openRechargeModal();
+                                                            }}
+                                                            className="px-2 py-0.5 rounded-md bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-bold tracking-wider uppercase transition-all shadow-xs cursor-pointer"
+                                                        >
+                                                            Recarregar
+                                                        </button>
+                                                    ) : (
+                                                        <p className="text-[9px] text-slate-400">/mês</p>
+                                                    )}
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     );
                 })()}
@@ -704,26 +777,31 @@ export default function ProfilePage() {
 
                         {/* Header */}
                         <div className="px-5 pt-3 pb-4 border-b border-gray-100 flex items-center gap-3">
-                            {managingSubscription.professional?.photoUrl ? (
-                                <img
-                                    src={managingSubscription.professional.photoUrl}
-                                    alt={managingSubscription.professional.name || managingSubscription.professional.username}
-                                    className="w-12 h-12 rounded-full object-cover border-2 border-purple-100"
-                                />
-                            ) : (
-                                <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
-                                    <Crown className="w-5 h-5 text-purple-500" />
+                            <div className="relative shrink-0">
+                                <div className={`p-0.5 rounded-full ${managingSubscription.status === 'PAST_DUE' ? 'ring-2 ring-amber-400' : 'ring-2 ring-black'}`}>
+                                    {managingSubscription.professional?.photoUrl ? (
+                                        <img
+                                            src={managingSubscription.professional.photoUrl}
+                                            alt={managingSubscription.professional.name || managingSubscription.professional.username}
+                                            className="w-12 h-12 rounded-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
+                                            <Crown className="w-5 h-5 text-purple-500" />
+                                        </div>
+                                    )}
                                 </div>
-                            )}
+                            </div>
                             <div className="flex-1 min-w-0">
                                 <h2 className="text-base font-bold text-gray-900 truncate">
                                     {managingSubscription.professional?.name || `@${managingSubscription.professional?.username}`}
                                 </h2>
-                                <p className="text-xs text-purple-600 font-medium">@{managingSubscription.professional?.username}</p>
+                                <p className="text-xs text-purple-600 font-medium truncate">@{managingSubscription.professional?.username}</p>
                             </div>
                             <button
+                                type="button"
                                 onClick={() => { setManagingSubscription(null); setCancellingSubscriptionId(null); }}
-                                className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-all active:scale-90"
+                                className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-all active:scale-90 cursor-pointer"
                             >
                                 <X className="w-4 h-4 text-gray-500" />
                             </button>
@@ -731,7 +809,31 @@ export default function ProfilePage() {
 
                         {/* Detalhes */}
                         <div className="px-5 py-4 flex flex-col gap-3">
-                            <div className="flex items-center justify-between bg-slate-50 rounded-2xl px-4 py-3">
+                            {/* Alerta se estiver PAST_DUE */}
+                            {managingSubscription.status === 'PAST_DUE' && (
+                                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3.5 flex flex-col gap-2 text-xs">
+                                    <div className="flex items-center gap-1.5 font-bold text-amber-800">
+                                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                                        <span>Renovação pendente por saldo insuficiente</span>
+                                    </div>
+                                    <p className="text-amber-700 leading-relaxed text-[11px]">
+                                        Você tem até <strong>{managingSubscription.daysLeftInGrace ?? 3} dias</strong> de tolerância para recarregar. Assim que o saldo for creditado, a renovação será efetuada automaticamente!
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setManagingSubscription(null);
+                                            openRechargeModal();
+                                        }}
+                                        className="mt-1 w-full h-9 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" />
+                                        Recarregar saldo agora
+                                    </button>
+                                </div>
+                            )}
+
+                            <div className="flex items-center justify-between bg-slate-50 rounded-2xl px-4 py-3 border border-slate-100">
                                 <div>
                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Valor mensal</p>
                                     <p className="text-lg font-black text-gray-900 mt-0.5">
@@ -740,7 +842,11 @@ export default function ProfilePage() {
                                 </div>
                                 <div className="text-right">
                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                                        {managingSubscription.cancelAtPeriodEnd ? 'Acesso ate' : 'Proxima renovacao'}
+                                        {managingSubscription.status === 'PAST_DUE'
+                                            ? 'Venceu em'
+                                            : managingSubscription.cancelAtPeriodEnd
+                                            ? 'Acesso até'
+                                            : 'Próxima renovação'}
                                     </p>
                                     <p className="text-sm font-bold text-gray-800 mt-0.5">
                                         {new Date(managingSubscription.expiresAt).toLocaleDateString('pt-BR')}
@@ -748,62 +854,106 @@ export default function ProfilePage() {
                                 </div>
                             </div>
 
-                            {/* Ação: acessar perfil */}
-                            {managingSubscription.professional?.username && (
+                            {/* Ações: Ir para chat / Visitar perfil */}
+                            <div className="grid grid-cols-2 gap-2">
                                 <button
+                                    type="button"
                                     onClick={() => {
+                                        const profId = managingSubscription.professionalId;
                                         setManagingSubscription(null);
-                                        router.push(`/${managingSubscription.professional!.username}`);
+                                        router.push(`/chat/${profId}`);
                                     }}
-                                    className="w-full flex items-center justify-center gap-2 h-11 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm transition-all duration-75 active:scale-95 active:bg-purple-800 shadow-sm shadow-purple-500/20"
+                                    className="flex items-center justify-center gap-1.5 h-11 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-all duration-75 active:scale-95 shadow-xs cursor-pointer"
                                 >
-                                    <ExternalLink className="w-4 h-4" />
-                                    Visitar perfil
+                                    <MessageCircle className="w-3.5 h-3.5" />
+                                    Conversar
                                 </button>
+
+                                {managingSubscription.professional?.username && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const username = managingSubscription.professional!.username;
+                                            setManagingSubscription(null);
+                                            router.push(`/${username}`);
+                                        }}
+                                        className="flex items-center justify-center gap-1.5 h-11 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs transition-all duration-75 active:scale-95 cursor-pointer"
+                                    >
+                                        <ExternalLink className="w-3.5 h-3.5" />
+                                        Ver perfil
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Reativação de renovação automática quando cancelamento está agendado */}
+                            {managingSubscription.cancelAtPeriodEnd && managingSubscription.status !== 'EXPIRED' && (
+                                <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5 flex flex-col gap-2.5">
+                                    <p className="text-xs font-bold text-amber-800 text-center">
+                                        Renovação cancelada. Acesso liberado até {new Date(managingSubscription.expiresAt).toLocaleDateString('pt-BR')}.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            try {
+                                                await resumeSubscriptionMutation.mutateAsync(managingSubscription._id);
+                                                toast.success('Renovação automática reativada com sucesso!');
+                                                setManagingSubscription(null);
+                                            } catch (err: any) {
+                                                toast.error(err.message || 'Erro ao reativar renovação');
+                                            }
+                                        }}
+                                        disabled={resumeSubscriptionMutation.isPending}
+                                        className="w-full h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer disabled:opacity-60"
+                                    >
+                                        <RotateCcw className="w-3.5 h-3.5" />
+                                        {resumeSubscriptionMutation.isPending ? 'Reativando...' : 'Reativar renovação automática'}
+                                    </button>
+                                </div>
                             )}
 
                             {/* Confirmação de cancelamento inline */}
-                            {cancellingSubscriptionId === managingSubscription._id ? (
-                                <div className="border border-red-100 bg-red-50/60 rounded-2xl p-4 flex flex-col gap-3">
-                                    <p className="text-xs font-bold text-red-700 text-center">
-                                        Tem certeza? A renovacao sera cancelada, mas seu acesso continua ate {new Date(managingSubscription.expiresAt).toLocaleDateString('pt-BR')}.
-                                    </p>
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => setCancellingSubscriptionId(null)}
-                                            className="flex-1 h-10 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all active:scale-95"
-                                        >
-                                            Voltar
-                                        </button>
-                                        <button
-                                            onClick={async () => {
-                                                try {
-                                                    await cancelSubscriptionMutation.mutateAsync(managingSubscription._id);
-                                                    toast.success('Renovacao cancelada. Seu acesso segue ativo ate o fim do ciclo.');
-                                                    setManagingSubscription(null);
-                                                    setCancellingSubscriptionId(null);
-                                                } catch (err: any) {
-                                                    toast.error(err.message || 'Erro ao cancelar assinatura');
-                                                }
-                                            }}
-                                            disabled={cancelSubscriptionMutation.isPending}
-                                            className="flex-1 h-10 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-all active:scale-95 disabled:opacity-60"
-                                        >
-                                            {cancelSubscriptionMutation.isPending ? 'Cancelando...' : 'Confirmar cancelamento'}
-                                        </button>
+                            {!managingSubscription.cancelAtPeriodEnd && managingSubscription.status !== 'EXPIRED' && (
+                                cancellingSubscriptionId === managingSubscription._id ? (
+                                    <div className="border border-red-100 bg-red-50/60 rounded-2xl p-4 flex flex-col gap-3">
+                                        <p className="text-xs font-bold text-red-700 text-center leading-relaxed">
+                                            Tem certeza? A renovação automática será cancelada, mas seu acesso de assinante continua normalmente até {new Date(managingSubscription.expiresAt).toLocaleDateString('pt-BR')}.
+                                        </p>
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setCancellingSubscriptionId(null)}
+                                                className="flex-1 h-10 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all active:scale-95 cursor-pointer"
+                                            >
+                                                Voltar
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    try {
+                                                        await cancelSubscriptionMutation.mutateAsync(managingSubscription._id);
+                                                        toast.success('Renovação cancelada. Seu acesso segue ativo até o fim do ciclo.');
+                                                        setManagingSubscription(null);
+                                                        setCancellingSubscriptionId(null);
+                                                    } catch (err: any) {
+                                                        toast.error(err.message || 'Erro ao cancelar assinatura');
+                                                    }
+                                                }}
+                                                disabled={cancelSubscriptionMutation.isPending}
+                                                className="flex-1 h-10 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-all active:scale-95 disabled:opacity-60 cursor-pointer"
+                                            >
+                                                {cancelSubscriptionMutation.isPending ? 'Cancelando...' : 'Confirmar cancelamento'}
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-                            ) : managingSubscription.cancelAtPeriodEnd ? (
-                                <div className="rounded-2xl border border-amber-100 bg-amber-50/70 px-4 py-3 text-xs font-bold text-amber-700 text-center">
-                                    Renovacao cancelada. Acesso ativo ate {new Date(managingSubscription.expiresAt).toLocaleDateString('pt-BR')}.
-                                </div>
-                            ) : (
-                                <button
-                                    onClick={() => setCancellingSubscriptionId(managingSubscription._id)}
-                                    className="w-full flex items-center justify-center gap-2 h-11 rounded-2xl border border-red-200 text-red-600 hover:bg-red-50 font-bold text-sm transition-all duration-75 active:scale-95"
-                                >
-                                    Cancelar assinatura
-                                </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => setCancellingSubscriptionId(managingSubscription._id)}
+                                        className="w-full flex items-center justify-center gap-2 h-10 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 font-bold text-xs transition-all duration-75 active:scale-95 cursor-pointer"
+                                    >
+                                        Cancelar renovação automática
+                                    </button>
+                                )
                             )}
                         </div>
                         <div className="h-6" />

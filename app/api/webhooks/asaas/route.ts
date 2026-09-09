@@ -269,6 +269,14 @@ export async function POST(request: NextRequest) {
             `Sua recarga de ${amountInReais} foi confirmada e ja esta disponivel.`
         );
 
+        // Tenta liquidar automaticamente assinaturas pendentes (PAST_DUE) por falta de saldo
+        try {
+            const { settlePendingSubscriptionsForUser } = await import('@/lib/subscriptionBilling');
+            await settlePendingSubscriptionsForUser(user.clerkId);
+        } catch (settleErr) {
+            console.error('[Asaas Webhook] Failed to settle pending subscriptions after recharge:', settleErr);
+        }
+
         return NextResponse.json({ success: true, message: 'Balance updated via Asaas webhook' });
     } catch (error) {
         console.error('Error in Asaas webhook:', error);

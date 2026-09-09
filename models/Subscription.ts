@@ -3,10 +3,12 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface ISubscription extends Document {
     subscriberId: string;    // ClerkID do cliente
     professionalId: string;   // ClerkID da profissional
-    status: 'ACTIVE' | 'EXPIRED' | 'CANCELED';
+    status: 'ACTIVE' | 'EXPIRED' | 'CANCELED' | 'PAST_DUE';
     priceInCents: number;     // Preço da assinatura na época do pagamento/renovação
     expiresAt: Date;          // Data em que o ciclo expira
     renewalCanceledAt?: Date | null;
+    pastDueSince?: Date | null;
+    lastRetryAt?: Date | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -24,7 +26,7 @@ const SubscriptionSchema = new Schema<ISubscription>({
     },
     status: { 
         type: String, 
-        enum: ['ACTIVE', 'EXPIRED', 'CANCELED'], 
+        enum: ['ACTIVE', 'EXPIRED', 'CANCELED', 'PAST_DUE'], 
         default: 'ACTIVE',
         index: true 
     },
@@ -41,6 +43,15 @@ const SubscriptionSchema = new Schema<ISubscription>({
         type: Date,
         default: null,
         index: true,
+    },
+    pastDueSince: {
+        type: Date,
+        default: null,
+        index: true,
+    },
+    lastRetryAt: {
+        type: Date,
+        default: null,
     },
 }, {
     timestamps: true,

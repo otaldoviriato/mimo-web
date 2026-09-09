@@ -708,9 +708,11 @@ export type MySubscription = {
     professionalId: string;
     priceInCents: number;
     expiresAt: string;
-    status: 'ACTIVE' | 'EXPIRED' | 'CANCELED';
+    status: 'ACTIVE' | 'EXPIRED' | 'CANCELED' | 'PAST_DUE';
     renewalCanceledAt?: string | null;
     cancelAtPeriodEnd?: boolean;
+    pastDueSince?: string | null;
+    daysLeftInGrace?: number | null;
     professional: {
         name?: string;
         username: string;
@@ -744,6 +746,28 @@ export function useCancelSubscription() {
             if (!response.ok) {
                 const error = await response.json();
                 throw new Error(error.error || 'Erro ao cancelar assinatura');
+            }
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['subscriptions', 'me'] });
+            queryClient.invalidateQueries({ queryKey: QueryKeys.me });
+        },
+    });
+}
+
+export function useResumeSubscription() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (subscriptionId: string) => {
+            const response = await fetch('/api/users/me/subscriptions', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ subscriptionId }),
+            });
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Erro ao reativar renovação');
             }
             return response.json();
         },

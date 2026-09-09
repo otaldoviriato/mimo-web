@@ -142,6 +142,14 @@ export async function POST(req: NextRequest) {
             `Sua recarga de ${amountInReais} foi confirmada e já está disponível.`
         );
 
+        // Tenta liquidar automaticamente assinaturas pendentes (PAST_DUE) por falta de saldo
+        try {
+            const { settlePendingSubscriptionsForUser } = await import('@/lib/subscriptionBilling');
+            await settlePendingSubscriptionsForUser(user.clerkId);
+        } catch (settleErr) {
+            console.error('[AbacatePay Webhook] Failed to settle pending subscriptions after recharge:', settleErr);
+        }
+
         return NextResponse.json({
             success: true,
             message: 'Balance updated via webhook'

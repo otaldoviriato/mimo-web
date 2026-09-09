@@ -69,6 +69,15 @@ export async function settleAbacatePix(id: string, userId?: string) {
             { sort: { signupCompletedAt: -1, createdAt: -1 } },
         );
     } catch { console.error('[PIX] Post-credit analytics failed', { paymentId: id }); }
+
+    // Tenta liquidar automaticamente assinaturas pendentes (PAST_DUE) por falta de saldo
+    try {
+        const { settlePendingSubscriptionsForUser } = await import('@/lib/subscriptionBilling');
+        await settlePendingSubscriptionsForUser(result.transaction.userId);
+    } catch (settleErr) {
+        console.error('[PIX] Failed to settle pending subscriptions after recharge:', settleErr);
+    }
+
     console.info('[PIX] Credit committed', { paymentId: id, amountCents: result.amountCents });
     return { transaction: result.transaction, credited: true };
 }

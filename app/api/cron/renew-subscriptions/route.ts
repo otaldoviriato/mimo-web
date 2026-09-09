@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import { connectToDatabase } from '@/lib/db';
 import { User, Transaction, Subscription, AppSettings } from '@/models';
 import { SubscriptionBillingError, subscriptionPriceBRLToCents } from '@/lib/subscriptionBilling';
+import { sendPushNotification } from '@/lib/push';
 
 function getNextExpiration(previousExpiresAt: Date, now: Date) {
     const nextExpiresAt = new Date(previousExpiresAt);
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
 
         const now = new Date();
         const expiredSubscriptions = await Subscription.find({
-            status: { $in: ['ACTIVE', 'CANCELED'] },
+            status: { $in: ['ACTIVE', 'PAST_DUE', 'CANCELED'] },
             expiresAt: { $lte: now },
         });
 
@@ -54,6 +55,7 @@ export async function GET(request: NextRequest) {
 
             if (sub.renewalCanceledAt || sub.status === 'CANCELED') {
                 sub.status = 'EXPIRED';
+                sub.pastDueSince = null;
                 await sub.save();
 
                 await User.updateOne(
@@ -76,6 +78,7 @@ export async function GET(request: NextRequest) {
                 !professional.isSubscriptionEnabled
             ) {
                 sub.status = 'EXPIRED';
+                sub.pastDueSince = null;
                 await sub.save();
 
                 await User.updateOne(
@@ -90,6 +93,7 @@ export async function GET(request: NextRequest) {
 
             if (!client) {
                 sub.status = 'EXPIRED';
+                sub.pastDueSince = null;
                 await sub.save();
 
                 await User.updateOne(
@@ -107,6 +111,7 @@ export async function GET(request: NextRequest) {
 
             if (priceInCents <= 0) {
                 sub.status = 'EXPIRED';
+                sub.pastDueSince = null;
                 await sub.save();
 
                 await User.updateOne(
@@ -120,16 +125,49 @@ export async function GET(request: NextRequest) {
             }
 
             if (client.balance < priceInCents) {
-                sub.status = 'EXPIRED';
+                const pastDueSince = sub.pastDueSince || now;
+                const daysInPastDue = Math.floor((now.getTime() - new Date(pastDueSince).getTime()) / (1000 * 60 * 60 * 24));
+                const profName = professional.name || (professional.username ? `@${professional.username}` : 'criadora');
+
+                if (sub.status === 'PAST_DUE' && daysInPastDue >= 3) {
+                    // Passou dos 3 dias de tolerância: expira definitivamente
+                    sub.status = 'EXPIRED';
+                    sub.pastDueSince = null;
+                    await sub.save();
+
+                    await User.updateOne(
+                        { clerkId: professionalId },
+                        { $pull: { subscribers: subscriberId } }
+                    );
+
+                    results.expired++;
+                    results.details.push(`Subscription of ${subscriberId} to ${professionalId} expired after 3 days in PAST_DUE without balance.`);
+
+                    try {
+                        await sendPushNotification(
+                            subscriberId,
+                            'Assinatura encerrada',
+                            `Sua assinatura de ${profName} expirou por falta de saldo. Recarregue para voltar a assinar quando quiser.`
+                        );
+                    } catch {}
+                    continue;
+                }
+
+                // Marca como PAST_DUE ou atualiza retry se ainda dentro dos 3 dias de carência
+                sub.status = 'PAST_DUE';
+                sub.pastDueSince = pastDueSince;
+                sub.lastRetryAt = now;
                 await sub.save();
 
-                await User.updateOne(
-                    { clerkId: professionalId },
-                    { $pull: { subscribers: subscriberId } }
-                );
+                results.details.push(`Subscription of ${subscriberId} to ${professionalId} set to PAST_DUE (day ${daysInPastDue} of 3).`);
 
-                results.expired++;
-                results.details.push(`Subscription of ${subscriberId} to ${professionalId} expired due to insufficient balance. Price: ${priceInCents} cents, Balance: ${client.balance} cents.`);
+                try {
+                    await sendPushNotification(
+                        subscriberId,
+                        'Renovação pendente ⚠️',
+                        `Sua assinatura de ${profName} não pôde ser renovada por falta de saldo. Recarregue em até 3 dias para manter seus benefícios!`
+                    );
+                } catch {}
                 continue;
             }
 
@@ -221,7 +259,7 @@ export async function GET(request: NextRequest) {
                     const renewResult = await Subscription.updateOne(
                         {
                             _id: sub._id,
-                            status: 'ACTIVE',
+                            status: { $in: ['ACTIVE', 'PAST_DUE'] },
                             expiresAt: { $lte: now },
                         },
                         {
@@ -229,6 +267,9 @@ export async function GET(request: NextRequest) {
                                 priceInCents,
                                 expiresAt: nextExpiresAt,
                                 renewalCanceledAt: null,
+                                status: 'ACTIVE',
+                                pastDueSince: null,
+                                lastRetryAt: now,
                             },
                         },
                         { session }
@@ -239,8 +280,34 @@ export async function GET(request: NextRequest) {
                     }
                 });
 
+                // Garante que o assinante permaneça no cache de subscribers da profissional
+                await User.updateOne(
+                    { clerkId: professionalId },
+                    { $addToSet: { subscribers: subscriberId } }
+                );
+
                 results.renewed++;
                 results.details.push(`Subscription of ${subscriberId} to ${professionalId} successfully renewed. Price: ${priceInCents} cents. New expiration: ${nextExpiresAt.toISOString()}.`);
+
+                try {
+                    const profName = professional?.name || (professional?.username ? `@${professional.username}` : 'criadora');
+                    const clientName = client?.name || (client?.username ? `@${client.username}` : 'Um assinante');
+                    const amountFormatted = (priceInCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+                    await sendPushNotification(
+                        subscriberId,
+                        'Assinatura renovada! ✅',
+                        `Sua assinatura de ${profName} foi renovada com sucesso.`
+                    );
+
+                    await sendPushNotification(
+                        professionalId,
+                        'Assinatura renovada! 🌟',
+                        `A assinatura de ${clientName} foi renovada (${amountFormatted}).`
+                    );
+                } catch (pushErr) {
+                    console.error('[renew-subscriptions] Push notification error on success:', pushErr);
+                }
             } catch (error) {
                 if (error instanceof SubscriptionBillingError) {
                     sub.status = 'EXPIRED';

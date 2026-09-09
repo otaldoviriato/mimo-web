@@ -326,6 +326,44 @@ export async function POST(
             priceInCents,
         });
 
+        // Cria mensagem de sistema no chat entre os dois para subir a conversa no topo
+        try {
+            const { Room, Message } = await import('@/models');
+            const participants = [requesterId, ownerId].sort();
+            const derivedRoomId = participants.join('_');
+            const subscriberDisplayName = requester.name || (requester.username ? `@${requester.username}` : 'Um novo assinante');
+
+            await Room.findOneAndUpdate(
+                { participants: { $all: [requesterId, ownerId], $size: 2 } },
+                {
+                    $setOnInsert: { participants },
+                    $set: {
+                        lastMessage: `⭐ ${subscriberDisplayName} assinou o seu perfil!`,
+                        lastMessageSenderId: requesterId,
+                        lastMessageTime: new Date(),
+                    },
+                    $pull: { deletedBy: { $in: [requesterId, ownerId] } }
+                },
+                { upsert: true, new: true }
+            );
+
+            await Message.create({
+                roomId: derivedRoomId,
+                senderId: requesterId,
+                receiverId: ownerId,
+                content: `⭐ ${subscriberDisplayName} agora é assinante do perfil! Prioridade nas respostas ativada.`,
+                charCount: 0,
+                cost: 0,
+                platformFee: 0,
+                receiverEarnings: 0,
+                timestamp: new Date(),
+                isRead: false,
+                isSystem: true,
+            });
+        } catch (chatMsgErr) {
+            console.error('[POST /api/users/[id]/subscribe] Failed to create system message in chat:', chatMsgErr);
+        }
+
         return NextResponse.json({
             success: true,
             message: 'Assinatura realizada com sucesso!',
