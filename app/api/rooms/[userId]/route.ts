@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { Room } from '@/models/Room';
 import { User } from '@/models/User';
+import { Subscription } from '@/models/Subscription';
 import { Message } from '@/models/Message';
 import { PENDING_MESSAGE_LABEL } from '@/lib/receiptBilling';
 import mongoose from 'mongoose';
@@ -24,7 +25,7 @@ export async function GET(
         if (onboardingGuard) return onboardingGuard;
 
         const currentUser = await User.findOne({ clerkId: userId })
-            .select('isProfessional')
+            .select('isProfessional subscribers')
             .lean();
 
         // Professionals only see a conversation after its first message.
@@ -88,9 +89,31 @@ export async function GET(
             }
         }
 
+        // Identifica os clientes que são assinantes ativos desta profissional
+        const activeSubscriberIds = new Set<string>();
+        if (currentUser?.isProfessional) {
+            const now = new Date();
+            const activeSubscriptions = await Subscription.find({
+                professionalId: userId,
+                status: 'ACTIVE',
+                expiresAt: { $gt: now }
+            }).select('subscriberId').lean();
+
+            for (const sub of activeSubscriptions) {
+                if (sub.subscriberId) activeSubscriberIds.add(sub.subscriberId);
+            }
+
+            if (Array.isArray((currentUser as any).subscribers)) {
+                for (const subId of (currentUser as any).subscribers) {
+                    if (subId) activeSubscriberIds.add(subId);
+                }
+            }
+        }
+
         // Enriquece cada sala com os dados do OUTRO participante
         const enrichedRooms = await Promise.all(rooms.map(async (room) => {
             const otherParticipantId = room.participants.find(p => p !== userId);
+            const isSubscriber = Boolean(currentUser?.isProfessional && otherParticipantId && activeSubscriberIds.has(otherParticipantId));
             
             let otherUser = null;
             if (otherParticipantId) {
@@ -192,7 +215,11 @@ export async function GET(
             return {
                 ...room,
                 lastMessage: sanitizedLastMessage,
-                otherUser,
+                otherUser: otherUser ? {
+                    ...otherUser,
+                    isSubscriber,
+                } : null,
+                isSubscriber,
             };
 
         }));

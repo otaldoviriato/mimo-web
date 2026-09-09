@@ -39,7 +39,9 @@ interface Room {
         isOnline?: boolean;
         identityStatus?: 'pending' | 'approved' | 'rejected' | null;
         isDeleted?: boolean;
+        isSubscriber?: boolean;
     };
+    isSubscriber?: boolean;
 }
 
 function formatMessageTime(dateStr: string): string {
@@ -793,6 +795,29 @@ export default function ChatsPage() {
                     <ul>
                         {[...rooms]
                             .sort((a, b) => {
+                                if (myProfile?.isProfessional) {
+                                    const myId = user?.id;
+                                    const unreadA = myId && a.unreadCount ? (a.unreadCount[myId] || 0) : 0;
+                                    const lastFromOtherA = Boolean(a.lastMessageSenderId && myId && a.lastMessageSenderId !== myId);
+                                    const isUnansweredA = unreadA > 0 || lastFromOtherA;
+                                    const isSubA = Boolean(a.isSubscriber || a.otherUser?.isSubscriber);
+
+                                    const unreadB = myId && b.unreadCount ? (b.unreadCount[myId] || 0) : 0;
+                                    const lastFromOtherB = Boolean(b.lastMessageSenderId && myId && b.lastMessageSenderId !== myId);
+                                    const isUnansweredB = unreadB > 0 || lastFromOtherB;
+                                    const isSubB = Boolean(b.isSubscriber || b.otherUser?.isSubscriber);
+
+                                    const getPriority = (isSub: boolean, isUnanswered: boolean) => {
+                                        if (isSub && isUnanswered) return 1;
+                                        if (isUnanswered) return 2;
+                                        return 3;
+                                    };
+
+                                    const prioA = getPriority(isSubA, isUnansweredA);
+                                    const prioB = getPriority(isSubB, isUnansweredB);
+                                    if (prioA !== prioB) return prioA - prioB;
+                                }
+
                                 const timeA = new Date(a.lastMessageTime ?? a.updatedAt).getTime();
                                 const timeB = new Date(b.lastMessageTime ?? b.updatedAt).getTime();
                                 return timeB - timeA;
@@ -804,6 +829,7 @@ export default function ChatsPage() {
                             const myUnreadCount = user?.id && room.unreadCount ? (room.unreadCount[user.id] || 0) : 0;
                             const hasUnread = myUnreadCount > 0;
                             const isRoomTyping = typingRooms[derivedRoomId] ?? false;
+                            const isClientSubscriber = Boolean(myProfile?.isProfessional && (room.isSubscriber || room.otherUser?.isSubscriber));
 
                             const handleItemClick = () => {
                                 if (otherUserId) {
@@ -841,8 +867,15 @@ export default function ChatsPage() {
                                         onContextMenu={(e) => handleContextMenu(e, room._id)}
                                         className="w-full flex items-center px-4 py-3.5 bg-white border-b border-gray-100 hover:bg-gray-50 transition-colors text-left select-none"
                                     >
-                                        <div className="relative shrink-0">
-                                            <Avatar size={52} uri={room.otherUser?.photoUrl} isOnline={room.otherUser?.isOnline} />
+                                        <div className="relative shrink-0 flex flex-col items-center">
+                                            <div className={`relative rounded-full transition-all ${isClientSubscriber ? 'p-0.5 ring-2 ring-black bg-white' : ''}`}>
+                                                <Avatar size={52} uri={room.otherUser?.photoUrl} isOnline={room.otherUser?.isOnline} />
+                                            </div>
+                                            {isClientSubscriber && (
+                                                <span className="absolute -bottom-1.5 z-10 px-1.5 py-0.5 rounded-full bg-black text-white text-[9px] font-black uppercase tracking-wider shadow-xs scale-90 border border-slate-900">
+                                                    Assinante
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="flex-1 ml-3 min-w-0">
                                             <div className="flex items-center justify-between mb-1">
