@@ -456,182 +456,219 @@ export default function AdminFunnelPage() {
                 ) : steps.length === 0 ? (
                     <div className="p-8 text-center text-slate-400">Nenhum dado registrado para este filtro.</div>
                 ) : viewMode === 'funnel' ? (
-                    /* MODO 1: FUNIL VISUAL HORIZONTAL GEOMÉTRICO */
+                    /* MODO 1: FUNIL VISUAL HORIZONTAL ONDULADO COM QUEDA PROPORCIONAL AO VAZAMENTO REAL */
                     <div className="space-y-4">
                         {/* Container do SVG do Funil com Grid HTML sobreposto */}
                         <div className="relative w-full overflow-x-auto pb-2">
                             <div className="min-w-[840px] relative">
-                                {/* SVG que desenha as 7 fatias afuniladas conectadas da esquerda para a direita */}
-                                <svg
-                                    viewBox="0 0 1050 240"
-                                    className="w-full h-56 block overflow-visible"
-                                    preserveAspectRatio="none"
-                                >
-                                    <defs>
-                                        <linearGradient id="funnelGrad0" x1="0%" y1="0%" x2="100%" y2="100%">
-                                            <stop offset="0%" stopColor="#ede9fe" />
-                                            <stop offset="100%" stopColor="#ddd6fe" />
-                                        </linearGradient>
-                                        <linearGradient id="funnelGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
-                                            <stop offset="0%" stopColor="#ddd6fe" />
-                                            <stop offset="100%" stopColor="#c4b5fd" />
-                                        </linearGradient>
-                                        <linearGradient id="funnelGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
-                                            <stop offset="0%" stopColor="#e0e7ff" />
-                                            <stop offset="100%" stopColor="#c7d2fe" />
-                                        </linearGradient>
-                                        <linearGradient id="funnelGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
-                                            <stop offset="0%" stopColor="#dbeafe" />
-                                            <stop offset="100%" stopColor="#bfdbfe" />
-                                        </linearGradient>
-                                        <linearGradient id="funnelGrad4" x1="0%" y1="0%" x2="100%" y2="100%">
-                                            <stop offset="0%" stopColor="#e0f2fe" />
-                                            <stop offset="100%" stopColor="#bae6fd" />
-                                        </linearGradient>
-                                        <linearGradient id="funnelGrad5" x1="0%" y1="0%" x2="100%" y2="100%">
-                                            <stop offset="0%" stopColor="#ccfbf1" />
-                                            <stop offset="100%" stopColor="#99f6e4" />
-                                        </linearGradient>
-                                        <linearGradient id="funnelGrad6" x1="0%" y1="0%" x2="100%" y2="100%">
-                                            <stop offset="0%" stopColor="#d1fae5" />
-                                            <stop offset="100%" stopColor="#a7f3d0" />
-                                        </linearGradient>
+                                {(() => {
+                                    const baseCount = steps[0]?.count || 1;
+                                    const yCenter = 140;
+                                    const maxFunnelHeight = 230; // Altura máxima na etapa com 100% de volume
+                                    const minFunnelHeight = 44;  // Altura mínima para garantir legibilidade dos badges
 
-                                        {/* Gradientes para estado com hover */}
-                                        <linearGradient id="funnelGradHover" x1="0%" y1="0%" x2="100%" y2="100%">
-                                            <stop offset="0%" stopColor="#7c3aed" />
-                                            <stop offset="100%" stopColor="#6d28d9" />
-                                        </linearGradient>
-                                    </defs>
+                                    // Alturas dinâmicas proporcionais ao volume real de cada etapa
+                                    const stageHeights = steps.map(s => {
+                                        if (baseCount <= 0 || s.count <= 0) return minFunnelHeight;
+                                        const ratio = Math.min(1, Math.max(0, s.count / baseCount));
+                                        // Curva proporcional: reflete com precisão o vazamento/drop-off real
+                                        return minFunnelHeight + (maxFunnelHeight - minFunnelHeight) * Math.pow(ratio, 0.65);
+                                    });
 
-                                    {steps.map((step, idx) => {
-                                        const isHovered = hoveredStepIndex === idx;
-                                        // Posições X com separador entre trapézios
-                                        const xStart = idx * 150 + 2;
-                                        const xEnd = (idx + 1) * 150 - 2;
+                                    const borderColors = [
+                                        '#8b5cf6', '#7c3aed', '#6366f1', '#3b82f6', '#0284c7', '#0d9488', '#10b981'
+                                    ];
 
-                                        // Altura afunilando da esquerda (210px) para a direita (85px)
-                                        const t1 = idx / 7;
-                                        const t2 = (idx + 1) / 7;
-                                        const yTop1 = 15 + 65 * t1;
-                                        const yTop2 = 15 + 65 * t2;
-                                        const yBottom1 = 225 - 65 * t1;
-                                        const yBottom2 = 225 - 65 * t2;
-
-                                        const points = `${xStart},${yTop1} ${xEnd},${yTop2} ${xEnd},${yBottom2} ${xStart},${yBottom1}`;
-                                        const borderColors = [
-                                            '#a78bfa', '#8b5cf6', '#6366f1', '#3b82f6', '#0284c7', '#0d9488', '#10b981'
-                                        ];
-
-                                        return (
-                                            <g key={step.id}>
-                                                <polygon
-                                                    points={points}
-                                                    fill={isHovered ? 'url(#funnelGradHover)' : `url(#funnelGrad${idx})`}
-                                                    stroke={isHovered ? '#5b21b6' : borderColors[idx]}
-                                                    strokeWidth={isHovered ? 2.5 : 1.5}
-                                                    className="transition-all duration-200 cursor-pointer"
-                                                    onMouseEnter={() => setHoveredStepIndex(idx)}
-                                                    onMouseLeave={() => setHoveredStepIndex(null)}
-                                                />
-                                            </g>
-                                        );
-                                    })}
-                                </svg>
-
-                                {/* Camada de Conteúdo HTML perfeitamente posicionada sobre o SVG */}
-                                <div className="absolute inset-0 grid grid-cols-7 pointer-events-none">
-                                    {steps.map((step, idx) => {
-                                        const Icon = stepIcons[idx] || CheckCircle2;
-                                        const isHovered = hoveredStepIndex === idx;
-
-                                        return (
-                                            <div
-                                                key={step.id}
-                                                onMouseEnter={() => setHoveredStepIndex(idx)}
-                                                onMouseLeave={() => setHoveredStepIndex(null)}
-                                                className="pointer-events-auto relative flex flex-col items-center justify-center p-2 text-center cursor-pointer select-none"
+                                    return (
+                                        <>
+                                            {/* SVG que desenha as 7 seções com fluxo ondulado contínuo */}
+                                            <svg
+                                                viewBox="0 0 1050 280"
+                                                className="w-full h-64 block overflow-visible"
+                                                preserveAspectRatio="none"
                                             >
-                                                {/* Cabeçalho com Número e Ícone */}
-                                                <div className="flex items-center gap-1 mb-1">
-                                                    <span className={`w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center shadow-2xs transition-colors ${
-                                                        isHovered ? 'bg-white text-purple-900' : 'bg-purple-700 text-white'
-                                                    }`}>
-                                                        {step.id}
-                                                    </span>
-                                                    <div className={`w-5 h-5 rounded-md flex items-center justify-center transition-colors ${
-                                                        isHovered ? 'bg-purple-800 text-white' : 'bg-white/80 text-slate-700'
-                                                    }`}>
-                                                        <Icon size={11} />
-                                                    </div>
-                                                </div>
+                                                <defs>
+                                                    <linearGradient id="waveGrad0" x1="0%" y1="0%" x2="100%" y2="100%">
+                                                        <stop offset="0%" stopColor="#ede9fe" stopOpacity="0.95" />
+                                                        <stop offset="100%" stopColor="#ddd6fe" stopOpacity="0.85" />
+                                                    </linearGradient>
+                                                    <linearGradient id="waveGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                                                        <stop offset="0%" stopColor="#f3e8ff" stopOpacity="0.95" />
+                                                        <stop offset="100%" stopColor="#e9d5ff" stopOpacity="0.85" />
+                                                    </linearGradient>
+                                                    <linearGradient id="waveGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                                                        <stop offset="0%" stopColor="#e0e7ff" stopOpacity="0.95" />
+                                                        <stop offset="100%" stopColor="#c7d2fe" stopOpacity="0.85" />
+                                                    </linearGradient>
+                                                    <linearGradient id="waveGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
+                                                        <stop offset="0%" stopColor="#dbeafe" stopOpacity="0.95" />
+                                                        <stop offset="100%" stopColor="#bfdbfe" stopOpacity="0.85" />
+                                                    </linearGradient>
+                                                    <linearGradient id="waveGrad4" x1="0%" y1="0%" x2="100%" y2="100%">
+                                                        <stop offset="0%" stopColor="#e0f2fe" stopOpacity="0.95" />
+                                                        <stop offset="100%" stopColor="#bae6fd" stopOpacity="0.85" />
+                                                    </linearGradient>
+                                                    <linearGradient id="waveGrad5" x1="0%" y1="0%" x2="100%" y2="100%">
+                                                        <stop offset="0%" stopColor="#ccfbf1" stopOpacity="0.95" />
+                                                        <stop offset="100%" stopColor="#99f6e4" stopOpacity="0.85" />
+                                                    </linearGradient>
+                                                    <linearGradient id="waveGrad6" x1="0%" y1="0%" x2="100%" y2="100%">
+                                                        <stop offset="0%" stopColor="#d1fae5" stopOpacity="0.95" />
+                                                        <stop offset="100%" stopColor="#a7f3d0" stopOpacity="0.85" />
+                                                    </linearGradient>
 
-                                                {/* Nome da Etapa */}
-                                                <p className={`text-[11px] font-extrabold line-clamp-2 leading-tight px-1 transition-colors ${
-                                                    isHovered ? 'text-white' : 'text-slate-900'
-                                                }`}>
-                                                    {step.label}
-                                                </p>
+                                                    {/* Gradiente de destaque ativo ao passar o cursor */}
+                                                    <linearGradient id="waveGradHover" x1="0%" y1="0%" x2="100%" y2="100%">
+                                                        <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.95" />
+                                                        <stop offset="100%" stopColor="#6d28d9" stopOpacity="0.95" />
+                                                    </linearGradient>
+                                                </defs>
 
-                                                {/* Contagem Principal */}
-                                                <span className={`text-base font-black my-0.5 tracking-tight transition-colors ${
-                                                    isHovered ? 'text-white' : 'text-slate-950'
-                                                }`}>
-                                                    {step.count.toLocaleString('pt-BR')}
-                                                </span>
+                                                {steps.map((step, idx) => {
+                                                    const isHovered = hoveredStepIndex === idx;
+                                                    const xStart = idx * 150;
+                                                    const xEnd = (idx + 1) * 150;
+                                                    const hStart = stageHeights[idx];
+                                                    const hEnd = idx < steps.length - 1 ? stageHeights[idx + 1] : stageHeights[idx] * 0.85;
 
-                                                {/* Porcentagem do Topo */}
-                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full transition-colors ${
-                                                    isHovered
-                                                        ? 'bg-purple-900 text-purple-200'
-                                                        : 'bg-white/90 text-purple-800 border border-purple-200 shadow-2xs'
-                                                }`}>
-                                                    {step.topConversionRate}%
-                                                </span>
+                                                    const yTopStart = yCenter - hStart / 2;
+                                                    const yBottomStart = yCenter + hStart / 2;
+                                                    const yTopEnd = yCenter - hEnd / 2;
+                                                    const yBottomEnd = yCenter + hEnd / 2;
 
-                                                {/* Indicador de Transição/Drop-off para a próxima etapa */}
-                                                {idx < steps.length - 1 && (
-                                                    <div className="hidden md:flex absolute -right-2.5 top-1/2 -translate-y-1/2 z-10 w-5 h-5 rounded-full bg-white border border-slate-300 items-center justify-center shadow-xs">
-                                                        <ChevronRight size={11} className="text-purple-600" />
-                                                    </div>
-                                                )}
+                                                    // Curvas Bézier cúbicas onduladas com tangentes horizontais
+                                                    const dx = xEnd - xStart;
+                                                    const c1x = xStart + dx * 0.52;
+                                                    const c2x = xEnd - dx * 0.52;
 
-                                                {/* TOOLTIP DETALHADO NO HOVER */}
-                                                {isHovered && (
-                                                    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-3 w-56 bg-slate-900 text-white p-3 rounded-xl shadow-2xl text-xs z-50 pointer-events-none animate-in fade-in-50 zoom-in-95 duration-150 text-left">
-                                                        <div className="flex items-center gap-1.5 font-bold border-b border-slate-800 pb-1.5 mb-1.5 text-purple-300">
-                                                            <Icon size={13} />
-                                                            <span>Etapa {step.id}: {step.label}</span>
-                                                        </div>
-                                                        <div className="space-y-1 text-[11px]">
-                                                            <div className="flex justify-between">
-                                                                <span className="text-slate-400">Total de Usuários:</span>
-                                                                <span className="font-bold text-white">{step.count}</span>
-                                                            </div>
-                                                            <div className="flex justify-between">
-                                                                <span className="text-slate-400">Conversão do Topo:</span>
-                                                                <span className="font-bold text-emerald-400">{step.topConversionRate}%</span>
-                                                            </div>
+                                                    const pathD = `M ${xStart} ${yTopStart} C ${c1x} ${yTopStart}, ${c2x} ${yTopEnd}, ${xEnd} ${yTopEnd} L ${xEnd} ${yBottomEnd} C ${c2x} ${yBottomEnd}, ${c1x} ${yBottomStart}, ${xStart} ${yBottomStart} Z`;
+
+                                                    return (
+                                                        <g key={step.id}>
+                                                            {/* Corpo ondulado da etapa do funil */}
+                                                            <path
+                                                                d={pathD}
+                                                                fill={isHovered ? 'url(#waveGradHover)' : `url(#waveGrad${idx})`}
+                                                                stroke={isHovered ? '#5b21b6' : borderColors[idx]}
+                                                                strokeWidth={isHovered ? 2.5 : 1.5}
+                                                                className="transition-all duration-200 cursor-pointer"
+                                                                onMouseEnter={() => setHoveredStepIndex(idx)}
+                                                                onMouseLeave={() => setHoveredStepIndex(null)}
+                                                            />
+                                                            {/* Linha divisória sutil entre etapas */}
                                                             {idx > 0 && (
-                                                                <>
-                                                                    <div className="flex justify-between">
-                                                                        <span className="text-slate-400">Retenção da Anterior:</span>
-                                                                        <span className="font-bold text-purple-300">{step.stepConversionRate}%</span>
+                                                                <line
+                                                                    x1={xStart}
+                                                                    y1={yTopStart}
+                                                                    x2={xStart}
+                                                                    y2={yBottomStart}
+                                                                    stroke="#ffffff"
+                                                                    strokeWidth={2}
+                                                                    strokeDasharray="4 3"
+                                                                    opacity={0.8}
+                                                                />
+                                                            )}
+                                                        </g>
+                                                    );
+                                                })}
+                                            </svg>
+
+                                            {/* Camada de Conteúdo HTML perfeitamente posicionada sobre o SVG */}
+                                            <div className="absolute inset-0 grid grid-cols-7 pointer-events-none">
+                                                {steps.map((step, idx) => {
+                                                    const Icon = stepIcons[idx] || CheckCircle2;
+                                                    const isHovered = hoveredStepIndex === idx;
+
+                                                    return (
+                                                        <div
+                                                            key={step.id}
+                                                            onMouseEnter={() => setHoveredStepIndex(idx)}
+                                                            onMouseLeave={() => setHoveredStepIndex(null)}
+                                                            className="pointer-events-auto relative flex flex-col items-center justify-center p-2 text-center cursor-pointer select-none"
+                                                        >
+                                                            {/* Cabeçalho com Número e Ícone */}
+                                                            <div className="flex items-center gap-1 mb-1">
+                                                                <span className={`w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center shadow-2xs transition-colors ${
+                                                                    isHovered ? 'bg-white text-purple-900' : 'bg-purple-700 text-white'
+                                                                }`}>
+                                                                    {step.id}
+                                                                </span>
+                                                                <div className={`w-5 h-5 rounded-md flex items-center justify-center transition-colors ${
+                                                                    isHovered ? 'bg-purple-800 text-white' : 'bg-white/90 text-slate-700'
+                                                                }`}>
+                                                                    <Icon size={11} />
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Nome da Etapa */}
+                                                            <p className={`text-[11px] font-extrabold line-clamp-2 leading-tight px-1 transition-colors ${
+                                                                isHovered ? 'text-white' : 'text-slate-900'
+                                                            }`}>
+                                                                {step.label}
+                                                            </p>
+
+                                                            {/* Contagem Principal */}
+                                                            <span className={`text-base font-black my-0.5 tracking-tight transition-colors ${
+                                                                isHovered ? 'text-white' : 'text-slate-950'
+                                                            }`}>
+                                                                {step.count.toLocaleString('pt-BR')}
+                                                            </span>
+
+                                                            {/* Porcentagem do Topo */}
+                                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full transition-colors ${
+                                                                isHovered
+                                                                    ? 'bg-purple-900 text-purple-200'
+                                                                    : 'bg-white/95 text-purple-800 border border-purple-200 shadow-2xs'
+                                                            }`}>
+                                                                {step.topConversionRate}%
+                                                            </span>
+
+                                                            {/* Indicador de Transição/Drop-off para a próxima etapa */}
+                                                            {idx < steps.length - 1 && (
+                                                                <div className="hidden md:flex absolute -right-2.5 top-1/2 -translate-y-1/2 z-10 w-5 h-5 rounded-full bg-white border border-slate-300 items-center justify-center shadow-xs">
+                                                                    <ChevronRight size={11} className="text-purple-600" />
+                                                                </div>
+                                                            )}
+
+                                                            {/* TOOLTIP DETALHADO NO HOVER */}
+                                                            {isHovered && (
+                                                                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-3 w-56 bg-slate-900 text-white p-3 rounded-xl shadow-2xl text-xs z-50 pointer-events-none animate-in fade-in-50 zoom-in-95 duration-150 text-left">
+                                                                    <div className="flex items-center gap-1.5 font-bold border-b border-slate-800 pb-1.5 mb-1.5 text-purple-300">
+                                                                        <Icon size={13} />
+                                                                        <span>Etapa {step.id}: {step.label}</span>
                                                                     </div>
-                                                                    <div className="flex justify-between">
-                                                                        <span className="text-slate-400">Drop-off (Perda):</span>
-                                                                        <span className="font-bold text-rose-400">-{step.dropoffCount} ({step.dropoffRate}%)</span>
+                                                                    <div className="space-y-1 text-[11px]">
+                                                                        <div className="flex justify-between">
+                                                                            <span className="text-slate-400">Total de Usuários:</span>
+                                                                            <span className="font-bold text-white">{step.count}</span>
+                                                                        </div>
+                                                                        <div className="flex justify-between">
+                                                                            <span className="text-slate-400">Conversão do Topo:</span>
+                                                                            <span className="font-bold text-emerald-400">{step.topConversionRate}%</span>
+                                                                        </div>
+                                                                        {idx > 0 && (
+                                                                            <>
+                                                                                <div className="flex justify-between">
+                                                                                    <span className="text-slate-400">Retenção da Anterior:</span>
+                                                                                    <span className="font-bold text-purple-300">{step.stepConversionRate}%</span>
+                                                                                </div>
+                                                                                <div className="flex justify-between">
+                                                                                    <span className="text-slate-400">Drop-off (Vazamento):</span>
+                                                                                    <span className="font-bold text-rose-400">-{step.dropoffCount} ({step.dropoffRate}%)</span>
+                                                                                </div>
+                                                                            </>
+                                                                        )}
                                                                     </div>
-                                                                </>
+                                                                    <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-6 border-x-transparent border-t-6 border-t-slate-900" />
+                                                                </div>
                                                             )}
                                                         </div>
-                                                        <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-6 border-x-transparent border-t-6 border-t-slate-900" />
-                                                    </div>
-                                                )}
+                                                    );
+                                                })}
                                             </div>
-                                        );
-                                    })}
-                                </div>
+                                        </>
+                                    );
+                                })()}
                             </div>
                         </div>
 
@@ -647,7 +684,7 @@ export default function AdminFunnelPage() {
                                             {step.stepConversionRate}% retêm
                                         </span>
                                         <span className="text-[10px] text-rose-500 font-semibold">
-                                            -{step.dropoffRate}% drop
+                                            -{step.dropoffRate}% vazam
                                         </span>
                                     </div>
                                 </div>
