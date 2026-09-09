@@ -93,32 +93,43 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { id: ownerId } = await params;
+        const { id: rawOwnerId } = await params;
         const { userId: requesterId } = await auth();
 
         if (!requesterId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        if (requesterId === ownerId) {
-            return NextResponse.json({ error: 'Voce nao pode assinar seu proprio perfil' }, { status: 400 });
-        }
-
         await connectToDatabase();
 
-        const owner = await User.findOne({ clerkId: ownerId });
-        const requester = await User.findOne({ clerkId: requesterId });
+        // Busca flexível: aceita clerkId, _id do MongoDB ou username
+        const mongooseModule = await import('mongoose');
+        const ownerQuery: any[] = [{ clerkId: rawOwnerId }, { username: rawOwnerId }];
+        if (mongooseModule.Types.ObjectId.isValid(rawOwnerId)) {
+            ownerQuery.push({ _id: new mongooseModule.Types.ObjectId(rawOwnerId) });
+        }
+
+        const [owner, requester] = await Promise.all([
+            User.findOne({ $or: ownerQuery }),
+            User.findOne({ clerkId: requesterId }),
+        ]);
 
         if (!owner || !owner.isProfessional || owner.professionalStatus !== 'approved') {
-            return NextResponse.json({ error: 'Perfil nao encontrado, nao profissional ou nao verificado' }, { status: 404 });
+            return NextResponse.json({ error: 'Perfil não encontrado, não profissional ou não verificado' }, { status: 404 });
+        }
+
+        const ownerId = owner.clerkId;
+
+        if (requesterId === ownerId) {
+            return NextResponse.json({ error: 'Você não pode assinar seu próprio perfil' }, { status: 400 });
         }
 
         if (!owner.isSubscriptionEnabled) {
-            return NextResponse.json({ error: 'Este perfil nao aceita assinaturas no momento' }, { status: 400 });
+            return NextResponse.json({ error: 'Este perfil não aceita assinaturas no momento' }, { status: 400 });
         }
 
         if (!requester) {
-            return NextResponse.json({ error: 'Seu perfil nao foi encontrado' }, { status: 404 });
+            return NextResponse.json({ error: 'Seu perfil não foi encontrado' }, { status: 404 });
         }
 
         const existingActiveSubscription = await Subscription.findOne({
@@ -129,14 +140,14 @@ export async function POST(
         });
 
         if (existingActiveSubscription) {
-            return NextResponse.json({ error: 'Voce ja e um assinante' }, { status: 400 });
+            return NextResponse.json({ error: 'Você já é um assinante ativo deste perfil' }, { status: 400 });
         }
 
         // User.subscriptionPrice is BRL. User.balance, Transaction.amount and Subscription.priceInCents are cents.
         const priceInCents = subscriptionPriceBRLToCents(owner.subscriptionPrice || 0);
 
         if (priceInCents <= 0) {
-            return NextResponse.json({ error: 'Preco da assinatura invalido' }, { status: 400 });
+            return NextResponse.json({ error: 'Preço da assinatura inválido' }, { status: 400 });
         }
 
         const expiresAt = new Date();
@@ -161,7 +172,7 @@ export async function POST(
             });
 
             if (activeSubscription) {
-                throw new SubscriptionBillingError('Voce ja e um assinante');
+                throw new SubscriptionBillingError('Você já é um assinante');
             }
 
             const debitResult = await User.updateOne(
@@ -207,19 +218,28 @@ export async function POST(
             );
 
             if (creditResult.modifiedCount === 0) {
-                throw new SubscriptionBillingError('Perfil nao aceita assinaturas no momento');
+                throw new SubscriptionBillingError('Perfil não aceita assinaturas no momento');
             }
             credited = true;
 
+            // Atualização parcial atômica com $set evitando document replacement
             await Subscription.findOneAndUpdate(
                 { subscriberId: requesterId, professionalId: ownerId },
                 {
-                    status: 'ACTIVE',
-                    priceInCents,
-                    expiresAt,
-                    renewalCanceledAt: null,
+                    $set: {
+                        status: 'ACTIVE',
+                        priceInCents,
+                        expiresAt,
+                        renewalCanceledAt: null,
+                        pastDueSince: null,
+                        lastRetryAt: null,
+                    },
+                    $setOnInsert: {
+                        subscriberId: requesterId,
+                        professionalId: ownerId,
+                    }
                 },
-                { upsert: true, new: true }
+                { upsert: true, returnDocument: 'after' }
             );
             subscriptionActivated = true;
 
@@ -371,11 +391,15 @@ export async function POST(
             expiresAt,
         });
     } catch (error: any) {
-        if (error instanceof SubscriptionBillingError) {
-            return NextResponse.json({ error: error.message }, { status: error.status });
+        const isBillingError = error instanceof SubscriptionBillingError || error?.name === 'SubscriptionBillingError';
+        if (isBillingError) {
+            return NextResponse.json({ error: error.message }, { status: error.status || 400 });
         }
 
-        console.error('Error in subscription:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        console.error('[POST /api/users/[id]/subscribe] Error in subscription:', error);
+        return NextResponse.json({ 
+            error: error?.message || 'Internal server error',
+            status: 500
+        }, { status: 500 });
     }
 }
