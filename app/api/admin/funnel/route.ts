@@ -64,10 +64,17 @@ export async function GET(request: NextRequest) {
             }
         }
 
-        // 1. Busca todas as campanhas e landing pages disponíveis para os filtros
-        const [allCampaigns, rawLandingPages] = await Promise.all([
+        // 1. Busca todas as campanhas, landing pages, configurações de admin e usuários da equipe/profissionais
+        const [allCampaigns, rawLandingPages, settings, teamAndProfClerkIds] = await Promise.all([
             Campaign.find().select('_id name slug network status').sort({ name: 1 }).lean(),
-            CampaignVisit.distinct('landingPage').then(list => list.filter(Boolean) as string[])
+            CampaignVisit.distinct('landingPage').then(list => list.filter(Boolean) as string[]),
+            AppSettings.findOne({ key: 'global' }).select('adminClerkIds').lean(),
+            User.distinct('clerkId', {
+                $or: [
+                    { isProfessional: true },
+                    { isTeam: true }
+                ]
+            })
         ]);
 
         const landingPagesSet = new Set<string>(rawLandingPages);
@@ -80,10 +87,12 @@ export async function GET(request: NextRequest) {
         }
         const landingPages = Array.from(landingPagesSet).sort();
 
-        // Exclui perfis do tipo profissional do funil
-        const professionalClerkIds = await User.distinct('clerkId', { isProfessional: true });
-        if (professionalClerkIds.length > 0) {
-            filter.userId = { $nin: professionalClerkIds };
+        // Exclui perfis do tipo profissional, equipe e administradores do funil
+        const adminClerkIds = Array.from(new Set([FALLBACK_ADMIN, ...(settings?.adminClerkIds || [])]));
+        const excludedUserIds = Array.from(new Set([...teamAndProfClerkIds, ...adminClerkIds]));
+
+        if (excludedUserIds.length > 0) {
+            filter.userId = { $nin: excludedUserIds };
         }
 
         // 2. Busca visitas filtradas
@@ -100,16 +109,18 @@ export async function GET(request: NextRequest) {
 
         const usersList = allLookupIds.length > 0
             ? await User.find({ clerkId: { $in: allLookupIds } })
-                .select('clerkId name username photoUrl email isProfessional createdAt')
+                .select('clerkId name username photoUrl email isProfessional isTeam createdAt')
                 .lean()
             : [];
         const userMap = new Map(usersList.map(u => [u.clerkId, u]));
 
-        // Filtro estrito: garante que nenhum perfil do tipo profissional entre no funil
+        // Filtro estrito: garante que nenhum perfil de profissional, equipe ou administrador entre no funil
+        const excludedUserIdsSet = new Set(excludedUserIds);
         const clientVisits = visits.filter(visit => {
             if (visit.userId) {
+                if (excludedUserIdsSet.has(visit.userId)) return false;
                 const u = userMap.get(visit.userId);
-                if (u?.isProfessional) return false;
+                if (u?.isProfessional || u?.isTeam) return false;
             }
             return true;
         });
@@ -140,17 +151,8 @@ export async function GET(request: NextRequest) {
             }
         }
 
-        // 5. Processamento dos clientes e cálculo das 7 etapas
-        let stage1Count = 0;
-        let stage2Count = 0;
-        let stage3Count = 0;
-        let stage4Count = 0;
-        let stage5Count = 0;
-        let stage6Count = 0;
-        let stage7Count = 0;
-        let totalRevenueCents = 0;
-
-        const clients = clientVisits.map(visit => {
+        // 5. Mapeamento de todos os clientes válidos (excluindo profissionais, equipe e admins)
+        const allClients = clientVisits.map(visit => {
             const u = visit.userId ? userMap.get(visit.userId) : null;
             const prof = visit.firstProfileViewedProfessionalId ? userMap.get(visit.firstProfileViewedProfessionalId) : null;
 
@@ -162,17 +164,6 @@ export async function GET(request: NextRequest) {
             const hasStage6 = Boolean(visit.firstMessageReceivedAt || (visit.userId && receivedMessageUsers.has(visit.userId)));
             const rechargeAmount = visit.firstRechargeAmountCents ?? (visit.userId ? rechargesByUser.get(visit.userId) : 0) ?? 0;
             const hasStage7 = Boolean(visit.firstRechargeAt || (rechargeAmount > 0));
-
-            if (hasStage1) stage1Count++;
-            if (hasStage2) stage2Count++;
-            if (hasStage3) stage3Count++;
-            if (hasStage4) stage4Count++;
-            if (hasStage5) stage5Count++;
-            if (hasStage6) stage6Count++;
-            if (hasStage7) {
-                stage7Count++;
-                totalRevenueCents += rechargeAmount;
-            }
 
             const completedStages = [hasStage1, hasStage2, hasStage3, hasStage4, hasStage5, hasStage6, hasStage7];
             const stagesCompleted = completedStages.filter(Boolean).length;
@@ -244,9 +235,9 @@ export async function GET(request: NextRequest) {
             };
         });
 
-        // Filtragem por etapa mínima (para a listagem detalhada de clientes)
-        const filteredClients = minStage > 1
-            ? clients.filter(c => {
+        // Filtragem por etapa mínima (afeta tanto o Funil Visual quanto a listagem)
+        const effectiveClients = minStage > 1
+            ? allClients.filter(c => {
                 if (minStage === 2) return c.stages.stage2_cta.reached;
                 if (minStage === 3) return c.stages.stage3_signup.reached;
                 if (minStage === 4) return c.stages.stage4_profileView.reached;
@@ -255,9 +246,31 @@ export async function GET(request: NextRequest) {
                 if (minStage === 7) return c.stages.stage7_firstRecharge.reached;
                 return true;
             })
-            : clients;
+            : allClients;
 
-        // 6. Funnel summary data para o gráfico horizontal
+        // 6. Contagem das 7 etapas e métricas consolidadas calculadas em cima dos leads filtrados
+        let stage1Count = 0;
+        let stage2Count = 0;
+        let stage3Count = 0;
+        let stage4Count = 0;
+        let stage5Count = 0;
+        let stage6Count = 0;
+        let stage7Count = 0;
+        let totalRevenueCents = 0;
+
+        for (const c of effectiveClients) {
+            if (c.stages.stage1_landing.reached) stage1Count++;
+            if (c.stages.stage2_cta.reached) stage2Count++;
+            if (c.stages.stage3_signup.reached) stage3Count++;
+            if (c.stages.stage4_profileView.reached) stage4Count++;
+            if (c.stages.stage5_messageSent.reached) stage5Count++;
+            if (c.stages.stage6_messageReceived.reached) stage6Count++;
+            if (c.stages.stage7_firstRecharge.reached) {
+                stage7Count++;
+                totalRevenueCents += (c.stages.stage7_firstRecharge.amountCents || 0);
+            }
+        }
+
         const stageTotals = [
             { id: 1, label: 'Acessou Landing Page', count: stage1Count, key: 'landing' },
             { id: 2, label: 'Clicou no CTA', count: stage2Count, key: 'cta' },
@@ -268,9 +281,12 @@ export async function GET(request: NextRequest) {
             { id: 7, label: 'Primeira Recarga', count: stage7Count, key: 'firstRecharge' },
         ];
 
+        // Base de conversão: se filtrado por etapa mínima, a etapa inicial selecionada passa a ser a base (100%)
+        const baseFunnelCount = stageTotals[minStage - 1]?.count || stage1Count || 1;
+
         const funnelSteps = stageTotals.map((step, index) => {
             const prevCount = index === 0 ? step.count : stageTotals[index - 1].count;
-            const topConversionRate = stage1Count > 0 ? Number(((step.count / stage1Count) * 100).toFixed(1)) : 0;
+            const topConversionRate = baseFunnelCount > 0 ? Number(((step.count / baseFunnelCount) * 100).toFixed(1)) : 0;
             const stepConversionRate = prevCount > 0 ? Number(((step.count / prevCount) * 100).toFixed(1)) : 0;
             const dropoffCount = Math.max(0, prevCount - step.count);
             const dropoffRate = prevCount > 0 ? Number(((dropoffCount / prevCount) * 100).toFixed(1)) : 0;
@@ -288,12 +304,12 @@ export async function GET(request: NextRequest) {
             campaigns: allCampaigns,
             landingPages,
             summary: {
-                totalLeads: stage1Count,
+                totalLeads: effectiveClients.length,
                 totalRevenueCents,
-                overallConversionRate: stage1Count > 0 ? Number(((stage7Count / stage1Count) * 100).toFixed(2)) : 0,
+                overallConversionRate: baseFunnelCount > 0 ? Number(((stage7Count / baseFunnelCount) * 100).toFixed(2)) : 0,
                 steps: funnelSteps,
             },
-            clients: filteredClients,
+            clients: effectiveClients,
         });
 
     } catch (error: any) {

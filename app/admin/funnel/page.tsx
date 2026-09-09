@@ -462,7 +462,7 @@ export default function AdminFunnelPage() {
                         <div className="relative w-full overflow-x-auto pb-2">
                             <div className="min-w-[840px] relative">
                                 {(() => {
-                                    const baseCount = steps[0]?.count || 1;
+                                    const baseCount = Math.max(...steps.map(s => s.count), 1);
                                     const yCenter = 140;
                                     const maxFunnelHeight = 230; // Altura máxima na etapa com 100% de volume
                                     const minFunnelHeight = 44;  // Altura mínima para garantir legibilidade dos badges
