@@ -2362,9 +2362,15 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     item.replyToSenderId
                 );
 
-                // Pequeno intervalo entre envios seriais para o WebSocket não congestionar o servidor
+                // Aguarda o ACK do servidor garantindo que a mensagem foi processada e transmitida
+                // antes de despachar a próxima mensagem da fila (elimina inversão no wire)
+                if (item.tempId) {
+                    await socketService.waitForAck(item.tempId, 2500);
+                }
+
+                // Pequeno espaçamento adicional de 20ms entre envios seriais
                 if (sendQueueRef.current.length > 0) {
-                    await new Promise(resolve => setTimeout(resolve, 40));
+                    await new Promise(resolve => setTimeout(resolve, 20));
                 }
             }
         } finally {

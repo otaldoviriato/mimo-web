@@ -205,6 +205,50 @@ class SocketService {
         }
     }
 
+    private _ackResolvers = new Map<string, (result: { success: boolean; error?: string }) => void>();
+
+    private _setupAckListeners() {
+        if (!this.socket) return;
+        this.socket.off('message_ack');
+        this.socket.on('message_ack', (data: { tempId?: string; success: boolean; error?: string }) => {
+            if (data?.tempId && this._ackResolvers.has(data.tempId)) {
+                const resolve = this._ackResolvers.get(data.tempId);
+                this._ackResolvers.delete(data.tempId);
+                resolve?.(data);
+            }
+        });
+        this.socket.off('message_error');
+        this.socket.on('message_error', (data: { tempId?: string; error: string }) => {
+            if (data?.tempId && this._ackResolvers.has(data.tempId)) {
+                const resolve = this._ackResolvers.get(data.tempId);
+                this._ackResolvers.delete(data.tempId);
+                resolve?.({ success: false, error: data.error });
+            }
+        });
+    }
+
+    waitForAck(tempId: string, timeoutMs = 2500): Promise<{ success: boolean; error?: string }> {
+        if (!this.socket || !tempId) {
+            return Promise.resolve({ success: true });
+        }
+        this._setupAckListeners();
+
+        return new Promise((resolve) => {
+            const timer = setTimeout(() => {
+                if (this._ackResolvers.has(tempId)) {
+                    this._ackResolvers.delete(tempId);
+                    // Fallback para não travar a fila em caso de lag transitório
+                    resolve({ success: true });
+                }
+            }, timeoutMs);
+
+            this._ackResolvers.set(tempId, (result) => {
+                clearTimeout(timer);
+                resolve(result);
+            });
+        });
+    }
+
     offError() {
         if (!this.socket) return;
         this.socket.off('error');
