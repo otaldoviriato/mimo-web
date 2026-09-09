@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/lib/db';
 import { AppSettings } from '@/models/AppSettings';
 import { Campaign } from '@/models/Campaign';
 import { CampaignVisit } from '@/models/CampaignVisit';
+import { User } from '@/models/User';
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
@@ -18,8 +19,19 @@ export async function GET() {
     await connectToDatabase();
     if (!await requireAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
+    // Exclui usuários profissionais das métricas de campanhas
+    const professionalClerkIds = await User.distinct('clerkId', { isProfessional: true });
+
     const campaigns = await Campaign.find().sort({ createdAt: -1 }).lean();
     const counts = await CampaignVisit.aggregate([
+        ...(professionalClerkIds.length > 0 ? [{
+            $match: {
+                $or: [
+                    { userId: null },
+                    { userId: { $nin: professionalClerkIds } }
+                ]
+            }
+        }] : []),
         { $group: {
             _id: '$campaignId',
             visits: { $sum: 1 },

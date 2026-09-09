@@ -22,7 +22,16 @@ export async function POST(request: NextRequest) {
 
         await connectToDatabase();
 
-        const user = await User.findOne({ clerkId: userId }).select('createdAt').lean();
+        const user = await User.findOne({ clerkId: userId }).select('createdAt isProfessional').lean();
+
+        // Usuários do tipo profissional NÃO devem aparecer em campanhas nem no funil
+        if (user?.isProfessional) {
+            return NextResponse.json({
+                success: true,
+                ignored: true,
+                reason: 'Perfil do tipo profissional não entra no funil de leads',
+            });
+        }
 
         // Vincula a visita do visitorId ao userId autenticado e marca cadastro se ainda não marcado
         const signupDate = user?.createdAt || new Date();

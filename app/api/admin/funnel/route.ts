@@ -61,6 +61,12 @@ export async function GET(request: NextRequest) {
         // 1. Busca todas as campanhas para os filtros do dropdown
         const allCampaigns = await Campaign.find().select('_id name slug network status').sort({ name: 1 }).lean();
 
+        // Exclui perfis do tipo profissional do funil
+        const professionalClerkIds = await User.distinct('clerkId', { isProfessional: true });
+        if (professionalClerkIds.length > 0) {
+            filter.userId = { $nin: professionalClerkIds };
+        }
+
         // 2. Busca visitas filtradas
         const visits = await CampaignVisit.find(filter)
             .sort({ landingViewedAt: -1 })
@@ -80,17 +86,27 @@ export async function GET(request: NextRequest) {
             : [];
         const userMap = new Map(usersList.map(u => [u.clerkId, u]));
 
+        // Filtro estrito: garante que nenhum perfil do tipo profissional entre no funil
+        const clientVisits = visits.filter(visit => {
+            if (visit.userId) {
+                const u = userMap.get(visit.userId);
+                if (u?.isProfessional) return false;
+            }
+            return true;
+        });
+
         // 4. Batch query de resiliência: mensagens enviadas e recebidas
+        const validClientUserIds = Array.from(new Set(clientVisits.map(v => v.userId).filter(Boolean))) as string[];
         let sentMessageUsers = new Set<string>();
         let receivedMessageUsers = new Set<string>();
         let rechargesByUser = new Map<string, number>();
 
-        if (userIds.length > 0) {
+        if (validClientUserIds.length > 0) {
             const [sent, received, recharges] = await Promise.all([
-                Message.distinct('senderId', { senderId: { $in: userIds } }),
-                Message.distinct('receiverId', { receiverId: { $in: userIds } }),
+                Message.distinct('senderId', { senderId: { $in: validClientUserIds } }),
+                Message.distinct('receiverId', { receiverId: { $in: validClientUserIds } }),
                 Transaction.find({
-                    userId: { $in: userIds },
+                    userId: { $in: validClientUserIds },
                     source: 'recharge',
                     status: { $in: ['COMPLETED', 'PAID'] }
                 }).select('userId amount').lean()
@@ -115,7 +131,7 @@ export async function GET(request: NextRequest) {
         let stage7Count = 0;
         let totalRevenueCents = 0;
 
-        const clients = visits.map(visit => {
+        const clients = clientVisits.map(visit => {
             const u = visit.userId ? userMap.get(visit.userId) : null;
             const prof = visit.firstProfileViewedProfessionalId ? userMap.get(visit.firstProfileViewedProfessionalId) : null;
 

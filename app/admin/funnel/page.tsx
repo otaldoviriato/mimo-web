@@ -461,7 +461,7 @@ export default function AdminFunnelPage() {
                             Clientes & Leads no Funil ({filteredClients.length})
                         </h2>
                         <p className="text-xs text-slate-500">
-                            Ordenados pelos mais recentes primeiro. Acompanhe a barra de progresso individual de 0% a 100%.
+                            Ordenados pelos mais recentes primeiro. Exclusivo para clientes e novos leads (perfis de profissionais são desconsiderados).
                         </p>
                     </div>
 
