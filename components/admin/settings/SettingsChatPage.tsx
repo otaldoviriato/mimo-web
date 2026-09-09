@@ -11,6 +11,8 @@ type Props = Pick<UseSettingsReturn,
     | 'earningsSessionMinimumCents' | 'setEarningsSessionMinimumCents'
     | 'lowBalanceThresholdInCents' | 'setLowBalanceThresholdInCents'
     | 'onlineDelayMinutes' | 'setOnlineDelayMinutes'
+    | 'offlineEmailDelayMinutes' | 'setOfflineEmailDelayMinutes'
+    | 'offlineEmailCooldownMinutes' | 'setOfflineEmailCooldownMinutes'
     | 'activeUserThresholdDays' | 'setActiveUserThresholdDays'
     | 'isDirtyChat' | 'saving' | 'saveSettings'
 >;
@@ -21,6 +23,8 @@ export function SettingsChatPage({
     earningsSessionMinimumCents, setEarningsSessionMinimumCents,
     lowBalanceThresholdInCents, setLowBalanceThresholdInCents,
     onlineDelayMinutes, setOnlineDelayMinutes,
+    offlineEmailDelayMinutes, setOfflineEmailDelayMinutes,
+    offlineEmailCooldownMinutes, setOfflineEmailCooldownMinutes,
     activeUserThresholdDays, setActiveUserThresholdDays,
     isDirtyChat, saving, saveSettings,
 }: Props) {
@@ -213,7 +217,79 @@ export function SettingsChatPage({
                     </div>
                 </div>
 
+                <div className="border-t border-slate-100 my-6" />
 
+                <div className="py-6">
+                    <div className="flex flex-col md:flex-row md:items-start gap-4 md:gap-8">
+                        <div className="md:w-1/2 space-y-1">
+                            <h4 className="text-sm font-bold text-slate-800">Tempo de Espera Offline para Notificação por E-mail (minutos)</h4>
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                                Define o intervalo mínimo, em minutos, que o destinatário precisa estar offline (desde o último acesso) para que o sistema comece a enviar alertas por e-mail de novas mensagens recebidas.
+                            </p>
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2">
+                                <strong className="text-slate-600">Como funciona na prática:</strong> se o usuário acabou de fechar a aba há 3 minutos e o valor configurado for 5 minutos, ele não receberá e-mail. Apenas quando completar 5 minutos ou mais offline é que os e-mails passam a ser disparados.
+                            </p>
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2">
+                                O valor padrão recomendado é de <strong className="text-slate-600">5 minutos</strong>.
+                            </p>
+                        </div>
+                        <div className="md:w-1/2 space-y-4">
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="number"
+                                    value={offlineEmailDelayMinutes}
+                                    onChange={(e) => setOfflineEmailDelayMinutes(Number(e.target.value))}
+                                    min={0}
+                                    max={1440}
+                                    className={inputCls}
+                                />
+                                <span className="text-sm font-bold text-slate-505">min</span>
+                            </div>
+                            <div className="bg-purple-50 border border-purple-100 rounded-xl px-4 py-3">
+                                <p className="text-[11px] text-purple-700 font-semibold">
+                                    Configuração atual: e-mails de alerta só serão enviados se o usuário estiver offline há pelo menos <strong>{offlineEmailDelayMinutes} minutos</strong>.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="border-t border-slate-100 my-6" />
+
+                <div className="py-6">
+                    <div className="flex flex-col md:flex-row md:items-start gap-4 md:gap-8">
+                        <div className="md:w-1/2 space-y-1">
+                            <h4 className="text-sm font-bold text-slate-800">Intervalo entre Notificações da Mesma Profissional (minutos)</h4>
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                                Define o tempo de espera mínimo, em minutos, para que a mesma profissional possa disparar outro e-mail de notificação para o mesmo cliente offline.
+                            </p>
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2">
+                                <strong className="text-slate-600">Como funciona na prática:</strong> evita envio de múltiplos e-mails repetidos se a profissional mandar várias mensagens na sequência. Se outra profissional enviar mensagem, essa outra profissional notificará normalmente.
+                            </p>
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2">
+                                O valor padrão recomendado é de <strong className="text-slate-600">15 minutos</strong>.
+                            </p>
+                        </div>
+                        <div className="md:w-1/2 space-y-4">
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="number"
+                                    value={offlineEmailCooldownMinutes}
+                                    onChange={(e) => setOfflineEmailCooldownMinutes(Number(e.target.value))}
+                                    min={0}
+                                    max={1440}
+                                    className={inputCls}
+                                />
+                                <span className="text-sm font-bold text-slate-505">min</span>
+                            </div>
+                            <div className="bg-purple-50 border border-purple-100 rounded-xl px-4 py-3">
+                                <p className="text-[11px] text-purple-700 font-semibold">
+                                    Configuração atual: novas mensagens da mesma profissional só gerarão novo e-mail após <strong>{offlineEmailCooldownMinutes} minutos</strong> do e-mail anterior.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <div className="border-t border-slate-100 my-6" />
 

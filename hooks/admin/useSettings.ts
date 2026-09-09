@@ -22,6 +22,8 @@ interface SettingsSnapshot {
     earningsSessionMinimumCents: number;
     lowBalanceThresholdInCents: number;
     onlineDelayMinutes: number;
+    offlineEmailDelayMinutes: number;
+    offlineEmailCooldownMinutes: number;
     activeUserThresholdDays: number;
     defaultPricePerCharSubscribers: number;
     defaultPricePerCharNonSubscribers: number;
@@ -73,6 +75,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     const [earningsSessionMinimumCents, setEarningsSessionMinimumCents] = useState(1000);
     const [lowBalanceThresholdInCents, setLowBalanceThresholdInCents] = useState(1000);
     const [onlineDelayMinutes, setOnlineDelayMinutes] = useState(2);
+    const [offlineEmailDelayMinutes, setOfflineEmailDelayMinutes] = useState(5);
+    const [offlineEmailCooldownMinutes, setOfflineEmailCooldownMinutes] = useState(15);
     const [activeUserThresholdDays, setActiveUserThresholdDays] = useState(7);
     const [defaultPricePerCharSubscribers, setDefaultPricePerCharSubscribers] = useState(0.04);
     const [defaultPricePerCharNonSubscribers, setDefaultPricePerCharNonSubscribers] = useState(0.05);
@@ -124,6 +128,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         earningsSessionMinimumCents: s.earningsSessionMinimumCents ?? 1000,
         lowBalanceThresholdInCents: s.lowBalanceThresholdInCents ?? 1000,
         onlineDelayMinutes: s.onlineDelayMinutes ?? 2,
+        offlineEmailDelayMinutes: s.offlineEmailDelayMinutes ?? 5,
+        offlineEmailCooldownMinutes: s.offlineEmailCooldownMinutes ?? 15,
         activeUserThresholdDays: s.activeUserThresholdDays ?? 7,
         defaultPricePerCharSubscribers: s.defaultPricePerCharSubscribers ?? 0.04,
         defaultPricePerCharNonSubscribers: s.defaultPricePerCharNonSubscribers ?? 0.05,
@@ -185,6 +191,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     setEarningsSessionMinimumCents(s.earningsSessionMinimumCents ?? 1000);
                     setLowBalanceThresholdInCents(s.lowBalanceThresholdInCents ?? 1000);
                     setOnlineDelayMinutes(s.onlineDelayMinutes ?? 2);
+                    setOfflineEmailDelayMinutes(s.offlineEmailDelayMinutes ?? 5);
+                    setOfflineEmailCooldownMinutes(s.offlineEmailCooldownMinutes ?? 15);
                     setActiveUserThresholdDays(s.activeUserThresholdDays ?? 7);
                     setDefaultPricePerCharSubscribers(s.defaultPricePerCharSubscribers ?? 0.04);
                     setDefaultPricePerCharNonSubscribers(s.defaultPricePerCharNonSubscribers ?? 0.05);
@@ -288,6 +296,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     earningsSessionMinimumCents,
                     lowBalanceThresholdInCents,
                     onlineDelayMinutes,
+                    offlineEmailDelayMinutes,
+                    offlineEmailCooldownMinutes,
                     activeUserThresholdDays,
                     defaultPricePerCharSubscribers,
                     defaultPricePerCharNonSubscribers,
@@ -327,6 +337,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                 setMinExclusivePhotos(s.minExclusivePhotos);
                 setMaxExclusivePhotos(s.maxExclusivePhotos);
                 setOnlineDelayMinutes(s.onlineDelayMinutes ?? 2);
+                setOfflineEmailDelayMinutes(s.offlineEmailDelayMinutes ?? 5);
+                setOfflineEmailCooldownMinutes(s.offlineEmailCooldownMinutes ?? 15);
                 setActiveUserThresholdDays(s.activeUserThresholdDays ?? 7);
                 setDefaultPricePerCharSubscribers(s.defaultPricePerCharSubscribers ?? 0.04);
                 setDefaultPricePerCharNonSubscribers(s.defaultPricePerCharNonSubscribers ?? 0.05);
@@ -391,6 +403,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         earningsSessionMinimumCents !== savedSnapshot.earningsSessionMinimumCents ||
         lowBalanceThresholdInCents !== savedSnapshot.lowBalanceThresholdInCents ||
         onlineDelayMinutes !== savedSnapshot.onlineDelayMinutes ||
+        offlineEmailDelayMinutes !== savedSnapshot.offlineEmailDelayMinutes ||
+        offlineEmailCooldownMinutes !== savedSnapshot.offlineEmailCooldownMinutes ||
         activeUserThresholdDays !== savedSnapshot.activeUserThresholdDays
     );
     const isDirtyPricing = savedSnapshot !== null && (
@@ -455,6 +469,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         earningsSessionMinimumCents, setEarningsSessionMinimumCents,
         lowBalanceThresholdInCents, setLowBalanceThresholdInCents,
         onlineDelayMinutes, setOnlineDelayMinutes,
+        offlineEmailDelayMinutes, setOfflineEmailDelayMinutes,
+        offlineEmailCooldownMinutes, setOfflineEmailCooldownMinutes,
         activeUserThresholdDays, setActiveUserThresholdDays,
         defaultPricePerCharSubscribers, setDefaultPricePerCharSubscribers,
         defaultPricePerCharNonSubscribers, setDefaultPricePerCharNonSubscribers,

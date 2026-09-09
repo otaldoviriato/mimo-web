@@ -23,6 +23,8 @@ export interface SettingsData {
     earningsSessionMinimumCents?: number;
     lowBalanceThresholdInCents?: number;
     onlineDelayMinutes?: number;
+    offlineEmailDelayMinutes?: number;
+    offlineEmailCooldownMinutes?: number;
     defaultPricePerCharSubscribers: number;
     defaultPricePerCharNonSubscribers: number;
     maxBillableMessageChars?: number;

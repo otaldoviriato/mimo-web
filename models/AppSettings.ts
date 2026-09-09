@@ -25,6 +25,8 @@ export interface IAppSettings extends Document {
     earningsSessionMinimumCents: number;
     lowBalanceThresholdInCents: number;
     onlineDelayMinutes: number;
+    offlineEmailDelayMinutes: number;
+    offlineEmailCooldownMinutes: number;
     institutionalEmails: string[];
     emailRedirections: { sourceEmail: string; targetEmail: string; displayName?: string }[];
     defaultPricePerCharSubscribers: number;
@@ -209,6 +211,18 @@ const AppSettingsSchema = new Schema<IAppSettings>({
         type: Number,
         required: true,
         default: 2,
+        min: 0,
+    },
+    offlineEmailDelayMinutes: {
+        type: Number,
+        required: true,
+        default: 5,
+        min: 0,
+    },
+    offlineEmailCooldownMinutes: {
+        type: Number,
+        required: true,
+        default: 15,
         min: 0,
     },
     defaultPricePerCharSubscribers: {

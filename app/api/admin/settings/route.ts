@@ -38,6 +38,8 @@ async function getOrCreateSettings() {
             identityVerificationPromptIntervalDays: 7,
             newProfileDaysThreshold: 15,
             onlineDelayMinutes: 2,
+            offlineEmailDelayMinutes: 5,
+            offlineEmailCooldownMinutes: 15,
             activeUserThresholdDays: 7,
             largeMessageWarningThresholdChars: 100,
         });
@@ -75,6 +77,8 @@ async function getOrCreateSettings() {
         if (settings.offlineFollowUpIntervalHours === undefined) { settings.offlineFollowUpIntervalHours = 24; updated = true; }
         if (settings.offlineFollowUpMaxAttempts === undefined) { settings.offlineFollowUpMaxAttempts = 3; updated = true; }
         if (settings.onlineDelayMinutes === undefined) { settings.onlineDelayMinutes = 2; updated = true; }
+        if (settings.offlineEmailDelayMinutes === undefined) { settings.offlineEmailDelayMinutes = 5; updated = true; }
+        if (settings.offlineEmailCooldownMinutes === undefined) { settings.offlineEmailCooldownMinutes = 15; updated = true; }
         if (settings.activeUserThresholdDays === undefined) { settings.activeUserThresholdDays = 7; updated = true; }
         if (settings.largeMessageWarningThresholdChars === undefined) { settings.largeMessageWarningThresholdChars = 100; updated = true; }
         if (updated) {
@@ -192,6 +196,8 @@ export async function PUT(request: NextRequest) {
             activeRechargedClientDaysThreshold,
             activeUnrechargedClientHoursThreshold,
             onlineDelayMinutes,
+            offlineEmailDelayMinutes,
+            offlineEmailCooldownMinutes,
             activeUserThresholdDays,
             largeMessageWarningThresholdChars,
         } = body;
@@ -338,6 +344,22 @@ export async function PUT(request: NextRequest) {
                 return NextResponse.json({ error: 'Tempo de atraso para status offline deve ser de pelo menos 0 minutos' }, { status: 400 });
             }
             settings.onlineDelayMinutes = delay;
+        }
+
+        if (offlineEmailDelayMinutes !== undefined) {
+            const delay = Number(offlineEmailDelayMinutes);
+            if (isNaN(delay) || delay < 0) {
+                return NextResponse.json({ error: 'Tempo de espera offline para notificação por e-mail deve ser de pelo menos 0 minutos' }, { status: 400 });
+            }
+            settings.offlineEmailDelayMinutes = delay;
+        }
+
+        if (offlineEmailCooldownMinutes !== undefined) {
+            const cooldown = Number(offlineEmailCooldownMinutes);
+            if (isNaN(cooldown) || cooldown < 0) {
+                return NextResponse.json({ error: 'Intervalo entre notificações por e-mail da mesma profissional deve ser de pelo menos 0 minutos' }, { status: 400 });
+            }
+            settings.offlineEmailCooldownMinutes = cooldown;
         }
 
 

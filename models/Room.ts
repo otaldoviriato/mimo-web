@@ -7,6 +7,7 @@ export interface IRoom extends Document {
     lastMessageBillingStatus?: string;
     lastMessageTime?: Date;
     unreadCount?: Map<string, number>;
+    lastEmailNotificationBySender?: Map<string, Date>;
     deletedBy?: string[]; // clerkIds que excluíram esta conversa
     roomId?: string;
     createdAt: Date;
@@ -37,6 +38,11 @@ const RoomSchema = new Schema<IRoom>({
     unreadCount: {
         type: Map,
         of: Number,
+        default: new Map(),
+    },
+    lastEmailNotificationBySender: {
+        type: Map,
+        of: Date,
         default: new Map(),
     },
     deletedBy: {

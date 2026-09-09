@@ -19,6 +19,10 @@ export default function AdminSettingsChatPage() {
             setLowBalanceThresholdInCents={settings.setLowBalanceThresholdInCents}
             onlineDelayMinutes={settings.onlineDelayMinutes}
             setOnlineDelayMinutes={settings.setOnlineDelayMinutes}
+            offlineEmailDelayMinutes={settings.offlineEmailDelayMinutes}
+            setOfflineEmailDelayMinutes={settings.setOfflineEmailDelayMinutes}
+            offlineEmailCooldownMinutes={settings.offlineEmailCooldownMinutes}
+            setOfflineEmailCooldownMinutes={settings.setOfflineEmailCooldownMinutes}
             activeUserThresholdDays={settings.activeUserThresholdDays}
             setActiveUserThresholdDays={settings.setActiveUserThresholdDays}
             isDirtyChat={settings.isDirtyChat}
