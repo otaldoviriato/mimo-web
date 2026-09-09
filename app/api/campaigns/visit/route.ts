@@ -41,44 +41,56 @@ export async function POST(request: NextRequest) {
 
         await connectToDatabase();
 
-        // Determina identificador e nome da campanha baseado em UTM ou orgânico
+        const rawLandingPage = String(body.landingPage || body.pathname || '').trim();
+        let cleanLandingPage = rawLandingPage;
+        if (!cleanLandingPage) {
+            if (rawSlug === 'descubra') cleanLandingPage = '/descubra';
+            else if (rawSlug && rawSlug !== 'organico') cleanLandingPage = `/c/${rawSlug}`;
+            else cleanLandingPage = '/';
+        }
+        if (!cleanLandingPage.startsWith('/')) cleanLandingPage = `/${cleanLandingPage}`;
+        if (cleanLandingPage.length > 1 && cleanLandingPage.endsWith('/')) {
+            cleanLandingPage = cleanLandingPage.slice(0, -1);
+        }
+
+        // Determina identificador e nome da campanha priorizando a rota da Landing Page (ponto de entrada)
         let targetSlug = '';
         let campaignName = '';
-        let network: 'exoclick' | 'direct' | 'other' = 'other';
+        let network: 'exoclick' | 'direct' | 'other' = 'direct';
 
-        if (utmSource || utmCampaign) {
-            // Tráfego pago / UTM detectado
+        if (utmSource) {
             const cleanSource = utmSource.toLowerCase();
-            if (cleanSource === 'exoclick') {
-                network = 'exoclick';
-            } else if (cleanSource === 'direct' || cleanSource === 'organico') {
-                network = 'direct';
-            } else {
-                network = 'other';
-            }
+            if (cleanSource === 'exoclick') network = 'exoclick';
+            else if (cleanSource === 'direct' || cleanSource === 'organico') network = 'direct';
+            else network = 'other';
+        }
 
-            if (utmCampaign) {
-                targetSlug = sanitizeSlug(`${cleanSource || 'campanha'}-${utmCampaign}`);
-                campaignName = `${cleanSource ? cleanSource.toUpperCase() + ' - ' : ''}${utmCampaign}`;
-            } else {
-                targetSlug = sanitizeSlug(cleanSource);
-                campaignName = `Origem: ${utmSource.toUpperCase()}`;
-            }
+        if (cleanLandingPage === '/descubra' || rawSlug === 'descubra') {
+            targetSlug = 'descubra';
+            campaignName = 'Landing Page: /descubra';
+        } else if (cleanLandingPage.startsWith('/c/')) {
+            const slugPart = cleanLandingPage.replace('/c/', '');
+            targetSlug = sanitizeSlug(slugPart || rawSlug);
+            campaignName = `Landing Page: /c/${targetSlug}`;
         } else if (rawSlug && rawSlug !== 'descubra' && rawSlug !== 'organico') {
-            // Slug direto de landing page específica (/c/[slug])
             targetSlug = sanitizeSlug(rawSlug);
-            campaignName = rawSlug;
-            network = 'direct';
+            campaignName = `Landing Page: /c/${targetSlug}`;
+            if (!rawLandingPage) cleanLandingPage = `/c/${targetSlug}`;
+        } else if (cleanLandingPage !== '/') {
+            targetSlug = sanitizeSlug(cleanLandingPage.replace(/^\//, ''));
+            campaignName = `Ponto de Entrada: ${cleanLandingPage}`;
+        } else if (utmCampaign || utmSource) {
+            targetSlug = sanitizeSlug(`${utmSource || 'campanha'}-${utmCampaign || 'utm'}`);
+            campaignName = `Origem: ${utmSource?.toUpperCase() || 'UTM'}${utmCampaign ? ' - ' + utmCampaign : ''}`;
         } else {
-            // Tráfego orgânico / desconhecido
             targetSlug = 'organico';
-            campaignName = 'Orgânico / Desconhecido';
+            campaignName = 'Direto / Orgânico';
             network = 'direct';
         }
 
         if (!targetSlug) {
             targetSlug = 'organico';
-            campaignName = 'Orgânico / Desconhecido';
+            campaignName = 'Direto / Orgânico';
             network = 'direct';
         }
 
@@ -86,8 +98,8 @@ export async function POST(request: NextRequest) {
         let campaign = await Campaign.findOne({
             $or: [
                 { slug: targetSlug },
-                ...(utmCampaign ? [{ externalCampaignId: utmCampaign }] : []),
                 ...(rawSlug ? [{ slug: sanitizeSlug(rawSlug) }] : []),
+                ...(utmCampaign ? [{ externalCampaignId: utmCampaign }] : []),
             ]
         });
 
@@ -102,9 +114,9 @@ export async function POST(request: NextRequest) {
                     externalCampaignId: utmCampaign || null,
                     externalVariationId: variationId || null,
                     landingHeadline: campaignName,
-                    landingBody: 'Campanha detectada automaticamente através de parâmetros de rastreamento.',
+                    landingBody: `Campanha e ponto de entrada detectados pela rota ${cleanLandingPage}.`,
                     conversionGoals: ['landing_view', 'cta_click', 'signup', 'explore_profile_view', 'first_message_sent', 'first_message_received', 'first_recharge'],
-                    createdBy: 'system_auto_utm',
+                    createdBy: 'system_auto_landing',
                 });
             } catch (err: any) {
                 // Em caso de colisão de índice unique concorrente, busca novamente
@@ -125,6 +137,7 @@ export async function POST(request: NextRequest) {
                     zone: zoneId || null,
                     creative: creative || null,
                     variation: variationId || null,
+                    landingPage: cleanLandingPage,
                     utm: {
                         ...(utmSource ? { utm_source: utmSource } : {}),
                         ...(utmMedium ? { utm_medium: utmMedium } : {}),
@@ -135,7 +148,10 @@ export async function POST(request: NextRequest) {
                     },
                     targetProfessionalId: campaign.targetProfessionalId || null,
                 },
-                ...(event === 'cta_clicked' ? { $set: { ctaClickedAt: now } } : {}),
+                $set: {
+                    ...(cleanLandingPage ? { landingPage: cleanLandingPage } : {}),
+                    ...(event === 'cta_clicked' ? { ctaClickedAt: now } : {}),
+                },
             },
             { upsert: true, new: true },
         );

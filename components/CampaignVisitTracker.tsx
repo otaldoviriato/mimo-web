@@ -6,6 +6,7 @@ export const CAMPAIGN_ATTRIBUTION_STORAGE_KEY = 'mimo_campaign_attribution';
 
 type Props = {
     slug: string;
+    landingPage?: string;
     clickId?: string;
     site?: string;
     zone?: string;
@@ -15,14 +16,26 @@ type Props = {
 };
 
 export function CampaignVisitTracker(props: Props) {
-    const { slug, clickId, site, zone, creative, variation, utm } = props;
+    const { slug, landingPage, clickId, site, zone, creative, variation, utm } = props;
     const serializedUtm = JSON.stringify(utm);
     useEffect(() => {
         const existing = localStorage.getItem('mimo_visitor_id');
         const visitorId = existing || crypto.randomUUID();
         if (!existing) localStorage.setItem('mimo_visitor_id', visitorId);
 
-        const attribution = { slug, clickId, site, zone, creative, variation, utm: JSON.parse(serializedUtm), visitorId, capturedAt: new Date().toISOString() };
+        const currentLanding = landingPage || (typeof window !== 'undefined' ? window.location.pathname : undefined);
+        const attribution = {
+            slug,
+            landingPage: currentLanding,
+            clickId,
+            site,
+            zone,
+            creative,
+            variation,
+            utm: JSON.parse(serializedUtm),
+            visitorId,
+            capturedAt: new Date().toISOString()
+        };
         localStorage.setItem(CAMPAIGN_ATTRIBUTION_STORAGE_KEY, JSON.stringify(attribution));
 
         void fetch('/api/campaigns/visit', {

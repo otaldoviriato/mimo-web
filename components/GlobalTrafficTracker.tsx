@@ -36,6 +36,7 @@ export function PublicTrafficTracker() {
 
         // Se tiver UTM na URL ou se for um novo visitante sem atribuição:
         if (hasUtm || (isNewVisitor && !existingAttributionStr)) {
+            const currentLanding = typeof window !== 'undefined' ? window.location.pathname : undefined;
             const attribution = {
                 visitorId,
                 clickId,
@@ -44,6 +45,7 @@ export function PublicTrafficTracker() {
                 creative,
                 variation,
                 utm,
+                landingPage: currentLanding,
                 slug: hasUtm ? (utm.utm_campaign || utm.utm_source || 'utm-traffic') : 'organico',
                 capturedAt: new Date().toISOString(),
             };
@@ -71,9 +73,12 @@ export function PublicTrafficTracker() {
             if (!currentAttribution) {
                 currentAttribution = {
                     visitorId: localStorage.getItem('mimo_visitor_id') || visitorId,
+                    landingPage: typeof window !== 'undefined' ? window.location.pathname : undefined,
                     slug: 'organico',
                     utm: {},
                 };
+            } else if (!currentAttribution.landingPage && typeof window !== 'undefined') {
+                currentAttribution.landingPage = window.location.pathname;
             }
 
             void fetch('/api/campaigns/visit', {

@@ -29,6 +29,8 @@ export async function GET(request: NextRequest) {
 
         const { searchParams } = new URL(request.url);
         const campaignId = searchParams.get('campaignId');
+        const landingPage = searchParams.get('landingPage');
+        const minStage = parseInt(searchParams.get('minStage') || '1', 10);
         const startDate = searchParams.get('startDate');
         const endDate = searchParams.get('endDate');
 
@@ -38,6 +40,10 @@ export async function GET(request: NextRequest) {
             if (mongoose.Types.ObjectId.isValid(campaignId)) {
                 filter.campaignId = new mongoose.Types.ObjectId(campaignId);
             }
+        }
+
+        if (landingPage && landingPage !== 'all') {
+            filter.landingPage = landingPage;
         }
 
         if (startDate || endDate) {
@@ -58,8 +64,21 @@ export async function GET(request: NextRequest) {
             }
         }
 
-        // 1. Busca todas as campanhas para os filtros do dropdown
-        const allCampaigns = await Campaign.find().select('_id name slug network status').sort({ name: 1 }).lean();
+        // 1. Busca todas as campanhas e landing pages disponíveis para os filtros
+        const [allCampaigns, rawLandingPages] = await Promise.all([
+            Campaign.find().select('_id name slug network status').sort({ name: 1 }).lean(),
+            CampaignVisit.distinct('landingPage').then(list => list.filter(Boolean) as string[])
+        ]);
+
+        const landingPagesSet = new Set<string>(rawLandingPages);
+        // Garante landing pages conhecidas no set
+        landingPagesSet.add('/descubra');
+        for (const camp of allCampaigns) {
+            if (camp.slug && camp.slug !== 'descubra') {
+                landingPagesSet.add(`/c/${camp.slug}`);
+            }
+        }
+        const landingPages = Array.from(landingPagesSet).sort();
 
         // Exclui perfis do tipo profissional do funil
         const professionalClerkIds = await User.distinct('clerkId', { isProfessional: true });
@@ -160,6 +179,7 @@ export async function GET(request: NextRequest) {
             const progressPercentage = Math.round((stagesCompleted / 7) * 100);
 
             const campaignData = visit.campaignId as any;
+            const inferredLandingPage = visit.landingPage || (campaignData?.slug === 'descubra' ? '/descubra' : (campaignData?.slug ? `/c/${campaignData.slug}` : '/descubra'));
 
             return {
                 visitorId: visit.visitorId,
@@ -178,6 +198,7 @@ export async function GET(request: NextRequest) {
                     slug: campaignData?.slug || 'unknown',
                     network: campaignData?.network || 'other',
                 },
+                landingPage: inferredLandingPage,
                 utm: visit.utm || {},
                 clickId: visit.clickId || null,
                 stagesCompleted,
@@ -223,6 +244,19 @@ export async function GET(request: NextRequest) {
             };
         });
 
+        // Filtragem por etapa mínima (para a listagem detalhada de clientes)
+        const filteredClients = minStage > 1
+            ? clients.filter(c => {
+                if (minStage === 2) return c.stages.stage2_cta.reached;
+                if (minStage === 3) return c.stages.stage3_signup.reached;
+                if (minStage === 4) return c.stages.stage4_profileView.reached;
+                if (minStage === 5) return c.stages.stage5_messageSent.reached;
+                if (minStage === 6) return c.stages.stage6_messageReceived.reached;
+                if (minStage === 7) return c.stages.stage7_firstRecharge.reached;
+                return true;
+            })
+            : clients;
+
         // 6. Funnel summary data para o gráfico horizontal
         const stageTotals = [
             { id: 1, label: 'Acessou Landing Page', count: stage1Count, key: 'landing' },
@@ -252,13 +286,14 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json({
             campaigns: allCampaigns,
+            landingPages,
             summary: {
                 totalLeads: stage1Count,
                 totalRevenueCents,
                 overallConversionRate: stage1Count > 0 ? Number(((stage7Count / stage1Count) * 100).toFixed(2)) : 0,
                 steps: funnelSteps,
             },
-            clients,
+            clients: filteredClients,
         });
 
     } catch (error: any) {

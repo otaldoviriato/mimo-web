@@ -23,7 +23,11 @@ import {
     ChevronRight,
     HelpCircle,
     Globe,
-    DollarSign
+    DollarSign,
+    Layers,
+    LayoutGrid,
+    SlidersHorizontal,
+    Link2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -55,6 +59,7 @@ type ClientRow = {
         slug: string;
         network: string;
     };
+    landingPage?: string;
     utm: Record<string, string>;
     clickId: string | null;
     stagesCompleted: number;
@@ -82,6 +87,7 @@ type ClientRow = {
 
 type FunnelData = {
     campaigns: Array<{ _id: string; name: string; slug: string; network: string }>;
+    landingPages?: string[];
     summary: {
         totalLeads: number;
         totalRevenueCents: number;
@@ -94,8 +100,13 @@ type FunnelData = {
 export default function AdminFunnelPage() {
     const searchParams = useSearchParams();
     const initialCampaign = searchParams.get('campaignId') || 'all';
+    const initialLanding = searchParams.get('landingPage') || 'all';
+    const initialMinStage = parseInt(searchParams.get('minStage') || '1', 10);
 
     const [selectedCampaign, setSelectedCampaign] = useState<string>(initialCampaign);
+    const [selectedLandingPage, setSelectedLandingPage] = useState<string>(initialLanding);
+    const [minStage, setMinStage] = useState<number>(initialMinStage);
+    const [viewMode, setViewMode] = useState<'funnel' | 'cards'>('funnel');
     const [startDate, setStartDate] = useState<string>('');
     const [endDate, setEndDate] = useState<string>('');
     const [data, setData] = useState<FunnelData | null>(null);
@@ -109,6 +120,12 @@ export default function AdminFunnelPage() {
             const params = new URLSearchParams();
             if (selectedCampaign && selectedCampaign !== 'all') {
                 params.set('campaignId', selectedCampaign);
+            }
+            if (selectedLandingPage && selectedLandingPage !== 'all') {
+                params.set('landingPage', selectedLandingPage);
+            }
+            if (minStage > 1) {
+                params.set('minStage', minStage.toString());
             }
             if (startDate) params.set('startDate', startDate);
             if (endDate) params.set('endDate', endDate);
@@ -129,7 +146,7 @@ export default function AdminFunnelPage() {
 
     useEffect(() => {
         void loadFunnel();
-    }, [selectedCampaign, startDate, endDate]);
+    }, [selectedCampaign, selectedLandingPage, minStage, startDate, endDate]);
 
     // Presets de data
     const applyDatePreset = (preset: 'today' | '7d' | '30d' | 'all') => {
@@ -170,7 +187,8 @@ export default function AdminFunnelPage() {
             const email = c.user?.email?.toLowerCase() || '';
             const visitor = c.visitorId.toLowerCase();
             const camp = c.campaign.name.toLowerCase();
-            return name.includes(q) || username.includes(q) || email.includes(q) || visitor.includes(q) || camp.includes(q);
+            const lp = (c.landingPage || '').toLowerCase();
+            return name.includes(q) || username.includes(q) || email.includes(q) || visitor.includes(q) || camp.includes(q) || lp.includes(q);
         });
     }, [data?.clients, clientSearch]);
 
@@ -225,21 +243,44 @@ export default function AdminFunnelPage() {
             {/* Barra de Filtros */}
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3">
                 <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-                    {/* Filtro por Campanha */}
-                    <div className="flex items-center gap-2 w-full lg:w-auto">
-                        <span className="text-xs font-bold text-slate-500 shrink-0">Campanha:</span>
-                        <select
-                            value={selectedCampaign}
-                            onChange={e => setSelectedCampaign(e.target.value)}
-                            className="w-full lg:w-72 rounded-xl border border-slate-200 p-2 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:border-purple-500"
-                        >
-                            <option value="all">Todas as campanhas & orgânico</option>
-                            {data?.campaigns?.map(camp => (
-                                <option key={camp._id} value={camp._id}>
-                                    {camp.name} ({camp.network})
-                                </option>
-                            ))}
-                        </select>
+                    {/* Filtros de Origem: Landing Page & Campanha */}
+                    <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                        {/* Filtro por Landing Page (Origem de Entrada) */}
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-slate-500 shrink-0 flex items-center gap-1">
+                                <Link2 size={13} className="text-purple-600" />
+                                Landing Page:
+                            </span>
+                            <select
+                                value={selectedLandingPage}
+                                onChange={e => setSelectedLandingPage(e.target.value)}
+                                className="rounded-xl border border-slate-200 p-2 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:border-purple-500 max-w-[200px]"
+                            >
+                                <option value="all">Todas as Landing Pages</option>
+                                {data?.landingPages?.map(lp => (
+                                    <option key={lp} value={lp}>
+                                        {lp}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Filtro por Campanha */}
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-slate-500 shrink-0">Campanha:</span>
+                            <select
+                                value={selectedCampaign}
+                                onChange={e => setSelectedCampaign(e.target.value)}
+                                className="rounded-xl border border-slate-200 p-2 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:border-purple-500 max-w-[200px]"
+                            >
+                                <option value="all">Todas as campanhas & orgânico</option>
+                                {data?.campaigns?.map(camp => (
+                                    <option key={camp._id} value={camp._id}>
+                                        {camp.name} ({camp.network})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
 
                     {/* Filtro de Datas com Presets */}
@@ -293,6 +334,39 @@ export default function AdminFunnelPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* Filtro Rápido por Etapa Mínima (1 a 7) */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-2.5 border-t border-slate-100">
+                    <span className="text-xs font-bold text-slate-600 flex items-center gap-1 mr-1">
+                        <SlidersHorizontal size={13} className="text-purple-600" />
+                        Filtrar clientes a partir da etapa:
+                    </span>
+                    {[
+                        { stage: 1, label: '1. Todas (Topo)' },
+                        { stage: 2, label: '2. Clicou CTA' },
+                        { stage: 3, label: '3. Cadastrou' },
+                        { stage: 4, label: '4. Visitou Perfil' },
+                        { stage: 5, label: '5. Enviou Mensagem' },
+                        { stage: 6, label: '6. Recebeu Mensagem' },
+                        { stage: 7, label: '7. Primeira Recarga' },
+                    ].map(item => {
+                        const active = minStage === item.stage;
+                        return (
+                            <button
+                                key={item.stage}
+                                type="button"
+                                onClick={() => setMinStage(item.stage)}
+                                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
+                                    active
+                                        ? 'bg-purple-600 text-white shadow-xs'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                            >
+                                {item.label}
+                            </button>
+                        );
+                    })}
+                </div>
             </div>
 
             {/* Cards de Métricas Principais */}
@@ -334,15 +408,43 @@ export default function AdminFunnelPage() {
 
             {/* REPRESENTAÇÃO GRÁFICA DO FUNIL (Horizontal: Da esquerda para a direita) */}
             <div className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-xs space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                         <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
                             <TrendingUp size={16} className="text-purple-600" />
-                            Fluxo Visual do Funil (Horizontal)
+                            Fluxo do Funil de Conversão (Horizontal)
                         </h2>
                         <p className="text-xs text-slate-500 mt-0.5">
-                            Passe o cursor sobre cada etapa para ver quantidade de usuários, retenção e drop-off.
+                            Visualização afunilada da esquerda (acesso à landing page) para a direita (conversão em recarga).
                         </p>
+                    </div>
+
+                    {/* Alternador de visualização: Funil Visual vs Cards */}
+                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => setViewMode('funnel')}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                viewMode === 'funnel'
+                                    ? 'bg-white text-purple-700 shadow-xs'
+                                    : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                        >
+                            <Layers size={13} />
+                            Funil Visual
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setViewMode('cards')}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                viewMode === 'cards'
+                                    ? 'bg-white text-purple-700 shadow-xs'
+                                    : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                        >
+                            <LayoutGrid size={13} />
+                            Cards em Colunas
+                        </button>
                     </div>
                 </div>
 
@@ -353,9 +455,208 @@ export default function AdminFunnelPage() {
                     </div>
                 ) : steps.length === 0 ? (
                     <div className="p-8 text-center text-slate-400">Nenhum dado registrado para este filtro.</div>
-                ) : (
+                ) : viewMode === 'funnel' ? (
+                    /* MODO 1: FUNIL VISUAL HORIZONTAL GEOMÉTRICO */
                     <div className="space-y-4">
-                        {/* Container do gráfico em 7 colunas conectadas */}
+                        {/* Container do SVG do Funil com Grid HTML sobreposto */}
+                        <div className="relative w-full overflow-x-auto pb-2">
+                            <div className="min-w-[840px] relative">
+                                {/* SVG que desenha as 7 fatias afuniladas conectadas da esquerda para a direita */}
+                                <svg
+                                    viewBox="0 0 1050 240"
+                                    className="w-full h-56 block overflow-visible"
+                                    preserveAspectRatio="none"
+                                >
+                                    <defs>
+                                        <linearGradient id="funnelGrad0" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stopColor="#ede9fe" />
+                                            <stop offset="100%" stopColor="#ddd6fe" />
+                                        </linearGradient>
+                                        <linearGradient id="funnelGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stopColor="#ddd6fe" />
+                                            <stop offset="100%" stopColor="#c4b5fd" />
+                                        </linearGradient>
+                                        <linearGradient id="funnelGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stopColor="#e0e7ff" />
+                                            <stop offset="100%" stopColor="#c7d2fe" />
+                                        </linearGradient>
+                                        <linearGradient id="funnelGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stopColor="#dbeafe" />
+                                            <stop offset="100%" stopColor="#bfdbfe" />
+                                        </linearGradient>
+                                        <linearGradient id="funnelGrad4" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stopColor="#e0f2fe" />
+                                            <stop offset="100%" stopColor="#bae6fd" />
+                                        </linearGradient>
+                                        <linearGradient id="funnelGrad5" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stopColor="#ccfbf1" />
+                                            <stop offset="100%" stopColor="#99f6e4" />
+                                        </linearGradient>
+                                        <linearGradient id="funnelGrad6" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stopColor="#d1fae5" />
+                                            <stop offset="100%" stopColor="#a7f3d0" />
+                                        </linearGradient>
+
+                                        {/* Gradientes para estado com hover */}
+                                        <linearGradient id="funnelGradHover" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stopColor="#7c3aed" />
+                                            <stop offset="100%" stopColor="#6d28d9" />
+                                        </linearGradient>
+                                    </defs>
+
+                                    {steps.map((step, idx) => {
+                                        const isHovered = hoveredStepIndex === idx;
+                                        // Posições X com separador entre trapézios
+                                        const xStart = idx * 150 + 2;
+                                        const xEnd = (idx + 1) * 150 - 2;
+
+                                        // Altura afunilando da esquerda (210px) para a direita (85px)
+                                        const t1 = idx / 7;
+                                        const t2 = (idx + 1) / 7;
+                                        const yTop1 = 15 + 65 * t1;
+                                        const yTop2 = 15 + 65 * t2;
+                                        const yBottom1 = 225 - 65 * t1;
+                                        const yBottom2 = 225 - 65 * t2;
+
+                                        const points = `${xStart},${yTop1} ${xEnd},${yTop2} ${xEnd},${yBottom2} ${xStart},${yBottom1}`;
+                                        const borderColors = [
+                                            '#a78bfa', '#8b5cf6', '#6366f1', '#3b82f6', '#0284c7', '#0d9488', '#10b981'
+                                        ];
+
+                                        return (
+                                            <g key={step.id}>
+                                                <polygon
+                                                    points={points}
+                                                    fill={isHovered ? 'url(#funnelGradHover)' : `url(#funnelGrad${idx})`}
+                                                    stroke={isHovered ? '#5b21b6' : borderColors[idx]}
+                                                    strokeWidth={isHovered ? 2.5 : 1.5}
+                                                    className="transition-all duration-200 cursor-pointer"
+                                                    onMouseEnter={() => setHoveredStepIndex(idx)}
+                                                    onMouseLeave={() => setHoveredStepIndex(null)}
+                                                />
+                                            </g>
+                                        );
+                                    })}
+                                </svg>
+
+                                {/* Camada de Conteúdo HTML perfeitamente posicionada sobre o SVG */}
+                                <div className="absolute inset-0 grid grid-cols-7 pointer-events-none">
+                                    {steps.map((step, idx) => {
+                                        const Icon = stepIcons[idx] || CheckCircle2;
+                                        const isHovered = hoveredStepIndex === idx;
+
+                                        return (
+                                            <div
+                                                key={step.id}
+                                                onMouseEnter={() => setHoveredStepIndex(idx)}
+                                                onMouseLeave={() => setHoveredStepIndex(null)}
+                                                className="pointer-events-auto relative flex flex-col items-center justify-center p-2 text-center cursor-pointer select-none"
+                                            >
+                                                {/* Cabeçalho com Número e Ícone */}
+                                                <div className="flex items-center gap-1 mb-1">
+                                                    <span className={`w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center shadow-2xs transition-colors ${
+                                                        isHovered ? 'bg-white text-purple-900' : 'bg-purple-700 text-white'
+                                                    }`}>
+                                                        {step.id}
+                                                    </span>
+                                                    <div className={`w-5 h-5 rounded-md flex items-center justify-center transition-colors ${
+                                                        isHovered ? 'bg-purple-800 text-white' : 'bg-white/80 text-slate-700'
+                                                    }`}>
+                                                        <Icon size={11} />
+                                                    </div>
+                                                </div>
+
+                                                {/* Nome da Etapa */}
+                                                <p className={`text-[11px] font-extrabold line-clamp-2 leading-tight px-1 transition-colors ${
+                                                    isHovered ? 'text-white' : 'text-slate-900'
+                                                }`}>
+                                                    {step.label}
+                                                </p>
+
+                                                {/* Contagem Principal */}
+                                                <span className={`text-base font-black my-0.5 tracking-tight transition-colors ${
+                                                    isHovered ? 'text-white' : 'text-slate-950'
+                                                }`}>
+                                                    {step.count.toLocaleString('pt-BR')}
+                                                </span>
+
+                                                {/* Porcentagem do Topo */}
+                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full transition-colors ${
+                                                    isHovered
+                                                        ? 'bg-purple-900 text-purple-200'
+                                                        : 'bg-white/90 text-purple-800 border border-purple-200 shadow-2xs'
+                                                }`}>
+                                                    {step.topConversionRate}%
+                                                </span>
+
+                                                {/* Indicador de Transição/Drop-off para a próxima etapa */}
+                                                {idx < steps.length - 1 && (
+                                                    <div className="hidden md:flex absolute -right-2.5 top-1/2 -translate-y-1/2 z-10 w-5 h-5 rounded-full bg-white border border-slate-300 items-center justify-center shadow-xs">
+                                                        <ChevronRight size={11} className="text-purple-600" />
+                                                    </div>
+                                                )}
+
+                                                {/* TOOLTIP DETALHADO NO HOVER */}
+                                                {isHovered && (
+                                                    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-3 w-56 bg-slate-900 text-white p-3 rounded-xl shadow-2xl text-xs z-50 pointer-events-none animate-in fade-in-50 zoom-in-95 duration-150 text-left">
+                                                        <div className="flex items-center gap-1.5 font-bold border-b border-slate-800 pb-1.5 mb-1.5 text-purple-300">
+                                                            <Icon size={13} />
+                                                            <span>Etapa {step.id}: {step.label}</span>
+                                                        </div>
+                                                        <div className="space-y-1 text-[11px]">
+                                                            <div className="flex justify-between">
+                                                                <span className="text-slate-400">Total de Usuários:</span>
+                                                                <span className="font-bold text-white">{step.count}</span>
+                                                            </div>
+                                                            <div className="flex justify-between">
+                                                                <span className="text-slate-400">Conversão do Topo:</span>
+                                                                <span className="font-bold text-emerald-400">{step.topConversionRate}%</span>
+                                                            </div>
+                                                            {idx > 0 && (
+                                                                <>
+                                                                    <div className="flex justify-between">
+                                                                        <span className="text-slate-400">Retenção da Anterior:</span>
+                                                                        <span className="font-bold text-purple-300">{step.stepConversionRate}%</span>
+                                                                    </div>
+                                                                    <div className="flex justify-between">
+                                                                        <span className="text-slate-400">Drop-off (Perda):</span>
+                                                                        <span className="font-bold text-rose-400">-{step.dropoffCount} ({step.dropoffRate}%)</span>
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                        <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-6 border-x-transparent border-t-6 border-t-slate-900" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Barra Informativa de Retenção e Drop-off entre Etapas */}
+                        <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 pt-2 border-t border-slate-100 text-[11px]">
+                            {steps.slice(1).map((step, idx) => (
+                                <div key={step.id} className="bg-slate-50 rounded-xl p-2 border border-slate-200">
+                                    <span className="text-[10px] font-bold text-slate-500 block truncate">
+                                        Etapa {idx + 1} → {idx + 2}
+                                    </span>
+                                    <div className="flex items-center justify-between mt-1">
+                                        <span className="font-extrabold text-emerald-600">
+                                            {step.stepConversionRate}% retêm
+                                        </span>
+                                        <span className="text-[10px] text-rose-500 font-semibold">
+                                            -{step.dropoffRate}% drop
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ) : (
+                    /* MODO 2: VISÃO EM CARDS / COLUNAS */
+                    <div className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-7 gap-2.5 relative pt-2">
                             {steps.map((step, idx) => {
                                 const Icon = stepIcons[idx] || CheckCircle2;
@@ -483,6 +784,7 @@ export default function AdminFunnelPage() {
                         <thead className="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-y border-slate-200">
                             <tr>
                                 <th className="p-3 pl-4">Lead / Cliente</th>
+                                <th className="p-3">Origem (Landing Page)</th>
                                 <th className="p-3">Campanha</th>
                                 <th className="p-3">Data de Entrada</th>
                                 <th className="p-3 text-center">Progresso</th>
@@ -492,7 +794,7 @@ export default function AdminFunnelPage() {
                         <tbody className="divide-y divide-slate-100">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={5} className="p-8 text-center text-slate-400">
+                                    <td colSpan={6} className="p-8 text-center text-slate-400">
                                         <div className="flex items-center justify-center gap-2">
                                             <RefreshCw size={14} className="animate-spin text-purple-600" />
                                             <span>Carregando clientes...</span>
@@ -501,7 +803,7 @@ export default function AdminFunnelPage() {
                                 </tr>
                             ) : filteredClients.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="p-8 text-center text-slate-500">
+                                    <td colSpan={6} className="p-8 text-center text-slate-500">
                                         Nenhum lead encontrado com os filtros atuais.
                                     </td>
                                 </tr>
@@ -530,7 +832,7 @@ export default function AdminFunnelPage() {
                                                     <div className="flex flex-col">
                                                         <div className="flex items-center gap-1.5">
                                                             <span className="font-bold text-slate-900">
-                                                                {user?.name || user?.username || 'Visitante Anônimo'}
+                                                                 {user?.name || user?.username || 'Visitante Anônimo'}
                                                             </span>
                                                             {user && (
                                                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800">
@@ -542,6 +844,21 @@ export default function AdminFunnelPage() {
                                                             {user?.username ? `@${user.username}` : `ID: ${client.visitorId.slice(0, 10)}...`}
                                                         </span>
                                                     </div>
+                                                </div>
+                                            </td>
+
+                                            {/* Origem (Landing Page de Entrada) */}
+                                            <td className="p-3">
+                                                <div className="flex flex-col items-start gap-1">
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                                        <Link2 size={11} className="text-purple-600 shrink-0" />
+                                                        {client.landingPage || '/descubra'}
+                                                    </span>
+                                                    {client.utm?.utm_source && (
+                                                        <span className="text-[10px] text-slate-400 font-mono">
+                                                            src: {client.utm.utm_source}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </td>
 

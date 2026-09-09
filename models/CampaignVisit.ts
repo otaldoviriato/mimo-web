@@ -11,6 +11,7 @@ export interface ICampaignVisit extends Document {
     creative?: string | null;
     variation?: string | null;
     utm?: Record<string, string>;
+    landingPage?: string | null;
     landingViewedAt: Date;
     ctaClickedAt?: Date | null;
     signupCompletedAt?: Date | null;
@@ -37,6 +38,7 @@ const schema = new Schema<ICampaignVisit>({
     creative: { type: String, default: null },
     variation: { type: String, default: null },
     utm: { type: Schema.Types.Mixed, default: {} },
+    landingPage: { type: String, default: null, index: true },
     landingViewedAt: { type: Date, required: true, default: Date.now, index: true },
     ctaClickedAt: { type: Date, default: null },
     signupCompletedAt: { type: Date, default: null },
