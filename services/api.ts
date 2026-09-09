@@ -72,6 +72,7 @@ export const userApi = {
         state?: string;
         emailNotificationsEnabled?: boolean;
         newUserNotificationsEnabled?: boolean;
+        hasSentFirstMessage?: boolean;
         hideFromExplore?: boolean;
         bio?: string;
         isAvailable?: boolean;

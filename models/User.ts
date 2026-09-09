@@ -59,6 +59,7 @@ export interface IUser extends Document {
     lastAccessAt?: Date;
     emailNotificationsEnabled?: boolean;
     newUserNotificationsEnabled?: boolean;
+    hasSentFirstMessage?: boolean;
     isSuspended?: boolean;
     suspendedAt?: Date;
     avgResponseTimeMinutes?: number | null;
@@ -282,6 +283,10 @@ const UserSchema = new Schema<IUser>({
         default: true,
     },
     newUserNotificationsEnabled: {
+        type: Boolean,
+        default: false,
+    },
+    hasSentFirstMessage: {
         type: Boolean,
         default: false,
     },

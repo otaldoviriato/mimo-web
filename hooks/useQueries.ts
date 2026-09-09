@@ -252,6 +252,7 @@ export function useUpdateProfile() {
             phone?: string;
             emailNotificationsEnabled?: boolean;
             newUserNotificationsEnabled?: boolean;
+            hasSentFirstMessage?: boolean;
             birthDate?: string | Date | null;
             city?: string;
             state?: string;

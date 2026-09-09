@@ -19,6 +19,8 @@ import { PendingReceiptBalloon } from '@/components/PendingReceiptBalloon';
 import { LargeMessageConfirmModal } from '@/components/LargeMessageConfirmModal';
 import { decryptMessageText } from '@/lib/messageCipher';
 import { trackAcquisitionEvent } from '@/lib/clientAcquisitionAnalytics';
+import { FirstMessageNotificationModal } from '@/components/FirstMessageNotificationModal';
+import { userApi } from '@/services/api';
 import { AlertTriangle, ShieldCheck, Wallet, Clock, MessageCircle, LockKeyhole } from 'lucide-react';
 
 interface Message {
@@ -637,6 +639,29 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     const [largeMessageThreshold, setLargeMessageThreshold] = useState(100);
     const [pendingLongMessageToConfirm, setPendingLongMessageToConfirm] = useState<Message | null>(null);
     const declinedLongMessageIdsRef = useRef<Set<string>>(new Set());
+    const [showFirstMessageNotifModal, setShowFirstMessageNotifModal] = useState<boolean>(false);
+
+    const triggerFirstMessageModalIfEligible = () => {
+        const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
+        if (!isClientToProfessional) return;
+
+        const storageKey = `mimo_first_msg_notif_modal_shown_${user?.id}`;
+        if (typeof window !== 'undefined' && localStorage.getItem(storageKey)) {
+            return;
+        }
+
+        if (userData?.hasSentFirstMessage) {
+            return;
+        }
+
+        setTimeout(() => {
+            setShowFirstMessageNotifModal(true);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(storageKey, 'true');
+            }
+            void userApi.updateMe({ hasSentFirstMessage: true }).catch(() => undefined);
+        }, 700);
+    };
 
     // Se por qualquer eventualidade uma mensagem bloqueada entrar em resposta, anula o estado
     useEffect(() => {
@@ -2048,6 +2073,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             if (!data.success) {
                 throw new Error(data.error || 'Erro ao processar mídia');
             }
+            triggerFirstMessageModalIfEligible();
 
             setUploadTasks(prev => {
                 const next = { ...prev };
@@ -2468,6 +2494,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                             }
                             return m;
                         }));
+                        triggerFirstMessageModalIfEligible();
                     }
                 }
 
@@ -2643,6 +2670,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             if (!res.data.success) {
                 throw new Error(res.data.error || 'Erro ao enviar áudio');
             }
+            triggerFirstMessageModalIfEligible();
         } catch (e: any) {
             console.error('Erro ao enviar áudio:', e);
             const serverError: string | undefined = e.response?.data?.error;
@@ -4688,6 +4716,12 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 charCount={pendingLongMessageToConfirm?.equivalentCharCount || pendingLongMessageToConfirm?.charCount || 0}
                 costInCents={pendingLongMessageToConfirm?.receiptChargeCents || 0}
                 userBalanceInCents={balance}
+            />
+
+            <FirstMessageNotificationModal
+                isOpen={showFirstMessageNotifModal}
+                onClose={() => setShowFirstMessageNotifModal(false)}
+                professionalName={receiver?.name || receiver?.username}
             />
         </div>
     );

@@ -520,6 +520,7 @@ export async function GET(request: NextRequest) {
                 identityVerificationPromptIntervalDays: settings?.identityVerificationPromptIntervalDays ?? 7,
                 emailNotificationsEnabled: user.emailNotificationsEnabled ?? true,
                 newUserNotificationsEnabled: user.newUserNotificationsEnabled ?? false,
+                hasSentFirstMessage: Boolean(user.hasSentFirstMessage),
                 hasPushToken: Boolean(user.fcmToken || (user.fcmTokens && user.fcmTokens.length > 0)),
                 hideFromExplore: user.hideFromExplore ?? false,
                 publicPhotosCount,
@@ -550,7 +551,7 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, completeProfile, subscriptionPrice, isSubscriptionEnabled, bio, emailNotificationsEnabled, newUserNotificationsEnabled, hideFromExplore, birthDate, city, state, isAvailable } = body;
+        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, completeProfile, subscriptionPrice, isSubscriptionEnabled, bio, emailNotificationsEnabled, newUserNotificationsEnabled, hasSentFirstMessage, hideFromExplore, birthDate, city, state, isAvailable } = body;
 
         await connectToDatabase();
 
@@ -655,6 +656,10 @@ export async function PATCH(request: NextRequest) {
 
         if (newUserNotificationsEnabled !== undefined) {
             updateData.newUserNotificationsEnabled = Boolean(newUserNotificationsEnabled);
+        }
+
+        if (hasSentFirstMessage !== undefined) {
+            updateData.hasSentFirstMessage = Boolean(hasSentFirstMessage);
         }
 
         if (hideFromExplore !== undefined) {
@@ -815,6 +820,7 @@ export async function PATCH(request: NextRequest) {
                 pwaShowAgainIntervalDays: settings?.pwaShowAgainIntervalDays ?? 7,
                 emailNotificationsEnabled: user.emailNotificationsEnabled ?? true,
                 newUserNotificationsEnabled: user.newUserNotificationsEnabled ?? false,
+                hasSentFirstMessage: Boolean(user.hasSentFirstMessage),
                 hasPushToken: Boolean(user.fcmToken || (user.fcmTokens && user.fcmTokens.length > 0)),
                 hideFromExplore: user.hideFromExplore ?? false,
                 avgResponseTimeMinutes: user.avgResponseTimeMinutes,
