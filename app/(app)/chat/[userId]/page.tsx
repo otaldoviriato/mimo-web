@@ -2494,6 +2494,12 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             return;
         }
 
+        const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
+        if (isClientToProfessional && balance <= 0) {
+            openRechargeModal('Para enviar mensagens para a criadora, seu saldo precisa ser maior que R$ 0,00. Faça uma recarga para continuar.');
+            return;
+        }
+
         const charCount = text.length;
         const costInCents = 0;
 
@@ -2581,10 +2587,15 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     };
 
     const handleSendAudio = async (audioBlob: Blob, durationInSeconds: number) => {
+        const isTeamMemberInvolved = userData?.isTeam || receiver?.isTeam;
+        const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
+        if (isClientToProfessional && balance <= 0) {
+            openRechargeModal('Para enviar mensagens para a criadora, seu saldo precisa ser maior que R$ 0,00. Faça uma recarga para continuar.');
+            return;
+        }
+
         const tempId = `temp-audio-${Date.now()}`;
         const previewUrl = URL.createObjectURL(audioBlob);
-
-        const isTeamMemberInvolved = userData?.isTeam || receiver?.isTeam;
         const estimatedAudioCostInCents = 0;
 
         const newMsg: Message = {
@@ -2655,6 +2666,14 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
         if (!e.target.files || e.target.files.length === 0) return;
+
+        const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
+        if (isClientToProfessional && balance <= 0) {
+            e.target.value = '';
+            openRechargeModal('Para enviar mensagens para a criadora, seu saldo precisa ser maior que R$ 0,00. Faça uma recarga para continuar.');
+            return;
+        }
+
         const file = e.target.files[0];
         const isVideoFile = type === 'video';
 
@@ -2873,6 +2892,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     const charCount = messageText.trim().length;
     const isSubscriber = chatPricing?.isSubscriber ?? false;
     const isTeamMemberInvolved = userData?.isTeam || receiver?.isTeam;
+    const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
     const currentRate = 0; // Client sends are free; prices describe incoming messages only.
     let estimatedCostInCents = 0;
     if (charCount > 0 && receiver?.isProfessional && !monetizationDisabled && !isTeamMemberInvolved) {
@@ -2885,7 +2905,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     // Quantos segundos de áudio o saldo atual do cliente consegue pagar (undefined = sem limite, mensagem gratuita).
     const maxAudioDurationSeconds = (audioCostPerSecondInCents > 0 && !isTeamMemberInvolved)
         ? Math.floor(balance / audioCostPerSecondInCents)
-        : undefined;
+        : (isClientToProfessional && balance <= 0 ? 0 : undefined);
     // Se o saldo for > 0, exibe quando estiver abaixo do limite configurado.
     // Se o saldo for == 0, só exibe quando houver pelo menos uma mensagem da profissional recebida ou bloqueada (pois agora há motivo para recarregar).
     const hasProfessionalMessage = messages.some(
@@ -3996,6 +4016,11 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         <button
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
+                                if (isClientToProfessional && balance <= 0) {
+                                    openRechargeModal('Para enviar mensagens para a criadora, seu saldo precisa ser maior que R$ 0,00. Faça uma recarga para continuar.');
+                                    return;
+                                }
+
                                 if (selectedFile) {
                                     sendSelectedMedia(0, false, 60);
                                 } else if (charCount > 0 && !userData?.isProfessional && receiver?.isProfessional && !monetizationDisabled && currentRate > 0 && balance < estimatedCostInCents) {
@@ -4035,9 +4060,11 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                             costPerSecondInCents={audioCostPerSecondInCents}
                             onInsufficientBalance={() =>
                                 openRechargeModal(
-                                    userData?.hasWelcomeCreditEnded
-                                        ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
-                                        : 'Você não tem saldo suficiente para enviar uma mensagem de áudio. Por favor, recarregue sua carteira.'
+                                    isClientToProfessional && balance <= 0
+                                        ? 'Para enviar mensagens para a criadora, seu saldo precisa ser maior que R$ 0,00. Faça uma recarga para continuar.'
+                                        : (userData?.hasWelcomeCreditEnded
+                                            ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
+                                            : 'Você não tem saldo suficiente para enviar uma mensagem de áudio. Por favor, recarregue sua carteira.')
                                 )
                             }
                         />

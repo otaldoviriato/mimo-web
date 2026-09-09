@@ -3,6 +3,8 @@ import { auth } from '@clerk/nextjs/server';
 import { uploadToGCS } from '@/lib/gcs';
 import { v4 as uuidv4 } from 'uuid';
 import { requireCompletedOnboarding } from '@/lib/apiOnboardingGuard';
+import { connectToDatabase } from '@/lib/db';
+import { User } from '@/models/User';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +35,16 @@ export async function POST(request: NextRequest) {
         const duration = parseFloat(durationStr);
         if (isNaN(duration) || duration <= 0) {
             return NextResponse.json({ error: 'Invalid duration' }, { status: 400 });
+        }
+
+        await connectToDatabase();
+        const [senderUser, receiverUser] = await Promise.all([
+            User.findOne({ clerkId: userId }).select('isProfessional isTeam balance').lean() as any,
+            User.findOne({ clerkId: receiverId }).select('isProfessional isTeam').lean() as any,
+        ]);
+
+        if (senderUser && !senderUser.isProfessional && !senderUser.isTeam && receiverUser?.isProfessional && !receiverUser?.isTeam && (senderUser.balance || 0) <= 0) {
+            return NextResponse.json({ error: 'Saldo insuficiente para enviar mensagens' }, { status: 403 });
         }
 
         // Determinar extensão do arquivo

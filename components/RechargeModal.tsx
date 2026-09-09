@@ -664,9 +664,14 @@ export function RechargeModal({
                                         </div>
                                     )}
                                     {!shouldShowInsufficientContext && insufficientBalanceMessage && (
-                                        <div className="mb-4 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-amber-700">
-                                            <AlertCircle size={16} className="shrink-0" strokeWidth={2.2} />
-                                            <p className="text-xs font-semibold uppercase tracking-widest">Saldo insuficiente</p>
+                                        <div className="mb-4 rounded-xl border border-amber-200/90 bg-amber-50/80 p-3.5 text-amber-800 animate-in fade-in duration-200">
+                                            <div className="flex items-center gap-2 mb-1 text-amber-900 font-semibold text-xs">
+                                                <AlertCircle size={15} className="shrink-0 text-amber-600" strokeWidth={2.2} />
+                                                <span>Aviso</span>
+                                            </div>
+                                            <p className="text-xs leading-relaxed text-amber-800 font-normal">
+                                                {insufficientBalanceMessage}
+                                            </p>
                                         </div>
                                     )}
                                     {/* 1. Forma de pagamento */}
