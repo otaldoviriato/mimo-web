@@ -19,7 +19,7 @@ export async function GET() {
         professionalStatus: 'approved',
         isSuspended: { $ne: true },
         hideFromExplore: { $ne: true },
-    }).select('clerkId username name photoUrl coverUrl bio isOnline lastSeen lastAccessAt createdAt accessCount').sort({ accessCount: -1, isOnline: -1, lastSeen: -1, lastAccessAt: -1 }).lean();
+    }).select('clerkId username name photoUrl coverUrl bio isOnline lastSeen lastAccessAt createdAt accessCount').sort({ isOnline: -1, lastSeen: -1, lastAccessAt: -1, createdAt: -1, accessCount: -1 }).lean();
     const ids = professionals.map(user => user.clerkId);
     const photos = await GalleryItem.find({ ownerId: { $in: ids }, galleryType: 'public', visibility: 'public', mediaType: 'photo' }).lean();
     const photoMap = new Map<string, string[]>();

@@ -6,16 +6,16 @@ export type ExploreRankable = {
     accessCount?: number;
 };
 
-function compareByAccessCount(a: ExploreRankable, b: ExploreRankable) {
+function compareByOnlineAndRecency(a: ExploreRankable, b: ExploreRankable) {
     const accessA = a.accessCount ?? 0;
     const accessB = b.accessCount ?? 0;
-    return accessB - accessA
-        || Number(b.isOnline) - Number(a.isOnline)
+    return Number(b.isOnline) - Number(a.isOnline)
         || b.lastActiveTime - a.lastActiveTime
+        || accessB - accessA
         || a.clerkId.localeCompare(b.clerkId);
 }
 
-/** Ordena as profissionais por acessos no explorar */
+/** Ordena as profissionais colocando em primeiro lugar as online agora ou com acesso mais recente */
 export function rankExploreUsers<T extends ExploreRankable>(users: T[], limit = EXPLORE_RESULT_LIMIT): T[] {
-    return [...users].sort(compareByAccessCount).slice(0, limit);
+    return [...users].sort(compareByOnlineAndRecency).slice(0, limit);
 }

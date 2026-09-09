@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
                 hideFromExplore: { $ne: true },
             })
                 .select('clerkId username name email photoUrl coverUrl identityStatus subscriptionPrice bio createdAt avgResponseTimeMinutes isOnline lastSeen lastAccessAt birthDate city state accessCount')
-                .sort({ accessCount: -1, isOnline: -1, lastSeen: -1, lastAccessAt: -1, createdAt: -1 })
+                .sort({ isOnline: -1, lastSeen: -1, lastAccessAt: -1, createdAt: -1, accessCount: -1 })
                 .limit(100)
                 .lean(),
             Room.find({ participants: userId }).select('participants').lean(),
