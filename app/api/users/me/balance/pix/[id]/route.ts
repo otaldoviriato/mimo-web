@@ -6,6 +6,7 @@ import { Transaction } from '@/models/Transaction';
 import { User } from '@/models/User';
 import { isAbacatePix } from '@/lib/abacatePix';
 import { settleAbacatePix } from '@/lib/settleAbacatePix';
+import { executeRechargeCredit } from '@/lib/creditRecharge';
 
 export async function GET(
     request: NextRequest,
@@ -21,7 +22,7 @@ export async function GET(
 
         await connectToDatabase();
 
-        let transaction = await Transaction.findOne({
+        let transaction: any = await Transaction.findOne({
             abacatePayId: id,
             userId: userId
         });
@@ -30,59 +31,65 @@ export async function GET(
             return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
         }
 
-        if (transaction.status !== 'PAID' && isAbacatePix(transaction)) {
+        // Reconciliação AbacatePay PIX (se não estiver PAID ou se PAID sem creditedAt)
+        if ((transaction.status !== 'PAID' || !transaction.metadata?.creditedAt) && isAbacatePix(transaction)) {
             try {
                 const result = await settleAbacatePix(id, userId);
-                if (result) transaction = result.transaction;
+                if (result?.transaction) transaction = result.transaction;
             } catch {
                 console.error('[PIX] Status reconciliation failed', { paymentId: id });
                 return NextResponse.json({ error: 'Payment verification temporarily unavailable' }, { status: 503 });
             }
         }
 
-        if (transaction.status === 'PENDING' && transaction.metadata?.provider === 'asaas') {
-            try {
-                const providerStatus = await checkAsaasPayment(id);
-                const status = mapAsaasPaymentStatus(providerStatus.status);
+        // Reconciliação Asaas Cartão de Crédito
+        if (transaction && transaction.metadata?.provider === 'asaas') {
+            if (transaction.status === 'PENDING') {
+                try {
+                    const providerStatus = await checkAsaasPayment(id);
+                    const status = mapAsaasPaymentStatus(providerStatus.status);
 
-                if (status === 'PAID') {
-                    const paidTransaction = await Transaction.findOneAndUpdate(
-                        { abacatePayId: id, userId, status: { $ne: 'PAID' } },
-                        { $set: { status: 'PAID', 'metadata.providerStatus': providerStatus.status } },
-                        { new: true }
-                    );
-
-                    if (paidTransaction) {
-                        transaction = paidTransaction;
-                        const rechargeAmountCents = Math.round((transaction.amount || 0) * 100);
-                        await User.findOneAndUpdate(
-                            { clerkId: userId },
-                            [{
-                                $set: {
-                                    balance: { $add: [{ $ifNull: ['$balance', 0] }, rechargeAmountCents] },
-                                    customerCashAvailableCents: {
-                                        $cond: [
-                                            { $ne: [{ $type: '$marketplaceWalletMigratedAt' }, 'missing'] },
-                                            { $add: [{ $ifNull: ['$customerCashAvailableCents', 0] }, rechargeAmountCents] },
-                                            '$customerCashAvailableCents',
-                                        ],
-                                    },
-                                },
-                            }]
-                        );
-                    } else {
-                        transaction = await Transaction.findOne({ abacatePayId: id, userId }) || transaction;
+                    if (status === 'PAID') {
+                        const creditResult = await executeRechargeCredit({
+                            paymentId: id,
+                            userId,
+                            provider: 'asaas',
+                            providerStatus: providerStatus.status,
+                            invoiceUrl: providerStatus.invoiceUrl,
+                            receiptUrl: providerStatus.transactionReceiptUrl,
+                        });
+                        if (creditResult.transaction) {
+                            transaction = creditResult.transaction;
+                        }
+                    } else if (status === 'CANCELLED') {
+                        transaction = await Transaction.findOneAndUpdate(
+                            { abacatePayId: id, userId, status: 'PENDING' },
+                            { $set: { status: 'CANCELLED', 'metadata.providerStatus': providerStatus.status } },
+                            { new: true }
+                        ) || transaction;
                     }
-                } else if (status === 'CANCELLED') {
-                    transaction = await Transaction.findOneAndUpdate(
-                        { abacatePayId: id, userId, status: 'PENDING' },
-                        { $set: { status: 'CANCELLED', 'metadata.providerStatus': providerStatus.status } },
-                        { new: true }
-                    ) || transaction;
+                } catch {
+                    // If Asaas status lookup is unavailable, return local state.
                 }
-            } catch {
-                // If Asaas status lookup is unavailable, return local state.
+            } else if (transaction.status === 'PAID' && !transaction.metadata?.creditedAt) {
+                // FAIL-SAFE CRÍTICO: transação marcada como PAID mas saldo ainda não creditado
+                try {
+                    const creditResult = await executeRechargeCredit({
+                        paymentId: id,
+                        userId,
+                        provider: 'asaas',
+                    });
+                    if (creditResult.transaction) {
+                        transaction = creditResult.transaction;
+                    }
+                } catch (err) {
+                    console.error('[Asaas Poll] Error auto-reconciling uncredited PAID transaction:', err);
+                }
             }
+        }
+
+        if (!transaction) {
+            return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
         }
 
         return NextResponse.json({

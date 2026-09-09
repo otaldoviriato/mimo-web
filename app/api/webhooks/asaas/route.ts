@@ -8,6 +8,7 @@ import { User } from '@/models/User';
 import { WithdrawRequest } from '@/models/WithdrawRequest';
 import { recordAcquisitionEvent } from '@/lib/acquisitionAnalytics';
 import { CampaignVisit } from '@/models/CampaignVisit';
+import { executeRechargeCredit } from '@/lib/creditRecharge';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_key');
 
@@ -193,88 +194,28 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ received: true });
         }
 
-        const transaction = await Transaction.findOneAndUpdate(
-            { abacatePayId: paymentId, status: { $ne: 'PAID' } },
-            {
-                $set: {
-                    status: 'PAID',
-                    'metadata.providerStatus': providerStatus,
-                    'metadata.asaasWebhookEvent': body.event,
-                    'metadata.invoiceUrl': payment?.invoiceUrl,
-                    'metadata.transactionReceiptUrl': payment?.transactionReceiptUrl,
-                },
-            },
-            { new: true }
-        );
+        const creditResult = await executeRechargeCredit({
+            paymentId,
+            provider: 'asaas',
+            providerStatus,
+            invoiceUrl: payment?.invoiceUrl,
+            receiptUrl: payment?.transactionReceiptUrl,
+            event: body.event,
+        });
 
-        if (!transaction) {
+        if (!creditResult.success) {
             const exists = await Transaction.exists({ abacatePayId: paymentId });
             if (!exists) {
                 console.error('Asaas transaction not found:', paymentId);
                 return NextResponse.json({ received: true, message: 'Transaction not found in Mimo database, ignoring' }, { status: 200 });
             }
 
-            return NextResponse.json({ received: true, message: 'Already paid' });
+            console.error('Falha ao creditar recarga Asaas:', creditResult.message);
+            return NextResponse.json({ error: creditResult.message || 'Failed to credit recharge' }, { status: 500 });
         }
 
-        const rechargeAmountCents = Math.round((transaction.amount || 0) * 100);
-        const user = await User.findOneAndUpdate(
-            { clerkId: transaction.userId },
-            [{
-                $set: {
-                    balance: { $add: [{ $ifNull: ['$balance', 0] }, rechargeAmountCents] },
-                    customerCashAvailableCents: {
-                        $cond: [
-                            { $ne: [{ $type: '$marketplaceWalletMigratedAt' }, 'missing'] },
-                            { $add: [{ $ifNull: ['$customerCashAvailableCents', 0] }, rechargeAmountCents] },
-                            '$customerCashAvailableCents',
-                        ],
-                    },
-                },
-            }],
-            { new: true }
-        );
-
-        if (!user) {
-            console.error('Asaas transaction user not found:', transaction.userId);
-            return NextResponse.json({ error: 'User not found' }, { status: 404 });
-        }
-
-        await recordAcquisitionEvent({
-            eventType: 'first_recharge',
-            dedupeKey: `first_recharge:${transaction.userId}`,
-            actorId: transaction.userId,
-            clientId: transaction.userId,
-            professionalId: user.acquiredByProfessionalId,
-            origin: user.acquisitionSource || 'unknown',
-            amountCents: rechargeAmountCents,
-            occurredAt: transaction.timestamp || new Date(),
-            metadata: { provider: 'asaas', transactionId: transaction._id.toString() },
-        });
-
-        await CampaignVisit.findOneAndUpdate(
-            { userId: transaction.userId, firstRechargeAt: null },
-            { $set: { firstRechargeAt: transaction.timestamp || new Date(), firstRechargeAmountCents: rechargeAmountCents } },
-            { sort: { signupCompletedAt: -1, createdAt: -1 } },
-        );
-
-        const amountInReais = (transaction.amount || 0).toLocaleString('pt-BR', {
-            style: 'currency',
-            currency: 'BRL',
-        });
-
-        await sendPushNotification(
-            user.clerkId,
-            'Recarga realizada!',
-            `Sua recarga de ${amountInReais} foi confirmada e ja esta disponivel.`
-        );
-
-        // Tenta liquidar automaticamente assinaturas pendentes (PAST_DUE) por falta de saldo
-        try {
-            const { settlePendingSubscriptionsForUser } = await import('@/lib/subscriptionBilling');
-            await settlePendingSubscriptionsForUser(user.clerkId);
-        } catch (settleErr) {
-            console.error('[Asaas Webhook] Failed to settle pending subscriptions after recharge:', settleErr);
+        if (creditResult.alreadyCredited) {
+            return NextResponse.json({ received: true, message: 'Already credited' });
         }
 
         return NextResponse.json({ success: true, message: 'Balance updated via Asaas webhook' });

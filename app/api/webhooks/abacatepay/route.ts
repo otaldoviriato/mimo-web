@@ -7,6 +7,7 @@ import { recordAcquisitionEvent } from '@/lib/acquisitionAnalytics';
 import { CampaignVisit } from '@/models/CampaignVisit';
 import { getAbacatePixWebhookId } from '@/lib/abacatePix';
 import { settleAbacatePix } from '@/lib/settleAbacatePix';
+import { executeRechargeCredit } from '@/lib/creditRecharge';
 
 export async function POST(req: NextRequest) {
     try {
@@ -66,88 +67,27 @@ export async function POST(req: NextRequest) {
 
         await connectToDatabase();
 
-        // Operação atômica: só atualiza se ainda estiver PENDING, evitando duplicatas
-        const transaction = await Transaction.findOneAndUpdate(
-            { abacatePayId: abacateId, status: { $ne: 'PAID' } },
-            {
-                $set: {
-                    status: 'PAID',
-                    'metadata.providerStatus': eventStatus,
-                    'metadata.receiptUrl': body?.data?.transparent?.receiptUrl || body?.data?.billing?.receiptUrl,
-                }
-            },
-            { new: true }
-        );
+        const creditResult = await executeRechargeCredit({
+            paymentId: abacateId,
+            provider: 'abacatepay',
+            providerStatus: eventStatus,
+            receiptUrl: body?.data?.transparent?.receiptUrl || body?.data?.billing?.receiptUrl,
+        });
 
-        if (!transaction) {
-            // Ou não existe, ou já foi processada antes
+        if (!creditResult.success) {
             const exists = await Transaction.exists({ abacatePayId: abacateId });
             if (!exists) {
                 console.error('Transação não encontrada:', abacateId);
                 return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
             }
-            console.log('Transação já paga anteriormente:', abacateId);
+
+            console.error('Falha ao creditar recarga AbacatePay:', creditResult.message);
+            return NextResponse.json({ error: creditResult.message || 'Failed to credit recharge' }, { status: 500 });
+        }
+
+        if (creditResult.alreadyCredited) {
+            console.log('Transação já paga/creditada anteriormente:', abacateId);
             return NextResponse.json({ received: true, message: 'Already paid' });
-        }
-
-        // Credita saldo ao usuário com $inc atômico
-        const amountInCents = Math.round((transaction.amount || 0) * 100);
-        const user = await User.findOneAndUpdate(
-            { clerkId: transaction.userId },
-            [{
-                $set: {
-                    balance: { $add: [{ $ifNull: ['$balance', 0] }, amountInCents] },
-                    customerCashAvailableCents: {
-                        $cond: [
-                            { $ne: [{ $type: '$marketplaceWalletMigratedAt' }, 'missing'] },
-                            { $add: [{ $ifNull: ['$customerCashAvailableCents', 0] }, amountInCents] },
-                            '$customerCashAvailableCents',
-                        ],
-                    },
-                },
-            }],
-            { new: true }
-        );
-
-        if (!user) {
-            console.error('Usuário da transação não encontrado:', transaction.userId);
-            return NextResponse.json({ error: 'User not found' }, { status: 404 });
-        }
-
-        await recordAcquisitionEvent({
-            eventType: 'first_recharge',
-            dedupeKey: `first_recharge:${transaction.userId}`,
-            actorId: transaction.userId,
-            clientId: transaction.userId,
-            professionalId: user.acquiredByProfessionalId,
-            origin: user.acquisitionSource || 'unknown',
-            amountCents: amountInCents,
-            occurredAt: transaction.timestamp || new Date(),
-            metadata: { provider: 'abacatepay', transactionId: transaction._id.toString() },
-        });
-
-        await CampaignVisit.findOneAndUpdate(
-            { userId: transaction.userId, firstRechargeAt: null },
-            { $set: { firstRechargeAt: transaction.timestamp || new Date(), firstRechargeAmountCents: amountInCents } },
-            { sort: { signupCompletedAt: -1, createdAt: -1 } },
-        );
-
-        console.log(`[SUCESSO] Saldo creditado para ${user.username} via webhook.`);
-
-        // Envia notificação push para o usuário
-        const amountInReais = (transaction.amount || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        await sendPushNotification(
-            user.clerkId,
-            'Recarga realizada! ✅',
-            `Sua recarga de ${amountInReais} foi confirmada e já está disponível.`
-        );
-
-        // Tenta liquidar automaticamente assinaturas pendentes (PAST_DUE) por falta de saldo
-        try {
-            const { settlePendingSubscriptionsForUser } = await import('@/lib/subscriptionBilling');
-            await settlePendingSubscriptionsForUser(user.clerkId);
-        } catch (settleErr) {
-            console.error('[AbacatePay Webhook] Failed to settle pending subscriptions after recharge:', settleErr);
         }
 
         return NextResponse.json({
