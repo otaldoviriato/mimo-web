@@ -4,6 +4,8 @@ import { connectToDatabase } from '@/lib/db';
 import { checkAsaasPayment, mapAsaasPaymentStatus } from '@/lib/asaas';
 import { Transaction } from '@/models/Transaction';
 import { User } from '@/models/User';
+import { isAbacatePix } from '@/lib/abacatePix';
+import { settleAbacatePix } from '@/lib/settleAbacatePix';
 
 export async function GET(
     request: NextRequest,
@@ -26,6 +28,16 @@ export async function GET(
 
         if (!transaction) {
             return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
+        }
+
+        if (transaction.status !== 'PAID' && isAbacatePix(transaction)) {
+            try {
+                const result = await settleAbacatePix(id, userId);
+                if (result) transaction = result.transaction;
+            } catch {
+                console.error('[PIX] Status reconciliation failed', { paymentId: id });
+                return NextResponse.json({ error: 'Payment verification temporarily unavailable' }, { status: 503 });
+            }
         }
 
         if (transaction.status === 'PENDING' && transaction.metadata?.provider === 'asaas') {

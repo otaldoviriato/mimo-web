@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
 
     const { amount } = await req.json();
 
-    if (!amount || amount < 1) {
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount < 1 || !Number.isSafeInteger(Math.round(amount * 100))) {
       return NextResponse.json({ error: 'Valor mínimo de R$ 1,00' }, { status: 400 });
     }
 
@@ -55,6 +55,8 @@ export async function POST(req: NextRequest) {
         type: 'PIX',
         source: 'recharge',
         metadata: {
+          provider: 'abacatepay',
+          devMode: pixData.devMode,
           externalId,
           brCode: pixData.brCode || '',
         }

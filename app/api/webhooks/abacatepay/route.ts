@@ -5,11 +5,26 @@ import { User } from '@/models/User';
 import { sendPushNotification } from '@/lib/push';
 import { recordAcquisitionEvent } from '@/lib/acquisitionAnalytics';
 import { CampaignVisit } from '@/models/CampaignVisit';
+import { getAbacatePixWebhookId } from '@/lib/abacatePix';
+import { settleAbacatePix } from '@/lib/settleAbacatePix';
 
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
         console.log('=== Webhook AbacatePay RECEBIDO ===');
+        const pixId = getAbacatePixWebhookId(body);
+        if (pixId) {
+            await connectToDatabase();
+            const result = await settleAbacatePix(pixId);
+            if (!result) return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
+            if (result.credited) {
+                try {
+                    const amount = result.transaction.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                    await sendPushNotification(result.transaction.userId, 'Recarga realizada! ✅', `Sua recarga de ${amount} foi confirmada e já está disponível.`);
+                } catch { console.error('[PIX] Post-credit notification failed', { paymentId: pixId }); }
+            }
+            return NextResponse.json({ received: true, status: result.transaction.status });
+        }
         
         let abacateId = '';
         if (body?.data?.transparent?.id) {
