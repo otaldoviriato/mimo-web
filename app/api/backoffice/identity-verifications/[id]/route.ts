@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminAccess } from '@/lib/adminAuth';
 import { User } from '@/models/User';
+import { AppSettings } from '@/models/AppSettings';
 import { connectToDatabase } from '@/lib/db';
 import { Resend } from 'resend';
 
@@ -117,59 +118,75 @@ export async function PATCH(
         }
 
         const appUrl = process.env.NEXT_PUBLIC_API_URL || 'https://www.mimochat.com.br';
+        const settings = await AppSettings.findOne({ key: 'global' }).lean();
+        const institutionalEmail = settings?.institutionalEmails?.[0] || 'suporte@mimochat.com.br';
+        const senderFrom = process.env.RESEND_FROM_EMAIL || `"Mimo Cadastro" <${institutionalEmail}>`;
 
         // Envio de e-mail ao aprovar o selo verificado
         if (update.identityStatus === 'approved' && oldStatus !== 'approved') {
             try {
-                await resend.emails.send({
-                    from: 'Mimo Cadastro <onboarding@resend.dev>',
-                    to: u.email,
-                    subject: 'Seu perfil no Mimo foi verificado! 🎉',
-                    html: `
-                        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                            <h2 style="color: #6d28d9; margin-top: 0;">Perfil Verificado! 🎉</h2>
-                            <p style="color: #475569; font-size: 16px;">Olá, <strong>${u.name || u.username}</strong>.</p>
-                            <p style="color: #475569; font-size: 16px;">Temos ótimas notícias! Seus documentos foram validados e agora seu perfil conta com o <strong>Selo de Verificado</strong>.</p>
-                            <p style="color: #475569; font-size: 16px;">Isso mostra para a nossa comunidade que seu perfil é oficial e totalmente seguro.</p>
-                            <div style="text-align: center; margin: 30px 0;">
-                                <a href="${appUrl}" style="background-color: #6d28d9; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Acessar meu Perfil</a>
+                if (u.email && process.env.RESEND_API_KEY) {
+                    const sendRes = await resend.emails.send({
+                        from: senderFrom,
+                        to: u.email,
+                        subject: 'Seu perfil no Mimo foi verificado! 🎉',
+                        html: `
+                            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                                <h2 style="color: #6d28d9; margin-top: 0;">Perfil Verificado! 🎉</h2>
+                                <p style="color: #475569; font-size: 16px;">Olá, <strong>${u.name || u.username}</strong>.</p>
+                                <p style="color: #475569; font-size: 16px;">Temos ótimas notícias! Seus documentos foram validados e agora seu perfil conta com o <strong>Selo de Verificado</strong>.</p>
+                                <p style="color: #475569; font-size: 16px;">Isso mostra para a nossa comunidade que seu perfil é oficial e totalmente seguro.</p>
+                                <div style="text-align: center; margin: 30px 0;">
+                                    <a href="${appUrl}" style="background-color: #6d28d9; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Acessar meu Perfil</a>
+                                </div>
+                                <p style="color: #94a3b8; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 15px; margin-top: 30px;">Mimo Suporte</p>
                             </div>
-                            <p style="color: #94a3b8; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 15px; margin-top: 30px;">Mimo Suporte</p>
-                        </div>
-                    `
-                });
-                console.log(`✉️ Email de verificação enviado para usuário: ${u.email}`);
+                        `
+                    });
+                    if (sendRes.error) {
+                        console.error('Erro retornado pela API do Resend ao aprovar verificação:', sendRes.error);
+                    } else {
+                        console.log(`✉️ Email de verificação enviado para usuário: ${u.email}`);
+                    }
+                }
             } catch (emailErr) {
                 console.error('Erro ao enviar e-mail de aprovação de verificação:', emailErr);
             }
         }
 
-        // Envio de e-mail ao rejeitar a verificação
-        if (update.identityStatus === 'rejected' && oldStatus !== 'rejected') {
+        // Envio de e-mail ao rejeitar a verificação (na reprovação ou quando atualiza a justificativa)
+        const isRejectionAction = update.identityStatus === 'rejected' && (oldStatus !== 'rejected' || !!update.notes);
+        if (isRejectionAction) {
             try {
-                await resend.emails.send({
-                    from: 'Mimo Cadastro <onboarding@resend.dev>',
-                    to: u.email,
-                    subject: 'Verificação de perfil no Mimo - Atualização 💜',
-                    html: `
-                        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                            <h2 style="color: #6d28d9; margin-top: 0;">Ajuste necessário nos documentos</h2>
-                            <p style="color: #475569; font-size: 16px;">Olá, <strong>${u.name || u.username}</strong>.</p>
-                            <p style="color: #475569; font-size: 16px;">Analisamos os documentos enviados para a verificação do seu perfil, mas infelizmente não pudemos aprovar neste momento.</p>
-                            ${update.notes ? `
-                            <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 15px; margin: 20px 0; color: #991b1b; font-size: 14px;">
-                                <strong>Motivo da recusa:</strong><br/>
-                                ${update.notes}
-                            </div>` : ''}
-                            <p style="color: #475569; font-size: 16px;">Você pode enviar novos documentos e uma nova selfie a qualquer momento diretamente pelos Ajustes do aplicativo.</p>
-                            <div style="text-align: center; margin: 30px 0;">
-                                <a href="${appUrl}/settings" style="background-color: #6d28d9; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Reenviar Documentos</a>
+                if (u.email && process.env.RESEND_API_KEY) {
+                    const sendRes = await resend.emails.send({
+                        from: senderFrom,
+                        to: u.email,
+                        subject: 'Verificação de perfil no Mimo - Atualização 💜',
+                        html: `
+                            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                                <h2 style="color: #6d28d9; margin-top: 0;">Ajuste necessário nos documentos</h2>
+                                <p style="color: #475569; font-size: 16px;">Olá, <strong>${u.name || u.username}</strong>.</p>
+                                <p style="color: #475569; font-size: 16px;">Analisamos os documentos enviados para a verificação do seu perfil, mas infelizmente não pudemos aprovar neste momento.</p>
+                                ${update.notes ? `
+                                <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 15px; margin: 20px 0; color: #991b1b; font-size: 14px;">
+                                    <strong>Motivo da recusa:</strong><br/>
+                                    ${update.notes}
+                                </div>` : ''}
+                                <p style="color: #475569; font-size: 16px;">Você pode enviar novos documentos e uma nova selfie a qualquer momento diretamente pelos Ajustes do aplicativo.</p>
+                                <div style="text-align: center; margin: 30px 0;">
+                                    <a href="${appUrl}/settings" style="background-color: #6d28d9; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Reenviar Documentos</a>
+                                </div>
+                                <p style="color: #94a3b8; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 15px; margin-top: 30px;">Mimo Suporte</p>
                             </div>
-                            <p style="color: #94a3b8; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 15px; margin-top: 30px;">Mimo Suporte</p>
-                        </div>
-                    `
-                });
-                console.log(`✉️ Email de rejeição de verificação enviado para usuário: ${u.email}`);
+                        `
+                    });
+                    if (sendRes.error) {
+                        console.error('Erro retornado pela API do Resend ao rejeitar verificação:', sendRes.error);
+                    } else {
+                        console.log(`✉️ Email de rejeição de verificação enviado para usuário: ${u.email}`);
+                    }
+                }
             } catch (emailErr) {
                 console.error('Erro ao enviar e-mail de rejeição de verificação:', emailErr);
             }

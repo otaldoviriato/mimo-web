@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminAccess } from '@/lib/adminAuth';
 import { User } from '@/models/User';
+import { AppSettings } from '@/models/AppSettings';
 import { connectToDatabase } from '@/lib/db';
 import { Resend } from 'resend';
 import { clerkClient } from '@clerk/nextjs/server';
@@ -131,26 +132,36 @@ export async function PATCH(
                 console.error('[backoffice/creator-applications] Erro ao sincronizar Clerk metadata:', clerkErr);
             }
 
+            const appUrl = process.env.NEXT_PUBLIC_API_URL || 'https://www.mimochat.com.br';
+            const settings = await AppSettings.findOne({ key: 'global' }).lean();
+            const institutionalEmail = settings?.institutionalEmails?.[0] || 'suporte@mimochat.com.br';
+            const senderFrom = process.env.RESEND_FROM_EMAIL || `"Mimo Cadastro" <${institutionalEmail}>`;
+
             try {
-                const appUrl = process.env.NEXT_PUBLIC_API_URL || 'https://www.mimochat.com.br';
-                await resend.emails.send({
-                    from: 'Mimo Cadastro <onboarding@resend.dev>',
-                    to: u.email,
-                    subject: 'Sua conta de criadora no Mimo foi aprovada! 🎉',
-                    html: `
-                        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                            <h2 style="color: #6d28d9; margin-top: 0;">Sua conta foi aprovada! 🎉</h2>
-                            <p style="color: #475569; font-size: 16px;">Olá, <strong>${u.name || u.username}</strong>.</p>
-                            <p style="color: #475569; font-size: 16px;">Temos ótimas notícias! Sua conta de criadora no Mimo foi analisada e aprovada pela nossa equipe.</p>
-                            <p style="color: #475569; font-size: 16px;">Agora você já pode acessar o aplicativo e começar a interagir com seus fãs.</p>
-                            <div style="text-align: center; margin: 30px 0;">
-                                <a href="${appUrl}" style="background-color: #6d28d9; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Acessar o Mimo</a>
+                if (u.email && process.env.RESEND_API_KEY) {
+                    const sendRes = await resend.emails.send({
+                        from: senderFrom,
+                        to: u.email,
+                        subject: 'Sua conta de criadora no Mimo foi aprovada! 🎉',
+                        html: `
+                            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                                <h2 style="color: #6d28d9; margin-top: 0;">Sua conta foi aprovada! 🎉</h2>
+                                <p style="color: #475569; font-size: 16px;">Olá, <strong>${u.name || u.username}</strong>.</p>
+                                <p style="color: #475569; font-size: 16px;">Temos ótimas notícias! Sua conta de criadora no Mimo foi analisada e aprovada pela nossa equipe.</p>
+                                <p style="color: #475569; font-size: 16px;">Agora você já pode acessar o aplicativo e começar a interagir com seus fãs.</p>
+                                <div style="text-align: center; margin: 30px 0;">
+                                    <a href="${appUrl}" style="background-color: #6d28d9; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Acessar o Mimo</a>
+                                </div>
+                                <p style="color: #94a3b8; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 15px; margin-top: 30px;">Se você tiver alguma dúvida, entre em contato com nosso suporte.</p>
                             </div>
-                            <p style="color: #94a3b8; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 15px; margin-top: 30px;">Se você tiver alguma dúvida, entre em contato com nosso suporte.</p>
-                        </div>
-                    `
-                });
-                console.log(`✉️ Email de aprovação enviado para criadora: ${u.email}`);
+                        `
+                    });
+                    if (sendRes.error) {
+                        console.error('Erro retornado pela API do Resend ao aprovar criadora:', sendRes.error);
+                    } else {
+                        console.log(`✉️ Email de aprovação enviado para criadora: ${u.email}`);
+                    }
+                }
             } catch (emailErr) {
                 console.error('Erro ao enviar e-mail de aprovação para a criadora:', emailErr);
             }
@@ -158,22 +169,32 @@ export async function PATCH(
 
         if (update.professionalStatus === 'rejected' && oldStatus !== 'rejected') {
             try {
-                await resend.emails.send({
-                    from: 'Mimo Cadastro <onboarding@resend.dev>',
-                    to: u.email,
-                    subject: 'Sua inscrição de criadora no Mimo - Atualização 💜',
-                    html: `
-                        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                            <h2 style="color: #6d28d9; margin-top: 0;">Inscrição não aprovada</h2>
-                            <p style="color: #475569; font-size: 16px;">Olá, <strong>${u.name || u.username}</strong>.</p>
-                            <p style="color: #475569; font-size: 16px;">Agradecemos muito pelo seu interesse em fazer parte do Mimo.</p>
-                            <p style="color: #475569; font-size: 16px;">Após avaliar seu cadastro, lamentamos informar que não foi possível aprovar seu perfil profissional neste momento.</p>
-                            <p style="color: #475569; font-size: 16px;">Se você acredita que isso foi um engano ou deseja obter mais detalhes, sinta-se à vontade para responder a este e-mail ou contatar nosso suporte técnico.</p>
-                            <p style="color: #94a3b8; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 15px; margin-top: 30px;">Mimo Suporte</p>
-                        </div>
-                    `
-                });
-                console.log(`✉️ Email de rejeição enviado para criadora: ${u.email}`);
+                const settings = await AppSettings.findOne({ key: 'global' }).lean();
+                const institutionalEmail = settings?.institutionalEmails?.[0] || 'suporte@mimochat.com.br';
+                const senderFrom = process.env.RESEND_FROM_EMAIL || `"Mimo Cadastro" <${institutionalEmail}>`;
+
+                if (u.email && process.env.RESEND_API_KEY) {
+                    const sendRes = await resend.emails.send({
+                        from: senderFrom,
+                        to: u.email,
+                        subject: 'Sua inscrição de criadora no Mimo - Atualização 💜',
+                        html: `
+                            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                                <h2 style="color: #6d28d9; margin-top: 0;">Inscrição não aprovada</h2>
+                                <p style="color: #475569; font-size: 16px;">Olá, <strong>${u.name || u.username}</strong>.</p>
+                                <p style="color: #475569; font-size: 16px;">Agradecemos muito pelo seu interesse em fazer parte do Mimo.</p>
+                                <p style="color: #475569; font-size: 16px;">Após avaliar seu cadastro, lamentamos informar que não foi possível aprovar seu perfil profissional neste momento.</p>
+                                <p style="color: #475569; font-size: 16px;">Se você acredita que isso foi um engano ou deseja obter mais detalhes, sinta-se à vontade para responder a este e-mail ou contatar nosso suporte técnico.</p>
+                                <p style="color: #94a3b8; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 15px; margin-top: 30px;">Mimo Suporte</p>
+                            </div>
+                        `
+                    });
+                    if (sendRes.error) {
+                        console.error('Erro retornado pela API do Resend ao rejeitar criadora:', sendRes.error);
+                    } else {
+                        console.log(`✉️ Email de rejeição enviado para criadora: ${u.email}`);
+                    }
+                }
             } catch (emailErr) {
                 console.error('Erro ao enviar e-mail de rejeição para a criadora:', emailErr);
             }
