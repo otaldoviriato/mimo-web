@@ -193,7 +193,7 @@ export async function GET(request: NextRequest) {
                                 },
                             },
                         }],
-                        { session }
+                        { session, updatePipeline: true } as any
                     );
 
                     if (debitResult.modifiedCount === 0) {
@@ -219,7 +219,7 @@ export async function GET(request: NextRequest) {
                                 },
                             },
                         }],
-                        { session }
+                        { session, updatePipeline: true } as any
                     );
 
                     if (creditResult.modifiedCount === 0) {

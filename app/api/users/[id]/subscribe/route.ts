@@ -188,7 +188,8 @@ export async function POST(
                             ],
                         },
                     },
-                }]
+                }],
+                { updatePipeline: true } as any
             );
 
             if (debitResult.modifiedCount === 0) {
@@ -214,7 +215,8 @@ export async function POST(
                             ],
                         },
                     },
-                }]
+                }],
+                { updatePipeline: true } as any
             );
 
             if (creditResult.modifiedCount === 0) {
@@ -293,7 +295,8 @@ export async function POST(
                                 ],
                             },
                         },
-                    }]
+                    }],
+                    { updatePipeline: true } as any
                 ).catch((refundError) => {
                     console.error('[POST /api/users/[id]/subscribe] Failed to refund subscriber after subscription error:', refundError);
                 });
@@ -313,7 +316,8 @@ export async function POST(
                                 ],
                             },
                         },
-                    }]
+                    }],
+                    { updatePipeline: true } as any
                 ).catch((revertCreditError) => {
                     console.error('[POST /api/users/[id]/subscribe] Failed to revert professional credit after subscription error:', revertCreditError);
                 });

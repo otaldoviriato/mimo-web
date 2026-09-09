@@ -124,7 +124,8 @@ export async function settlePendingSubscriptionsForUser(userId: string) {
                             ],
                         },
                     },
-                }]
+                }],
+                { updatePipeline: true } as any
             );
 
             if (debitResult.modifiedCount === 0) {
@@ -145,7 +146,8 @@ export async function settlePendingSubscriptionsForUser(userId: string) {
                             ],
                         },
                     },
-                }]
+                }],
+                { updatePipeline: true } as any
             );
 
             const newExpiresAt = new Date();
