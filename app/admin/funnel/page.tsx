@@ -27,7 +27,9 @@ import {
     Layers,
     LayoutGrid,
     SlidersHorizontal,
-    Link2
+    Link2,
+    Trash2,
+    AlertTriangle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -113,6 +115,9 @@ export default function AdminFunnelPage() {
     const [loading, setLoading] = useState(true);
     const [hoveredStepIndex, setHoveredStepIndex] = useState<number | null>(null);
     const [clientSearch, setClientSearch] = useState('');
+    const [isClearModalOpen, setIsClearModalOpen] = useState(false);
+    const [clearScope, setClearScope] = useState<'all' | 'filtered'>('all');
+    const [clearing, setClearing] = useState(false);
 
     const loadFunnel = async () => {
         setLoading(true);
@@ -141,6 +146,40 @@ export default function AdminFunnelPage() {
             toast.error('Erro de conexão com o servidor');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleClearData = async () => {
+        setClearing(true);
+        try {
+            const body: Record<string, any> = {};
+            if (clearScope === 'all') {
+                body.all = true;
+            } else {
+                if (selectedCampaign && selectedCampaign !== 'all') {
+                    body.campaignId = selectedCampaign;
+                }
+                if (selectedLandingPage && selectedLandingPage !== 'all') {
+                    body.landingPage = selectedLandingPage;
+                }
+            }
+            const res = await fetch('/api/admin/campaigns/clear', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const json = await res.json();
+            if (res.ok) {
+                toast.success(json.message || 'Dados de rastreamento limpos com sucesso!');
+                setIsClearModalOpen(false);
+                await loadFunnel();
+            } else {
+                toast.error(json.error || 'Erro ao limpar dados');
+            }
+        } catch {
+            toast.error('Erro de conexão ao limpar dados');
+        } finally {
+            setClearing(false);
         }
     };
 
@@ -236,6 +275,15 @@ export default function AdminFunnelPage() {
                     >
                         <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
                         Atualizar
+                    </button>
+                    <button
+                        onClick={() => setIsClearModalOpen(true)}
+                        disabled={loading || clearing}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all shadow-xs"
+                        title="Limpar dados de rastreamento"
+                    >
+                        <Trash2 size={14} />
+                        Limpar
                     </button>
                 </div>
             </div>
@@ -1065,6 +1113,80 @@ export default function AdminFunnelPage() {
                     </table>
                 </div>
             </div>
+
+            {/* Modal de Confirmação de Limpeza de Dados */}
+            {isClearModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 text-slate-900 space-y-4">
+                        <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                                <AlertTriangle size={20} />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-black text-slate-900">Limpar Dados de Rastreamento</h3>
+                                <p className="text-xs text-slate-500 font-medium mt-1">
+                                    Esta ação remove os registros de acessos, etapas do funil e cliques de conversão.
+                                    Os usuários e campanhas existentes continuarão preservados.
+                                </p>
+                            </div>
+                        </div>
+
+                        {(selectedLandingPage !== 'all' || selectedCampaign !== 'all') && (
+                            <div className="bg-slate-50 rounded-xl border border-slate-200 p-3 space-y-2 text-xs">
+                                <span className="font-bold text-slate-700 block">Escolha o escopo da limpeza:</span>
+                                <label className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+                                    <input
+                                        type="radio"
+                                        name="clearScope"
+                                        checked={clearScope === 'filtered'}
+                                        onChange={() => setClearScope('filtered')}
+                                        className="text-purple-600 focus:ring-purple-500"
+                                    />
+                                    <span>
+                                        Apenas dados do filtro ativo
+                                        {selectedLandingPage !== 'all' && ` (${selectedLandingPage})`}
+                                        {selectedCampaign !== 'all' && ` (Campanha selecionada)`}
+                                    </span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+                                    <input
+                                        type="radio"
+                                        name="clearScope"
+                                        checked={clearScope === 'all'}
+                                        onChange={() => setClearScope('all')}
+                                        className="text-purple-600 focus:ring-purple-500"
+                                    />
+                                    <span>Todos os dados de rastreamento (redefinir tudo do zero)</span>
+                                </label>
+                            </div>
+                        )}
+
+                        <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-800 font-medium">
+                            Atenção: Os dados de métricas removidos não poderão ser recuperados após a confirmação.
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setIsClearModalOpen(false)}
+                                disabled={clearing}
+                                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => void handleClearData()}
+                                disabled={clearing}
+                                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition-colors flex items-center gap-1.5 shadow-xs"
+                            >
+                                {clearing ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                                {clearing ? 'Limpando...' : 'Confirmar Limpeza'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
