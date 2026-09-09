@@ -13,6 +13,7 @@ import { usePayment } from '@/context/PaymentContext';
 import { Drawer } from 'vaul';
 import { AudioRecorder, type AudioRecorderStatus } from '@/components/AudioRecorder';
 import { AudioPlayer } from '@/components/AudioPlayer';
+import { MessageStatusTicks } from '@/components/MessageStatusTicks';
 import { MediaComposerSheet } from '@/components/MediaComposerSheet';
 import { PendingReceiptBalloon } from '@/components/PendingReceiptBalloon';
 import { LargeMessageConfirmModal } from '@/components/LargeMessageConfirmModal';
@@ -1423,8 +1424,17 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 if (data.tempId) {
                     const index = prev.findIndex(m => m.tempId === data.tempId || m._id === data.tempId);
                     if (index !== -1) {
+                        const existing = prev[index];
                         const newMessages = [...prev];
-                        newMessages[index] = { ...processedMsg, status: 'sent' as const };
+                        // Preservar monotonicidade: estado mais avançado sempre prevalece
+                        const isRead = !!(existing.isRead || processedMsg.isRead);
+                        const isDelivered = !!(isRead || existing.isDelivered || processedMsg.isDelivered);
+                        newMessages[index] = {
+                            ...processedMsg,
+                            isRead,
+                            isDelivered,
+                            status: 'sent' as const,
+                        };
                         if (processedMsg._id) {
                             setNewIncomingMessageIds((prevIds) => {
                                 const nextIds = new Set(prevIds);
@@ -1439,8 +1449,16 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 // Se a mensagem já existe (evitar duplicatas), atualiza com processedMsg
                 const existingIndex = prev.findIndex(m => m._id === processedMsg._id);
                 if (existingIndex !== -1) {
+                    const existing = prev[existingIndex];
                     const newMessages = [...prev];
-                    newMessages[existingIndex] = { ...processedMsg, status: 'sent' as const };
+                    const isRead = !!(existing.isRead || processedMsg.isRead);
+                    const isDelivered = !!(isRead || existing.isDelivered || processedMsg.isDelivered);
+                    newMessages[existingIndex] = {
+                        ...processedMsg,
+                        isRead,
+                        isDelivered,
+                        status: 'sent' as const,
+                    };
                     return newMessages;
                 }
 
@@ -1549,7 +1567,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             if (data.roomId === roomId) {
                 setMessages((prev) => prev.map((msg) => {
                     if (msg.senderId === user?.id && data.readBy !== user?.id) {
-                        return { ...msg, isRead: true, isDelivered: true };
+                        return { ...msg, isRead: true, isDelivered: true, status: 'sent' as const };
                     }
                     return msg;
                 }));
@@ -1560,7 +1578,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             if (data.roomId === roomId && data.receiverId !== user?.id) {
                 setMessages((prev) => prev.map((msg) => {
                     if (msg.senderId === user?.id && !msg.isDelivered) {
-                        return { ...msg, isDelivered: true };
+                        return { ...msg, isDelivered: true, status: (msg.status === 'sending' ? ('sent' as const) : msg.status) };
                     }
                     return msg;
                 }));
@@ -2365,7 +2383,18 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 // Aguarda o ACK do servidor garantindo que a mensagem foi processada e transmitida
                 // antes de despachar a próxima mensagem da fila (elimina inversão no wire)
                 if (item.tempId) {
-                    await socketService.waitForAck(item.tempId, 2500);
+                    const ack = await socketService.waitForAck(item.tempId, 2500);
+                    if (ack.success) {
+                        setMessages(prev => prev.map(m => {
+                            if (m.tempId === item.tempId || m._id === item.tempId) {
+                                return {
+                                    ...m,
+                                    status: 'sent' as const,
+                                };
+                            }
+                            return m;
+                        }));
+                    }
                 }
 
                 // Pequeno espaçamento adicional de 20ms entre envios seriais
@@ -3278,23 +3307,12 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                     })()}
                                                 </span>
                                                 {isMine && (
-                                                    <span className={`text-[11px] ${item.isRead ? 'text-blue-300' : (item.status === 'sending' ? 'text-purple-300 animate-pulse' : 'text-purple-300')}`}>
-                                                        {item.status === 'sending' ? (
-                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                                                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                                                            </svg>
-                                                        ) : item.isRead ? (
-                                                            <div className="inline-flex items-center">
-                                                                <span className="relative">✓</span>
-                                                                <span className="relative -ml-1.5">✓</span>
-                                                            </div>
-                                                        ) : item.isDelivered ? (
-                                                            <div className="inline-flex items-center">
-                                                                <span className="relative">✓</span>
-                                                                <span className="relative -ml-1.5">✓</span>
-                                                            </div>
-                                                        ) : '✓'}
-                                                    </span>
+                                                    <MessageStatusTicks
+                                                        status={item.status}
+                                                        isRead={item.isRead}
+                                                        isDelivered={item.isDelivered}
+                                                        onRetry={() => handleRetryMessage(item)}
+                                                    />
                                                 )}
                                             </div>
                                         </div>
@@ -3651,39 +3669,12 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                         })()}
                                                     </span>
                                                     {isMine && (
-                                                        <span className={`text-[11px] ${item.isRead ? 'text-blue-300' : (item.status === 'sending' ? 'text-purple-300 animate-pulse' : item.status === 'error' ? 'text-red-300' : 'text-purple-300/80')}`}>
-                                                            {item.status === 'sending' ? (
-                                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                                                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                                                                </svg>
-                                                            ) : item.status === 'error' ? (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        handleRetryMessage(item);
-                                                                    }}
-                                                                    className="inline-flex items-center gap-0.5 text-red-300 hover:text-white cursor-pointer"
-                                                                    title="Falha ao enviar. Clique para tentar novamente."
-                                                                >
-                                                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                                                        <circle cx="12" cy="12" r="10" />
-                                                                        <line x1="12" y1="8" x2="12" y2="12" />
-                                                                        <line x1="12" y1="16" x2="12.01" y2="16" />
-                                                                    </svg>
-                                                                </button>
-                                                            ) : item.isRead ? (
-                                                                <div className="inline-flex items-center">
-                                                                    <span className="relative">✓</span>
-                                                                    <span className="relative -ml-1.5">✓</span>
-                                                                </div>
-                                                            ) : item.isDelivered ? (
-                                                                <div className="inline-flex items-center">
-                                                                    <span className="relative">✓</span>
-                                                                    <span className="relative -ml-1.5">✓</span>
-                                                                </div>
-                                                            ) : '✓'}
-                                                        </span>
+                                                        <MessageStatusTicks
+                                                            status={item.status}
+                                                            isRead={item.isRead}
+                                                            isDelivered={item.isDelivered}
+                                                            onRetry={() => handleRetryMessage(item)}
+                                                        />
                                                     )}
                                                     </div>
                                                 </div>
@@ -3704,39 +3695,12 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                     })()}
                                                 </span>
                                                 {isMine && (
-                                                    <span className={`text-[11px] ${item.isRead ? 'text-blue-300' : (item.status === 'sending' ? 'text-purple-300 animate-pulse' : item.status === 'error' ? 'text-red-300' : 'text-purple-300/80')}`}>
-                                                        {item.status === 'sending' ? (
-                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                                                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                                                            </svg>
-                                                        ) : item.status === 'error' ? (
-                                                            <button
-                                                                type="button"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleRetryMessage(item);
-                                                                }}
-                                                                className="inline-flex items-center gap-0.5 text-red-300 hover:text-white cursor-pointer"
-                                                                title="Falha ao enviar. Clique para tentar novamente."
-                                                            >
-                                                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                                                    <circle cx="12" cy="12" r="10" />
-                                                                    <line x1="12" y1="8" x2="12" y2="12" />
-                                                                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                                                                </svg>
-                                                            </button>
-                                                        ) : item.isRead ? (
-                                                            <div className="inline-flex items-center">
-                                                                <span className="relative">✓</span>
-                                                                <span className="relative -ml-1.5">✓</span>
-                                                            </div>
-                                                        ) : item.isDelivered ? (
-                                                            <div className="inline-flex items-center">
-                                                                <span className="relative">✓</span>
-                                                                <span className="relative -ml-1.5">✓</span>
-                                                            </div>
-                                                        ) : '✓'}
-                                                    </span>
+                                                    <MessageStatusTicks
+                                                        status={item.status}
+                                                        isRead={item.isRead}
+                                                        isDelivered={item.isDelivered}
+                                                        onRetry={() => handleRetryMessage(item)}
+                                                    />
                                                 )}
                                             </div>
                                             <div className="clear-both" />

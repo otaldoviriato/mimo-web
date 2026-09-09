@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { MessageStatusTicks } from '@/components/MessageStatusTicks';
 
 interface AudioPlayerProps {
     src: string;
@@ -193,25 +194,13 @@ export function AudioPlayer({ src, duration = 0, isMine, timestamp, isRead, isDe
                         </span>
                     )}
 
-                    {/* Checks */}
+                    {/* Checks com monotonicidade de estados */}
                     {isMine && (
-                        <span className={`text-[11px] leading-none ${isRead ? 'text-blue-300' : (status === 'sending' ? 'text-purple-300 animate-pulse' : 'text-purple-300/80')}`}>
-                            {status === 'sending' ? (
-                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="inline mb-[-1px]">
-                                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                                </svg>
-                            ) : isRead ? (
-                                <span className="inline-flex items-center">
-                                    <span>✓</span>
-                                    <span className="-ml-1">✓</span>
-                                </span>
-                            ) : isDelivered ? (
-                                <span className="inline-flex items-center">
-                                    <span>✓</span>
-                                    <span className="-ml-1">✓</span>
-                                </span>
-                            ) : '✓'}
-                        </span>
+                        <MessageStatusTicks
+                            status={status as any}
+                            isRead={isRead}
+                            isDelivered={isDelivered}
+                        />
                     )}
 
                     {/* Ícone de microfone */}
