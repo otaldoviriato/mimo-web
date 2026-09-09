@@ -138,31 +138,55 @@ export async function GET(
 
             let sanitizedLastMessage = room.lastMessage;
 
-            // Se o usuário logado é o cliente e a última mensagem recebida está pendente de saldo:
-            const isClientLatestPending = Boolean(
-                (pendingForClientTime && (!room.lastMessageTime || new Date(room.lastMessageTime).getTime() <= pendingForClientTime.getTime() + 10000)) ||
-                (room.lastMessageBillingStatus === 'pending' && room.lastMessageSenderId !== userId)
-            );
+            if (currentUser?.isProfessional) {
+                // Para usuária do tipo profissional: DEVE aparecer o conteúdo da mensagem normal
+                // NUNCA exibir "Conteúdo bloqueado" nem "Aguardando saldo do cliente"
+                const isMaskedOrPlaceholder =
+                    !sanitizedLastMessage ||
+                    sanitizedLastMessage === PENDING_MESSAGE_LABEL ||
+                    sanitizedLastMessage === 'Nova mensagem' ||
+                    sanitizedLastMessage === 'Nova Mensagem' ||
+                    sanitizedLastMessage.includes('Aguardando saldo') ||
+                    sanitizedLastMessage.includes('Recarregue') ||
+                    sanitizedLastMessage.includes('Conteúdo bloqueado');
 
-            // Se o usuário logado é o profissional e a última mensagem enviada está aguardando saldo do cliente:
-            const isProLatestPending = Boolean(
-                (pendingForProTime && (!room.lastMessageTime || new Date(room.lastMessageTime).getTime() <= pendingForProTime.getTime() + 10000)) ||
-                (room.lastMessageBillingStatus === 'pending' && room.lastMessageSenderId === userId)
-            );
+                if (isMaskedOrPlaceholder) {
+                    const lastRealMsg = await Message.findOne({
+                        roomId: room.roomId || derivedRoomId,
+                        deletedFor: { $nin: [userId] }
+                    })
+                    .sort({ timestamp: -1 })
+                    .select('content isAudio isVideo isLockedImage billingStatus')
+                    .lean();
 
-            if (isClientLatestPending) {
-                const isAudio = room.lastMessage?.includes('🎙️') || room.lastMessage?.toLowerCase().includes('áudio') || room.lastMessage?.toLowerCase().includes('audio');
-                sanitizedLastMessage = isAudio ? '🎙️ Nova mensagem de áudio' : PENDING_MESSAGE_LABEL;
-            } else if (
-                isProLatestPending ||
-                (currentUser?.isProfessional && (
+                    if (lastRealMsg) {
+                        if (lastRealMsg.isAudio) {
+                            sanitizedLastMessage = '🎙️ Mensagem de áudio';
+                        } else if (lastRealMsg.isVideo) {
+                            sanitizedLastMessage = '📹 Vídeo';
+                        } else if (lastRealMsg.isLockedImage) {
+                            sanitizedLastMessage = '🔒 Foto exclusiva';
+                        } else if (lastRealMsg.content && !lastRealMsg.content.includes('Recarregue para visualizar')) {
+                            sanitizedLastMessage = lastRealMsg.content.trim().substring(0, 100);
+                        }
+                    }
+                }
+            } else {
+                // Para usuário do tipo cliente:
+                // Se a última mensagem recebida está pendente de saldo/recarga, exibe "Nova Mensagem" sem revelar o conteúdo
+                const isClientLatestPending = Boolean(
+                    (pendingForClientTime && (!room.lastMessageTime || new Date(room.lastMessageTime).getTime() <= pendingForClientTime.getTime() + 10000)) ||
+                    (room.lastMessageBillingStatus === 'pending' && room.lastMessageSenderId !== userId) ||
                     room.lastMessage === PENDING_MESSAGE_LABEL ||
-                    room.lastMessage?.includes('Recarregue para visualizar') ||
                     room.lastMessage?.includes('Recarregue') ||
+                    room.lastMessage?.includes('Conteúdo bloqueado') ||
                     room.lastMessage?.includes('Aguardando saldo')
-                ))
-            ) {
-                sanitizedLastMessage = 'Aguardando saldo do cliente';
+                );
+
+                if (isClientLatestPending) {
+                    const isAudio = room.lastMessage?.includes('🎙️') || room.lastMessage?.toLowerCase().includes('áudio') || room.lastMessage?.toLowerCase().includes('audio');
+                    sanitizedLastMessage = isAudio ? '🎙️ Nova mensagem de áudio' : 'Nova Mensagem';
+                }
             }
 
             return {

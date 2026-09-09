@@ -17,6 +17,8 @@ interface Room {
     participants: string[];
     lastMessage?: string;
     lastMessageTime?: string;
+    lastMessageBillingStatus?: 'free' | 'pending' | 'paid' | string;
+    lastMessageSenderId?: string;
     updatedAt: string;
     isTyping?: boolean;
     unreadCount?: Record<string, number>;
@@ -889,15 +891,33 @@ export default function ChatsPage() {
                                                                 : 'text-purple-500 italic font-medium'
                                                     }`}>
                                                         {(() => {
-                                                            const isPendingPrompt = room.lastMessage?.includes('Recarregue para visualizar') || room.lastMessage?.includes('Recarregue') || room.lastMessage?.includes('Aguardando saldo') || room.lastMessage?.includes('Conteúdo bloqueado');
+                                                            const isProfessionalUser = Boolean(myProfile?.isProfessional);
+
+                                                            // 1. Para usuária do tipo profissional: SEMPRE exibe o conteúdo da mensagem normal
+                                                            if (isProfessionalUser) {
+                                                                return room.lastMessage || 'Toque para iniciar a conversa!';
+                                                            }
+
+                                                            // 2. Para usuário masculino/cliente:
+                                                            // Exibe "Nova Mensagem" sem revelar o conteúdo quando pendente
+                                                            const isPendingPrompt =
+                                                                room.lastMessageBillingStatus === 'pending' ||
+                                                                room.lastMessage === 'Nova mensagem' ||
+                                                                room.lastMessage === 'Nova Mensagem' ||
+                                                                room.lastMessage?.includes('Recarregue') ||
+                                                                room.lastMessage?.includes('Aguardando saldo') ||
+                                                                room.lastMessage?.includes('Conteúdo bloqueado');
+
                                                             if (isPendingPrompt) {
+                                                                const isAudio = room.lastMessage?.includes('🎙️') || room.lastMessage?.toLowerCase().includes('áudio') || room.lastMessage?.toLowerCase().includes('audio');
                                                                 return (
-                                                                    <span className="text-slate-500 inline-flex items-center gap-1 font-normal">
-                                                                        <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                                                        Conteúdo bloqueado
+                                                                    <span className="text-purple-600 inline-flex items-center gap-1 font-semibold">
+                                                                        <Lock className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                                                                        {isAudio ? 'Nova mensagem de áudio' : 'Nova Mensagem'}
                                                                     </span>
                                                                 );
                                                             }
+
                                                             return room.lastMessage || 'Toque para iniciar a conversa!';
                                                         })()}
                                                     </span>
