@@ -3404,6 +3404,15 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                 </div>
                                             ) : isAudio ? (
                                                 <div>
+                                                     {isMine && userData?.isProfessional && item.billingStatus === 'pending' && (
+                                                         <div className="flex items-center gap-1.5 text-[10px] font-medium text-purple-200/90 pb-1 mb-1.5 border-b border-purple-400/25 select-none">
+                                                             <span className="relative flex h-2 w-2 shrink-0">
+                                                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
+                                                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500" />
+                                                             </span>
+                                                             <span>Aguardando saldo do cliente</span>
+                                                         </div>
+                                                     )}
                                                     <AudioPlayer
                                                         src={item.audioUrl!}
                                                         duration={item.audioDuration}
@@ -3682,6 +3691,15 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                         </>
                                     ) : (
                                         <div className="relative">
+                                            {isMine && userData?.isProfessional && item.billingStatus === 'pending' && (
+                                                <div className="flex items-center gap-1.5 text-[10px] font-medium text-purple-200/90 pb-1 mb-1 border-b border-purple-400/25 select-none">
+                                                    <span className="relative flex h-2 w-2 shrink-0">
+                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
+                                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500" />
+                                                    </span>
+                                                    <span>Aguardando saldo do cliente</span>
+                                                </div>
+                                            )}
                                             <CollapsibleTextMessage content={item.content} isMine={isMine} />
                                             <div className="inline-flex items-center gap-1.5 float-right mt-2 ml-2 mb-[-2px]">
                                                 <span className={`text-[10px] font-medium ${isMine ? 'text-purple-200/70' : 'text-gray-400'}`}>
