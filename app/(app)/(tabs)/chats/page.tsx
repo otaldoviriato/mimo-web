@@ -795,32 +795,13 @@ export default function ChatsPage() {
                     <ul>
                         {[...rooms]
                             .sort((a, b) => {
-                                if (myProfile?.isProfessional) {
-                                    const myId = user?.id;
-                                    const unreadA = myId && a.unreadCount ? (a.unreadCount[myId] || 0) : 0;
-                                    const lastFromOtherA = Boolean(a.lastMessageSenderId && myId && a.lastMessageSenderId !== myId);
-                                    const isUnansweredA = unreadA > 0 || lastFromOtherA;
-                                    const isSubA = Boolean(a.isSubscriber || a.otherUser?.isSubscriber);
-
-                                    const unreadB = myId && b.unreadCount ? (b.unreadCount[myId] || 0) : 0;
-                                    const lastFromOtherB = Boolean(b.lastMessageSenderId && myId && b.lastMessageSenderId !== myId);
-                                    const isUnansweredB = unreadB > 0 || lastFromOtherB;
-                                    const isSubB = Boolean(b.isSubscriber || b.otherUser?.isSubscriber);
-
-                                    const getPriority = (isSub: boolean, isUnanswered: boolean) => {
-                                        if (isSub && isUnanswered) return 1;
-                                        if (isUnanswered) return 2;
-                                        return 3;
-                                    };
-
-                                    const prioA = getPriority(isSubA, isUnansweredA);
-                                    const prioB = getPriority(isSubB, isUnansweredB);
-                                    if (prioA !== prioB) return prioA - prioB;
-                                }
-
-                                const timeA = new Date(a.lastMessageTime ?? a.updatedAt).getTime();
-                                const timeB = new Date(b.lastMessageTime ?? b.updatedAt).getTime();
-                                return timeB - timeA;
+                                const getTime = (r: Room) => {
+                                    const raw = r.lastMessageTime ?? r.updatedAt;
+                                    if (!raw) return 0;
+                                    const t = new Date(raw).getTime();
+                                    return isNaN(t) ? 0 : t;
+                                };
+                                return getTime(b) - getTime(a);
                             })
                             .map((room: Room) => {
                             const otherUserId = room.participants.find((p) => p !== user?.id);

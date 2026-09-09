@@ -124,6 +124,11 @@ function unlockMessageIfEligible(
     roomId: string,
     declinedMessageIds?: Set<string>
 ): Message {
+    // Se a mensagem já foi destrancada, NUNCA re-bloquear!
+    if (msg.isContentLocked === false && msg.billingStatus === 'paid') {
+        return msg;
+    }
+
     if (
         msg.billingStatus === 'pending' &&
         msg.receiverId === currentUserId &&
@@ -150,10 +155,46 @@ function unlockMessageIfEligible(
                 audioUrl: decryptedAudioUrl || msg.audioUrl,
                 billingStatus: 'paid',
                 isContentLocked: false,
+                awaitingBalance: false,
             };
         }
     }
     return msg;
+}
+
+function mergeMessagePreservingUnlocked(current: Message, incoming: Message): Message {
+    const isCurrentlyUnlocked = current.isContentLocked === false && current.billingStatus === 'paid';
+    const isIncomingPending = incoming.isContentLocked === true || incoming.billingStatus === 'pending';
+
+    let merged = { ...incoming };
+
+    // Regra de ouro da monotonicidade: se a mensagem já foi destrancada na tela localmente,
+    // NENHUM snapshot de rede desatualizado ou em trânsito pode re-bloqueá-la ou apagar o conteúdo descriptografado.
+    if (isCurrentlyUnlocked && isIncomingPending) {
+        merged.isContentLocked = false;
+        merged.billingStatus = 'paid';
+        merged.awaitingBalance = false;
+        if (current.content) {
+            merged.content = current.content;
+        }
+        if (current.audioUrl) {
+            merged.audioUrl = current.audioUrl;
+        }
+    } else if (incoming.isContentLocked && current.isContentLocked === false && current.content) {
+        merged.isContentLocked = false;
+        merged.content = current.content;
+        if (current.audioUrl) merged.audioUrl = current.audioUrl;
+        merged.awaitingBalance = false;
+    }
+
+    // Preservar monotonicidade de leitura, entrega e envio otimista
+    merged.isRead = !!(current.isRead || incoming.isRead);
+    merged.isDelivered = !!(merged.isRead || current.isDelivered || incoming.isDelivered);
+    if (current.status === 'sending' && incoming.status !== 'error') {
+        merged.status = 'sent';
+    }
+
+    return merged;
 }
 
 function sortMessagesStable(msgs: Message[]): Message[] {
@@ -1150,8 +1191,8 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     const normalizedHttp = rawList.map((newMsg: any) => {
                         const unlocked = unlockMessageIfEligible(newMsg, user.id, balance, largeMessageThreshold, currentRoomId, declinedLongMessageIdsRef.current);
                         const prevMsg = prev.find((m: any) => m._id === newMsg._id);
-                        if (prevMsg && unlocked.isContentLocked && prevMsg.isContentLocked && prevMsg.content) {
-                            return { ...unlocked, content: prevMsg.content };
+                        if (prevMsg) {
+                            return mergeMessagePreservingUnlocked(prevMsg, unlocked);
                         }
                         return unlocked;
                     });
@@ -1194,7 +1235,12 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             });
             return changed ? updated : prev;
         });
-    }, [balance, largeMessageThreshold, user?.id, roomId]);
+
+        // Se for o cliente e o saldo for positivo, notifica o servidor para liquidar no MongoDB
+        if (!userData?.isProfessional && balance > 0 && socket && roomId) {
+            socket.emit('confirm_view_messages', { roomId });
+        }
+    }, [balance, largeMessageThreshold, user?.id, roomId, userData?.isProfessional, socket]);
 
     // Salva apenas as últimas 50 mensagens confirmadas no cache local para não sobrecarregar o armazenamento
     useEffect(() => {
@@ -1298,8 +1344,8 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 const unlockedMessages = data.messages.map((newMsg) => {
                     const unlocked = unlockMessageIfEligible(newMsg, user.id, balance, currentThreshold, roomId, declinedLongMessageIdsRef.current);
                     const prevMsg = prev.find(m => m._id === newMsg._id);
-                    if (prevMsg && unlocked.isContentLocked && prevMsg.isContentLocked && prevMsg.content) {
-                        return { ...unlocked, content: prevMsg.content };
+                    if (prevMsg) {
+                        return mergeMessagePreservingUnlocked(prevMsg, unlocked);
                     }
                     return unlocked;
                 });
@@ -1450,21 +1496,12 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     }
                 }
 
-                // Se a mensagem já existe (evitar duplicatas), atualiza com processedMsg
+                // Se a mensagem já existe (evitar duplicatas), atualiza preservando estado destrancado
                 const existingIndex = prev.findIndex(m => m._id === processedMsg._id);
                 if (existingIndex !== -1) {
                     const existing = prev[existingIndex];
                     const newMessages = [...prev];
-                    const isRead = !!(existing.isRead || processedMsg.isRead);
-                    const isDelivered = !!(isRead || existing.isDelivered || processedMsg.isDelivered);
-                    const awaitingBalance = !!(existing.awaitingBalance || processedMsg.awaitingBalance);
-                    newMessages[existingIndex] = {
-                        ...processedMsg,
-                        isRead,
-                        isDelivered,
-                        awaitingBalance,
-                        status: 'sent' as const,
-                    };
+                    newMessages[existingIndex] = mergeMessagePreservingUnlocked(existing, processedMsg);
                     return newMessages;
                 }
 
@@ -1497,6 +1534,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                             lastMessage: safeText,
                             lastMessageTime: data.message.timestamp,
                             updatedAt: data.message.timestamp,
+                            lastMessageSenderId: data.message.senderId,
                             unreadCount: {
                                 ...r.unreadCount,
                                 [user?.id ?? '']: data.message.receiverId === user?.id ? 0 : (r.unreadCount?.[user?.id ?? ''] ?? 0)
@@ -1594,6 +1632,10 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         socket.on('messages_awaiting_balance', (data: { roomId: string; clientId: string; messageIds?: string[] }) => {
             if (data.roomId === roomId) {
                 setMessages((prev) => prev.map((msg) => {
+                    // Se a mensagem já está destrancada na tela, não marca como aguardando saldo
+                    if (msg.billingStatus === 'paid' || msg.isContentLocked === false) {
+                        return msg;
+                    }
                     if (msg.billingStatus === 'pending' && (!data.messageIds || data.messageIds.includes(msg._id))) {
                         return { ...msg, awaitingBalance: true };
                     }
@@ -1628,7 +1670,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         });
                     }
                 }
-                return prev.map(m => m._id === data.message._id ? data.message : m);
+                return prev.map(m => m._id === data.message._id ? (oldMsg ? mergeMessagePreservingUnlocked(oldMsg, data.message) : data.message) : m);
             });
         });
 
@@ -2529,6 +2571,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         lastMessage: text.substring(0, 100),
                         lastMessageTime: timestampIso,
                         updatedAt: timestampIso,
+                        lastMessageSenderId: user?.id,
                         unreadCount: { ...r.unreadCount, [user?.id ?? '']: 0 }
                     };
                 }

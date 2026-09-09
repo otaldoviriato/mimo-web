@@ -132,6 +132,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                                 lastMessage: data.lastMessage,
                                 lastMessageTime: data.lastMessageTime,
                                 updatedAt: data.lastMessageTime,
+                                lastMessageSenderId: data.senderId,
                                 isInactive: data.isInactive,
                                 lastExchangeTime: data.lastExchangeTime,
                                 unreadCount: {
