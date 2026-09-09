@@ -8,6 +8,7 @@ export const ACQUISITION_EVENT_TYPES = [
     'first_paid_message',
     'explore_profile_impression',
     'explore_profile_viewed',
+    'message_attempt',
     'professional_consumed',
     'gmv_recorded',
 ] as const;
@@ -15,6 +16,7 @@ export const ACQUISITION_EVENT_TYPES = [
 export const ACQUISITION_ORIGINS = [
     'profile_share',
     'explore',
+    'chat',
     'first_paid_message',
     'direct',
     'unknown',

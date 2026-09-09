@@ -80,9 +80,8 @@ type ClientRow = {
                 photoUrl?: string;
             } | null;
         };
-        stage5_messageSent: { reached: boolean; at?: string };
-        stage6_messageReceived: { reached: boolean; at?: string };
-        stage7_firstRecharge: { reached: boolean; at?: string; amountCents?: number };
+        stage5_messageAttempt: { reached: boolean; at?: string };
+        stage6_firstRecharge: { reached: boolean; at?: string; amountCents?: number };
     };
     createdAt: string;
 };
@@ -239,9 +238,8 @@ export default function AdminFunnelPage() {
         MousePointer,    // 2. CTA
         UserPlus,        // 3. Signup
         Compass,         // 4. Explorar perfil
-        Send,            // 5. Enviou mensagem
-        MessageSquare,   // 6. Recebeu mensagem
-        CreditCard       // 7. Primeira recarga
+        Send,            // 5. Tentou enviar mensagem
+        CreditCard       // 6. Primeira recarga
     ];
 
     return (
@@ -383,7 +381,7 @@ export default function AdminFunnelPage() {
                     </div>
                 </div>
 
-                {/* Filtro Rápido por Etapa Mínima (1 a 7) */}
+                {/* Filtro Rápido por Etapa Mínima (1 a 6) */}
                 <div className="flex flex-wrap items-center gap-1.5 pt-2.5 border-t border-slate-100">
                     <span className="text-xs font-bold text-slate-600 flex items-center gap-1 mr-1">
                         <SlidersHorizontal size={13} className="text-purple-600" />
@@ -394,9 +392,8 @@ export default function AdminFunnelPage() {
                         { stage: 2, label: '2. Clicou CTA' },
                         { stage: 3, label: '3. Cadastrou' },
                         { stage: 4, label: '4. Visitou Perfil' },
-                        { stage: 5, label: '5. Enviou Mensagem' },
-                        { stage: 6, label: '6. Recebeu Mensagem' },
-                        { stage: 7, label: '7. Primeira Recarga' },
+                        { stage: 5, label: '5. Tentou Mensagem' },
+                        { stage: 6, label: '6. Primeira Recarga' },
                     ].map(item => {
                         const active = minStage === item.stage;
                         return (
@@ -890,7 +887,7 @@ export default function AdminFunnelPage() {
                                 <th className="p-3">Campanha</th>
                                 <th className="p-3">Data de Entrada</th>
                                 <th className="p-3 text-center">Progresso</th>
-                                <th className="p-3 pr-4">Etapas Concluídas (1 a 7)</th>
+                                <th className="p-3 pr-4">Etapas Concluídas (1 a 6)</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -986,7 +983,7 @@ export default function AdminFunnelPage() {
                                                 <div className="flex flex-col items-center gap-1 w-28 mx-auto">
                                                     <div className="flex items-center justify-between w-full text-[11px]">
                                                         <span className="font-extrabold text-slate-900">{client.progressPercentage}%</span>
-                                                        <span className="text-[10px] text-slate-400 font-medium">{client.stagesCompleted}/7</span>
+                                                        <span className="text-[10px] text-slate-400 font-medium">{client.stagesCompleted}/6</span>
                                                     </div>
                                                     <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
                                                         <div
@@ -1003,7 +1000,7 @@ export default function AdminFunnelPage() {
                                                 </div>
                                             </td>
 
-                                            {/* Checklist das 7 Etapas */}
+                                            {/* Checklist das 6 Etapas */}
                                             <td className="p-3 pr-4">
                                                 <div className="flex items-center gap-1.5">
                                                     {/* 1. Landing */}
@@ -1061,11 +1058,11 @@ export default function AdminFunnelPage() {
                                                         )}
                                                     </div>
 
-                                                    {/* 5. Enviou Mensagem */}
+                                                    {/* 5. Tentou Enviar Mensagem */}
                                                     <div
-                                                        title="5. Enviou uma mensagem"
+                                                        title="5. Tentou enviar mensagem"
                                                         className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold ${
-                                                            stages.stage5_messageSent.reached
+                                                            stages.stage5_messageAttempt.reached
                                                                 ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
                                                                 : 'bg-slate-100 text-slate-400'
                                                         }`}
@@ -1073,33 +1070,21 @@ export default function AdminFunnelPage() {
                                                         5
                                                     </div>
 
-                                                    {/* 6. Recebeu Mensagem */}
+                                                    {/* 6. Primeira Recarga */}
                                                     <div
-                                                        title="6. Recebeu uma mensagem"
-                                                        className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold ${
-                                                            stages.stage6_messageReceived.reached
-                                                                ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
-                                                                : 'bg-slate-100 text-slate-400'
-                                                        }`}
-                                                    >
-                                                        6
-                                                    </div>
-
-                                                    {/* 7. Primeira Recarga */}
-                                                    <div
-                                                        title={stages.stage7_firstRecharge.reached
-                                                            ? `7. Realizou primeira recarga: ${((stages.stage7_firstRecharge.amountCents || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
-                                                            : '7. Primeira recarga (pendente)'}
+                                                        title={stages.stage6_firstRecharge.reached
+                                                            ? `6. Realizou primeira recarga: ${((stages.stage6_firstRecharge.amountCents || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                                                            : '6. Primeira recarga (pendente)'}
                                                         className={`px-2 h-6 rounded-lg flex items-center gap-1 text-[10px] font-bold ${
-                                                            stages.stage7_firstRecharge.reached
+                                                            stages.stage6_firstRecharge.reached
                                                                 ? 'bg-amber-100 text-amber-800 border border-amber-300'
                                                                 : 'bg-slate-100 text-slate-400'
                                                         }`}
                                                     >
-                                                        <span>7</span>
-                                                        {stages.stage7_firstRecharge.reached && stages.stage7_firstRecharge.amountCents ? (
+                                                        <span>6</span>
+                                                        {stages.stage6_firstRecharge.reached && stages.stage6_firstRecharge.amountCents ? (
                                                             <span>
-                                                                {((stages.stage7_firstRecharge.amountCents) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                                {((stages.stage6_firstRecharge.amountCents) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                                             </span>
                                                         ) : null}
                                                     </div>

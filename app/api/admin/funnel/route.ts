@@ -8,6 +8,7 @@ import { CampaignVisit } from '@/models/CampaignVisit';
 import { User } from '@/models/User';
 import { Message } from '@/models/Message';
 import { Transaction } from '@/models/Transaction';
+import { AcquisitionEvent } from '@/models/AcquisitionEvent';
 
 export const dynamic = 'force-dynamic';
 
@@ -125,16 +126,19 @@ export async function GET(request: NextRequest) {
             return true;
         });
 
-        // 4. Batch query de resiliência: mensagens enviadas e recebidas
+        // 4. Batch query de resiliência: tentativas de mensagem e recargas
         const validClientUserIds = Array.from(new Set(clientVisits.map(v => v.userId).filter(Boolean))) as string[];
+        let attemptedMessageUsers = new Set<string>();
         let sentMessageUsers = new Set<string>();
-        let receivedMessageUsers = new Set<string>();
         let rechargesByUser = new Map<string, number>();
 
         if (validClientUserIds.length > 0) {
-            const [sent, received, recharges] = await Promise.all([
+            const [attempts, sent, recharges] = await Promise.all([
+                AcquisitionEvent.distinct('clientId', {
+                    eventType: 'message_attempt',
+                    clientId: { $in: validClientUserIds }
+                }),
                 Message.distinct('senderId', { senderId: { $in: validClientUserIds } }),
-                Message.distinct('receiverId', { receiverId: { $in: validClientUserIds } }),
                 Transaction.find({
                     userId: { $in: validClientUserIds },
                     source: 'recharge',
@@ -142,8 +146,8 @@ export async function GET(request: NextRequest) {
                 }).select('userId amount').lean()
             ]);
 
+            attemptedMessageUsers = new Set(attempts);
             sentMessageUsers = new Set(sent);
-            receivedMessageUsers = new Set(received);
 
             for (const r of recharges) {
                 const current = rechargesByUser.get(r.userId) || 0;
@@ -160,14 +164,16 @@ export async function GET(request: NextRequest) {
             const hasStage2 = Boolean(visit.ctaClickedAt);
             const hasStage3 = Boolean(visit.signupCompletedAt || visit.userId);
             const hasStage4 = Boolean(visit.firstProfileViewedAt || visit.firstProfileViewedProfessionalId);
-            const hasStage5 = Boolean(visit.firstMessageSentAt || (visit.userId && sentMessageUsers.has(visit.userId)));
-            const hasStage6 = Boolean(visit.firstMessageReceivedAt || (visit.userId && receivedMessageUsers.has(visit.userId)));
+            const hasStage5 = Boolean(
+                visit.firstMessageAttemptAt ||
+                (visit.userId && (attemptedMessageUsers.has(visit.userId) || sentMessageUsers.has(visit.userId)))
+            );
             const rechargeAmount = visit.firstRechargeAmountCents ?? (visit.userId ? rechargesByUser.get(visit.userId) : 0) ?? 0;
-            const hasStage7 = Boolean(visit.firstRechargeAt || (rechargeAmount > 0));
+            const hasStage6 = Boolean(visit.firstRechargeAt || (rechargeAmount > 0));
 
-            const completedStages = [hasStage1, hasStage2, hasStage3, hasStage4, hasStage5, hasStage6, hasStage7];
+            const completedStages = [hasStage1, hasStage2, hasStage3, hasStage4, hasStage5, hasStage6];
             const stagesCompleted = completedStages.filter(Boolean).length;
-            const progressPercentage = Math.round((stagesCompleted / 7) * 100);
+            const progressPercentage = Math.round((stagesCompleted / 6) * 100);
 
             const campaignData = visit.campaignId as any;
             const inferredLandingPage = visit.landingPage || (campaignData?.slug === 'descubra' ? '/descubra' : (campaignData?.slug ? `/c/${campaignData.slug}` : '/descubra'));
@@ -217,16 +223,12 @@ export async function GET(request: NextRequest) {
                             photoUrl: prof.photoUrl,
                         } : null,
                     },
-                    stage5_messageSent: {
+                    stage5_messageAttempt: {
                         reached: hasStage5,
-                        at: visit.firstMessageSentAt || null,
+                        at: visit.firstMessageAttemptAt || null,
                     },
-                    stage6_messageReceived: {
+                    stage6_firstRecharge: {
                         reached: hasStage6,
-                        at: visit.firstMessageReceivedAt || null,
-                    },
-                    stage7_firstRecharge: {
-                        reached: hasStage7,
                         at: visit.firstRechargeAt || null,
                         amountCents: rechargeAmount,
                     },
@@ -241,21 +243,19 @@ export async function GET(request: NextRequest) {
                 if (minStage === 2) return c.stages.stage2_cta.reached;
                 if (minStage === 3) return c.stages.stage3_signup.reached;
                 if (minStage === 4) return c.stages.stage4_profileView.reached;
-                if (minStage === 5) return c.stages.stage5_messageSent.reached;
-                if (minStage === 6) return c.stages.stage6_messageReceived.reached;
-                if (minStage === 7) return c.stages.stage7_firstRecharge.reached;
+                if (minStage === 5) return c.stages.stage5_messageAttempt.reached;
+                if (minStage === 6) return c.stages.stage6_firstRecharge.reached;
                 return true;
             })
             : allClients;
 
-        // 6. Contagem das 7 etapas e métricas consolidadas calculadas em cima dos leads filtrados
+        // 6. Contagem das 6 etapas e métricas consolidadas calculadas em cima dos leads filtrados
         let stage1Count = 0;
         let stage2Count = 0;
         let stage3Count = 0;
         let stage4Count = 0;
         let stage5Count = 0;
         let stage6Count = 0;
-        let stage7Count = 0;
         let totalRevenueCents = 0;
 
         for (const c of effectiveClients) {
@@ -263,11 +263,10 @@ export async function GET(request: NextRequest) {
             if (c.stages.stage2_cta.reached) stage2Count++;
             if (c.stages.stage3_signup.reached) stage3Count++;
             if (c.stages.stage4_profileView.reached) stage4Count++;
-            if (c.stages.stage5_messageSent.reached) stage5Count++;
-            if (c.stages.stage6_messageReceived.reached) stage6Count++;
-            if (c.stages.stage7_firstRecharge.reached) {
-                stage7Count++;
-                totalRevenueCents += (c.stages.stage7_firstRecharge.amountCents || 0);
+            if (c.stages.stage5_messageAttempt.reached) stage5Count++;
+            if (c.stages.stage6_firstRecharge.reached) {
+                stage6Count++;
+                totalRevenueCents += (c.stages.stage6_firstRecharge.amountCents || 0);
             }
         }
 
@@ -276,9 +275,8 @@ export async function GET(request: NextRequest) {
             { id: 2, label: 'Clicou no CTA', count: stage2Count, key: 'cta' },
             { id: 3, label: 'Criou uma Conta', count: stage3Count, key: 'signup' },
             { id: 4, label: 'Visitou Perfil no Explorar', count: stage4Count, key: 'profileView' },
-            { id: 5, label: 'Enviou Mensagem', count: stage5Count, key: 'messageSent' },
-            { id: 6, label: 'Recebeu Mensagem', count: stage6Count, key: 'messageReceived' },
-            { id: 7, label: 'Primeira Recarga', count: stage7Count, key: 'firstRecharge' },
+            { id: 5, label: 'Tentou Enviar Mensagem', count: stage5Count, key: 'messageAttempt' },
+            { id: 6, label: 'Primeira Recarga', count: stage6Count, key: 'firstRecharge' },
         ];
 
         // Remove etapas anteriores quando o usuário filtra a partir de uma etapa mínima específica
@@ -307,7 +305,7 @@ export async function GET(request: NextRequest) {
             summary: {
                 totalLeads: effectiveClients.length,
                 totalRevenueCents,
-                overallConversionRate: baseFunnelCount > 0 ? Number(((stage7Count / baseFunnelCount) * 100).toFixed(2)) : 0,
+                overallConversionRate: baseFunnelCount > 0 ? Number(((stage6Count / baseFunnelCount) * 100).toFixed(2)) : 0,
                 steps: funnelSteps,
             },
             clients: effectiveClients,

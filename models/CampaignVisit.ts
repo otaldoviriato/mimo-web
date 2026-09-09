@@ -17,6 +17,7 @@ export interface ICampaignVisit extends Document {
     signupCompletedAt?: Date | null;
     firstProfileViewedAt?: Date | null;
     firstProfileViewedProfessionalId?: string | null;
+    firstMessageAttemptAt?: Date | null;
     firstMessageSentAt?: Date | null;
     firstMessageReceivedAt?: Date | null;
     firstRechargeAt?: Date | null;
@@ -44,6 +45,7 @@ const schema = new Schema<ICampaignVisit>({
     signupCompletedAt: { type: Date, default: null },
     firstProfileViewedAt: { type: Date, default: null },
     firstProfileViewedProfessionalId: { type: String, default: null, index: true },
+    firstMessageAttemptAt: { type: Date, default: null },
     firstMessageSentAt: { type: Date, default: null },
     firstMessageReceivedAt: { type: Date, default: null },
     firstRechargeAt: { type: Date, default: null },

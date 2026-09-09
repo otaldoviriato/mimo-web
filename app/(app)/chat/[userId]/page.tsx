@@ -18,6 +18,7 @@ import { MediaComposerSheet } from '@/components/MediaComposerSheet';
 import { PendingReceiptBalloon } from '@/components/PendingReceiptBalloon';
 import { LargeMessageConfirmModal } from '@/components/LargeMessageConfirmModal';
 import { decryptMessageText } from '@/lib/messageCipher';
+import { trackAcquisitionEvent } from '@/lib/clientAcquisitionAnalytics';
 import { AlertTriangle, ShieldCheck, Wallet, Clock, MessageCircle, LockKeyhole } from 'lucide-react';
 
 interface Message {
@@ -612,6 +613,16 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     const otherUserId = propUserId || resolvedParams?.userId || '';
     const { openRechargeModal } = usePayment();
     const router = useTransitionRouter();
+
+    const reportMessageAttempt = () => {
+        const profId = receiver?.clerkId || otherUserId;
+        if (profId) {
+            trackAcquisitionEvent({
+                eventType: 'message_attempt',
+                professionalId: profId,
+            });
+        }
+    };
     const queryClient = useQueryClient();
     const { user } = useUser();
     const { socket, connected, socketService, socketVersion } = useSocket(user?.id);
@@ -2496,6 +2507,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
         const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
         if (isClientToProfessional && balance <= 0) {
+            reportMessageAttempt();
             openRechargeModal('Para enviar mensagens para a criadora, seu saldo precisa ser maior que R$ 0,00. Faça uma recarga para continuar.');
             return;
         }
@@ -2590,6 +2602,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         const isTeamMemberInvolved = userData?.isTeam || receiver?.isTeam;
         const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
         if (isClientToProfessional && balance <= 0) {
+            reportMessageAttempt();
             openRechargeModal('Para enviar mensagens para a criadora, seu saldo precisa ser maior que R$ 0,00. Faça uma recarga para continuar.');
             return;
         }
@@ -2670,6 +2683,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
         if (isClientToProfessional && balance <= 0) {
             e.target.value = '';
+            reportMessageAttempt();
             openRechargeModal('Para enviar mensagens para a criadora, seu saldo precisa ser maior que R$ 0,00. Faça uma recarga para continuar.');
             return;
         }
@@ -4017,6 +4031,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
                                 if (isClientToProfessional && balance <= 0) {
+                                    reportMessageAttempt();
                                     openRechargeModal('Para enviar mensagens para a criadora, seu saldo precisa ser maior que R$ 0,00. Faça uma recarga para continuar.');
                                     return;
                                 }
@@ -4058,15 +4073,18 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                             maxDurationSeconds={maxAudioDurationSeconds}
                             confirmBeforeSend={false}
                             costPerSecondInCents={audioCostPerSecondInCents}
-                            onInsufficientBalance={() =>
+                            onInsufficientBalance={() => {
+                                if (isClientToProfessional && balance <= 0) {
+                                    reportMessageAttempt();
+                                }
                                 openRechargeModal(
                                     isClientToProfessional && balance <= 0
                                         ? 'Para enviar mensagens para a criadora, seu saldo precisa ser maior que R$ 0,00. Faça uma recarga para continuar.'
                                         : (userData?.hasWelcomeCreditEnded
                                             ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
                                             : 'Você não tem saldo suficiente para enviar uma mensagem de áudio. Por favor, recarregue sua carteira.')
-                                )
-                            }
+                                );
+                            }}
                         />
                     )}
                 </div>

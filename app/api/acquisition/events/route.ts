@@ -9,7 +9,7 @@ import { CampaignVisit } from '@/models/CampaignVisit';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const PUBLIC_EVENTS = new Set(['link_viewed', 'explore_profile_impression', 'explore_profile_viewed']);
+const PUBLIC_EVENTS = new Set(['link_viewed', 'explore_profile_impression', 'explore_profile_viewed', 'message_attempt']);
 
 function cleanMetadata(value: unknown) {
     if (!value || typeof value !== 'object') return undefined;
@@ -50,13 +50,13 @@ export async function POST(request: NextRequest) {
         const day = new Date().toISOString().slice(0, 10);
         const actorKey = userId || visitorId;
         await recordAcquisitionEvent({
-            eventType: eventType as 'link_viewed' | 'explore_profile_impression' | 'explore_profile_viewed',
+            eventType: eventType as 'link_viewed' | 'explore_profile_impression' | 'explore_profile_viewed' | 'message_attempt',
             dedupeKey: `${eventType}:${actorKey}:${professionalId}:${day}`,
             actorId: userId || undefined,
             clientId: userId || undefined,
             visitorId,
             professionalId,
-            origin: eventType === 'link_viewed' ? 'profile_share' : 'explore',
+            origin: eventType === 'link_viewed' ? 'profile_share' : eventType === 'message_attempt' ? 'chat' : 'explore',
             metadata: cleanMetadata(body.metadata),
         });
 
@@ -69,6 +69,20 @@ export async function POST(request: NextRequest) {
                 await CampaignVisit.findOneAndUpdate(
                     { $or: queryOr, firstProfileViewedAt: null },
                     { $set: { firstProfileViewedAt: new Date(), firstProfileViewedProfessionalId: professionalId } },
+                    { sort: { landingViewedAt: -1 } },
+                );
+            }
+        }
+
+        if (eventType === 'message_attempt') {
+            const queryOr = [
+                ...(visitorId ? [{ visitorId }] : []),
+                ...(userId ? [{ userId }] : []),
+            ];
+            if (queryOr.length > 0) {
+                await CampaignVisit.findOneAndUpdate(
+                    { $or: queryOr, firstMessageAttemptAt: null },
+                    { $set: { firstMessageAttemptAt: new Date() } },
                     { sort: { landingViewedAt: -1 } },
                 );
             }
