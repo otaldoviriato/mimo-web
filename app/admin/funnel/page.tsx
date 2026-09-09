@@ -526,8 +526,10 @@ export default function AdminFunnelPage() {
 
                                                 {steps.map((step, idx) => {
                                                     const isHovered = hoveredStepIndex === idx;
-                                                    const xStart = idx * 150;
-                                                    const xEnd = (idx + 1) * 150;
+                                                    const numSteps = Math.max(1, steps.length);
+                                                    const stepWidth = 1050 / numSteps;
+                                                    const xStart = idx * stepWidth;
+                                                    const xEnd = (idx + 1) * stepWidth;
                                                     const hStart = stageHeights[idx];
                                                     const hEnd = idx < steps.length - 1 ? stageHeights[idx + 1] : stageHeights[idx] * 0.85;
 
@@ -542,14 +544,15 @@ export default function AdminFunnelPage() {
                                                     const c2x = xEnd - dx * 0.52;
 
                                                     const pathD = `M ${xStart} ${yTopStart} C ${c1x} ${yTopStart}, ${c2x} ${yTopEnd}, ${xEnd} ${yTopEnd} L ${xEnd} ${yBottomEnd} C ${c2x} ${yBottomEnd}, ${c1x} ${yBottomStart}, ${xStart} ${yBottomStart} Z`;
+                                                    const colorIndex = (step.id - 1) % 7;
 
                                                     return (
                                                         <g key={step.id}>
                                                             {/* Corpo ondulado da etapa do funil */}
                                                             <path
                                                                 d={pathD}
-                                                                fill={isHovered ? 'url(#waveGradHover)' : `url(#waveGrad${idx})`}
-                                                                stroke={isHovered ? '#5b21b6' : borderColors[idx]}
+                                                                fill={isHovered ? 'url(#waveGradHover)' : `url(#waveGrad${colorIndex})`}
+                                                                stroke={isHovered ? '#5b21b6' : borderColors[colorIndex]}
                                                                 strokeWidth={isHovered ? 2.5 : 1.5}
                                                                 className="transition-all duration-200 cursor-pointer"
                                                                 onMouseEnter={() => setHoveredStepIndex(idx)}
@@ -574,9 +577,12 @@ export default function AdminFunnelPage() {
                                             </svg>
 
                                             {/* Camada de Conteúdo HTML perfeitamente posicionada sobre o SVG */}
-                                            <div className="absolute inset-0 grid grid-cols-7 pointer-events-none">
+                                            <div
+                                                className="absolute inset-0 grid pointer-events-none"
+                                                style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}
+                                            >
                                                 {steps.map((step, idx) => {
-                                                    const Icon = stepIcons[idx] || CheckCircle2;
+                                                    const Icon = stepIcons[step.id - 1] || CheckCircle2;
                                                     const isHovered = hoveredStepIndex === idx;
 
                                                     return (
@@ -643,7 +649,7 @@ export default function AdminFunnelPage() {
                                                                             <span className="font-bold text-white">{step.count}</span>
                                                                         </div>
                                                                         <div className="flex justify-between">
-                                                                            <span className="text-slate-400">Conversão do Topo:</span>
+                                                                            <span className="text-slate-400">Conversão da Base:</span>
                                                                             <span className="font-bold text-emerald-400">{step.topConversionRate}%</span>
                                                                         </div>
                                                                         {idx > 0 && (
@@ -673,30 +679,41 @@ export default function AdminFunnelPage() {
                         </div>
 
                         {/* Barra Informativa de Retenção e Drop-off entre Etapas */}
-                        <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 pt-2 border-t border-slate-100 text-[11px]">
-                            {steps.slice(1).map((step, idx) => (
-                                <div key={step.id} className="bg-slate-50 rounded-xl p-2 border border-slate-200">
-                                    <span className="text-[10px] font-bold text-slate-500 block truncate">
-                                        Etapa {idx + 1} → {idx + 2}
-                                    </span>
-                                    <div className="flex items-center justify-between mt-1">
-                                        <span className="font-extrabold text-emerald-600">
-                                            {step.stepConversionRate}% retêm
-                                        </span>
-                                        <span className="text-[10px] text-rose-500 font-semibold">
-                                            -{step.dropoffRate}% vazam
-                                        </span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                        {steps.length > 1 && (
+                            <div
+                                className="grid gap-2 pt-2 border-t border-slate-100 text-[11px]"
+                                style={{ gridTemplateColumns: `repeat(${Math.min(6, steps.length - 1)}, minmax(0, 1fr))` }}
+                            >
+                                {steps.slice(1).map((step, idx) => {
+                                    const prevStep = steps[idx];
+                                    return (
+                                        <div key={step.id} className="bg-slate-50 rounded-xl p-2 border border-slate-200">
+                                            <span className="text-[10px] font-bold text-slate-500 block truncate">
+                                                Etapa {prevStep.id} → {step.id}
+                                            </span>
+                                            <div className="flex items-center justify-between mt-1">
+                                                <span className="font-extrabold text-emerald-600">
+                                                    {step.stepConversionRate}% retêm
+                                                </span>
+                                                <span className="text-[10px] text-rose-500 font-semibold">
+                                                    -{step.dropoffRate}% vazam
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 ) : (
                     /* MODO 2: VISÃO EM CARDS / COLUNAS */
                     <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-7 gap-2.5 relative pt-2">
+                        <div
+                            className="grid gap-2.5 relative pt-2"
+                            style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}
+                        >
                             {steps.map((step, idx) => {
-                                const Icon = stepIcons[idx] || CheckCircle2;
+                                const Icon = stepIcons[step.id - 1] || CheckCircle2;
                                 const isHovered = hoveredStepIndex === idx;
                                 const heightPercent = Math.max(25, Math.round((step.count / maxCount) * 100));
 

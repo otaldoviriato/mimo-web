@@ -281,11 +281,12 @@ export async function GET(request: NextRequest) {
             { id: 7, label: 'Primeira Recarga', count: stage7Count, key: 'firstRecharge' },
         ];
 
-        // Base de conversão: se filtrado por etapa mínima, a etapa inicial selecionada passa a ser a base (100%)
-        const baseFunnelCount = stageTotals[minStage - 1]?.count || stage1Count || 1;
+        // Remove etapas anteriores quando o usuário filtra a partir de uma etapa mínima específica
+        const visibleStageTotals = minStage > 1 ? stageTotals.slice(minStage - 1) : stageTotals;
+        const baseFunnelCount = visibleStageTotals[0]?.count || 1;
 
-        const funnelSteps = stageTotals.map((step, index) => {
-            const prevCount = index === 0 ? step.count : stageTotals[index - 1].count;
+        const funnelSteps = visibleStageTotals.map((step, index) => {
+            const prevCount = index === 0 ? step.count : visibleStageTotals[index - 1].count;
             const topConversionRate = baseFunnelCount > 0 ? Number(((step.count / baseFunnelCount) * 100).toFixed(1)) : 0;
             const stepConversionRate = prevCount > 0 ? Number(((step.count / prevCount) * 100).toFixed(1)) : 0;
             const dropoffCount = Math.max(0, prevCount - step.count);
