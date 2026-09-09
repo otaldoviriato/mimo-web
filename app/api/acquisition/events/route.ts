@@ -61,11 +61,17 @@ export async function POST(request: NextRequest) {
         });
 
         if (eventType === 'explore_profile_viewed') {
-            await CampaignVisit.findOneAndUpdate(
-                { visitorId, firstProfileViewedAt: null },
-                { $set: { firstProfileViewedAt: new Date(), firstProfileViewedProfessionalId: professionalId } },
-                { sort: { landingViewedAt: -1 } },
-            );
+            const queryOr = [
+                ...(visitorId ? [{ visitorId }] : []),
+                ...(userId ? [{ userId }] : []),
+            ];
+            if (queryOr.length > 0) {
+                await CampaignVisit.findOneAndUpdate(
+                    { $or: queryOr, firstProfileViewedAt: null },
+                    { $set: { firstProfileViewedAt: new Date(), firstProfileViewedProfessionalId: professionalId } },
+                    { sort: { landingViewedAt: -1 } },
+                );
+            }
         }
 
         return new NextResponse(null, { status: 204 });

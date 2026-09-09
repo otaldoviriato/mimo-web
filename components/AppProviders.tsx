@@ -9,6 +9,8 @@ import { PaymentProvider } from '@/context/PaymentContext';
 import { PWAProvider } from '@/context/PWAContext';
 import { PUBLIC_CONTENT_ROUTES } from '@/lib/routes';
 
+import { PublicTrafficTracker, AuthenticatedTrafficSync } from '@/components/GlobalTrafficTracker';
+
 export function AppProviders({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
 
@@ -17,6 +19,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     if (isPublicRoute) {
         return (
             <>
+                <PublicTrafficTracker />
                 {children}
                 <Toaster position="top-center" />
                 <CookieBanner />
@@ -26,6 +29,8 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
 
     return (
         <ClerkProvider>
+            <PublicTrafficTracker />
+            <AuthenticatedTrafficSync />
             <QueryProvider>
                 <PWAProvider>
                     <PaymentProvider>
