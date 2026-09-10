@@ -355,6 +355,41 @@ export function RechargeModal({
 
     }, [visible, queryClient]);
 
+    // Previne que o fechamento do teclado virtual no mobile deixe o drawer suspenso na metade da tela
+    useEffect(() => {
+        if (!visible || typeof window === 'undefined') return;
+
+        const handleViewportChange = () => {
+            const vv = window.visualViewport;
+            if (!vv) return;
+
+            // Quando a altura do visualViewport volta ao normal (teclado virtual fechou)
+            if (vv.height >= window.innerHeight - 60) {
+                // 1. Reseta qualquer deslocamento de scroll fantasma do body/window
+                if (window.scrollY > 0) {
+                    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+                }
+                // 2. Se algum input estiver retendo foco após o teclado fechar (comum no Android com botão voltar), remove o foco
+                if (document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement) {
+                    document.activeElement.blur();
+                }
+            }
+        };
+
+        const vv = window.visualViewport;
+        if (vv) {
+            vv.addEventListener('resize', handleViewportChange);
+            vv.addEventListener('scroll', handleViewportChange);
+        }
+
+        return () => {
+            if (vv) {
+                vv.removeEventListener('resize', handleViewportChange);
+                vv.removeEventListener('scroll', handleViewportChange);
+            }
+        };
+    }, [visible]);
+
     const resetState = () => {
         setStep('amount_and_method');
         const last = getLastRechargeAmount();
@@ -611,10 +646,17 @@ export function RechargeModal({
 
     return (
         <>
-            <Drawer.Root open={visible} onOpenChange={(open) => !open && handleClose()}>
+            <Drawer.Root
+                open={visible}
+                onOpenChange={(open) => !open && handleClose()}
+                repositionInputs={false}
+            >
             <Drawer.Portal>
                 <Drawer.Overlay className="fixed inset-0 z-[100] bg-gray-950/55 backdrop-blur-[2px]" />
-                <Drawer.Content className="fixed inset-x-0 bottom-0 z-[101] mx-auto flex max-h-[84vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[24px] bg-white shadow-[0_-20px_60px_rgba(15,23,42,0.18)] outline-none">
+                <Drawer.Content
+                    className="fixed inset-x-0 !bottom-0 z-[101] mx-auto flex max-h-[84vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[24px] bg-white shadow-[0_-20px_60px_rgba(15,23,42,0.18)] outline-none"
+                    style={{ bottom: 0 }}
+                >
                     <div className="border-b border-gray-100 px-5 pb-4 pt-3 shrink-0 bg-white">
                         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-gray-200" />
                         <div className="flex items-center justify-between gap-3">
@@ -995,6 +1037,11 @@ export function RechargeModal({
                                                                 onChange={(e) => setCustomAmountText(e.target.value.replace(/[^0-9.,]/g, ''))}
                                                                 autoFocus
                                                                 onClick={(e) => e.stopPropagation()}
+                                                                onBlur={() => {
+                                                                    if (typeof window !== 'undefined' && window.scrollY > 0) {
+                                                                        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+                                                                    }
+                                                                }}
                                                             />
                                                         </div>
                                                     ) : (

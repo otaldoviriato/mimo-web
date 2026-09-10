@@ -178,10 +178,17 @@ export function MediaComposerSheet({ file, previewUrl, isVideo, onCancel, onConf
     };
 
     return (
-        <Drawer.Root open onOpenChange={(open) => !open && onCancel()}>
+        <Drawer.Root
+            open
+            onOpenChange={(open) => !open && onCancel()}
+            repositionInputs={false}
+        >
             <Drawer.Portal>
                 <Drawer.Overlay className="fixed inset-0 z-[100] bg-gray-950/55 backdrop-blur-[2px]" />
-                <Drawer.Content className="fixed inset-x-0 bottom-0 z-[101] mx-auto flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[24px] bg-white shadow-[0_-20px_60px_rgba(15,23,42,0.18)] outline-none">
+                <Drawer.Content
+                    className="fixed inset-x-0 !bottom-0 z-[101] mx-auto flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[24px] bg-white shadow-[0_-20px_60px_rgba(15,23,42,0.18)] outline-none"
+                    style={{ bottom: 0 }}
+                >
                     {/* Header */}
                     <div className="shrink-0 border-b border-gray-100 px-5 pb-4 pt-3 bg-white">
                         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-gray-200" />
