@@ -2535,7 +2535,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
         if (isClientToProfessional && balance <= 0) {
             reportMessageAttempt();
-            openRechargeModal('Para enviar mensagens para a criadora, seu saldo precisa ser maior que R$ 0,00. Faça uma recarga para continuar.');
+            openRechargeModal('ZERO_BALANCE_START');
             return;
         }
 
@@ -2630,7 +2630,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
         if (isClientToProfessional && balance <= 0) {
             reportMessageAttempt();
-            openRechargeModal('Para enviar mensagens para a criadora, seu saldo precisa ser maior que R$ 0,00. Faça uma recarga para continuar.');
+            openRechargeModal('ZERO_BALANCE_START');
             return;
         }
 
@@ -2712,7 +2712,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         if (isClientToProfessional && balance <= 0) {
             e.target.value = '';
             reportMessageAttempt();
-            openRechargeModal('Para enviar mensagens para a criadora, seu saldo precisa ser maior que R$ 0,00. Faça uma recarga para continuar.');
+            openRechargeModal('ZERO_BALANCE_START');
             return;
         }
 
@@ -4060,7 +4060,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                             onClick={() => {
                                 if (isClientToProfessional && balance <= 0) {
                                     reportMessageAttempt();
-                                    openRechargeModal('Para enviar mensagens para a criadora, seu saldo precisa ser maior que R$ 0,00. Faça uma recarga para continuar.');
+                                    openRechargeModal('ZERO_BALANCE_START');
                                     return;
                                 }
 
@@ -4107,7 +4107,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                 }
                                 openRechargeModal(
                                     isClientToProfessional && balance <= 0
-                                        ? 'Para enviar mensagens para a criadora, seu saldo precisa ser maior que R$ 0,00. Faça uma recarga para continuar.'
+                                        ? 'ZERO_BALANCE_START'
                                         : (userData?.hasWelcomeCreditEnded
                                             ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
                                             : 'Você não tem saldo suficiente para enviar uma mensagem de áudio. Por favor, recarregue sua carteira.')

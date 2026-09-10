@@ -5,7 +5,7 @@ import { PixCheckoutView } from './PixCheckoutView';
 import { ProcessingPaymentView } from './ProcessingPaymentView';
 import { userApi } from '@/services/api';
 import { useQueryClient } from '@tanstack/react-query';
-import { QueryKeys } from '@/hooks/useQueries';
+import { QueryKeys, useChatPricing } from '@/hooks/useQueries';
 import { useUser } from '@clerk/nextjs';
 import { Drawer } from 'vaul';
 import {
@@ -610,6 +610,27 @@ export function RechargeModal({
             currency: 'BRL',
         });
 
+    const { data: chatPricing } = useChatPricing();
+    const rawPricePerChar = chatPricing?.defaultPricePerCharNonSubscribers ?? 0.05;
+    const formattedPricePerChar = rawPricePerChar.toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+    });
+
+    const defaultZeroBalanceNotice = `Para começar, adicione saldo. Você não paga pelo envio: o saldo é descontado ao visualizar as mensagens recebidas. Tarifa: ${formattedPricePerChar} por caractere`;
+
+    const activeNotice = (() => {
+        if (!insufficientBalanceMessage) return null;
+        if (
+            insufficientBalanceMessage === 'ZERO_BALANCE_START' ||
+            insufficientBalanceMessage.includes('Para enviar mensagens para a criadora') ||
+            insufficientBalanceMessage.includes('Para começar, adicione saldo')
+        ) {
+            return defaultZeroBalanceNotice;
+        }
+        return insufficientBalanceMessage;
+    })();
+
     return (
         <>
             <Drawer.Root
@@ -671,14 +692,14 @@ export function RechargeModal({
                                             </p>
                                         </div>
                                     )}
-                                    {!shouldShowInsufficientContext && insufficientBalanceMessage && (
+                                    {!shouldShowInsufficientContext && activeNotice && (
                                         <div className="mb-4 rounded-xl border border-amber-200/90 bg-amber-50/80 p-3.5 text-amber-800 animate-in fade-in duration-200">
                                             <div className="flex items-center gap-2 mb-1 text-amber-900 font-semibold text-xs">
                                                 <AlertCircle size={15} className="shrink-0 text-amber-600" strokeWidth={2.2} />
                                                 <span>Aviso</span>
                                             </div>
                                             <p className="text-xs leading-relaxed text-amber-800 font-normal">
-                                                {insufficientBalanceMessage}
+                                                {activeNotice}
                                             </p>
                                         </div>
                                     )}
