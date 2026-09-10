@@ -26,47 +26,6 @@ const calculateAge = (birthDateString?: string | Date) => {
     }
 };
 
-type ActivityBadgeType = 'online' | 'today' | 'recent' | 'away';
-
-interface ActivityStatus {
-    type: ActivityBadgeType;
-    label: string;
-}
-
-const formatOnlineStatus = (
-    lastSeen?: string | Date | number,
-    isOnline?: boolean
-): ActivityStatus => {
-    if (isOnline) {
-        return { type: 'online', label: 'Online' };
-    }
-
-    const now = Date.now();
-    let timestamp = 0;
-
-    if (lastSeen) {
-        const d = new Date(lastSeen).getTime();
-        if (!isNaN(d)) timestamp = d;
-    }
-
-    if (!timestamp) {
-        return { type: 'away', label: 'Ausente' };
-    }
-
-    const diffHours = Math.floor((now - timestamp) / (1000 * 60 * 60));
-
-    if (diffHours < 24) {
-        return { type: 'today', label: 'Ativa hoje' };
-    }
-
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays <= 7) {
-        return { type: 'recent', label: `Há ${diffDays}d` };
-    }
-
-    return { type: 'away', label: 'Ausente' };
-};
-
 export default function SearchPage() {
     const router = useTransitionRouter();
     const queryClient = useQueryClient();
@@ -215,7 +174,7 @@ export default function SearchPage() {
             ? `${user.name || `@${user.username}`}, ${age}` 
             : (user.name || `@${user.username}`);
         const mainPhoto = user.photoUrl || (user.publicPhotos && user.publicPhotos[0]) || '/Logo.svg';
-        const status = formatOnlineStatus(user.lastSeen || user.lastActiveTime, user.isOnline);
+        const responseTime = user.availabilityResponseTimeMinutes || user.avgResponseTimeMinutes || 10;
 
         return (
             <button
@@ -236,33 +195,16 @@ export default function SearchPage() {
                 {/* Overlay gradiente escuro suave na parte inferior */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
 
-                {/* Badge de Atividade (topo direito) */}
-                {status.type === 'online' && (
-                    <div className="absolute top-2.5 right-2.5 bg-white text-emerald-600 border border-emerald-100 text-[10.5px] font-bold px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1.5 z-10">
-                        <span className="relative flex h-1.5 w-1.5 shrink-0">
+                {/* Badge de Disponibilidade (topo direito) - Exibido apenas se a profissional estiver disponível */}
+                {user.isAvailable && (
+                    <div className="absolute top-2.5 right-2.5 bg-white/95 text-emerald-700 border border-emerald-200/80 text-[10.5px] font-bold px-2.5 py-1 rounded-full shadow-md flex items-center gap-1.5 z-10 backdrop-blur-xs">
+                        <span className="relative flex h-2 w-2 shrink-0">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                         </span>
-                        <span className="leading-none whitespace-nowrap">Online</span>
-                    </div>
-                )}
-
-                {status.type === 'today' && (
-                    <div className="absolute top-2.5 right-2.5 bg-white/95 text-purple-700 border border-purple-100 text-[10.5px] font-bold px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1.5 z-10 backdrop-blur-xs">
-                        <span className="h-1.5 w-1.5 rounded-full bg-purple-500 shrink-0"></span>
-                        <span className="leading-none whitespace-nowrap">Ativa hoje</span>
-                    </div>
-                )}
-
-                {status.type === 'recent' && (
-                    <div className="absolute top-2.5 right-2.5 bg-black/45 text-white/90 border border-white/10 text-[10px] font-semibold px-2 py-0.5 rounded-full shadow-xs flex items-center gap-1 z-10 backdrop-blur-sm">
-                        <span className="leading-none whitespace-nowrap">{status.label}</span>
-                    </div>
-                )}
-
-                {status.type === 'away' && (
-                    <div className="absolute top-2.5 right-2.5 bg-black/35 text-white/60 border border-white/5 text-[9.5px] font-medium px-2 py-0.5 rounded-full shadow-xs flex items-center gap-1 z-10 backdrop-blur-sm">
-                        <span className="leading-none whitespace-nowrap">Ausente</span>
+                        <span className="leading-none whitespace-nowrap">
+                            Disponível • Responde em até {responseTime} min
+                        </span>
                     </div>
                 )}
 

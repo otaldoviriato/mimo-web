@@ -531,8 +531,10 @@ export async function GET(request: NextRequest) {
                 hasWelcomeCreditEnded,
                 conversationsLastWeekCount,
                 messagesLastWeekCount,
-                mediaGiftsLastWeekCount,
-                isAvailable: user.isAvailable ?? true,
+                isAvailable: Boolean(user.isAvailable && user.availableUntil && new Date(user.availableUntil).getTime() > Date.now()),
+                availableUntil: user.availableUntil || null,
+                availabilityResponseTimeMinutes: settings?.availabilityResponseTimeMinutes ?? 10,
+                availabilityDurationHours: settings?.availabilityDurationHours ?? 4,
             },
         });
     } catch (error: any) {
@@ -589,7 +591,14 @@ export async function PATCH(request: NextRequest) {
         if (taxId !== undefined) updateData.taxId = taxId;
         
         if (isAvailable !== undefined) {
-            updateData.isAvailable = Boolean(isAvailable);
+            const isAvail = Boolean(isAvailable);
+            updateData.isAvailable = isAvail;
+            if (isAvail) {
+                const durationHours = settings?.availabilityDurationHours ?? 4;
+                updateData.availableUntil = new Date(Date.now() + durationHours * 60 * 60 * 1000);
+            } else {
+                updateData.availableUntil = null;
+            }
         }
 
         // Determina dinamicamente o onboardingStep para o updateData
@@ -828,6 +837,10 @@ export async function PATCH(request: NextRequest) {
                 acquiredByProfessionalUsername: user.acquiredByProfessionalUsername,
                 acquisitionSource: user.acquisitionSource,
                 acquiredAt: user.acquiredAt,
+                isAvailable: Boolean(user.isAvailable && user.availableUntil && new Date(user.availableUntil).getTime() > Date.now()),
+                availableUntil: user.availableUntil || null,
+                availabilityResponseTimeMinutes: settings?.availabilityResponseTimeMinutes ?? 10,
+                availabilityDurationHours: settings?.availabilityDurationHours ?? 4,
             },
         });
     } catch (error: any) {

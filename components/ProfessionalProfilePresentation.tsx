@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { ChevronLeft, ChevronRight, Eye, EyeOff, Lock, Pause, Play, ShieldCheck, Pencil } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Eye, EyeOff, Lock, Pause, Play, ShieldCheck, Pencil, RotateCcw } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 
@@ -27,6 +27,10 @@ interface Props {
         subscriptionPrice?: number;
         chargePerCharSubscribers?: number;
         chargePerCharNonSubscribers?: number;
+        isAvailable?: boolean;
+        availableUntil?: Date | string | null;
+        availabilityResponseTimeMinutes?: number;
+        availabilityDurationHours?: number;
     };
     publicItems: ProfileGalleryItem[];
     exclusiveItems: ProfileGalleryItem[];
@@ -38,6 +42,8 @@ interface Props {
     onBack?: () => void;
     onSubscribe?: () => void;
     onEditSubscription?: () => void;
+    onToggleAvailability?: (enable: boolean) => Promise<void> | void;
+    updatingAvailability?: boolean;
     onOpen: (items: ProfileGalleryItem[], index: number) => void;
     headerActions?: React.ReactNode;
 }
@@ -55,7 +61,23 @@ export function ProfilePhoto({ src, alt, priority = false, ambient = false }: { 
     );
 }
 
-export function ProfessionalProfilePresentation({ user, publicItems, exclusiveItems, privateCount, isSubscriber, isOwner, loadingGallery, subscribing, onBack, onSubscribe, onEditSubscription, onOpen, headerActions }: Props) {
+export function ProfessionalProfilePresentation({
+    user,
+    publicItems,
+    exclusiveItems,
+    privateCount,
+    isSubscriber,
+    isOwner,
+    loadingGallery,
+    subscribing,
+    onBack,
+    onSubscribe,
+    onEditSubscription,
+    onToggleAvailability,
+    updatingAvailability = false,
+    onOpen,
+    headerActions,
+}: Props) {
     const router = useRouter();
     const [photoIndex, setPhotoIndex] = useState(0);
     const [expanded, setExpanded] = useState(false);
@@ -76,6 +98,27 @@ export function ProfessionalProfilePresentation({ user, publicItems, exclusiveIt
         && typeof subscriberRate === 'number' && subscriberRate >= 0 && subscriberRate < regularRate
         ? Math.round((1 - subscriberRate / regularRate) * 100)
         : 0;
+
+    const isAvailable = Boolean(
+        user.isAvailable &&
+        user.availableUntil &&
+        new Date(user.availableUntil).getTime() > Date.now()
+    );
+    const responseTime = user.availabilityResponseTimeMinutes || 10;
+    const durationHours = user.availabilityDurationHours || 4;
+
+    const formatExpiry = (dateVal?: Date | string | null) => {
+        if (!dateVal) return '';
+        const d = new Date(dateVal);
+        if (isNaN(d.getTime())) return '';
+        const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const diffMs = d.getTime() - Date.now();
+        if (diffMs <= 0) return `expirou às ${timeStr}`;
+        const hours = Math.floor(diffMs / (1000 * 60 * 60));
+        const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        const diffText = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+        return `até ${timeStr} (restam ${diffText})`;
+    };
 
     useEffect(() => {
         const gallery = galleryRef.current;
@@ -201,6 +244,92 @@ export function ProfessionalProfilePresentation({ user, publicItems, exclusiveIt
                     </div>
                     <p className="mt-1 break-all text-sm text-slate-500">@{user.username}</p>
                     {(user.messagesLastWeekCount ?? 0) > 0 && <p className="mt-3 text-xs text-slate-500">Atividade nos últimos 7 dias</p>}
+
+                    {/* Badge de disponibilidade para visitantes */}
+                    {!isOwner && isAvailable && (
+                        <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 shadow-2xs">
+                            <span className="relative flex h-2 w-2 shrink-0">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                            </span>
+                            <span>Disponível agora • Responde em até {responseTime} min</span>
+                        </div>
+                    )}
+
+                    {/* Card de gestão de disponibilidade para a própria profissional */}
+                    {isOwner && (
+                        <div className={`mt-4 rounded-2xl border p-4 sm:p-5 transition-all shadow-2xs ${isAvailable ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200 bg-slate-50/80'}`}>
+                            {isAvailable ? (
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <span className="relative flex h-2.5 w-2.5 shrink-0">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                                            </span>
+                                            <span className="text-sm font-bold text-emerald-900">Você está Disponível</span>
+                                        </div>
+                                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                                            Topo do Explorar
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-slate-600 leading-relaxed">
+                                        Você se compromete a responder novos clientes em até <strong className="text-slate-800">{responseTime} minutos</strong>.
+                                        {user.availableUntil && (
+                                            <span className="block mt-0.5 text-slate-500 font-medium">
+                                                Válido {formatExpiry(user.availableUntil)}.
+                                            </span>
+                                        )}
+                                    </p>
+                                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                                        <button
+                                            type="button"
+                                            disabled={updatingAvailability}
+                                            onClick={() => onToggleAvailability?.(true)}
+                                            className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50 cursor-pointer"
+                                        >
+                                            <RotateCcw size={13} className={updatingAvailability ? 'animate-spin' : ''} />
+                                            Renovar (+{durationHours}h)
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={updatingAvailability}
+                                            onClick={() => onToggleAvailability?.(false)}
+                                            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors disabled:opacity-50 cursor-pointer"
+                                        >
+                                            Desativar
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <span className="h-2.5 w-2.5 rounded-full bg-slate-300"></span>
+                                            <span className="text-sm font-bold text-slate-800">Disponibilidade para Conversas</span>
+                                        </div>
+                                        <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                                            Inativo
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-slate-500 leading-relaxed">
+                                        Fique no topo do Explorar com o selo de disponibilidade por até <strong className="text-slate-700">{durationHours} horas</strong>. Ao ativar, você se compromete a responder os clientes em até <strong className="text-slate-700">{responseTime} minutos</strong>.
+                                    </p>
+                                    <div className="pt-1">
+                                        <button
+                                            type="button"
+                                            disabled={updatingAvailability}
+                                            onClick={() => onToggleAvailability?.(true)}
+                                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition-all shadow-xs active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                                        >
+                                            <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
+                                            {updatingAvailability ? 'Ativando...' : `Ativar disponibilidade (${durationHours}h)`}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                     {bio && (
                         <div className="mt-5">
                             <p id={bioId} ref={bioRef} className={`whitespace-pre-line break-words text-base leading-6 text-slate-600 ${expanded ? '' : 'line-clamp-4'}`}>{bio}</p>

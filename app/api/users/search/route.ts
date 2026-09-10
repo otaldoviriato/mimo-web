@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
             }),
             ...queryFilter
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        }).select('clerkId username name email photoUrl coverUrl isProfessional identityStatus subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers bio createdAt avgResponseTimeMinutes isOnline lastSeen birthDate city state').limit(40).lean() as any[];
+        }).select('clerkId username name email photoUrl coverUrl isProfessional identityStatus subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers bio createdAt avgResponseTimeMinutes isOnline lastSeen birthDate city state isAvailable availableUntil').limit(40).lean() as any[];
 
         if (!foundUsers || foundUsers.length === 0) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
             return acc;
         }, {});
 
-        const settings = await AppSettings.findOne({ key: 'global' }).select('conversationPricePerEquivalentCharCents subscriberDiscountPercentage newProfileDaysThreshold newClientHoursThreshold activeRechargedClientDaysThreshold activeUnrechargedClientHoursThreshold').lean() as any;
+        const settings = await AppSettings.findOne({ key: 'global' }).select('conversationPricePerEquivalentCharCents subscriberDiscountPercentage newProfileDaysThreshold newClientHoursThreshold activeRechargedClientDaysThreshold activeUnrechargedClientHoursThreshold availabilityResponseTimeMinutes').lean() as any;
         const defaultNonSub = (settings?.conversationPricePerEquivalentCharCents ?? 5) / 100;
         const defaultSub = defaultNonSub * (1 - (settings?.subscriberDiscountPercentage ?? 20) / 100);
         const thresholdDays = settings?.newProfileDaysThreshold ?? 15;
@@ -211,6 +211,12 @@ export async function GET(request: NextRequest) {
                 ? (u.createdAt ? new Date(u.createdAt) >= cutoffDatePro : false)
                 : (u.createdAt ? new Date(u.createdAt) >= cutoffDateClient : false);
 
+            const isCurrentlyAvailable = Boolean(
+                u.isAvailable &&
+                u.availableUntil &&
+                new Date(u.availableUntil).getTime() > Date.now()
+            );
+
             return {
                 id: u._id,
                 clerkId: u.clerkId,
@@ -227,10 +233,12 @@ export async function GET(request: NextRequest) {
                 bio: u.bio || '',
                 isNew,
                 publicPhotos: publicPhotos.slice(0, 4),
-                avgResponseTimeMinutes: u.avgResponseTimeMinutes ?? null,
+                avgResponseTimeMinutes: settings?.availabilityResponseTimeMinutes ?? 10,
+                availabilityResponseTimeMinutes: settings?.availabilityResponseTimeMinutes ?? 10,
                 score,
                 isOnline: isOnlineNow,
-                isAvailable: u.isAvailable !== false,
+                isAvailable: isCurrentlyAvailable,
+                availableUntil: u.availableUntil ?? null,
                 lastSeen: u.lastSeen ?? null,
                 birthDate: u.birthDate ?? null,
                 city: u.city ?? '',
@@ -245,8 +253,11 @@ export async function GET(request: NextRequest) {
         // Na busca textual, qualquer perfil profissional aprovado pode ser encontrado.
         const filteredUsers = usersWithScores;
 
-        // Ordenação manual: Por Tier (1 -> 2 -> 3), Perfis sem conversa aberta primeiro, exact username matches depois, depois por score
+        // Ordenação manual: Disponíveis primeiro, por Tier (1 -> 2 -> 3), Perfis sem conversa aberta primeiro, exact username matches depois, depois por score
         const sortedUsers = filteredUsers.sort((a, b) => {
+            if (a.isAvailable !== b.isAvailable) {
+                return a.isAvailable ? -1 : 1;
+            }
             if (a.tier !== b.tier) {
                 return a.tier - b.tier;
             }

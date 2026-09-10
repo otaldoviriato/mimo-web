@@ -50,7 +50,7 @@ export async function GET(
         await connectToDatabase();
 
         let user = await User.findOne({ username: cleanUsername }).select(
-            'clerkId username name email photoUrl coverUrl isProfessional professionalStatus identityStatus subscriptionPrice isSubscriptionEnabled chargePerCharSubscribers chargePerCharNonSubscribers subscribers balance bio avgResponseTimeMinutes isOnline lastSeen birthDate city state isTeam teamTitle'
+            'clerkId username name email photoUrl coverUrl isProfessional professionalStatus identityStatus subscriptionPrice isSubscriptionEnabled chargePerCharSubscribers chargePerCharNonSubscribers subscribers balance bio avgResponseTimeMinutes isOnline lastSeen birthDate city state isTeam teamTitle isAvailable availableUntil'
         );
 
         if (!user) {
@@ -282,7 +282,7 @@ export async function GET(
             }
         }
 
-        const settings = await AppSettings.findOne({ key: 'global' }).select('conversationPricePerEquivalentCharCents subscriberDiscountPercentage').lean();
+        const settings = await AppSettings.findOne({ key: 'global' }).select('conversationPricePerEquivalentCharCents subscriberDiscountPercentage availabilityResponseTimeMinutes').lean();
         const defaultNonSub = (settings?.conversationPricePerEquivalentCharCents ?? 5) / 100;
         const defaultSub = defaultNonSub * (1 - (settings?.subscriberDiscountPercentage ?? 20) / 100);
         let effectiveSubscribers = user.subscribers || [];
@@ -424,6 +424,9 @@ export async function GET(
                 messagesLastWeekCount: user.isProfessional ? messagesLastWeekCount : 0,
                 mediaGiftsLastWeekCount: user.isProfessional ? mediaGiftsLastWeekCount : 0,
                 teamActivationContact,
+                isAvailable: Boolean(user.isAvailable && user.availableUntil && new Date(user.availableUntil).getTime() > Date.now()),
+                availableUntil: user.availableUntil || null,
+                availabilityResponseTimeMinutes: settings?.availabilityResponseTimeMinutes ?? 10,
             },
         });
     } catch (error: any) {

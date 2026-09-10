@@ -54,6 +54,7 @@ export interface IUser extends Document {
     bio?: string;
     isOnline?: boolean;
     isAvailable?: boolean;
+    availableUntil?: Date | null;
     lastSeen?: Date;
     accessCount?: number;
     lastAccessAt?: Date;
@@ -264,7 +265,12 @@ const UserSchema = new Schema<IUser>({
     },
     isAvailable: {
         type: Boolean,
-        default: true,
+        default: false,
+        index: true,
+    },
+    availableUntil: {
+        type: Date,
+        default: null,
         index: true,
     },
     lastSeen: {
@@ -357,6 +363,8 @@ const UserSchema = new Schema<IUser>({
 }, {
     timestamps: true,
 });
+
+UserSchema.index({ isAvailable: 1, availableUntil: 1 });
 
 UserSchema.pre('save', async function () {
     this.onboardingStep = calculateOnboardingStep(this);

@@ -47,6 +47,8 @@ export interface SettingsData {
     creatorEngagementStep1Hours?: number;
     creatorEngagementStep2Enabled?: boolean;
     creatorEngagementStep2Hours?: number;
+    availabilityResponseTimeMinutes?: number;
+    availabilityDurationHours?: number;
 }
 
 export interface ChatMessage {

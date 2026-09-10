@@ -29,13 +29,13 @@ export async function GET(request: NextRequest) {
                 isSuspended: { $ne: true },
                 hideFromExplore: { $ne: true },
             })
-                .select('clerkId username name email photoUrl coverUrl identityStatus subscriptionPrice bio createdAt avgResponseTimeMinutes isOnline lastSeen lastAccessAt birthDate city state accessCount')
+                .select('clerkId username name email photoUrl coverUrl identityStatus subscriptionPrice bio createdAt avgResponseTimeMinutes isOnline lastSeen lastAccessAt birthDate city state accessCount isAvailable availableUntil')
                 .sort({ isOnline: -1, lastSeen: -1, lastAccessAt: -1, createdAt: -1, accessCount: -1 })
                 .limit(100)
                 .lean(),
             Room.find({ participants: userId }).select('participants').lean(),
             AppSettings.findOne({ key: 'global' })
-                .select('conversationPricePerEquivalentCharCents subscriberDiscountPercentage')
+                .select('conversationPricePerEquivalentCharCents subscriberDiscountPercentage availabilityResponseTimeMinutes')
                 .lean(),
         ]);
 
@@ -60,12 +60,20 @@ export async function GET(request: NextRequest) {
         const regularPrice = (settings?.conversationPricePerEquivalentCharCents ?? 5) / 100;
         const subscriberPrice = regularPrice * (1 - (settings?.subscriberDiscountPercentage ?? 20) / 100);
 
+        const defaultResponseTime = settings?.availabilityResponseTimeMinutes ?? 10;
+
         const ranked = rankExploreUsers(professionals.map(user => {
             const lastActiveTime = Math.max(
                 user.lastSeen ? new Date(user.lastSeen).getTime() : 0,
                 user.lastAccessAt ? new Date(user.lastAccessAt).getTime() : 0,
             );
             const publicPhotos = photosByOwner.get(user.clerkId) ?? [];
+            const isCurrentlyAvailable = Boolean(
+                user.isAvailable &&
+                user.availableUntil &&
+                new Date(user.availableUntil).getTime() > Date.now()
+            );
+
             return {
                 id: user._id,
                 clerkId: user.clerkId,
@@ -82,7 +90,10 @@ export async function GET(request: NextRequest) {
                 bio: user.bio ?? '',
                 publicPhotos: publicPhotos.slice(0, 4),
                 publicPhotosCount: publicPhotos.length,
-                avgResponseTimeMinutes: user.avgResponseTimeMinutes ?? null,
+                avgResponseTimeMinutes: defaultResponseTime,
+                availabilityResponseTimeMinutes: defaultResponseTime,
+                isAvailable: isCurrentlyAvailable,
+                availableUntil: user.availableUntil ?? null,
                 isOnline: user.isOnline === true,
                 lastSeen: user.lastSeen ?? user.lastAccessAt ?? null,
                 lastActiveTime,

@@ -30,7 +30,7 @@ export async function GET(
                     ]
                 }
         ).select(
-            'clerkId username name email photoUrl coverUrl isProfessional identityStatus subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers subscribers balance bio isOnline lastSeen avgResponseTimeMinutes birthDate city state isTeam teamTitle isSuspended'
+            'clerkId username name email photoUrl coverUrl isProfessional identityStatus subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers subscribers balance bio isOnline lastSeen avgResponseTimeMinutes birthDate city state isTeam teamTitle isSuspended isAvailable availableUntil'
         );
 
         if (!user || user.isSuspended) {
@@ -62,7 +62,7 @@ export async function GET(
         }
 
 
-        const settings = await AppSettings.findOne({ key: 'global' }).select('conversationPricePerEquivalentCharCents subscriberDiscountPercentage audioEquivalentCharsPerSecond').lean();
+        const settings = await AppSettings.findOne({ key: 'global' }).select('conversationPricePerEquivalentCharCents subscriberDiscountPercentage audioEquivalentCharsPerSecond availabilityResponseTimeMinutes').lean();
         const defaultNonSub = (settings?.conversationPricePerEquivalentCharCents ?? 5) / 100;
         const defaultSub = defaultNonSub * (1 - (settings?.subscriberDiscountPercentage ?? 20) / 100);
         const audioPriceMultiplier = settings?.audioEquivalentCharsPerSecond ?? 5;
@@ -100,6 +100,9 @@ export async function GET(
                 bio: user.bio || '',
                 isOnline: user.isOnline ?? false,
                 lastSeen: user.lastSeen ?? null,
+                isAvailable: Boolean(user.isAvailable && user.availableUntil && new Date(user.availableUntil).getTime() > Date.now()),
+                availableUntil: user.availableUntil || null,
+                availabilityResponseTimeMinutes: settings?.availabilityResponseTimeMinutes ?? 10,
             },
         });
     } catch (error: any) {

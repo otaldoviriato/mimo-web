@@ -46,6 +46,8 @@ interface SettingsSnapshot {
     creatorEngagementStep1Hours: number;
     creatorEngagementStep2Enabled: boolean;
     creatorEngagementStep2Hours: number;
+    availabilityResponseTimeMinutes: number;
+    availabilityDurationHours: number;
 }
 
 export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, userId: string | null | undefined) {
@@ -93,6 +95,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     const [activeRechargedClientDaysThreshold, setActiveRechargedClientDaysThreshold] = useState(30);
     const [activeUnrechargedClientHoursThreshold, setActiveUnrechargedClientHoursThreshold] = useState(24);
     const [exploreSortingCriteria, setExploreSortingCriteria] = useState<string[]>(['online', 'recentAccess']);
+    const [availabilityResponseTimeMinutes, setAvailabilityResponseTimeMinutes] = useState(10);
+    const [availabilityDurationHours, setAvailabilityDurationHours] = useState(4);
 
     // Parametrização de e-mails de engajamento de criadoras
     const [creatorEngagementEmailsEnabled, setCreatorEngagementEmailsEnabled] = useState(false);
@@ -152,6 +156,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         creatorEngagementStep1Hours: s.creatorEngagementStep1Hours ?? 24,
         creatorEngagementStep2Enabled: s.creatorEngagementStep2Enabled ?? true,
         creatorEngagementStep2Hours: s.creatorEngagementStep2Hours ?? 72,
+        availabilityResponseTimeMinutes: s.availabilityResponseTimeMinutes ?? 10,
+        availabilityDurationHours: s.availabilityDurationHours ?? 4,
     });
 
     useEffect(() => {
@@ -209,6 +215,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     setActiveRechargedClientDaysThreshold(s.activeRechargedClientDaysThreshold ?? 30);
                     setActiveUnrechargedClientHoursThreshold(s.activeUnrechargedClientHoursThreshold ?? 24);
                     setExploreSortingCriteria(['online', 'recentAccess']);
+                    setAvailabilityResponseTimeMinutes(s.availabilityResponseTimeMinutes ?? 10);
+                    setAvailabilityDurationHours(s.availabilityDurationHours ?? 4);
                     setCreatorEngagementEmailsEnabled(s.creatorEngagementEmailsEnabled ?? true);
                     setCreatorEngagementStep1Enabled(s.creatorEngagementStep1Enabled ?? true);
                     setCreatorEngagementStep1Hours(s.creatorEngagementStep1Hours ?? 24);
@@ -313,6 +321,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     newClientHoursThreshold,
                     activeRechargedClientDaysThreshold,
                     activeUnrechargedClientHoursThreshold,
+                    availabilityResponseTimeMinutes,
+                    availabilityDurationHours,
                 }),
             });
             if (response.ok) {
@@ -355,6 +365,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                 setActiveRechargedClientDaysThreshold(s.activeRechargedClientDaysThreshold ?? 30);
                 setActiveUnrechargedClientHoursThreshold(s.activeUnrechargedClientHoursThreshold ?? 24);
                 setExploreSortingCriteria(['online', 'recentAccess']);
+                setAvailabilityResponseTimeMinutes(s.availabilityResponseTimeMinutes ?? 10);
+                setAvailabilityDurationHours(s.availabilityDurationHours ?? 4);
                 setCreatorEngagementEmailsEnabled(s.creatorEngagementEmailsEnabled ?? true);
                 setCreatorEngagementStep1Enabled(s.creatorEngagementStep1Enabled ?? true);
                 setCreatorEngagementStep1Hours(s.creatorEngagementStep1Hours ?? 24);
@@ -444,12 +456,17 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         adminListRich.length !== savedSnapshot.adminClerkIds.length ||
         adminListRich.some(a => !savedSnapshot.adminClerkIds.includes(a.clerkId))
     );
-    const isDirtyExplore = false;
+    const isDirtyExplore = savedSnapshot !== null && (
+        availabilityResponseTimeMinutes !== savedSnapshot.availabilityResponseTimeMinutes ||
+        availabilityDurationHours !== savedSnapshot.availabilityDurationHours
+    );
 
     return {
         settings, loadingSettings, isAuthorized, saving, savedSnapshot,
         isDirtyPlatform, isDirtyChat, isDirtyPricing, isDirtyProfiles,
         isDirtyPayments, isDirtyApp, isDirtyAdmins, isDirtyExplore,
+        availabilityResponseTimeMinutes, setAvailabilityResponseTimeMinutes,
+        availabilityDurationHours, setAvailabilityDurationHours,
         platformFee, setPlatformFee,
         uploadLimit, setUploadLimit,
         comparisonPeriod, setComparisonPeriod,
