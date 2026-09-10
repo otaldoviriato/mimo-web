@@ -13,7 +13,7 @@ export interface ITransaction extends Document {
     creditGrantId?: string;
     withdrawable?: boolean;
     timestamp: Date;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -76,6 +76,7 @@ const TransactionSchema = new Schema<ITransaction>({
 
 TransactionSchema.index({ userId: 1, timestamp: -1 });
 TransactionSchema.index({ abacatePayId: 1 }, { unique: true, sparse: true });
+TransactionSchema.index({ type: 1, source: 1, status: 1, 'metadata.provider': 1, timestamp: 1 });
 
 export const Transaction = (mongoose.models.Transaction as mongoose.Model<ITransaction>) ||
     mongoose.model<ITransaction>('Transaction', TransactionSchema);

@@ -8,7 +8,7 @@ import { Resend } from 'resend';
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
 export async function sendAdminAlert(
-    type: 'new_professional' | 'new_client_brought',
+    type: 'new_professional' | 'new_client_brought' | 'payment_reconciliation',
     payload: {
         title: string;
         body: string;
@@ -58,9 +58,9 @@ export async function sendAdminAlert(
                 };
 
                 // Verificar se o alerta do tipo específico está ativado
-                const isAlertActive = type === 'new_professional'
+                const isAlertActive = type === 'payment_reconciliation' || (type === 'new_professional'
                     ? prefObj.newProfessionalAlert
-                    : prefObj.newClientBroughtAlert;
+                    : prefObj.newClientBroughtAlert);
 
                 if (!isAlertActive) {
                     console.log(`[AdminAlerts] Alerta "${type}" desativado nas preferências do admin ${adminId}`);

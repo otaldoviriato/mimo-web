@@ -1,102 +1,98 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
-import { Transaction } from '@/models/Transaction';
-import { User } from '@/models/User';
-import { sendPushNotification } from '@/lib/push';
-import { recordAcquisitionEvent } from '@/lib/acquisitionAnalytics';
-import { CampaignVisit } from '@/models/CampaignVisit';
 import { getAbacatePixWebhookId } from '@/lib/abacatePix';
+import { getWebhookEventId, verifyAbacateWebhook } from '@/lib/abacateWebhook';
 import { settleAbacatePix } from '@/lib/settleAbacatePix';
-import { executeRechargeCredit } from '@/lib/creditRecharge';
+import { sendPushNotification } from '@/lib/push';
+import { PaymentWebhookEvent } from '@/models/PaymentWebhookEvent';
+import { Transaction } from '@/models/Transaction';
 
-export async function POST(req: NextRequest) {
+export const runtime = 'nodejs';
+
+function eventName(body: unknown) {
+    if (!body || typeof body !== 'object') return undefined;
+    const event = (body as Record<string, unknown>).event;
+    return typeof event === 'string' ? event : undefined;
+}
+
+export async function POST(request: NextRequest) {
+    const rawBody = await request.text();
+    const signature = request.headers.get('x-webhook-signature') || request.headers.get('x-abacate-signature');
+    if (!verifyAbacateWebhook(rawBody, request.nextUrl.searchParams.get('webhookSecret'), signature)) {
+        console.warn('[abacatepay-webhook]', { outcome: 'unauthorized' });
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    let body: unknown;
     try {
-        const body = await req.json();
-        console.log('=== Webhook AbacatePay RECEBIDO ===');
-        const pixId = getAbacatePixWebhookId(body);
-        if (pixId) {
-            await connectToDatabase();
-            const result = await settleAbacatePix(pixId);
-            if (!result) return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
-            if (result.credited) {
-                try {
-                    const amount = result.transaction.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                    await sendPushNotification(result.transaction.userId, 'Recarga realizada! ✅', `Sua recarga de ${amount} foi confirmada e já está disponível.`);
-                } catch { console.error('[PIX] Post-credit notification failed', { paymentId: pixId }); }
-            }
-            return NextResponse.json({ received: true, status: result.transaction.status });
-        }
-        
-        let abacateId = '';
-        if (body?.data?.transparent?.id) {
-            abacateId = body.data.transparent.id;
-        } else if (body?.data?.pixQrCode?.id) {
-            abacateId = body.data.pixQrCode.id;
-        } else if (body?.data?.billing?.id) {
-            abacateId = body.data.billing.id;
-        } else if (body?.data?.id) {
-            abacateId = body.data.id;
-        } else if (body?.id) {
-            abacateId = body.id;
-        }
+        body = JSON.parse(rawBody);
+    } catch {
+        return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
 
-        const eventStatus =
-            body?.data?.transparent?.status ||
-            body?.data?.pixQrCode?.status ||
-            body?.data?.billing?.status ||
-            body?.data?.status ||
-            body?.status ||
-            body?.event;
+    const paymentId = getAbacatePixWebhookId(body);
+    const eventId = getWebhookEventId(body, rawBody);
+    const event = eventName(body);
+    await connectToDatabase();
 
-        if (!abacateId) {
-            console.error('Webhook payload sem id:', body);
-            return NextResponse.json({ error: 'Missing Id' }, { status: 400 });
-        }
-
-        // Se o status indicar que foi pago ('PAID' / 'payment.paid')
-        const isPaid =
-            typeof eventStatus === 'string' &&
-            (eventStatus.toUpperCase() === 'PAID' ||
-                eventStatus.toLowerCase().includes('paid') ||
-                eventStatus.toLowerCase().includes('completed'));
-
-        if (!isPaid) {
-            console.log('Webhook evento ignorado (não é pago):', eventStatus);
-            return NextResponse.json({ received: true });
-        }
-
-        await connectToDatabase();
-
-        const creditResult = await executeRechargeCredit({
-            paymentId: abacateId,
-            provider: 'abacatepay',
-            providerStatus: eventStatus,
-            receiptUrl: body?.data?.transparent?.receiptUrl || body?.data?.billing?.receiptUrl,
+    try {
+        await PaymentWebhookEvent.create({
+            eventId, provider: 'abacatepay', event, paymentId,
+            status: 'RECEIVED', attempts: 1, receivedAt: new Date(),
         });
-
-        if (!creditResult.success) {
-            const exists = await Transaction.exists({ abacatePayId: abacateId });
-            if (!exists) {
-                console.error('Transação não encontrada:', abacateId);
-                return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
-            }
-
-            console.error('Falha ao creditar recarga AbacatePay:', creditResult.message);
-            return NextResponse.json({ error: creditResult.message || 'Failed to credit recharge' }, { status: 500 });
-        }
-
-        if (creditResult.alreadyCredited) {
-            console.log('Transação já paga/creditada anteriormente:', abacateId);
-            return NextResponse.json({ received: true, message: 'Already paid' });
-        }
-
-        return NextResponse.json({
-            success: true,
-            message: 'Balance updated via webhook'
-        });
-
     } catch (error) {
-        console.error('Error no Webhook AbacatePay:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        const duplicate = error && typeof error === 'object' && 'code' in error && error.code === 11000;
+        if (!duplicate) throw error;
+        const previous = await PaymentWebhookEvent.findOneAndUpdate(
+            { eventId }, { $inc: { attempts: 1 } }, { new: true },
+        );
+        if (previous?.status === 'PROCESSED') {
+            return NextResponse.json({ received: true, duplicate: true });
+        }
+    }
+
+    try {
+        if (!paymentId) throw new Error('Unsupported webhook payload: missing PIX payment ID');
+
+        await Transaction.updateOne({ abacatePayId: paymentId }, {
+            $set: { 'metadata.webhookReceivedAt': new Date(), 'metadata.webhookEventId': eventId },
+        });
+        const settlement = await settleAbacatePix(paymentId);
+        if (!settlement) throw new Error('Transaction not found');
+        if (settlement.transaction.status !== 'PAID') {
+            throw new Error('Provider payment confirmation is not visible yet');
+        }
+
+        await PaymentWebhookEvent.updateOne({ eventId }, {
+            $set: { status: 'PROCESSED', processedAt: new Date(), paymentId },
+            $unset: { lastError: 1 },
+        });
+
+        if (settlement.credited) {
+            try {
+                const amount = settlement.transaction.amount.toLocaleString('pt-BR', {
+                    style: 'currency', currency: 'BRL',
+                });
+                await sendPushNotification(
+                    settlement.transaction.userId,
+                    'Recarga realizada! ✅',
+                    `Sua recarga de ${amount} foi confirmada e já está disponível.`,
+                );
+            } catch {
+                console.error('[abacatepay-webhook]', { eventId, paymentId, outcome: 'notification_failed' });
+            }
+        }
+
+        console.info('[abacatepay-webhook]', {
+            eventId, paymentId, outcome: settlement.credited ? 'credited' : 'processed',
+        });
+        return NextResponse.json({ received: true, status: settlement.transaction.status });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown webhook processing error';
+        await PaymentWebhookEvent.updateOne({ eventId }, {
+            $set: { status: 'FAILED', lastError: message, paymentId },
+        });
+        console.error('[abacatepay-webhook]', { eventId, paymentId, outcome: 'failed', error: message });
+        return NextResponse.json({ error: 'Webhook processing failed' }, { status: 503 });
     }
 }

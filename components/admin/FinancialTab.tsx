@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Trash2, X, AlertCircle, CheckCircle2, Clock, Coins, TrendingUp, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { Trash2, X, AlertCircle, CheckCircle2, Clock, Coins, TrendingUp, ArrowDownLeft, ArrowUpRight, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 
@@ -20,6 +20,7 @@ export function FinancialTab({ dashboardData, loadingDashboard: parentLoading, h
     const [totalPages, setTotalPages] = useState(1);
     const [totalItems, setTotalItems] = useState(0);
     const [loadingLocal, setLoadingLocal] = useState(true);
+    const [reconcilingId, setReconcilingId] = useState<string | null>(null);
 
     // Estados para o painel contábil mensal
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
@@ -110,6 +111,24 @@ export function FinancialTab({ dashboardData, loadingDashboard: parentLoading, h
         await handleDeleteTransaction(id, displayId);
         fetchTransactions(selectedMonth, selectedYear);
         fetchStats(selectedMonth, selectedYear);
+    };
+
+    const handleReconcilePix = async (id: string) => {
+        setReconcilingId(id);
+        try {
+            const response = await fetch(`/api/admin/transactions/${id}/reconcile`, { method: 'POST' });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Falha ao reconciliar PIX');
+            toast.success(data.credited ? 'PIX confirmado e saldo creditado.' : `Status consultado: ${data.status}.`);
+            await Promise.all([
+                fetchTransactions(selectedMonth, selectedYear),
+                fetchStats(selectedMonth, selectedYear),
+            ]);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Falha ao reconciliar PIX');
+        } finally {
+            setReconcilingId(null);
+        }
     };
 
     // Handler para rejeitar saques pendentes
@@ -721,13 +740,25 @@ export function FinancialTab({ dashboardData, loadingDashboard: parentLoading, h
                                                         )}
                                                     </div>
                                                 ) : (
-                                                    <button
-                                                        onClick={() => handleDeleteNormal(tx.id, tx.displayId || tx.id)}
-                                                        className="p-1.5 bg-slate-50 border border-slate-200 text-slate-505 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100 rounded-lg cursor-pointer transition-all shadow-sm active:scale-95"
-                                                        title="Excluir Transação"
-                                                    >
-                                                        <Trash2 size={13} />
-                                                    </button>
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        {activeTab === 'recharge' && tx.status === 'Pendente' && String(tx.displayId || '').startsWith('pix_char_') && (
+                                                            <button
+                                                                onClick={() => handleReconcilePix(tx.id)}
+                                                                disabled={reconcilingId === tx.id}
+                                                                className="p-1.5 bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 rounded-lg cursor-pointer transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                                                                title="Consultar provedor e reconciliar PIX"
+                                                            >
+                                                                <RefreshCw size={13} className={reconcilingId === tx.id ? 'animate-spin' : ''} />
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={() => handleDeleteNormal(tx.id, tx.displayId || tx.id)}
+                                                            className="p-1.5 bg-slate-50 border border-slate-200 text-slate-505 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100 rounded-lg cursor-pointer transition-all shadow-sm active:scale-95"
+                                                            title="Excluir Transação"
+                                                        >
+                                                            <Trash2 size={13} />
+                                                        </button>
+                                                    </div>
                                                 )}
                                             </td>
                                         </tr>

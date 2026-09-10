@@ -14,9 +14,31 @@ export async function settleAbacatePix(id: string, userId?: string) {
     }
 
     // Se ainda não estava PAID, valida com a API da AbacatePay
-    let providerStatus = existing.metadata?.providerStatus;
+    let providerStatus = typeof existing.metadata?.providerStatus === 'string'
+        ? existing.metadata.providerStatus
+        : undefined;
     if (existing.status !== 'PAID') {
-        providerStatus = await checkAbacatePix(id);
+        try {
+            providerStatus = await checkAbacatePix(id);
+            await Transaction.updateOne(filter, {
+                $set: {
+                    'metadata.lastProviderStatus': providerStatus,
+                    'metadata.lastReconciliationAt': new Date(),
+                },
+                $inc: { 'metadata.reconciliationAttempts': 1 },
+                $unset: { 'metadata.lastReconciliationError': 1 },
+            });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown provider lookup error';
+            await Transaction.updateOne(filter, {
+                $set: {
+                    'metadata.lastReconciliationAt': new Date(),
+                    'metadata.lastReconciliationError': message,
+                },
+                $inc: { 'metadata.reconciliationAttempts': 1 },
+            });
+            throw error;
+        }
         if (providerStatus !== 'PAID') {
             if (providerStatus === 'EXPIRED' || providerStatus === 'CANCELLED') {
                 await Transaction.updateOne({ ...filter, status: 'PENDING' }, {
@@ -35,7 +57,15 @@ export async function settleAbacatePix(id: string, userId?: string) {
     });
 
     if (!creditResult.success) {
-        return { transaction: await Transaction.findOne(filter) || existing, credited: false };
+        const message = creditResult.message || 'Failed to credit confirmed AbacatePay PIX';
+        await Transaction.updateOne(filter, {
+            $set: {
+                'metadata.lastReconciliationAt': new Date(),
+                'metadata.lastReconciliationError': message,
+            },
+        });
+        console.error('[pix-settlement]', { paymentId: id, outcome: 'credit_failed', error: message });
+        throw new Error(message);
     }
 
     return {
