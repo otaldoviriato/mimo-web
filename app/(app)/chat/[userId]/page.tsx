@@ -19,7 +19,7 @@ import { PendingReceiptBalloon } from '@/components/PendingReceiptBalloon';
 import { LargeMessageConfirmModal } from '@/components/LargeMessageConfirmModal';
 import { decryptMessageText } from '@/lib/messageCipher';
 import { trackAcquisitionEvent } from '@/lib/clientAcquisitionAnalytics';
-import { FirstMessageNotificationModal } from '@/components/FirstMessageNotificationModal';
+import { PWAPromoModal } from '@/components/PWAPromoModal';
 import { userApi } from '@/services/api';
 import { AlertTriangle, ShieldCheck, Wallet, Clock, MessageCircle, LockKeyhole } from 'lucide-react';
 
@@ -639,7 +639,6 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     const [largeMessageThreshold, setLargeMessageThreshold] = useState(100);
     const [pendingLongMessageToConfirm, setPendingLongMessageToConfirm] = useState<Message | null>(null);
     const declinedLongMessageIdsRef = useRef<Set<string>>(new Set());
-    const [showFirstMessageNotifModal, setShowFirstMessageNotifModal] = useState<boolean>(false);
 
     const triggerFirstMessageModalIfEligible = () => {
         const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
@@ -655,9 +654,9 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         }
 
         setTimeout(() => {
-            setShowFirstMessageNotifModal(true);
             if (typeof window !== 'undefined') {
                 localStorage.setItem(storageKey, 'true');
+                window.dispatchEvent(new Event('show_pwa_promo'));
             }
             void userApi.updateMe({ hasSentFirstMessage: true }).catch(() => undefined);
         }, 700);
@@ -4718,11 +4717,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 userBalanceInCents={balance}
             />
 
-            <FirstMessageNotificationModal
-                isOpen={showFirstMessageNotifModal}
-                onClose={() => setShowFirstMessageNotifModal(false)}
-                professionalName={receiver?.name || receiver?.username}
-            />
+            <PWAPromoModal />
         </div>
     );
 }
