@@ -216,16 +216,17 @@ export function NetflixStyleLanding({
             <main className="relative z-20 flex-1 flex flex-col justify-center px-5 sm:px-12 lg:px-16 max-w-7xl mx-auto w-full py-8 sm:my-auto sm:py-12">
                 <div className="w-full max-w-xl mx-auto sm:mx-0 text-left space-y-5 sm:space-y-6">
                     {/* Título Principal de Impacto: Escala Perfeita em Telas Pequenas */}
-                    <h1 className="text-[2.5rem] sm:text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 tracking-[-0.035em] leading-[0.98] sm:leading-[1.05]">
-                        <span className="block">Conversas privadas.</span>
-                        <span className="mt-1.5 block text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-600">
-                            Mulheres reais.
+                    <h1 className="text-[2.5rem] sm:text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 tracking-[-0.035em] leading-[1.02] sm:leading-[1.05]">
+                        <span className="block">Recarregue</span>
+                        <span className="block">Converse</span>
+                        <span className="mt-1 block text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-600">
+                            Descubra
                         </span>
                     </h1>
 
                     {/* Subtexto */}
                     <p className="text-sm sm:text-base lg:text-lg text-slate-600 font-medium leading-relaxed max-w-md">
-                        Elas ganham pra te responder. Mande um oi de graça, dê mimos pras que você curtir e receba fotos e vídeos exclusivos.
+                        Converse com mulheres reais, troque fotos e vídeos exclusivos com total privacidade e respostas rápidas.
                     </p>
 
                     {/* Botão de Chamada para Ação */}
@@ -240,7 +241,7 @@ export function NetflixStyleLanding({
                         </Link>
 
                         <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
-                            Mulheres reais • Envio grátis • 100% no sigilo
+                            Mulheres reais • Conversas privadas • Recargas no PIX
                         </p>
                     </div>
                 </div>
