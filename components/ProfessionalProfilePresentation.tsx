@@ -247,12 +247,15 @@ export function ProfessionalProfilePresentation({
 
                     {/* Badge de disponibilidade para visitantes */}
                     {!isOwner && isAvailable && (
-                        <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 shadow-2xs">
+                        <div className="mt-3 inline-flex items-center gap-2.5 rounded-full border border-emerald-200 bg-emerald-50 px-3.5 py-1.5 shadow-2xs">
                             <span className="relative flex h-2 w-2 shrink-0">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                             </span>
-                            <span>Disponível agora • Responde em até {responseTime} min</span>
+                            <div className="flex flex-col leading-tight">
+                                <span className="text-xs font-bold text-emerald-700">Disponível agora</span>
+                                <span className="text-[10px] font-medium text-emerald-600/80">Responde em até {responseTime} min</span>
+                            </div>
                         </div>
                     )}
 
