@@ -355,40 +355,6 @@ export function RechargeModal({
 
     }, [visible, queryClient]);
 
-    // Previne que o fechamento do teclado virtual no mobile deixe o drawer suspenso na metade da tela
-    useEffect(() => {
-        if (!visible || typeof window === 'undefined') return;
-
-        const handleViewportChange = () => {
-            const vv = window.visualViewport;
-            if (!vv) return;
-
-            // Quando a altura do visualViewport volta ao normal (teclado virtual fechou)
-            if (vv.height >= window.innerHeight - 60) {
-                // 1. Reseta qualquer deslocamento de scroll fantasma do body/window
-                if (window.scrollY > 0) {
-                    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-                }
-                // 2. Se algum input estiver retendo foco após o teclado fechar (comum no Android com botão voltar), remove o foco
-                if (document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement) {
-                    document.activeElement.blur();
-                }
-            }
-        };
-
-        const vv = window.visualViewport;
-        if (vv) {
-            vv.addEventListener('resize', handleViewportChange);
-            vv.addEventListener('scroll', handleViewportChange);
-        }
-
-        return () => {
-            if (vv) {
-                vv.removeEventListener('resize', handleViewportChange);
-                vv.removeEventListener('scroll', handleViewportChange);
-            }
-        };
-    }, [visible]);
 
     const resetState = () => {
         setStep('amount_and_method');
@@ -1067,6 +1033,7 @@ export function RechargeModal({
                                                         value={userCpf}
                                                         onChange={(e) => setUserCpf(formatCPF(e.target.value))}
                                                         maxLength={14}
+                                                        inputMode="numeric"
                                                         className="rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
                                                     />
                                                 </div>
@@ -1080,6 +1047,7 @@ export function RechargeModal({
                                                         value={userPhone}
                                                         onChange={(e) => setUserPhone(formatPhone(e.target.value))}
                                                         maxLength={15}
+                                                        inputMode="tel"
                                                         className="rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
                                                     />
                                                 </div>
