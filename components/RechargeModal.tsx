@@ -215,6 +215,9 @@ export function RechargeModal({
     const [selectedSavedCardId, setSelectedSavedCardId] = useState('');
     const [userCpf, setUserCpf] = useState('');
     const [userPhone, setUserPhone] = useState('');
+    const [hasSavedCpf, setHasSavedCpf] = useState(false);
+    const [hasSavedPhone, setHasSavedPhone] = useState(false);
+    const [showBillingInputsOverride, setShowBillingInputsOverride] = useState(false);
     const [couponCode, setCouponCode] = useState('');
     const [couponError, setCouponError] = useState('');
     const [couponSuccess, setCouponSuccess] = useState('');
@@ -247,8 +250,16 @@ export function RechargeModal({
 
         userApi.getMe()
             .then((res: UserProfileResponse) => {
-                if (res?.user?.taxId) setUserCpf(formatCPF(res.user.taxId));
-                if (res?.user?.phone) setUserPhone(formatPhone(res.user.phone));
+                const savedTaxId = res?.user?.taxId?.replace(/\D/g, '');
+                const savedPhoneNum = res?.user?.phone?.replace(/\D/g, '');
+                if (savedTaxId && savedTaxId.length === 11) {
+                    setUserCpf(formatCPF(savedTaxId));
+                    setHasSavedCpf(true);
+                }
+                if (savedPhoneNum && savedPhoneNum.length >= 10) {
+                    setUserPhone(formatPhone(savedPhoneNum));
+                    setHasSavedPhone(true);
+                }
                 if (typeof res?.user?.balance === 'number') setCurrentBalanceInCents(res.user.balance);
                 const cards = (res?.user?.savedCards || []).filter((card) => card.canUseForPayments);
                 setSavedCards(cards);
@@ -381,6 +392,7 @@ export function RechargeModal({
         setCouponCode('');
         setCouponError('');
         setCouponSuccess('');
+        setShowBillingInputsOverride(false);
     };
 
     const handleClose = (wasPaid = false) => {
@@ -573,9 +585,10 @@ export function RechargeModal({
     };
 
     const finalAmount = getFinalAmount();
-    const hasCpf = userCpf.replace(/\D/g, '').length === 11;
-    const hasPhone = userPhone.replace(/\D/g, '').length >= 10;
-    const hasCompletePixData = hasCpf && hasPhone;
+    const isCpfValid = userCpf.replace(/\D/g, '').length === 11;
+    const isPhoneValid = userPhone.replace(/\D/g, '').length >= 10;
+    const hasCompletePixData = isCpfValid && isPhoneValid;
+    const shouldShowPixBillingInputs = !hasSavedCpf || !hasSavedPhone || showBillingInputsOverride;
     const cleanCardNumber = cardNumber.replace(/\s/g, '');
     const [expiryMonth = '', expiryYear = ''] = cardExpiry.split('/');
     const hasSavedCardSelected = Boolean(selectedSavedCardId);
@@ -588,8 +601,8 @@ export function RechargeModal({
             expiryYear.length === 2 &&
             isFutureCardExpiry(expiryMonth, expiryYear) &&
             cardCvv.length >= 3 &&
-            hasCpf &&
-            hasPhone
+            isCpfValid &&
+            isPhoneValid
         );
     const isPixValid = isPixSelected
         ? hasCompletePixData
@@ -931,34 +944,30 @@ export function RechargeModal({
                                                                     Salvar cartão para compras futuras
                                                                 </span>
                                                             </label>
-                                                            {!hasCpf && (
-                                                                <div className="flex flex-col gap-1">
-                                                                    <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">CPF do titular</label>
-                                                                    <input
-                                                                        type="text"
-                                                                        placeholder="000.000.000-00"
-                                                                        value={userCpf}
-                                                                        onChange={(e) => setUserCpf(formatCPF(e.target.value))}
-                                                                        maxLength={14}
-                                                                        inputMode="numeric"
-                                                                        className="rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
-                                                                    />
-                                                                </div>
-                                                            )}
-                                                            {!hasPhone && (
-                                                                <div className="flex flex-col gap-1">
-                                                                    <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">Telefone</label>
-                                                                    <input
-                                                                        type="text"
-                                                                        placeholder="(00) 00000-0000"
-                                                                        value={userPhone}
-                                                                        onChange={(e) => setUserPhone(formatPhone(e.target.value))}
-                                                                        maxLength={15}
-                                                                        inputMode="tel"
-                                                                        className="rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
-                                                                    />
-                                                                </div>
-                                                            )}
+                                                            <div className="flex flex-col gap-1">
+                                                                <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">CPF do titular</label>
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="000.000.000-00"
+                                                                    value={userCpf}
+                                                                    onChange={(e) => setUserCpf(formatCPF(e.target.value))}
+                                                                    maxLength={14}
+                                                                    inputMode="numeric"
+                                                                    className="rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+                                                                />
+                                                            </div>
+                                                            <div className="flex flex-col gap-1">
+                                                                <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">Telefone</label>
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="(00) 00000-0000"
+                                                                    value={userPhone}
+                                                                    onChange={(e) => setUserPhone(formatPhone(e.target.value))}
+                                                                    maxLength={15}
+                                                                    inputMode="tel"
+                                                                    className="rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+                                                                />
+                                                            </div>
                                                             {paymentError && (
                                                                 <p className="text-xs font-medium text-red-600 animate-in fade-in duration-200 mt-2">
                                                                     {paymentError}
@@ -1039,40 +1048,49 @@ export function RechargeModal({
                                         </div>
                                     )}
 
-                                    {isPixSelected && !hasCompletePixData && (
+                                    {isPixSelected && shouldShowPixBillingInputs && (
                                         <div className="mt-4 flex flex-col gap-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
                                             <div className="flex items-center gap-2 text-xs text-gray-500">
                                                 <ShieldCheck size={13} className="text-green-600" strokeWidth={2.2} />
                                                 Dados usados apenas para gerar a cobrança Pix.
                                             </div>
-                                            {!hasCpf && (
-                                                <div className="flex flex-col gap-1">
-                                                    <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">CPF</label>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="000.000.000-00"
-                                                        value={userCpf}
-                                                        onChange={(e) => setUserCpf(formatCPF(e.target.value))}
-                                                        maxLength={14}
-                                                        inputMode="numeric"
-                                                        className="rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
-                                                    />
-                                                </div>
-                                            )}
-                                            {!hasPhone && (
-                                                <div className="flex flex-col gap-1">
-                                                    <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">Telefone</label>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="(00) 00000-0000"
-                                                        value={userPhone}
-                                                        onChange={(e) => setUserPhone(formatPhone(e.target.value))}
-                                                        maxLength={15}
-                                                        inputMode="tel"
-                                                        className="rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
-                                                    />
-                                                </div>
-                                            )}
+                                            <div className="flex flex-col gap-1">
+                                                <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">CPF</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="000.000.000-00"
+                                                    value={userCpf}
+                                                    onChange={(e) => setUserCpf(formatCPF(e.target.value))}
+                                                    maxLength={14}
+                                                    inputMode="numeric"
+                                                    className="rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+                                                />
+                                            </div>
+                                            <div className="flex flex-col gap-1">
+                                                <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">Telefone</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="(00) 00000-0000"
+                                                    value={userPhone}
+                                                    onChange={(e) => setUserPhone(formatPhone(e.target.value))}
+                                                    maxLength={15}
+                                                    inputMode="tel"
+                                                    className="rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {isPixSelected && !shouldShowPixBillingInputs && (
+                                        <div className="mt-3 flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-500">
+                                            <span className="truncate">CPF: {userCpf} • Tel: {userPhone}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowBillingInputsOverride(true)}
+                                                className="text-xs font-semibold text-purple-600 hover:text-purple-700 ml-2 shrink-0 cursor-pointer"
+                                            >
+                                                Alterar
+                                            </button>
                                         </div>
                                     )}
 
