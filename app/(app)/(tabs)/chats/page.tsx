@@ -422,7 +422,8 @@ export default function ChatsPage() {
 
     // Abre a tela de conversa física usando o roteador de transição com dados pré-carregados
     const handleOpenChat = (userId: string, initialUser?: any) => {
-        router.push(`/chat/${userId}`, { initialUser });
+        const friendlySlug = initialUser?.username || userId;
+        router.push(`/chat/${friendlySlug}`, { initialUser });
     };
 
     const handleDeleteRoom = async (roomId: string) => {

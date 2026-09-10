@@ -57,9 +57,11 @@ export function StackNavigationProvider({ children }: { children: React.ReactNod
         // Define a URL silenciosamente
         let url = '';
         if (type === 'chat') {
-            url = `/chat/${params.userId}`;
+            const chatSlug = params.username || params.initialUser?.username || (!params.userId?.startsWith('user_') ? params.userId : null) || params.userId;
+            url = `/chat/${chatSlug}`;
         } else if (type === 'chatInfo') {
-            url = `/chat/${params.userId}/info`;
+            const chatSlug = params.username || params.initialUser?.username || (!params.userId?.startsWith('user_') ? params.userId : null) || params.userId;
+            url = `/chat/${chatSlug}/info`;
         } else if (type === 'profile') {
             url = `/${params.username}`;
         } else if (type === 'settings') {

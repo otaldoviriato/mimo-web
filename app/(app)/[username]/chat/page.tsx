@@ -38,7 +38,7 @@ export default function UsernameChatPage({ params }: UsernameChatPageProps) {
                     // Redireciona fisicamente para /chats passando os query params para que
                     // a página por baixo do chat virtual seja a lista de conversas.
                     const giftQuery = gift?.trim() ? `&gift=${encodeURIComponent(gift.trim())}` : '';
-                    router.replace(`/chats?openChat=${userId}${giftQuery}`);
+                    router.replace(`/chats?openChat=${cleanedUsername}${giftQuery}`);
                 } else {
                     router.replace('/chats');
                 }

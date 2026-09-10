@@ -128,6 +128,17 @@ export default function ChatInfoPage({ params, userId: propUserId }: ChatInfoPag
     const targetClerkId = receiver?.clerkId || (isClerkUserId(otherUserId) ? otherUserId : null);
     const isResolvingReceiver = isRouteClerkId ? loadingReceiverById : loadingReceiverByUsername;
 
+    // Se a rota acessada tiver o Clerk ID (ex: /chat/user_123/info), substitui na barra do navegador pela rota amigável (/chat/username/info)
+    useEffect(() => {
+        if (typeof window !== 'undefined' && receiver?.username && isRouteClerkId) {
+            const currentPath = window.location.pathname;
+            if (currentPath.includes(`/chat/${otherUserId}/info`)) {
+                const friendlyUrl = currentPath.replace(`/chat/${otherUserId}/info`, `/chat/${receiver.username}/info`);
+                window.history.replaceState(window.history.state, '', friendlyUrl + window.location.search);
+            }
+        }
+    }, [receiver?.username, isRouteClerkId, otherUserId]);
+
     // Carrega mensagens e mídias da conversa
     useEffect(() => {
         if (typeof window !== 'undefined' && user?.id && targetClerkId) {

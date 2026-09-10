@@ -116,7 +116,7 @@ export default function UserProfilePage({ params, username: propUsername, initia
                     return;
                 }
 
-                router.push(`/chat/${user.clerkId}`, { initialUser: user });
+                router.push(`/chat/${user.username || user.clerkId}`, { initialUser: user });
             } catch (err) {
                 console.error('Erro ao abrir conversa de ativacao:', err);
                 toast.error('Falha de conexao.');
@@ -126,7 +126,7 @@ export default function UserProfilePage({ params, username: propUsername, initia
             return;
         }
 
-        router.push(`/chat/${user.clerkId}`, { initialUser: user });
+        router.push(`/chat/${user.username || user.clerkId}`, { initialUser: user });
     };
 
     const publicGalleryItems = useMemo<PublicProfileGalleryItem[]>(() => {

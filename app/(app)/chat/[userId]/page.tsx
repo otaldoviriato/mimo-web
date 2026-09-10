@@ -8,7 +8,7 @@ import { useUser } from '@clerk/nextjs';
 import { useQueryClient } from '@tanstack/react-query';
 import { Avatar } from '@/components/Avatar';
 import { useSocket } from '@/hooks/useSocket';
-import { useChatPricing, useUserById, useMyProfile, QueryKeys } from '@/hooks/useQueries';
+import { useChatPricing, useUserById, useUserByUsername, useMyProfile, QueryKeys } from '@/hooks/useQueries';
 import { usePayment } from '@/context/PaymentContext';
 import { Drawer } from 'vaul';
 import { AudioRecorder, type AudioRecorderStatus } from '@/components/AudioRecorder';
@@ -846,23 +846,41 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     const pendingMediaRef = useRef<{ file: File; isVideoFile: boolean } | null>(null);
 
     const { data: userData, refetch: refetchMyProfile } = useMyProfile();
-    const { data: fetchedReceiver } = useUserById(otherUserId);
-    const receiver = fetchedReceiver || propInitialUser;
+    const isRouteClerkId = otherUserId.startsWith('user_');
+    const cleanedRouteUsername = isRouteClerkId ? '' : otherUserId.toLowerCase().replace(/^@/, '');
+
+    const { data: fetchedReceiverById, isLoading: loadingReceiverById } = useUserById(isRouteClerkId ? otherUserId : undefined);
+    const { data: fetchedReceiverByUsername, isLoading: loadingReceiverByUsername } = useUserByUsername(!isRouteClerkId && cleanedRouteUsername ? cleanedRouteUsername : undefined);
+    const isResolvingReceiver = isRouteClerkId ? loadingReceiverById : loadingReceiverByUsername;
+    const receiver = fetchedReceiverById || fetchedReceiverByUsername || propInitialUser;
+    const targetClerkId = receiver?.clerkId || (isRouteClerkId ? otherUserId : '');
 
     useEffect(() => {
-        if (propInitialUser && otherUserId) {
-            queryClient.setQueryData(QueryKeys.userById(otherUserId), (old: any) => ({
+        if (propInitialUser && targetClerkId) {
+            queryClient.setQueryData(QueryKeys.userById(targetClerkId), (old: any) => ({
                 ...(old || {}),
                 ...propInitialUser,
             }));
         }
-    }, [propInitialUser, otherUserId, queryClient]);
+    }, [propInitialUser, targetClerkId, queryClient]);
+
+    // Se a rota acessada tiver o Clerk ID (ex: /chat/user_123), substitui na barra do navegador pela rota amigável (/chat/username)
+    useEffect(() => {
+        if (typeof window !== 'undefined' && receiver?.username && isRouteClerkId) {
+            const currentPath = window.location.pathname;
+            if (currentPath.includes(`/chat/${otherUserId}`)) {
+                const friendlyUrl = currentPath.replace(`/chat/${otherUserId}`, `/chat/${receiver.username}`);
+                window.history.replaceState(window.history.state, '', friendlyUrl + window.location.search);
+            }
+        }
+    }, [receiver?.username, isRouteClerkId, otherUserId]);
+
     const targetProfessionalId = userData?.isProfessional ? (userData.clerkId || user?.id) : (receiver?.isProfessional ? receiver.clerkId : undefined);
     const { data: chatPricing } = useChatPricing(targetProfessionalId);
     const balance = userData?.balance ?? 0;
     const formattedBalance = (balance / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    const cachedRoom = user?.id
-        ? queryClient.getQueryData<CachedRoom[]>(QueryKeys.rooms(user.id))?.find((room) => room.participants.includes(otherUserId))
+    const cachedRoom = user?.id && targetClerkId
+        ? queryClient.getQueryData<CachedRoom[]>(QueryKeys.rooms(user.id))?.find((room) => room.participants.includes(targetClerkId) || (otherUserId && room.participants.includes(otherUserId)))
         : undefined;
     const receiverBalance = receiver?.balance ?? cachedRoom?.otherUser?.balance ?? 0;
 
@@ -885,8 +903,9 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     }, []);
 
     const latestPartnerMessage = React.useMemo(() => {
-        return messages.filter(m => m.senderId === otherUserId).slice(-1)[0];
-    }, [messages, otherUserId]);
+        const partnerId = targetClerkId || otherUserId;
+        return messages.filter(m => m.senderId === partnerId || (targetClerkId && m.senderId === otherUserId)).slice(-1)[0];
+    }, [messages, otherUserId, targetClerkId]);
 
     const ACTIVE_CONVERSATION_WINDOW_MS = 5 * 60 * 1000; // 5 minutos de janela para conversa ativa
 
@@ -1184,13 +1203,22 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         });
     }, [user?.id, propGiftCode, queryClient]);
 
-    const roomId = [user?.id, otherUserId].sort().join('_');
+    const partnerClerkId = targetClerkId || (isRouteClerkId ? otherUserId : '');
+    const roomId = (user?.id && partnerClerkId) ? [user.id, partnerClerkId].sort().join('_') : '';
 
     // Carrega mensagens do cache local APENAS no primeiro render da sala e preserva se já houver mensagens
     useEffect(() => {
-        if (typeof window !== 'undefined' && user?.id && otherUserId) {
-            const currentRoomId = [user.id, otherUserId].sort().join('_');
-            const cached = localStorage.getItem(`mimo_messages_${currentRoomId}`);
+        if (typeof window !== 'undefined' && user?.id && (partnerClerkId || otherUserId)) {
+            const currentRoomId = roomId || [user.id, partnerClerkId || otherUserId].sort().join('_');
+            const keysToTry = [
+                `mimo_messages_${currentRoomId}`,
+                `mimo_messages_${[user.id, otherUserId].sort().join('_')}`,
+            ];
+            let cached: string | null = null;
+            for (const key of keysToTry) {
+                cached = localStorage.getItem(key);
+                if (cached) break;
+            }
             if (cached) {
                 try {
                     const parsed = JSON.parse(cached);
@@ -1210,13 +1238,14 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 }
             }
         }
-    }, [roomId, user?.id, otherUserId]);
+    }, [roomId, user?.id, otherUserId, partnerClerkId]);
 
     // Fallback HTTP para carregar mensagens da API se o socket atrasar ou falhar (executa apenas ao montar a sala)
     useEffect(() => {
-        if (!user?.id || !otherUserId) return;
+        const partner = partnerClerkId || otherUserId;
+        if (!user?.id || !partner) return;
 
-        const currentRoomId = [user.id, otherUserId].sort().join('_');
+        const currentRoomId = roomId || [user.id, partner].sort().join('_');
         axios.get(`/api/rooms/${user.id}/messages`, {
             params: { roomId: currentRoomId, limit: 50 }
         })
@@ -1254,7 +1283,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         .finally(() => {
             setLoadingMessages(false);
         });
-    }, [roomId, user?.id, otherUserId]);
+    }, [roomId, user?.id, otherUserId, partnerClerkId]);
 
     // Atualiza apenas o destrancamento em memória quando o saldo ou o limite de caracteres muda (SEM resetar cache ou estado)
     useEffect(() => {
@@ -1280,15 +1309,16 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
     // Salva apenas as últimas 50 mensagens confirmadas no cache local para não sobrecarregar o armazenamento
     useEffect(() => {
-        if (typeof window !== 'undefined' && user?.id && otherUserId && !loadingMessages) {
-            const currentRoomId = [user.id, otherUserId].sort().join('_');
+        const partner = partnerClerkId || otherUserId;
+        if (typeof window !== 'undefined' && user?.id && partner && !loadingMessages) {
+            const currentRoomId = roomId || [user.id, partner].sort().join('_');
             const confirmedMessages = messages.filter(m => !m.tempId && m.status !== 'sending');
             const recentMessages = confirmedMessages.slice(-50);
             if (recentMessages.length > 0) {
                 localStorage.setItem(`mimo_messages_${currentRoomId}`, JSON.stringify(recentMessages));
             }
         }
-    }, [messages, user?.id, otherUserId, loadingMessages]);
+    }, [messages, user?.id, otherUserId, partnerClerkId, loadingMessages, roomId]);
 
     // Busca mídias históricas do backend quando a galeria for aberta
     useEffect(() => {
@@ -1366,9 +1396,10 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     }, [messages, loadingMessages, user?.id]);
 
     useEffect(() => {
-        if (!socket || !user?.id) return;
+        const partner = partnerClerkId || (isRouteClerkId ? otherUserId : '');
+        if (!socket || !user?.id || !partner) return;
 
-        socketService.joinRoom(user.id, otherUserId);
+        socketService.joinRoom(user.id, partner);
 
         socket.on('room_joined', (data: { messages: Message[]; monetizationDisabled?: boolean; largeMessageThreshold?: number }) => {
             if (data.largeMessageThreshold) {
@@ -1446,7 +1477,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     const pendingRoom = {
                         _id: `pending-${roomId}`,
                         roomId,
-                        participants: [user.id!, otherUserId].sort(),
+                        participants: [user.id!, partner].sort(),
                         otherUser: receiver,
                         unreadCount: { [user.id!]: 0 },
                         createdAt: new Date().toISOString(),
@@ -1472,8 +1503,9 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         });
 
         socket.on('user_presence', (data: { userId: string; isOnline: boolean; lastSeen: string }) => {
-            if (data.userId === otherUserId) {
-                queryClient.setQueryData(QueryKeys.userById(otherUserId), (old: any) => {
+            if (data.userId === partner || data.userId === otherUserId) {
+                const targetKey = partnerClerkId || otherUserId;
+                queryClient.setQueryData(QueryKeys.userById(targetKey), (old: any) => {
                     if (!old) return old;
                     return {
                         ...old,
@@ -1752,7 +1784,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 partnerTypingTimeoutRef.current = null;
             }
         };
-    }, [socket, socketVersion, roomId, otherUserId, user?.id, queryClient]);
+    }, [socket, socketVersion, roomId, otherUserId, partnerClerkId, isRouteClerkId, user?.id, queryClient]);
 
     // Handles the edge case where the user selects a file before userData finishes
     // loading. Once userData is available we decide: auto-send (non-professional)
@@ -1781,7 +1813,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     _id: tempId,
                     tempId: tempId,
                     senderId: user?.id ?? '',
-                    receiverId: otherUserId,
+                    receiverId: partnerClerkId || otherUserId,
                     content: isVideoFile ? 'Vídeo' : 'Foto',
                     charCount: 0,
                     cost: 0,
@@ -2023,8 +2055,10 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 formData.append('file', uploadFile);
             }
             
-            formData.append('roomId', roomId);
-            formData.append('receiverId', otherUserId);
+            const effectivePartnerId = partnerClerkId || otherUserId;
+            const effectiveRoomId = roomId || (user?.id && effectivePartnerId ? [user.id, effectivePartnerId].sort().join('_') : roomId);
+            formData.append('roomId', effectiveRoomId);
+            formData.append('receiverId', effectivePartnerId);
             formData.append('lockedPrice', (priceInCents / 100).toString());
             formData.append('isVideo', isVideoFile.toString());
             formData.append('tempId', tempId);
@@ -2513,9 +2547,10 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
         setMessages(prev => prev.map(m => (m._id === msg._id || m.tempId === msg.tempId) ? { ...m, status: 'sending' as const } : m));
 
+        const effectivePartnerId = partnerClerkId || otherUserId;
         sendQueueRef.current.push({
             content: msg.content,
-            otherUserId,
+            otherUserId: effectivePartnerId,
             roomId,
             tempId: msg.tempId || msg._id,
             replyToId: msg.replyToId || undefined,
@@ -2547,12 +2582,13 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         lastSentTimestampRef.current = safeTimestampMs;
         const timestampIso = new Date(safeTimestampMs).toISOString();
 
+        const effectivePartnerId = partnerClerkId || otherUserId;
         const tempId = `temp-${safeTimestampMs}-${Math.random().toString(36).slice(2, 7)}`;
         const newMsg: Message = {
             _id: tempId,
             tempId: tempId,
             senderId: user?.id ?? '',
-            receiverId: otherUserId,
+            receiverId: effectivePartnerId,
             content: text,
             charCount: charCount,
             cost: costInCents,
@@ -2580,7 +2616,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         // Enfileira para despacho serial garantido
         sendQueueRef.current.push({
             content: text,
-            otherUserId,
+            otherUserId: effectivePartnerId,
             roomId,
             tempId,
             replyToId: replySnapshot?._id,
@@ -2638,11 +2674,13 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         const previewUrl = URL.createObjectURL(audioBlob);
         const estimatedAudioCostInCents = 0;
 
+        const effectivePartnerId = partnerClerkId || otherUserId;
+        const effectiveRoomId = roomId || (user?.id && effectivePartnerId ? [user.id, effectivePartnerId].sort().join('_') : roomId);
         const newMsg: Message = {
             _id: tempId,
             tempId: tempId,
             senderId: user?.id ?? '',
-            receiverId: otherUserId,
+            receiverId: effectivePartnerId,
             content: '🎙️ Mensagem de áudio',
             charCount: 0,
             cost: estimatedAudioCostInCents,
@@ -2658,8 +2696,8 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         try {
             const formData = new FormData();
             formData.append('file', new File([audioBlob], `audio.webm`, { type: audioBlob.type }));
-            formData.append('roomId', roomId);
-            formData.append('receiverId', otherUserId);
+            formData.append('roomId', effectiveRoomId);
+            formData.append('receiverId', effectivePartnerId);
             formData.append('duration', durationInSeconds.toString());
             formData.append('tempId', tempId);
 
@@ -2690,10 +2728,12 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     const handleTyping = (text: string) => {
         setMessageText(text);
         if (socket) {
-            socket.emit('typing', { roomId, isTyping: true, receiverId: otherUserId });
+            const effectivePartnerId = partnerClerkId || otherUserId;
+            const effectiveRoomId = roomId || (user?.id && effectivePartnerId ? [user.id, effectivePartnerId].sort().join('_') : roomId);
+            socket.emit('typing', { roomId: effectiveRoomId, isTyping: true, receiverId: effectivePartnerId });
             if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
             typingTimeoutRef.current = setTimeout(() => {
-                socket.emit('typing', { roomId, isTyping: false, receiverId: otherUserId });
+                socket.emit('typing', { roomId: effectiveRoomId, isTyping: false, receiverId: effectivePartnerId });
             }, 1000);
         }
     };
@@ -2745,12 +2785,13 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             setSelectedFile(null);
             setPreviewUrl(null);
 
+            const effectivePartnerId = partnerClerkId || otherUserId;
             const tempId = `temp-media-${Date.now()}`;
             const newMsg: Message = {
                 _id: tempId,
                 tempId: tempId,
                 senderId: user?.id ?? '',
-                receiverId: otherUserId,
+                receiverId: effectivePartnerId,
                 content: isVideoFile ? 'Vídeo' : 'Foto',
                 charCount: 0,
                 cost: 0,
@@ -2782,12 +2823,13 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         setSelectedFile(null);
         setPreviewUrl(null);
 
+        const effectivePartnerId = partnerClerkId || otherUserId;
         const tempId = `temp-media-${Date.now()}`;
         const newMsg: Message = {
             _id: tempId,
             tempId: tempId,
             senderId: user?.id ?? '',
-            receiverId: otherUserId,
+            receiverId: effectivePartnerId,
             content: isVideoFile ? 'Vídeo' : 'Foto',
             charCount: 0,
             cost: 0,
@@ -2886,12 +2928,14 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
         setSendingGift(true);
         try {
+            const effectivePartnerId = partnerClerkId || otherUserId;
+            const effectiveRoomId = roomId || (user?.id && effectivePartnerId ? [user.id, effectivePartnerId].sort().join('_') : roomId);
             const res = await fetch('/api/chats/gift', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    roomId,
-                    receiverId: otherUserId,
+                    roomId: effectiveRoomId,
+                    receiverId: effectivePartnerId,
                     amount: giftAmountStr
                 })
             });
@@ -2950,8 +2994,9 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         : (isClientToProfessional && balance <= 0 ? 0 : undefined);
     // Se o saldo for > 0, exibe quando estiver abaixo do limite configurado.
     // Se o saldo for == 0, só exibe quando houver pelo menos uma mensagem da profissional recebida ou bloqueada (pois agora há motivo para recarregar).
+    const partnerIdForFilter = partnerClerkId || otherUserId;
     const hasProfessionalMessage = messages.some(
-        (m) => (!m.isSystem && m.senderId === otherUserId) || m.isContentLocked
+        (m) => (!m.isSystem && (m.senderId === partnerIdForFilter || (partnerClerkId && m.senderId === otherUserId))) || m.isContentLocked
     );
 
     const isBalanceLowOrZeroWithReason = balance > 0
@@ -2979,7 +3024,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     // Um usuário nunca pode conversar consigo mesmo, nem com outro usuário do mesmo tipo
     // (profissional com profissional, cliente com cliente). O servidor também bloqueia isso,
     // mas escondemos a UI de chat aqui para não exibir uma conversa inválida.
-    const isSelfChat = !!user?.id && user.id === otherUserId;
+    const isSelfChat = !!user?.id && (user.id === partnerClerkId || user.id === otherUserId);
     const isSameUserType = !!userData && !!receiver && !userData.isTeam && !receiver.isTeam && !!userData.isProfessional === !!receiver.isProfessional;
     if (isSelfChat || isSameUserType) {
         return (
@@ -3058,7 +3103,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         </button>
                         <button 
                             onClick={() => {
-                                const target = receiver?.clerkId || otherUserId;
+                                const target = receiver?.username || receiver?.clerkId || otherUserId;
                                 router.push(`/chat/${target}/info`);
                             }}
                             className="flex-1 flex items-center gap-3.5 min-w-0 text-left py-0.5"
@@ -3072,7 +3117,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                             <div className={`flex-1 min-w-0 ${!receiver ? 'animate-pulse' : ''}`}>
                                 <div className="flex items-center gap-1.5 min-w-0">
                                     <p className="text-base font-bold text-white truncate tracking-tight">
-                                        {receiver?.isDeleted ? 'Usuário Excluído' : (receiver?.name || receiver?.username || (otherUserId ? 'Usuário Excluído' : 'Conversa'))}
+                                        {receiver?.isDeleted ? 'Usuário Excluído' : (receiver?.name || receiver?.username || (isResolvingReceiver ? 'Carregando...' : (otherUserId ? 'Usuário' : 'Conversa')))}
                                     </p>
                                     {!receiver?.isDeleted && receiver?.isTeam && (
                                         <span className="text-[10px] bg-emerald-500/90 text-white font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider shrink-0 flex items-center gap-1 border border-white/20">

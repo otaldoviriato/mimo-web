@@ -291,13 +291,15 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
             const currentPath = window.location.pathname;
 
-            // 1. Caso seja rota de chat: /chat/userId
+            // 1. Caso seja rota de chat: /chat/userId ou /chat/username
             const chatMatch = currentPath.match(/^\/chat\/([^\/]+)$/);
             if (chatMatch) {
-                const userId = chatMatch[1];
+                const identifier = chatMatch[1];
+                const giftParam = new URLSearchParams(window.location.search).get('gift');
+                const giftQuery = giftParam ? `&gift=${encodeURIComponent(giftParam)}` : '';
                 // Redireciona fisicamente para /chats com openChat para que o layout abra a tela virtual
                 // por cima de forma consistente e evite o bug de voltar do histórico.
-                router.replace(`/chats?openChat=${userId}`);
+                router.replace(`/chats?openChat=${identifier}${giftQuery}`);
                 setIsNavInitialized(true);
                 return;
             }
@@ -345,7 +347,12 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             url.searchParams.delete('gift');
             window.history.replaceState({}, '', url.pathname + url.search);
 
-            pushVirtual('chat', { userId: openChatId, giftCode: giftCode || undefined });
+            const isClerk = openChatId.startsWith('user_');
+            pushVirtual('chat', {
+                userId: openChatId,
+                username: !isClerk ? openChatId : undefined,
+                giftCode: giftCode || undefined
+            });
         } else if (openProfileUsername) {
             // Remove os query params da URL silenciosamente para não reabrir o perfil ao atualizar a página
             const url = new URL(window.location.href);

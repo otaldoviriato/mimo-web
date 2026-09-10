@@ -18,7 +18,18 @@ export async function GET(
 
         await connectToDatabase();
 
-        let user = await User.findOne({ clerkId: id }).select(
+        const cleanedId = id.trim();
+        const isClerk = cleanedId.startsWith('user_');
+        let user = await User.findOne(
+            isClerk
+                ? { clerkId: cleanedId }
+                : {
+                    $or: [
+                        { clerkId: cleanedId },
+                        { username: cleanedId.toLowerCase().replace(/^@/, '') }
+                    ]
+                }
+        ).select(
             'clerkId username name email photoUrl coverUrl isProfessional identityStatus subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers subscribers balance bio isOnline lastSeen avgResponseTimeMinutes birthDate city state isTeam teamTitle isSuspended'
         );
 

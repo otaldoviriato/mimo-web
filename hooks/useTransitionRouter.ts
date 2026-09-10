@@ -23,7 +23,12 @@ export function useTransitionRouter() {
             const chatInfoMatch = href.match(/^\/chat\/([^\/]+)\/info$/);
             if (chatInfoMatch) {
                 const userId = chatInfoMatch[1];
-                stackNav.pushVirtual('chatInfo', { userId });
+                const initialUser = meta?.initialUser ?? (meta && !meta.giftCode ? meta : undefined);
+                stackNav.pushVirtual('chatInfo', {
+                    userId,
+                    username: meta?.username || initialUser?.username || (!userId.startsWith('user_') ? userId : undefined),
+                    initialUser,
+                });
                 return;
             }
 
@@ -41,6 +46,7 @@ export function useTransitionRouter() {
                 }
                 stackNav.pushVirtual('chat', {
                     userId,
+                    username: meta?.username || initialUser?.username || (!userId.startsWith('user_') ? userId : undefined),
                     initialUser,
                     giftCode: meta?.giftCode,
                 });

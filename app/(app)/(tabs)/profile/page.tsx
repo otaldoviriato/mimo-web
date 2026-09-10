@@ -859,9 +859,9 @@ export default function ProfilePage() {
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        const profId = managingSubscription.professionalId;
+                                        const profSlug = managingSubscription.professional?.username || managingSubscription.professionalId;
                                         setManagingSubscription(null);
-                                        router.push(`/chat/${profId}`);
+                                        router.push(`/chat/${profSlug}`, { initialUser: managingSubscription.professional });
                                     }}
                                     className="flex items-center justify-center gap-1.5 h-11 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-all duration-75 active:scale-95 shadow-xs cursor-pointer"
                                 >
