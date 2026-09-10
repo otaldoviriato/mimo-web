@@ -1,20 +1,56 @@
-'use client';
+﻿'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Bell, Mail, Smartphone, X, AlertCircle, Download, Check, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useId } from 'react';
+import { Bell, Mail, Smartphone, X, Download, Check, Loader2, CheckCircle2 } from 'lucide-react';
 import { usePWA } from '@/context/PWAContext';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useMyProfile } from '@/hooks/useQueries';
 import { userApi } from '@/services/api';
 import toast from 'react-hot-toast';
 
-// Chave usada para sinalizar ao PWA standalone que deve reabrir o modal de notificações
+// Quando o PWA abre em standalone, o NotifPromoModal lÃª esta flag e pede permissÃ£o de push
 const PWA_REOPEN_MODAL_KEY = 'mimo_reopen_notif_modal';
 
 interface FirstMessageNotificationModalProps {
     isOpen: boolean;
     onClose: () => void;
     professionalName?: string;
+}
+
+// Toggle real: input[type=checkbox] escondido + label estilizado como switch
+function NativeSwitch({
+    id,
+    checked,
+    onChange,
+    disabled,
+}: {
+    id: string;
+    checked: boolean;
+    onChange: (v: boolean) => void;
+    disabled?: boolean;
+}) {
+    return (
+        <label
+            htmlFor={id}
+            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 ${
+                checked ? 'bg-purple-600' : 'bg-slate-300'
+            } ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+        >
+            <input
+                id={id}
+                type="checkbox"
+                className="sr-only"
+                checked={checked}
+                disabled={disabled}
+                onChange={(e) => onChange(e.target.checked)}
+            />
+            <span
+                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
+                    checked ? 'translate-x-5' : 'translate-x-0'
+                }`}
+            />
+        </label>
+    );
 }
 
 export function FirstMessageNotificationModal({
@@ -26,9 +62,12 @@ export function FirstMessageNotificationModal({
     const { permission, handleRequestPermission } = usePushNotifications();
     const { data: user } = useMyProfile();
 
+    const emailSwitchId = useId();
+    const pushSwitchId = useId();
+
     const [emailEnabled, setEmailEnabled] = useState<boolean>(true);
     const [pushEnabled, setPushEnabled] = useState<boolean>(false);
-    const [showInstallPromptAlert, setShowInstallPromptAlert] = useState<boolean>(false);
+    const [showInstallAlert, setShowInstallAlert] = useState<boolean>(false);
     const [isUpdatingEmail, setIsUpdatingEmail] = useState<boolean>(false);
     const [isRequestingPush, setIsRequestingPush] = useState<boolean>(false);
     const [isInstallingApp, setIsInstallingApp] = useState<boolean>(false);
@@ -41,82 +80,62 @@ export function FirstMessageNotificationModal({
     }, [user?.emailNotificationsEnabled]);
 
     useEffect(() => {
-        if (isStandalone && permission === 'granted') {
-            setPushEnabled(true);
-        } else {
-            setPushEnabled(false);
-        }
+        setPushEnabled(isStandalone && permission === 'granted');
     }, [isStandalone, permission]);
 
-    // Ouve o evento nativo 'pwa_app_installed' (disparado pelo PWAContext via 'appinstalled')
+    // Ouve confirmaÃ§Ã£o de instalaÃ§Ã£o do Chrome (disparado pelo PWAContext)
     useEffect(() => {
         const onInstalled = () => {
             setIsInstallingApp(false);
             setInstallDone(true);
-            setShowInstallPromptAlert(prev => prev); // mantém visível para mostrar feedback
-
-            // Salva flag para reabrir o modal quando o PWA abre em standalone
+            // Sinaliza ao NotifPromoModal para pedir permissÃ£o de push quando o PWA abrir
             if (typeof window !== 'undefined') {
                 localStorage.setItem(PWA_REOPEN_MODAL_KEY, '1');
             }
         };
-
         window.addEventListener('pwa_app_installed', onInstalled);
         return () => window.removeEventListener('pwa_app_installed', onInstalled);
     }, []);
 
-    // Quando o app abre em modo standalone com a flag, exibe o switch de push disponível
-    useEffect(() => {
-        if (!isStandalone || !isOpen) return;
-        if (typeof window === 'undefined') return;
-
-        const shouldReopen = localStorage.getItem(PWA_REOPEN_MODAL_KEY);
-        if (shouldReopen) {
-            localStorage.removeItem(PWA_REOPEN_MODAL_KEY);
-        }
-    }, [isStandalone, isOpen]);
-
     if (!isOpen) return null;
 
-    const handleToggleEmail = async () => {
-        const nextValue = !emailEnabled;
-        setEmailEnabled(nextValue);
+    const handleToggleEmail = async (next: boolean) => {
+        setEmailEnabled(next);
         setIsUpdatingEmail(true);
         try {
-            await userApi.updateMe({ emailNotificationsEnabled: nextValue });
-            toast.success(
-                nextValue
-                    ? 'Avisos por e-mail ativados!'
-                    : 'Avisos por e-mail desativados.'
-            );
+            await userApi.updateMe({ emailNotificationsEnabled: next });
+            toast.success(next ? 'Avisos por e-mail ativados!' : 'Avisos por e-mail desativados.');
         } catch {
-            setEmailEnabled(!nextValue);
-            toast.error('Erro ao atualizar preferência de e-mail.');
+            setEmailEnabled(!next);
+            toast.error('Erro ao atualizar preferÃªncia de e-mail.');
         } finally {
             setIsUpdatingEmail(false);
         }
     };
 
-    const handleTogglePush = async () => {
-        if (pushEnabled) return;
+    const handleTogglePush = async (next: boolean) => {
+        if (!next || pushEnabled) return;
 
         if (!isStandalone) {
-            setShowInstallPromptAlert(true);
+            setShowInstallAlert(true);
             return;
         }
 
         setIsRequestingPush(true);
         try {
             await handleRequestPermission();
-            if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            const granted =
+                typeof window !== 'undefined' &&
+                'Notification' in window &&
+                Notification.permission === 'granted';
+            if (granted) {
                 setPushEnabled(true);
-                setShowInstallPromptAlert(false);
-                toast.success('Notificações no dispositivo ativadas com sucesso!');
+                toast.success('NotificaÃ§Ãµes no dispositivo ativadas com sucesso!');
             } else {
-                toast.error('Permissão para notificações não concedida no navegador.');
+                toast.error('PermissÃ£o para notificaÃ§Ãµes nÃ£o concedida.');
             }
         } catch {
-            toast.error('Não foi possível ativar notificações no momento.');
+            toast.error('NÃ£o foi possÃ­vel ativar notificaÃ§Ãµes no momento.');
         } finally {
             setIsRequestingPush(false);
         }
@@ -128,8 +147,7 @@ export function FirstMessageNotificationModal({
         try {
             const outcome = await promptInstall();
             if (outcome === 'accepted') {
-                // Mantém loading — o evento 'pwa_app_installed' irá resolver quando o Chrome confirmar.
-                // Timeout de segurança de 12s caso o evento não chegue.
+                // MantÃ©m loading â€” pwa_app_installed resolverÃ¡; timeout de seguranÃ§a 12s
                 const timeout = setTimeout(() => setIsInstallingApp(false), 12_000);
                 window.addEventListener('pwa_app_installed', () => clearTimeout(timeout), { once: true });
             } else {
@@ -142,13 +160,15 @@ export function FirstMessageNotificationModal({
 
     const displayName = professionalName || 'a criadora';
 
+    // ApÃ³s instalaÃ§Ã£o: oculta opÃ§Ã£o de push e aviso amber; mostra card verde de sucesso
+    const showPushRow = !installDone;
+    const showInstallPanel = showInstallAlert && !installDone;
+
     return (
         <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-            {/* Overlay para fechar */}
             <div className="absolute inset-0" onClick={onClose} />
 
             <div className="relative w-full sm:max-w-md overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl border border-slate-100 text-slate-900 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200">
-                {/* Botão Fechar */}
                 <button
                     onClick={onClose}
                     className="absolute right-4 top-4 z-10 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
@@ -157,22 +177,21 @@ export function FirstMessageNotificationModal({
                     <X size={18} strokeWidth={2.4} />
                 </button>
 
-                {/* Área com scroll para caber em telas pequenas */}
                 <div className="overflow-y-auto max-h-[85svh] p-5 space-y-4">
-                    {/* Cabeçalho */}
-                    <div className="flex flex-col items-center text-center pt-1 pb-1">
-                        <div className="w-11 h-11 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center mb-3 shadow-xs">
+                    {/* CabeÃ§alho */}
+                    <div className="flex flex-col items-center text-center pt-1">
+                        <div className="w-11 h-11 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center mb-3">
                             <Bell size={22} strokeWidth={2.3} />
                         </div>
                         <h3 className="text-base font-extrabold text-slate-900 tracking-tight leading-snug">
-                            Não perca a resposta de {displayName}!
+                            NÃ£o perca a resposta de {displayName}!
                         </h3>
                         <p className="text-[11px] text-slate-500 mt-1 leading-relaxed max-w-xs">
-                            Sua primeira mensagem foi enviada. Verifique se suas notificações estão ativas para ser avisado assim que ela te responder:
+                            Sua primeira mensagem foi enviada. Ative suas notificaÃ§Ãµes para ser avisado assim que ela te responder:
                         </p>
                     </div>
 
-                    {/* Opções de Notificação */}
+                    {/* OpÃ§Ãµes de NotificaÃ§Ã£o */}
                     <div className="space-y-2.5">
                         {/* E-mail */}
                         <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3">
@@ -194,96 +213,66 @@ export function FirstMessageNotificationModal({
                                     </p>
                                 </div>
                             </div>
-                            <button
-                                type="button"
-                                role="switch"
-                                aria-checked={emailEnabled}
+                            <NativeSwitch
+                                id={emailSwitchId}
+                                checked={emailEnabled}
+                                onChange={handleToggleEmail}
                                 disabled={isUpdatingEmail}
-                                onClick={handleToggleEmail}
-                                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
-                                    emailEnabled ? 'bg-purple-600' : 'bg-slate-300'
-                                }`}
-                            >
-                                <span
-                                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition duration-200 ease-in-out my-0.5 ml-0.5 ${
-                                        emailEnabled ? 'translate-x-5' : 'translate-x-0'
-                                    }`}
-                                />
-                            </button>
+                            />
                         </div>
 
-                        {/* Push */}
-                        <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3">
-                            <div className="flex items-start gap-2.5 min-w-0">
-                                <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 shrink-0 flex items-center justify-center mt-0.5">
-                                    <Smartphone size={16} strokeWidth={2.2} />
-                                </div>
-                                <div className="min-w-0">
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                        <span className="text-xs font-bold text-slate-800">Notificações no celular</span>
-                                        {pushEnabled ? (
-                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-100 text-emerald-800">
-                                                Ativado
-                                            </span>
-                                        ) : (
-                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-200 text-slate-600">
-                                                {isStandalone ? 'Disponível' : 'Requer app'}
-                                            </span>
-                                        )}
+                        {/* Push â€” oculto apÃ³s instalaÃ§Ã£o concluÃ­da */}
+                        {showPushRow && (
+                            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3">
+                                <div className="flex items-start gap-2.5 min-w-0">
+                                    <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 shrink-0 flex items-center justify-center mt-0.5">
+                                        <Smartphone size={16} strokeWidth={2.2} />
                                     </div>
-                                    <p className="text-[10px] text-slate-500 leading-relaxed mt-0.5">
-                                        Receba alertas instantâneos na tela do seu aparelho assim que ela responder.
-                                    </p>
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className="text-xs font-bold text-slate-800">NotificaÃ§Ãµes no celular</span>
+                                            {pushEnabled ? (
+                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-100 text-emerald-800">
+                                                    Ativado
+                                                </span>
+                                            ) : (
+                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-200 text-slate-600">
+                                                    {isStandalone ? 'DisponÃ­vel' : 'Requer app'}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 leading-relaxed mt-0.5">
+                                            Receba alertas instantÃ¢neos na tela do seu aparelho assim que ela responder.
+                                        </p>
+                                    </div>
                                 </div>
-                            </div>
-                            <button
-                                type="button"
-                                role="switch"
-                                aria-checked={pushEnabled}
-                                disabled={isRequestingPush}
-                                onClick={handleTogglePush}
-                                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
-                                    pushEnabled ? 'bg-purple-600' : 'bg-slate-300'
-                                }`}
-                            >
-                                <span
-                                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition duration-200 ease-in-out my-0.5 ml-0.5 ${
-                                        pushEnabled ? 'translate-x-5' : 'translate-x-0'
-                                    }`}
+                                <NativeSwitch
+                                    id={pushSwitchId}
+                                    checked={pushEnabled}
+                                    onChange={handleTogglePush}
+                                    disabled={isRequestingPush}
                                 />
-                            </button>
-                        </div>
+                            </div>
+                        )}
                     </div>
 
-                    {/* Aviso de instalação necessária */}
-                    {showInstallPromptAlert && (
-                        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3.5 text-amber-900 space-y-3 animate-in fade-in duration-200">
-                            <div className="flex items-start gap-2.5">
-                                <AlertCircle size={16} className="shrink-0 text-amber-600 mt-0.5" strokeWidth={2.2} />
-                                <div className="space-y-1 text-xs">
-                                    <p className="font-bold text-amber-900">Aplicativo não instalado</p>
-                                    <p className="text-amber-800 leading-relaxed">
-                                        Para receber notificações na tela do seu aparelho, você precisa primeiro instalar o aplicativo do Mimo no celular ou computador.
-                                    </p>
-                                    {!installDone && (
-                                        <p className="font-semibold text-amber-900 pt-0.5">Deseja instalar o aplicativo agora?</p>
-                                    )}
-                                </div>
+                    {/* Painel de instalaÃ§Ã£o â€” somente enquanto NÃƒO instalado */}
+                    {showInstallPanel && (
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5 space-y-3 animate-in fade-in duration-200">
+                            <div className="space-y-1 text-xs">
+                                <p className="font-bold text-slate-800">Aplicativo nÃ£o instalado</p>
+                                <p className="text-slate-600 leading-relaxed">
+                                    Para receber notificaÃ§Ãµes na tela do seu celular, instale o aplicativo do Mimo.
+                                </p>
                             </div>
-
                             <div className="flex items-center gap-2">
                                 <button
                                     type="button"
                                     onClick={handleInstallClick}
-                                    disabled={isInstallingApp || installDone}
-                                    className="flex-1 h-9 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-70 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] shadow-xs cursor-pointer"
+                                    disabled={isInstallingApp}
+                                    className="flex-1 h-9 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-70 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] cursor-pointer"
                                 >
-                                    {installDone ? (
-                                        <>
-                                            <Check size={14} />
-                                            <span>Instalado!</span>
-                                        </>
-                                    ) : isInstallingApp ? (
+                                    {isInstallingApp ? (
                                         <>
                                             <Loader2 size={14} className="animate-spin" />
                                             <span>Instalando...</span>
@@ -291,30 +280,35 @@ export function FirstMessageNotificationModal({
                                     ) : (
                                         <>
                                             <Download size={14} />
-                                            <span>Instalar Aplicativo</span>
+                                            <span>Instalar aplicativo</span>
                                         </>
                                     )}
                                 </button>
-                                {!installDone && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowInstallPromptAlert(false)}
-                                        className="px-3 h-9 rounded-xl bg-white border border-amber-200 text-amber-900 hover:bg-amber-100/50 text-xs font-semibold transition-colors cursor-pointer"
-                                    >
-                                        Agora não
-                                    </button>
-                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => setShowInstallAlert(false)}
+                                    className="px-3 h-9 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-semibold transition-colors cursor-pointer"
+                                >
+                                    Agora nÃ£o
+                                </button>
                             </div>
-
-                            {installDone && (
-                                <p className="text-[10px] text-amber-800 leading-relaxed animate-in fade-in duration-300">
-                                    Aplicativo instalado! Abra o Mimo pela sua tela inicial e ative as notificações de lá.
-                                </p>
-                            )}
                         </div>
                     )}
 
-                    {/* Botão de Conclusão */}
+                    {/* Card de sucesso â€” exibido quando instalaÃ§Ã£o concluÃ­da */}
+                    {installDone && (
+                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3.5 flex items-start gap-2.5 animate-in fade-in duration-300">
+                            <CheckCircle2 size={16} className="shrink-0 text-emerald-600 mt-0.5" strokeWidth={2.2} />
+                            <div className="space-y-0.5 text-xs">
+                                <p className="font-bold text-emerald-800">Aplicativo instalado</p>
+                                <p className="text-emerald-700 leading-relaxed">
+                                    Abra o Mimo pelo atalho na sua tela inicial e ative as notificaÃ§Ãµes de lÃ¡ para nÃ£o perder nenhuma resposta.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* BotÃ£o de ConclusÃ£o */}
                     <button
                         type="button"
                         onClick={onClose}
@@ -329,4 +323,5 @@ export function FirstMessageNotificationModal({
             </div>
         </div>
     );
-}
+}
+
