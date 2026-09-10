@@ -247,6 +247,16 @@ export function RechargeModal({
             const cards = (cachedProfile.user.savedCards || []).filter((card) => card.canUseForPayments);
             setSavedCards(cards);
         }
+        const cachedTaxId = ((cachedProfile as any)?.user?.taxId || (cachedProfile as any)?.taxId)?.replace(/\D/g, '');
+        const cachedPhoneNum = ((cachedProfile as any)?.user?.phone || (cachedProfile as any)?.phone)?.replace(/\D/g, '');
+        if (cachedTaxId && cachedTaxId.length === 11) {
+            setUserCpf(formatCPF(cachedTaxId));
+            setHasSavedCpf(true);
+        }
+        if (cachedPhoneNum && cachedPhoneNum.length >= 10) {
+            setUserPhone(formatPhone(cachedPhoneNum));
+            setHasSavedPhone(true);
+        }
 
         userApi.getMe()
             .then((res: UserProfileResponse) => {
@@ -588,7 +598,7 @@ export function RechargeModal({
     const isCpfValid = userCpf.replace(/\D/g, '').length === 11;
     const isPhoneValid = userPhone.replace(/\D/g, '').length >= 10;
     const hasCompletePixData = isCpfValid && isPhoneValid;
-    const shouldShowPixBillingInputs = !hasSavedCpf || !hasSavedPhone || showBillingInputsOverride;
+    const shouldShowBillingInputs = !hasSavedCpf || !hasSavedPhone;
     const cleanCardNumber = cardNumber.replace(/\s/g, '');
     const [expiryMonth = '', expiryYear = ''] = cardExpiry.split('/');
     const hasSavedCardSelected = Boolean(selectedSavedCardId);
@@ -944,30 +954,34 @@ export function RechargeModal({
                                                                     Salvar cartão para compras futuras
                                                                 </span>
                                                             </label>
-                                                            <div className="flex flex-col gap-1">
-                                                                <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">CPF do titular</label>
-                                                                <input
-                                                                    type="text"
-                                                                    placeholder="000.000.000-00"
-                                                                    value={userCpf}
-                                                                    onChange={(e) => setUserCpf(formatCPF(e.target.value))}
-                                                                    maxLength={14}
-                                                                    inputMode="numeric"
-                                                                    className="rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
-                                                                />
-                                                            </div>
-                                                            <div className="flex flex-col gap-1">
-                                                                <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">Telefone</label>
-                                                                <input
-                                                                    type="text"
-                                                                    placeholder="(00) 00000-0000"
-                                                                    value={userPhone}
-                                                                    onChange={(e) => setUserPhone(formatPhone(e.target.value))}
-                                                                    maxLength={15}
-                                                                    inputMode="tel"
-                                                                    className="rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
-                                                                />
-                                                            </div>
+                                                            {shouldShowBillingInputs && (
+                                                                <>
+                                                                    <div className="flex flex-col gap-1">
+                                                                        <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">CPF do titular</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="000.000.000-00"
+                                                                            value={userCpf}
+                                                                            onChange={(e) => setUserCpf(formatCPF(e.target.value))}
+                                                                            maxLength={14}
+                                                                            inputMode="numeric"
+                                                                            className="rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="flex flex-col gap-1">
+                                                                        <label className="text-xs font-semibold uppercase tracking-widest text-gray-400">Telefone</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="(00) 00000-0000"
+                                                                            value={userPhone}
+                                                                            onChange={(e) => setUserPhone(formatPhone(e.target.value))}
+                                                                            maxLength={15}
+                                                                            inputMode="tel"
+                                                                            className="rounded-lg border border-gray-100 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+                                                                        />
+                                                                    </div>
+                                                                </>
+                                                            )}
                                                             {paymentError && (
                                                                 <p className="text-xs font-medium text-red-600 animate-in fade-in duration-200 mt-2">
                                                                     {paymentError}
@@ -1048,7 +1062,7 @@ export function RechargeModal({
                                         </div>
                                     )}
 
-                                    {isPixSelected && shouldShowPixBillingInputs && (
+                                    {isPixSelected && shouldShowBillingInputs && (
                                         <div className="mt-4 flex flex-col gap-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
                                             <div className="flex items-center gap-2 text-xs text-gray-500">
                                                 <ShieldCheck size={13} className="text-green-600" strokeWidth={2.2} />
@@ -1081,18 +1095,6 @@ export function RechargeModal({
                                         </div>
                                     )}
 
-                                    {isPixSelected && !shouldShowPixBillingInputs && (
-                                        <div className="mt-3 flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-500">
-                                            <span className="truncate">CPF: {userCpf} • Tel: {userPhone}</span>
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowBillingInputsOverride(true)}
-                                                className="text-xs font-semibold text-purple-600 hover:text-purple-700 ml-2 shrink-0 cursor-pointer"
-                                            >
-                                                Alterar
-                                            </button>
-                                        </div>
-                                    )}
 
                                     {selectedMethod === 'coupon' && (
                                         <div className="mt-4 flex flex-col gap-3 rounded-lg border border-gray-100 bg-gray-50 p-3">

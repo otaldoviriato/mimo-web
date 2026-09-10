@@ -9,6 +9,8 @@ import { useMyProfile } from '@/hooks/useQueries';
 
 const COOLDOWN_MS = 10 * 60 * 1000;
 const SHOWN_KEY   = 'notif_promo_shown';
+const REOPEN_AFTER_INSTALL_KEY = 'mimo_reopen_notif_modal';
+const FIRST_STANDALONE_OPEN_KEY = 'mimo_first_standalone_notification_prompt';
 
 const benefits = [
     {
@@ -51,6 +53,8 @@ export function NotifPromoModal() {
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
+        if (!isStandalone) return;
+
         const tryShow = (intentional: boolean) => {
             // Só exibe dentro do PWA instalado (standalone), sem permissão concedida E sem token de push ativo
             if (!isStandalone || permission === 'granted' || user?.hasPushToken) return;
@@ -61,11 +65,23 @@ export function NotifPromoModal() {
                 setVisible(true);
                 setTimeout(() => setAnimating(true), 10);
             }, 2000);
+            return true;
         };
 
+        const reopenAfterInstall = localStorage.getItem(REOPEN_AFTER_INSTALL_KEY) === '1';
+        const isFirstStandaloneOpen = !localStorage.getItem(FIRST_STANDALONE_OPEN_KEY);
+        if (isFirstStandaloneOpen) {
+            localStorage.setItem(FIRST_STANDALONE_OPEN_KEY, '1');
+        }
+        let launchPromptScheduled = false;
+        if (reopenAfterInstall || isFirstStandaloneOpen) {
+            localStorage.removeItem(REOPEN_AFTER_INSTALL_KEY);
+            launchPromptScheduled = Boolean(tryShow(true));
+        }
+
         const pending = localStorage.getItem(SESSION_KEYS.newSession);
-        if (pending) {
-            tryShow(pending === 'intentional');
+        if (!launchPromptScheduled && pending && tryShow(pending === 'intentional')) {
+            localStorage.removeItem(SESSION_KEYS.newSession);
         }
 
         const onNewSession = (e: Event) => {
@@ -87,7 +103,7 @@ export function NotifPromoModal() {
         await handleRequestPermission();
     };
 
-    if (!visible || user?.hasPushToken) return null;
+    if (!isStandalone || !visible || user?.hasPushToken) return null;
 
     return (
         <div
