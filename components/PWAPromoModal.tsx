@@ -84,20 +84,8 @@ export function PWAPromoModal() {
             tryShow(intentional);
         };
 
-        // Disparo imperativo externo: qualquer componente pode chamar
-        // window.dispatchEvent(new Event('show_pwa_promo')) para exibir o modal
-        const onShowPwaPromo = () => {
-            if (!hasDeferredPrompt || isStandalone) return;
-            setVisible(true);
-            setTimeout(() => setAnimating(true), 10);
-        };
-
         window.addEventListener(NEW_SESSION_EVENT, onNewSession);
-        window.addEventListener('show_pwa_promo', onShowPwaPromo);
-        return () => {
-            window.removeEventListener(NEW_SESSION_EVENT, onNewSession);
-            window.removeEventListener('show_pwa_promo', onShowPwaPromo);
-        };
+        return () => window.removeEventListener(NEW_SESSION_EVENT, onNewSession);
     }, [hasDeferredPrompt, isStandalone, userData?.pwaShowAgainIntervalDays]);
 
     const dismiss = () => {
