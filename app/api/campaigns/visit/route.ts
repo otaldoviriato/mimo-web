@@ -105,36 +105,61 @@ export async function POST(request: NextRequest) {
             network = 'direct';
         }
 
-        // 1. Procura se já existe a campanha no banco
-        let campaign = await Campaign.findOne({ slug: targetSlug });
-        if (!campaign && utmCampaign) {
-            campaign = await Campaign.findOne({ externalCampaignId: utmCampaign });
+        // 1. Verifica primeiro se existe uma campanha ativa com status 'tracking' cujo ponto de entrada é esta página
+        let campaign = await Campaign.findOne({
+            status: 'tracking',
+            $or: [
+                { entryPoint: cleanLandingPage },
+                { entryPoint: cleanLandingPage === '/descubra' ? 'descubra' : cleanLandingPage },
+                ...(cleanLandingPage === '/descubra' ? [{ entryPoint: '/descubra' }] : [])
+            ]
+        }).sort({ startedAt: -1 });
+
+        // Se não houver campanha tracking específica da rota, verifica se existe qualquer campanha tracking ativa
+        if (!campaign && cleanLandingPage === '/descubra') {
+            campaign = await Campaign.findOne({ status: 'tracking' }).sort({ startedAt: -1 });
         }
 
-        // 2. Se não existir, cria automaticamente
+        // Se não houver campanha em rastreamento temporal ativo, busca por slug ou id externo (comportamento clássico)
+        if (!campaign) {
+            if (targetSlug) {
+                campaign = await Campaign.findOne({ slug: targetSlug });
+            }
+            if (!campaign && utmCampaign) {
+                campaign = await Campaign.findOne({ externalCampaignId: utmCampaign });
+            }
+        }
+
+        // 2. Se ainda não existir nenhuma campanha, cria automaticamente fallback
         if (!campaign) {
             try {
                 campaign = await Campaign.create({
                     name: campaignName,
-                    slug: targetSlug,
+                    slug: targetSlug || `campanha-${Date.now()}`,
+                    entryPoint: cleanLandingPage,
                     status: 'active',
                     network,
                     externalCampaignId: utmCampaign || null,
                     externalVariationId: variationId || null,
                     landingHeadline: campaignName,
-                    landingBody: `Campanha e ponto de entrada detectados pela rota ${cleanLandingPage}.`,
+                    landingBody: `Campanha detectada pela rota ${cleanLandingPage}.`,
+                    uniqueVisitorsCount: 0,
                     conversionGoals: ['landing_view', 'cta_click', 'signup', 'explore_profile_view', 'first_message_sent', 'first_message_received', 'first_recharge'],
                     createdBy: 'system_auto_landing',
                 });
             } catch (error: unknown) {
-                // Em caso de colisão de índice unique concorrente, busca novamente
                 campaign = await Campaign.findOne({ slug: targetSlug });
                 if (!campaign) throw error;
             }
         }
 
-        // 3. Upsert do registro de visita
+        // 3. Upsert do registro de visita e incremento atômico de acessos únicos
         const now = new Date();
+        const existingVisit = await CampaignVisit.findOne({ campaignId: campaign._id, visitorId }).select('_id').lean();
+        if (!existingVisit) {
+            await Campaign.updateOne({ _id: campaign._id }, { $inc: { uniqueVisitorsCount: 1 } });
+        }
+
         const visit = await CampaignVisit.findOneAndUpdate(
             { campaignId: campaign._id, visitorId },
             {

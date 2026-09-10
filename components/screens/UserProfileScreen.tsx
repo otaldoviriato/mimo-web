@@ -11,6 +11,7 @@ import { useUserByUsername, usePublicGallery, useSubscribe, useMyProfile } from 
 import { UserX, Lock, Eye, X, ChevronLeft, ChevronRight, ShieldCheck, Gift } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { trackAcquisitionEvent } from '@/lib/clientAcquisitionAnalytics';
+import { emitCampaignTelemetry } from '@/lib/campaignTelemetry';
 
 interface UserProfilePageProps {
     params?: Promise<{ username: string }>;
@@ -96,10 +97,26 @@ export default function UserProfilePage({ params, username: propUsername, initia
                 utmCampaign: search.get('utm_campaign') || '',
             },
         });
-    }, [user?.clerkId]);
+        if (user?.clerkId) {
+            emitCampaignTelemetry({
+                eventType: 'profile_view',
+                professionalId: user.clerkId,
+                username: user.username,
+                name: user.name,
+            });
+        }
+    }, [user?.clerkId, user?.username, user?.name]);
 
     const handleMessageClick = async () => {
         if (!user || isBlockedByOtherTeamMember) return;
+
+        if (user.clerkId) {
+            emitCampaignTelemetry({
+                eventType: 'message_click',
+                professionalId: user.clerkId,
+                username: user.username,
+            });
+        }
 
         if (me?.isTeam && user.isProfessional) {
             setStartingTeamChat(true);
@@ -162,7 +179,17 @@ export default function UserProfilePage({ params, username: propUsername, initia
     const openViewer = useCallback((items: PublicProfileGalleryItem[], index: number) => {
         setViewerItems(items);
         setActiveViewerIndex(index);
-    }, []);
+
+        if (user?.clerkId) {
+            emitCampaignTelemetry({
+                eventType: 'photo_view',
+                professionalId: user.clerkId,
+                username: user.username,
+                photoIndex: index,
+                totalPhotos: items.length,
+            });
+        }
+    }, [user?.clerkId, user?.username]);
 
     const closeViewer = useCallback(() => {
         setActiveViewerIndex(null);
@@ -185,13 +212,23 @@ export default function UserProfilePage({ params, username: propUsername, initia
         setViewerIsAnimating(true);
         setViewerDragOffset(directionOffset);
 
+        if (user?.clerkId) {
+            emitCampaignTelemetry({
+                eventType: 'photo_view',
+                professionalId: user.clerkId,
+                username: user.username,
+                photoIndex: nextIndex,
+                totalPhotos: currentGalleryItems.length,
+            });
+        }
+
         viewerTransitionTimeoutRef.current = window.setTimeout(() => {
             setActiveViewerIndex(nextIndex);
             setViewerIsAnimating(false);
             setViewerDragOffset(0);
             viewerTransitionTimeoutRef.current = null;
         }, viewerTransitionMs);
-    }, [activeViewerIndex]);
+    }, [activeViewerIndex, currentGalleryItems.length, user?.clerkId, user?.username]);
 
     const showPreviousViewerItem = useCallback(() => {
         if (activeViewerIndex !== null && activeViewerIndex > 0) {

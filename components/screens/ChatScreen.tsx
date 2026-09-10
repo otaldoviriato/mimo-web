@@ -20,6 +20,7 @@ import { PendingReceiptBalloon } from '@/components/PendingReceiptBalloon';
 import { LargeMessageConfirmModal } from '@/components/LargeMessageConfirmModal';
 import { decryptMessageText } from '@/lib/messageCipher';
 import { trackAcquisitionEvent } from '@/lib/clientAcquisitionAnalytics';
+import { emitCampaignTelemetry } from '@/lib/campaignTelemetry';
 import { FirstMessageNotificationModal } from '@/components/FirstMessageNotificationModal';
 import { userApi } from '@/services/api';
 import { AlertTriangle, ShieldCheck, Wallet, Clock, MessageCircle, LockKeyhole } from 'lucide-react';
@@ -623,6 +624,12 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             trackAcquisitionEvent({
                 eventType: 'message_attempt',
                 professionalId: profId,
+            });
+            emitCampaignTelemetry({
+                eventType: 'recharge_trigger',
+                professionalId: profId,
+                username: receiver?.username,
+                reason: 'Tentativa de mensagem sem créditos (abriu modal de recarga)',
             });
         }
     };

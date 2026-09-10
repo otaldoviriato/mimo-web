@@ -4,7 +4,10 @@ import { connectToDatabase } from '@/lib/db';
 import { AppSettings } from '@/models/AppSettings';
 import { Campaign } from '@/models/Campaign';
 import { CampaignVisit } from '@/models/CampaignVisit';
+import { CampaignUserJourney } from '@/models/CampaignUserJourney';
 import { User } from '@/models/User';
+
+export const dynamic = 'force-dynamic';
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
@@ -15,85 +18,114 @@ async function requireAdmin() {
     return userId === FALLBACK_ADMIN || settings?.adminClerkIds?.includes(userId) ? userId : null;
 }
 
-export async function GET() {
+function sanitizeSlug(text: string): string {
+    return text
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+}
+
+export async function GET(request: NextRequest) {
     await connectToDatabase();
     if (!await requireAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-    // Exclui usuários profissionais das métricas de campanhas
-    const professionalClerkIds = await User.distinct('clerkId', { isProfessional: true });
+    const searchParams = request.nextUrl.searchParams;
+    const requestedCampaignId = searchParams.get('campaignId');
 
+    // Se o admin solicitou detalhes e leads de uma campanha específica
+    if (requestedCampaignId) {
+        const campaign = await Campaign.findById(requestedCampaignId).lean();
+        if (!campaign) {
+            return NextResponse.json({ error: 'Campanha não encontrada' }, { status: 404 });
+        }
+
+        const uniqueVisits = await CampaignVisit.countDocuments({ campaignId: campaign._id });
+        const leads = await CampaignUserJourney.find({ campaignId: campaign._id })
+            .sort({ signupAt: -1 })
+            .lean();
+
+        return NextResponse.json({
+            campaign: {
+                ...campaign,
+                uniqueVisits,
+                signupsCount: leads.length,
+            },
+            leads,
+        });
+    }
+
+    // 1. Busca a campanha que está atualmente em rastreamento ao vivo
+    const activeCampaign = await Campaign.findOne({ status: 'tracking' }).sort({ startedAt: -1 }).lean();
+    let activeCampaignData = null;
+
+    if (activeCampaign) {
+        const activeUniqueVisits = await CampaignVisit.countDocuments({ campaignId: activeCampaign._id });
+        const activeLeads = await CampaignUserJourney.find({ campaignId: activeCampaign._id })
+            .sort({ signupAt: -1 })
+            .limit(300)
+            .lean();
+
+        activeCampaignData = {
+            ...activeCampaign,
+            uniqueVisits: Math.max(activeCampaign.uniqueVisitorsCount || 0, activeUniqueVisits),
+            leads: activeLeads,
+            signupsCount: activeLeads.length,
+        };
+    }
+
+    // 2. Busca histórico geral de campanhas
     const campaigns = await Campaign.find().sort({ createdAt: -1 }).lean();
-    const counts = await CampaignVisit.aggregate([
-        ...(professionalClerkIds.length > 0 ? [{
-            $match: {
-                $or: [
-                    { userId: null },
-                    { userId: { $nin: professionalClerkIds } }
-                ]
-            }
-        }] : []),
+
+    // Agregação de acessos únicos e cadastros por campanha
+    const visitsCounts = await CampaignVisit.aggregate([
         { $group: {
             _id: '$campaignId',
-            visits: { $sum: 1 },
-            ctaClicks: { $sum: { $cond: [{ $ne: ['$ctaClickedAt', null] }, 1, 0] } },
+            uniqueVisits: { $sum: 1 },
             signups: { $sum: { $cond: [{ $ne: ['$signupCompletedAt', null] }, 1, 0] } },
-            recharges: { $sum: { $cond: [{ $ne: ['$firstRechargeAt', null] }, 1, 0] } },
-            paidChatStarts: { $sum: { $cond: [{ $ne: ['$firstPaidMessageAt', null] }, 1, 0] } },
-            rechargeRevenueCents: { $sum: { $ifNull: ['$firstRechargeAmountCents', 0] } },
         } },
     ]);
-    const byId = new Map(counts.map(row => [row._id.toString(), row]));
+    const visitsMap = new Map(visitsCounts.map(row => [row._id.toString(), row]));
 
-    let totalVisits = 0;
-    let totalCtaClicks = 0;
-    let totalSignups = 0;
-    let totalRecharges = 0;
-    let totalRevenueCents = 0;
+    // Agregação de leads por campanha em CampaignUserJourney
+    const journeysCounts = await CampaignUserJourney.aggregate([
+        { $group: {
+            _id: '$campaignId',
+            journeyLeadsCount: { $sum: 1 },
+        } },
+    ]);
+    const journeysMap = new Map(journeysCounts.map(row => [row._id.toString(), row.journeyLeadsCount]));
 
-    const formattedCampaigns = campaigns.map(campaign => {
-        const stats = byId.get(campaign._id.toString());
-        const visits = stats?.visits ?? 0;
-        const ctaClicks = stats?.ctaClicks ?? 0;
-        const signups = stats?.signups ?? 0;
-        const recharges = stats?.recharges ?? 0;
-        const paidChatStarts = stats?.paidChatStarts ?? 0;
-        const rechargeRevenueCents = stats?.rechargeRevenueCents ?? 0;
+    const formattedCampaigns = campaigns.map(c => {
+        const vStats = visitsMap.get(c._id.toString());
+        const jCount = journeysMap.get(c._id.toString()) || 0;
+        const uniqueVisits = Math.max(c.uniqueVisitorsCount || 0, vStats?.uniqueVisits ?? 0);
+        const signups = Math.max(jCount, vStats?.signups ?? 0);
 
-        totalVisits += visits;
-        totalCtaClicks += ctaClicks;
-        totalSignups += signups;
-        totalRecharges += recharges;
-        totalRevenueCents += rechargeRevenueCents;
-
-        const ctaRate = visits > 0 ? ((ctaClicks / visits) * 100) : 0;
-        const signupRate = visits > 0 ? ((signups / visits) * 100) : 0;
-        const rechargeRate = visits > 0 ? ((recharges / visits) * 100) : 0;
+        const impressions = c.externalImpressions || 0;
+        const clicks = c.externalClicks || 0;
+        const ctr = impressions > 0 ? Number(((clicks / impressions) * 100).toFixed(2)) : 0;
+        const conversionRate = uniqueVisits > 0 ? Number(((signups / uniqueVisits) * 100).toFixed(2)) : 0;
 
         return {
-            ...campaign,
-            visits,
-            ctaClicks,
+            ...c,
+            uniqueVisits,
             signups,
-            recharges,
-            paidChatStarts,
-            rechargeRevenueCents,
-            ctaRate: Number(ctaRate.toFixed(1)),
-            signupRate: Number(signupRate.toFixed(1)),
-            rechargeRate: Number(rechargeRate.toFixed(1)),
+            impressions,
+            clicks,
+            ctr,
+            conversionRate,
         };
     });
 
     return NextResponse.json({
+        activeCampaign: activeCampaignData,
         campaigns: formattedCampaigns,
         summary: {
             totalCampaigns: campaigns.length,
-            activeCampaigns: campaigns.filter(c => c.status === 'active').length,
-            totalVisits,
-            totalCtaClicks,
-            totalSignups,
-            totalRecharges,
-            totalRevenueCents,
-            overallConversionRate: totalVisits > 0 ? Number(((totalRecharges / totalVisits) * 100).toFixed(2)) : 0,
+            activeCount: activeCampaign ? 1 : 0,
+            completedCount: campaigns.filter(c => c.status === 'completed').length,
         }
     });
 }
@@ -102,30 +134,139 @@ export async function POST(request: NextRequest) {
     await connectToDatabase();
     const userId = await requireAdmin();
     if (!userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
     const body = await request.json();
-    const slug = String(body.slug ?? '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
-    if (!body.name || !slug || !body.landingHeadline || !body.landingBody) {
-        return NextResponse.json({ error: 'Nome, slug, título e texto são obrigatórios.' }, { status: 400 });
+    const name = String(body.name || '').trim();
+    let entryPoint = String(body.entryPoint || '/descubra').trim();
+    if (!entryPoint.startsWith('/')) entryPoint = `/${entryPoint}`;
+
+    const description = body.description ? String(body.description).trim() : null;
+
+    if (!name) {
+        return NextResponse.json({ error: 'Nome da campanha é obrigatório.' }, { status: 400 });
     }
+
+    const baseSlug = sanitizeSlug(name) || 'campanha';
+    const slug = `${baseSlug}-${Date.now().toString(36)}`;
+
     const campaign = await Campaign.create({
-        name: String(body.name).trim(), slug, status: 'draft', network: body.network ?? 'exoclick',
-        targetProfessionalId: body.targetProfessionalId || null,
-        landingHeadline: String(body.landingHeadline).trim(), landingBody: String(body.landingBody).trim(),
-        landingImageUrl: body.landingImageUrl || null, internalDestination: body.internalDestination || null,
-        externalCampaignId: body.externalCampaignId || null, externalVariationId: body.externalVariationId || null,
-        conversionGoals: ['landing_view', 'cta_click', 'signup', 'first_recharge', 'first_paid_message'],
+        name,
+        slug,
+        entryPoint,
+        description,
+        status: 'draft',
+        network: body.network || 'exoclick',
+        uniqueVisitorsCount: 0,
         createdBy: userId,
     });
-    return NextResponse.json({ campaign }, { status: 201 });
+
+    return NextResponse.json({ success: true, campaign }, { status: 201 });
 }
 
 export async function PATCH(request: NextRequest) {
     await connectToDatabase();
     if (!await requireAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    const { id, status } = await request.json();
-    if (!id || !['draft', 'active', 'paused', 'archived'].includes(status)) {
-        return NextResponse.json({ error: 'Dados inválidos.' }, { status: 400 });
+
+    const body = await request.json();
+    const { id, action } = body;
+
+    if (!id) {
+        return NextResponse.json({ error: 'ID da campanha é obrigatório' }, { status: 400 });
     }
-    const campaign = await Campaign.findByIdAndUpdate(id, { $set: { status } }, { new: true });
-    return NextResponse.json({ campaign });
+
+    if (action === 'start_tracking') {
+        const now = new Date();
+        // Se houver qualquer outra campanha em tracking, encerra
+        await Campaign.updateMany(
+            { status: 'tracking', _id: { $ne: id } },
+            { $set: { status: 'completed', endedAt: now } }
+        );
+
+        const campaign = await Campaign.findByIdAndUpdate(
+            id,
+            {
+                $set: {
+                    status: 'tracking',
+                    startedAt: now,
+                    endedAt: null,
+                }
+            },
+            { new: true }
+        );
+        return NextResponse.json({ success: true, campaign });
+    }
+
+    if (action === 'stop_tracking') {
+        const now = new Date();
+        const impressions = Number(body.externalImpressions) || 0;
+        const clicks = Number(body.externalClicks) || 0;
+
+        const campaign = await Campaign.findByIdAndUpdate(
+            id,
+            {
+                $set: {
+                    status: 'completed',
+                    endedAt: now,
+                    externalImpressions: impressions,
+                    externalClicks: clicks,
+                }
+            },
+            { new: true }
+        );
+        return NextResponse.json({ success: true, campaign });
+    }
+
+    if (action === 'update_metrics') {
+        const impressions = Number(body.externalImpressions) || 0;
+        const clicks = Number(body.externalClicks) || 0;
+
+        const campaign = await Campaign.findByIdAndUpdate(
+            id,
+            {
+                $set: {
+                    externalImpressions: impressions,
+                    externalClicks: clicks,
+                }
+            },
+            { new: true }
+        );
+        return NextResponse.json({ success: true, campaign });
+    }
+
+    if (body.status) {
+        const campaign = await Campaign.findByIdAndUpdate(
+            id,
+            { $set: { status: body.status } },
+            { new: true }
+        );
+        return NextResponse.json({ success: true, campaign });
+    }
+
+    return NextResponse.json({ error: 'Ação inválida' }, { status: 400 });
+}
+
+export async function DELETE(request: NextRequest) {
+    await connectToDatabase();
+    if (!await requireAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+    const searchParams = request.nextUrl.searchParams;
+    let id = searchParams.get('id');
+
+    if (!id) {
+        const body = await request.json().catch(() => ({}));
+        id = body.id;
+    }
+
+    if (!id) {
+        return NextResponse.json({ error: 'ID da campanha é obrigatório para exclusão' }, { status: 400 });
+    }
+
+    // Exclui a campanha e seus registros filhos (leads de jornada e visitas)
+    await Promise.all([
+        CampaignUserJourney.deleteMany({ campaignId: id }),
+        CampaignVisit.deleteMany({ campaignId: id }),
+        Campaign.findByIdAndDelete(id),
+    ]);
+
+    return NextResponse.json({ success: true, message: 'Campanha e métricas excluídas com sucesso.' });
 }

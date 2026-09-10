@@ -143,7 +143,7 @@ export default async function CampaignLandingPage({ params, searchParams }: Page
                         <div className="relative w-full h-48 sm:h-64 rounded-2xl overflow-hidden border border-slate-200">
                             <Image
                                 src={campaign.landingImageUrl}
-                                alt={campaign.landingHeadline}
+                                alt={campaign.landingHeadline || 'Banner da campanha'}
                                 fill
                                 className="object-cover"
                             />

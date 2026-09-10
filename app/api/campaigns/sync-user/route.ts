@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
+import { Campaign } from '@/models/Campaign';
 import { CampaignVisit } from '@/models/CampaignVisit';
+import { CampaignUserJourney } from '@/models/CampaignUserJourney';
 import { User } from '@/models/User';
 
 export const dynamic = 'force-dynamic';
@@ -22,9 +24,11 @@ export async function POST(request: NextRequest) {
 
         await connectToDatabase();
 
-        const user = await User.findOne({ clerkId: userId }).select('createdAt isProfessional').lean();
+        const user = await User.findOne({ clerkId: userId })
+            .select('createdAt isProfessional username name photoUrl email')
+            .lean();
 
-        // Usuários do tipo profissional NÃO devem aparecer em campanhas nem no funil
+        // Usuários do tipo profissional NÃO devem aparecer em campanhas
         if (user?.isProfessional) {
             return NextResponse.json({
                 success: true,
@@ -46,10 +50,58 @@ export async function POST(request: NextRequest) {
             }
         );
 
+        // Identifica campanha associada: primeiro tenta a campanha em tracking ativo;
+        // caso contrário, pega a campanha mais recente desse visitorId
+        let activeCampaign = await Campaign.findOne({ status: 'tracking' }).sort({ startedAt: -1 });
+        if (!activeCampaign) {
+            const recentVisit = await CampaignVisit.findOne({ visitorId }).sort({ landingViewedAt: -1 }).select('campaignId').lean();
+            if (recentVisit?.campaignId) {
+                activeCampaign = await Campaign.findById(recentVisit.campaignId);
+            }
+        }
+
+        let journeyCreated = false;
+        if (activeCampaign) {
+            const existingJourney = await CampaignUserJourney.findOne({
+                campaignId: activeCampaign._id,
+                userId,
+            }).select('_id').lean();
+
+            if (!existingJourney) {
+                await CampaignUserJourney.create({
+                    campaignId: activeCampaign._id,
+                    userId,
+                    visitorId,
+                    userInfo: {
+                        username: user?.username || 'usuario',
+                        name: user?.name || null,
+                        photoUrl: user?.photoUrl || null,
+                        email: user?.email || null,
+                    },
+                    signupAt: signupDate,
+                    isOnline: true,
+                    lastActiveAt: new Date(),
+                    lastAction: 'Cadastro concluído na plataforma',
+                    hasScrolledExplore: false,
+                    profilesVisitedCount: 0,
+                    profilesVisited: [],
+                    timeline: [{
+                        type: 'signup',
+                        title: 'Cadastro concluído',
+                        detail: 'Usuário finalizou o cadastro e entrou no aplicativo',
+                        timestamp: signupDate,
+                    }],
+                });
+                journeyCreated = true;
+            }
+        }
+
         return NextResponse.json({
             success: true,
             matchedCount: result.matchedCount,
             modifiedCount: result.modifiedCount,
+            campaignId: activeCampaign?._id || null,
+            journeyCreated,
         });
     } catch (error: any) {
         console.error('Erro ao sincronizar usuário de campanha:', error);

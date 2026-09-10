@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { CAMPAIGN_ATTRIBUTION_STORAGE_KEY } from './CampaignVisitTracker';
+import { emitCampaignTelemetry } from '@/lib/campaignTelemetry';
 
 export function PublicTrafficTracker() {
     useEffect(() => {
@@ -114,6 +115,42 @@ export function AuthenticatedTrafficSync() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ visitorId }),
         }).catch(() => {});
+    }, [isSignedIn, userId]);
+
+    // Rastreamento de presença em tempo real (online / saiu da página)
+    useEffect(() => {
+        if (!isSignedIn || !userId || typeof window === 'undefined') return;
+
+        // Heartbeat inicial
+        emitCampaignTelemetry({ eventType: 'heartbeat' });
+
+        // Intervalo periódico de presença
+        const interval = setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                emitCampaignTelemetry({ eventType: 'heartbeat' });
+            }
+        }, 25000);
+
+        const handleVisibility = () => {
+            if (document.visibilityState === 'hidden') {
+                emitCampaignTelemetry({ eventType: 'page_leave' });
+            } else if (document.visibilityState === 'visible') {
+                emitCampaignTelemetry({ eventType: 'heartbeat' });
+            }
+        };
+
+        const handlePageHide = () => {
+            emitCampaignTelemetry({ eventType: 'page_leave' });
+        };
+
+        document.addEventListener('visibilitychange', handleVisibility);
+        window.addEventListener('pagehide', handlePageHide);
+
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibility);
+            window.removeEventListener('pagehide', handlePageHide);
+        };
     }, [isSignedIn, userId]);
 
     return null;

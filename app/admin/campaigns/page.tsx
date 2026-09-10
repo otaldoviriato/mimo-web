@@ -1,628 +1,1366 @@
 'use client';
 
-import React, { FormEvent, useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
     Megaphone,
-    Filter,
+    Play,
+    Square,
+    Users,
     MousePointer,
-    UserPlus,
-    CreditCard,
-    DollarSign,
-    TrendingUp,
+    Eye,
     Plus,
-    Search,
-    Copy,
-    Check,
-    ExternalLink,
-    Globe,
-    ChevronDown,
-    ChevronUp,
-    RefreshCw,
     Trash2,
-    AlertTriangle
+    RefreshCw,
+    Clock,
+    Compass,
+    MessageSquare,
+    Image as ImageIcon,
+    CreditCard,
+    AlertCircle,
+    CheckCircle2,
+    X,
+    ExternalLink,
+    ChevronRight,
+    Search,
+    TrendingUp,
+    FileText,
+    Sparkles,
+    Calendar,
+    ArrowUpRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-type CampaignRow = {
+interface UserInfo {
+    username: string;
+    name?: string | null;
+    photoUrl?: string | null;
+    email?: string | null;
+}
+
+interface TimelineEvent {
+    type: string;
+    title: string;
+    detail?: string | null;
+    timestamp: string | Date;
+    metadata?: Record<string, any>;
+}
+
+interface LeadJourney {
+    _id: string;
+    userId: string;
+    userInfo: UserInfo;
+    signupAt: string | Date;
+    isOnline: boolean;
+    lastActiveAt: string | Date;
+    lastAction: string;
+    firstProfileViewed?: {
+        professionalId: string;
+        username: string;
+        name?: string | null;
+        viewedAt: string | Date;
+    } | null;
+    profilesVisited: Array<{
+        professionalId: string;
+        username: string;
+        name?: string | null;
+        viewedAt: string | Date;
+        count: number;
+    }>;
+    profilesVisitedCount: number;
+    hasScrolledExplore: boolean;
+    exploreScrollCount: number;
+    photoGalleryActions: Array<{
+        professionalId: string;
+        username: string;
+        photoIndex: number;
+        totalPhotos: number;
+        action: string;
+        timestamp: string | Date;
+    }>;
+    hasNavigatedPastFirstPhoto: boolean;
+    messageButtonClicks: Array<{
+        professionalId: string;
+        username: string;
+        timestamp: string | Date;
+    }>;
+    rechargeTriggers: Array<{
+        professionalId: string;
+        username?: string | null;
+        reason?: string | null;
+        timestamp: string | Date;
+    }>;
+    timeline: TimelineEvent[];
+}
+
+interface CampaignData {
     _id: string;
     name: string;
     slug: string;
-    status: 'draft' | 'active' | 'paused' | 'archived';
-    network: 'exoclick' | 'direct' | 'other';
-    visits: number;
-    ctaClicks: number;
+    entryPoint: string;
+    description?: string | null;
+    status: 'draft' | 'tracking' | 'completed' | 'active' | 'paused' | 'archived';
+    startedAt?: string | Date | null;
+    endedAt?: string | Date | null;
+    uniqueVisits: number;
     signups: number;
-    recharges: number;
-    paidChatStarts: number;
-    rechargeRevenueCents: number;
-    ctaRate: number;
-    signupRate: number;
-    rechargeRate: number;
-    createdAt?: string;
-};
+    impressions: number;
+    clicks: number;
+    ctr: number;
+    conversionRate: number;
+    createdAt?: string | Date;
+}
 
-type SummaryData = {
-    totalCampaigns: number;
-    activeCampaigns: number;
-    totalVisits: number;
-    totalCtaClicks: number;
-    totalSignups: number;
-    totalRecharges: number;
-    totalRevenueCents: number;
-    overallConversionRate: number;
-};
+interface ActiveCampaignData extends CampaignData {
+    leads: LeadJourney[];
+    signupsCount: number;
+}
 
 export default function CampaignsPage() {
-    const router = useRouter();
-    const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
-    const [summary, setSummary] = useState<SummaryData | null>(null);
+    const [activeCampaign, setActiveCampaign] = useState<ActiveCampaignData | null>(null);
+    const [campaigns, setCampaigns] = useState<CampaignData[]>([]);
     const [loading, setLoading] = useState(true);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [networkFilter, setNetworkFilter] = useState('all');
-    const [isCreateOpen, setIsCreateOpen] = useState(false);
-    const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
-    const [isClearModalOpen, setIsClearModalOpen] = useState(false);
-    const [selectedCampaignToClear, setSelectedCampaignToClear] = useState<string>('all');
-    const [clearing, setClearing] = useState(false);
+    const [pollingActive, setPollingActive] = useState(true);
+    const [lastPollTime, setLastPollTime] = useState<Date>(new Date());
 
-    const [form, setForm] = useState({
+    // Modais
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isStopModalOpen, setIsStopModalOpen] = useState(false);
+    const [isInspectModalOpen, setIsInspectModalOpen] = useState(false);
+    const [selectedLeadForDetails, setSelectedLeadForDetails] = useState<LeadJourney | null>(null);
+    const [inspectCampaignData, setInspectCampaignData] = useState<{ campaign: CampaignData; leads: LeadJourney[] } | null>(null);
+    const [campaignToDelete, setCampaignToDelete] = useState<CampaignData | null>(null);
+
+    // Formulários
+    const [createForm, setCreateForm] = useState({
         name: '',
-        slug: '',
-        network: 'exoclick',
-        landingHeadline: '',
-        landingBody: '',
-        targetProfessionalId: ''
+        entryPoint: '/descubra',
+        description: '',
     });
+    const [stopForm, setStopForm] = useState({
+        externalImpressions: '',
+        externalClicks: '',
+    });
+    const [submitting, setSubmitting] = useState(false);
 
-    const load = async () => {
-        setLoading(true);
+    // Destaque de novos itens na lista de leads (animação incremental)
+    const prevLeadIdsRef = useRef<Set<string>>(new Set());
+    const [newLeadIds, setNewLeadIds] = useState<Set<string>>(new Set());
+
+    const fetchCampaigns = async (isBackground = false) => {
+        if (!isBackground) setLoading(true);
         try {
-            const response = await fetch('/api/admin/campaigns');
-            const data = await response.json();
-            if (response.ok) {
-                setCampaigns(data.campaigns ?? []);
-                setSummary(data.summary ?? null);
+            const res = await fetch('/api/admin/campaigns');
+            if (!res.ok) throw new Error('Erro ao carregar dados');
+            const data = await res.json();
+
+            if (data.activeCampaign) {
+                const currentLeads: LeadJourney[] = data.activeCampaign.leads || [];
+                const currentIds = new Set(currentLeads.map(l => l._id));
+
+                if (prevLeadIdsRef.current.size > 0) {
+                    const newlyAdded = new Set<string>();
+                    currentIds.forEach(id => {
+                        if (!prevLeadIdsRef.current.has(id)) {
+                            newlyAdded.add(id);
+                        }
+                    });
+                    if (newlyAdded.size > 0) {
+                        setNewLeadIds(newlyAdded);
+                        // Limpa o destaque após 4 segundos
+                        setTimeout(() => setNewLeadIds(new Set()), 4000);
+                    }
+                }
+                prevLeadIdsRef.current = currentIds;
+                setActiveCampaign(data.activeCampaign);
             } else {
-                toast.error(data.error || 'Erro ao carregar campanhas');
+                setActiveCampaign(null);
+                prevLeadIdsRef.current.clear();
             }
-        } catch {
-            toast.error('Erro de conexão ao carregar campanhas');
+
+            setCampaigns(data.campaigns || []);
+            setLastPollTime(new Date());
+        } catch (err) {
+            console.error('Erro na sincronização de campanhas:', err);
+            if (!isBackground) toast.error('Falha ao carregar campanhas');
         } finally {
-            setLoading(false);
+            if (!isBackground) setLoading(false);
         }
     };
 
-    const handleClearMetrics = async () => {
-        setClearing(true);
-        try {
-            const body: Record<string, any> = {};
-            if (selectedCampaignToClear === 'all') {
-                body.all = true;
-            } else {
-                body.campaignId = selectedCampaignToClear;
-            }
-            const res = await fetch('/api/admin/campaigns/clear', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
-            const json = await res.json();
-            if (res.ok) {
-                toast.success(json.message || 'Métricas limpas com sucesso!');
-                setIsClearModalOpen(false);
-                await load();
-            } else {
-                toast.error(json.error || 'Erro ao limpar métricas');
-            }
-        } catch {
-            toast.error('Erro de conexão ao limpar métricas');
-        } finally {
-            setClearing(false);
-        }
-    };
-
+    // Carga inicial
     useEffect(() => {
-        void load();
+        fetchCampaigns(false);
     }, []);
 
-    const create = async (event: FormEvent) => {
-        event.preventDefault();
+    // Polling contínuo para atualizações em tempo real (a cada 3.5 segundos quando há campanha ativa ou tela aberta)
+    useEffect(() => {
+        if (!pollingActive) return;
+        const interval = setInterval(() => {
+            fetchCampaigns(true);
+        }, 3500);
+        return () => clearInterval(interval);
+    }, [pollingActive]);
+
+    const handleCreateCampaign = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!createForm.name.trim()) {
+            toast.error('Informe o nome da campanha');
+            return;
+        }
+
+        setSubmitting(true);
         try {
-            const response = await fetch('/api/admin/campaigns', {
+            const res = await fetch('/api/admin/campaigns', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(form)
+                body: JSON.stringify(createForm),
             });
-            const data = await response.json();
-            if (!response.ok) {
-                return toast.error(data.error ?? 'Não foi possível criar a campanha.');
-            }
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao criar');
+
             toast.success('Campanha criada com sucesso!');
-            setForm({
-                name: '',
-                slug: '',
-                network: 'exoclick',
-                landingHeadline: '',
-                landingBody: '',
-                targetProfessionalId: ''
-            });
-            setIsCreateOpen(false);
-            await load();
-        } catch {
-            toast.error('Erro ao enviar dados da campanha.');
+            setIsCreateModalOpen(false);
+            setCreateForm({ name: '', entryPoint: '/descubra', description: '' });
+            await fetchCampaigns(false);
+        } catch (err: any) {
+            toast.error(err.message || 'Erro ao salvar campanha');
+        } finally {
+            setSubmitting(false);
         }
     };
 
-    const changeStatus = async (id: string, status: string) => {
+    const handleStartTracking = async (campaignId: string) => {
+        if (!confirm('Iniciar o rastreamento ao vivo para esta campanha agora?')) return;
+
+        setSubmitting(true);
         try {
             const res = await fetch('/api/admin/campaigns', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id, status })
+                body: JSON.stringify({ id: campaignId, action: 'start_tracking' }),
             });
-            if (res.ok) {
-                toast.success('Status atualizado');
-                await load();
-            } else {
-                toast.error('Não foi possível alterar status');
-            }
-        } catch {
-            toast.error('Erro ao atualizar status');
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao iniciar rastreamento');
+
+            toast.success('Rastreamento ao vivo iniciado!');
+            await fetchCampaigns(false);
+        } catch (err: any) {
+            toast.error(err.message || 'Erro ao iniciar');
+        } finally {
+            setSubmitting(false);
         }
     };
 
-    const copyTrackingUrl = (slug: string, network: string) => {
-        const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.mimochat.com.br';
-        let url = `${origin}/descubra?utm_source=${network}&utm_campaign=${slug}`;
-        if (network === 'exoclick') {
-            url = `${origin}/descubra?utm_source=exoclick&utm_medium=display&utm_campaign=${slug}&utm_content={variation_id}&zone_id={zone_id}&click_id={conversions_tracking}`;
+    const handleStopTrackingConfirm = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!activeCampaign) return;
+
+        setSubmitting(true);
+        try {
+            const res = await fetch('/api/admin/campaigns', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: activeCampaign._id,
+                    action: 'stop_tracking',
+                    externalImpressions: Number(stopForm.externalImpressions) || 0,
+                    externalClicks: Number(stopForm.externalClicks) || 0,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao encerrar rastreamento');
+
+            toast.success('Rastreamento encerrado e métricas salvas!');
+            setIsStopModalOpen(false);
+            setStopForm({ externalImpressions: '', externalClicks: '' });
+            await fetchCampaigns(false);
+        } catch (err: any) {
+            toast.error(err.message || 'Erro ao finalizar');
+        } finally {
+            setSubmitting(false);
         }
-        navigator.clipboard.writeText(url);
-        setCopiedSlug(slug);
-        toast.success('URL com parâmetros UTM copiada!');
-        setTimeout(() => setCopiedSlug(null), 2500);
     };
 
-    const filteredCampaigns = campaigns.filter(c => {
-        const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            c.slug.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesNetwork = networkFilter === 'all' || c.network === networkFilter;
-        return matchesSearch && matchesNetwork;
-    });
+    const handleDeleteCampaign = async () => {
+        if (!campaignToDelete) return;
+
+        setSubmitting(true);
+        try {
+            const res = await fetch(`/api/admin/campaigns?id=${campaignToDelete._id}`, {
+                method: 'DELETE',
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao excluir');
+
+            toast.success('Campanha excluída com sucesso!');
+            setCampaignToDelete(null);
+            await fetchCampaigns(false);
+        } catch (err: any) {
+            toast.error(err.message || 'Erro ao excluir');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleOpenInspectCampaign = async (campaignId: string) => {
+        setSubmitting(true);
+        try {
+            const res = await fetch(`/api/admin/campaigns?campaignId=${campaignId}`);
+            if (!res.ok) throw new Error('Erro ao carregar detalhes');
+            const data = await res.json();
+            setInspectCampaignData(data);
+            setIsInspectModalOpen(true);
+        } catch (err: any) {
+            toast.error(err.message || 'Erro ao inspecionar campanha');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const formatTimestamp = (dateVal?: string | Date | null) => {
+        if (!dateVal) return '--';
+        const d = new Date(dateVal);
+        return d.toLocaleString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+        });
+    };
+
+    const formatTimeOnly = (dateVal?: string | Date | null) => {
+        if (!dateVal) return '--';
+        const d = new Date(dateVal);
+        return d.toLocaleTimeString('pt-BR', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+        });
+    };
+
+    const calculateDuration = (start?: string | Date | null, end?: string | Date | null) => {
+        if (!start) return '--';
+        const s = new Date(start).getTime();
+        const e = end ? new Date(end).getTime() : Date.now();
+        const diffMinutes = Math.max(0, Math.floor((e - s) / (1000 * 60)));
+        if (diffMinutes < 60) return `${diffMinutes} min`;
+        const hours = Math.floor(diffMinutes / 60);
+        const mins = diffMinutes % 60;
+        return `${hours}h ${mins}m`;
+    };
 
     return (
-        <div className="space-y-6">
-            {/* Header com Ações */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
-                            <Megaphone size={18} />
+        <div className="min-h-screen bg-slate-50 text-slate-900 pb-16">
+            {/* Topbar / Header da Página */}
+            <div className="bg-white border-b border-slate-200 sticky top-0 z-20">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <div className="p-2 bg-purple-50 text-purple-700 rounded-xl border border-purple-100">
+                                    <Megaphone size={22} className="stroke-[2.2]" />
+                                </div>
+                                <div>
+                                    <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
+                                        Campanhas & Ponto de Entrada
+                                    </h1>
+                                    <p className="text-xs sm:text-sm text-slate-500 font-medium">
+                                        Rastreamento temporal de tráfego, acessos únicos e jornada detalhada de novos cadastros.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
-                        <h1 className="text-2xl font-black text-slate-900 tracking-tight">Campanhas & Tráfego</h1>
-                    </div>
-                    <p className="text-xs text-slate-500 font-medium mt-1">
-                        Detecção automática via parâmetros UTM e compilação de resultados de conversão.
-                    </p>
-                </div>
 
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => void load()}
-                        disabled={loading}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50 transition-colors shadow-xs"
-                    >
-                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                        Atualizar
-                    </button>
-                    <button
-                        onClick={() => {
-                            setSelectedCampaignToClear('all');
-                            setIsClearModalOpen(true);
-                        }}
-                        disabled={loading || clearing}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all shadow-xs"
-                        title="Limpar métricas de rastreamento"
-                    >
-                        <Trash2 size={14} />
-                        Limpar
-                    </button>
-                    <button
-                        onClick={() => setIsCreateOpen(!isCreateOpen)}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
-                    >
-                        <Plus size={16} />
-                        Nova Campanha
-                        {isCreateOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                    </button>
+                        <div className="flex items-center gap-2 self-start sm:self-auto">
+                            <button
+                                onClick={() => fetchCampaigns(false)}
+                                className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
+                                title="Atualizar dados manualmente"
+                            >
+                                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                                <span className="hidden sm:inline">Atualizar</span>
+                            </button>
+
+                            <button
+                                onClick={() => setIsCreateModalOpen(true)}
+                                className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm transition cursor-pointer"
+                            >
+                                <Plus size={16} className="stroke-[2.5]" />
+                                Nova Campanha
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* Cards de Métricas Agregadas */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-                    <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Campanhas</span>
-                        <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center">
-                            <Megaphone size={14} />
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+                {/* ══════════════════════════════════════════════════════════════════════
+                    PAINEL AO VIVO DA CAMPANHA ATIVA EM RASTREAMENTO
+                ══════════════════════════════════════════════════════════════════════ */}
+                {activeCampaign ? (
+                    <div className="bg-white rounded-3xl border-2 border-purple-200 shadow-xl shadow-purple-900/5 overflow-hidden transition-all">
+                        {/* Faixa Superior de Status Ao Vivo */}
+                        <div className="bg-gradient-to-r from-purple-700 via-purple-600 to-indigo-700 text-white px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                                <span className="relative flex h-3.5 w-3.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-400"></span>
+                                </span>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-black tracking-wider uppercase bg-white/20 px-2 py-0.5 rounded-md">
+                                            Rastreamento Ao Vivo
+                                        </span>
+                                        <span className="text-xs text-purple-100 font-medium">
+                                            Em andamento há {calculateDuration(activeCampaign.startedAt)}
+                                        </span>
+                                    </div>
+                                    <h2 className="text-lg sm:text-xl font-black tracking-tight mt-0.5">
+                                        {activeCampaign.name}
+                                    </h2>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => {
+                                        setStopForm({ externalImpressions: '', externalClicks: '' });
+                                        setIsStopModalOpen(true);
+                                    }}
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-rose-500 hover:bg-rose-600 active:bg-rose-700 text-white text-xs sm:text-sm font-black rounded-xl shadow-md transition cursor-pointer"
+                                >
+                                    <Square size={14} className="fill-white" />
+                                    Encerrar Rastreamento
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                    <p className="mt-2 text-xl font-black text-slate-900">{summary?.activeCampaigns ?? 0}</p>
-                    <span className="text-[10px] text-slate-500 font-medium">{summary?.totalCampaigns ?? 0} no total</span>
-                </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-                    <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Visitas / Clicks</span>
-                        <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                            <MousePointer size={14} />
+                        {/* Detalhes do Ponto de Entrada e Descrição */}
+                        <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex flex-wrap items-center gap-4 text-xs font-medium text-slate-600">
+                                <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-slate-200">
+                                    <Compass size={15} className="text-purple-600" />
+                                    <span>Ponto de Entrada:</span>
+                                    <code className="text-purple-700 font-mono font-bold">{activeCampaign.entryPoint}</code>
+                                </div>
+                                <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-slate-200">
+                                    <Clock size={15} className="text-slate-500" />
+                                    <span>Iniciada em:</span>
+                                    <strong className="text-slate-800">{formatTimestamp(activeCampaign.startedAt)}</strong>
+                                </div>
+                            </div>
+
+                            {activeCampaign.description && (
+                                <div className="text-xs bg-purple-50 text-purple-800 px-3 py-1.5 rounded-xl border border-purple-100 max-w-xl truncate">
+                                    <span className="font-bold mr-1">Anotações:</span>
+                                    {activeCampaign.description}
+                                </div>
+                            )}
                         </div>
-                    </div>
-                    <p className="mt-2 text-xl font-black text-slate-900">{summary?.totalVisits ?? 0}</p>
-                    <span className="text-[10px] text-blue-600 font-medium">{summary?.totalCtaClicks ?? 0} no CTA</span>
-                </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-                    <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Cadastros</span>
-                        <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                            <UserPlus size={14} />
+                        {/* Grade de Contadores / Métricas da Campanha Ativa */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
+                            {/* Card Contador Gigante de Acessos Únicos na Landing Page */}
+                            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white rounded-2xl p-6 relative overflow-hidden shadow-lg flex flex-col justify-between">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                        Acessos Únicos no Ponto de Entrada
+                                    </span>
+                                    <div className="p-2 bg-white/10 rounded-xl">
+                                        <MousePointer size={18} className="text-emerald-400" />
+                                    </div>
+                                </div>
+                                <div className="my-4">
+                                    <div className="text-5xl sm:text-6xl font-black tracking-tight text-white">
+                                        {activeCampaign.uniqueVisits.toLocaleString('pt-BR')}
+                                    </div>
+                                    <p className="text-xs text-slate-400 mt-1 font-medium">
+                                        Visitantes únicos que acessaram <span className="text-purple-300 font-mono">{activeCampaign.entryPoint}</span>
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-1 rounded-lg self-start">
+                                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                    Atualizando a cada 3.5s
+                                </div>
+                            </div>
+
+                            {/* Card Cadastros Realizados */}
+                            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                        Novos Usuários Cadastrados
+                                    </span>
+                                    <div className="p-2 bg-purple-50 text-purple-600 rounded-xl border border-purple-100">
+                                        <Users size={18} />
+                                    </div>
+                                </div>
+                                <div className="my-4">
+                                    <div className="text-5xl sm:text-6xl font-black tracking-tight text-slate-900">
+                                        {activeCampaign.signupsCount.toLocaleString('pt-BR')}
+                                    </div>
+                                    <p className="text-xs text-slate-500 mt-1 font-medium">
+                                        Usuários que concluíram o cadastro durante este rastreamento
+                                    </p>
+                                </div>
+                                <div className="text-xs font-bold text-slate-600">
+                                    Taxa de Cadastro:{' '}
+                                    <span className="text-purple-600">
+                                        {activeCampaign.uniqueVisits > 0
+                                            ? `${((activeCampaign.signupsCount / activeCampaign.uniqueVisits) * 100).toFixed(1)}%`
+                                            : '0%'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Card Resumo de Engajamento e Trajetos */}
+                            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                        Engajamento dos Leads
+                                    </span>
+                                    <div className="p-2 bg-amber-50 text-amber-600 rounded-xl border border-amber-100">
+                                        <TrendingUp size={18} />
+                                    </div>
+                                </div>
+                                <div className="space-y-2.5 my-3 text-xs">
+                                    <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                                        <span className="text-slate-600 font-medium">Scrollaram o Explorar:</span>
+                                        <strong className="text-slate-900 font-bold">
+                                            {activeCampaign.leads.filter(l => l.hasScrolledExplore).length}
+                                        </strong>
+                                    </div>
+                                    <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                                        <span className="text-slate-600 font-medium">Visualizaram Perfis:</span>
+                                        <strong className="text-slate-900 font-bold">
+                                            {activeCampaign.leads.filter(l => l.profilesVisitedCount > 0).length}
+                                        </strong>
+                                    </div>
+                                    <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                                        <span className="text-slate-600 font-medium">Folhearam Fotos da Galeria:</span>
+                                        <strong className="text-slate-900 font-bold">
+                                            {activeCampaign.leads.filter(l => l.hasNavigatedPastFirstPhoto).length}
+                                        </strong>
+                                    </div>
+                                    <div className="flex justify-between items-center py-1">
+                                        <span className="text-slate-600 font-medium">Acionaram Gatilho de Recarga:</span>
+                                        <strong className="text-purple-700 font-bold">
+                                            {activeCampaign.leads.filter(l => (l.rechargeTriggers?.length || 0) > 0).length}
+                                        </strong>
+                                    </div>
+                                </div>
+                                <div className="text-[11px] text-slate-400 font-medium">
+                                    Métricas calculadas sobre {activeCampaign.signupsCount} cadastros
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <p className="mt-2 text-xl font-black text-slate-900">{summary?.totalSignups ?? 0}</p>
-                    <span className="text-[10px] text-emerald-600 font-medium">
-                        {summary?.totalVisits ? ((summary.totalSignups / summary.totalVisits) * 100).toFixed(1) : 0}% conv.
-                    </span>
-                </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-                    <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">1ª Recarga</span>
-                        <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
-                            <CreditCard size={14} />
-                        </div>
-                    </div>
-                    <p className="mt-2 text-xl font-black text-slate-900">{summary?.totalRecharges ?? 0}</p>
-                    <span className="text-[10px] text-purple-600 font-medium">Conversões pagas</span>
-                </div>
+                        {/* ──────────────────────────────────────────────────────────
+                            LISTA INCREMENTAL AO VIVO DE USUÁRIOS CADASTRADOS
+                        ────────────────────────────────────────────────────────── */}
+                        <div className="p-6 border-t border-slate-200">
+                            <div className="flex items-center justify-between mb-4">
+                                <div>
+                                    <h3 className="text-base sm:text-lg font-black tracking-tight text-slate-900 flex items-center gap-2">
+                                        <Users size={18} className="text-purple-600" />
+                                        Leads Cadastrados em Tempo Real ({activeCampaign.leads.length})
+                                    </h3>
+                                    <p className="text-xs text-slate-500 font-medium">
+                                        Apenas usuários que se cadastraram durante a campanha. Clique em qualquer lead para ver o trajeto detalhado.
+                                    </p>
+                                </div>
+                            </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-                    <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Faturamento</span>
-                        <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-                            <DollarSign size={14} />
-                        </div>
-                    </div>
-                    <p className="mt-2 text-xl font-black text-slate-900">
-                        {((summary?.totalRevenueCents ?? 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                    </p>
-                    <span className="text-[10px] text-amber-700 font-medium">1ª recarga de leads</span>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-                    <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Taxa Geral</span>
-                        <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
-                            <TrendingUp size={14} />
-                        </div>
-                    </div>
-                    <p className="mt-2 text-xl font-black text-slate-900">{summary?.overallConversionRate ?? 0}%</p>
-                    <span className="text-[10px] text-slate-500 font-medium">Visita → Recarga</span>
-                </div>
-            </div>
-
-            {/* Formulário Retrátil para Criação Manual */}
-            {isCreateOpen && (
-                <form onSubmit={create} className="rounded-2xl border border-purple-200 bg-white p-5 shadow-sm space-y-4 animate-in fade-in-50 duration-200">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-sm font-bold text-slate-900">Cadastrar Nova Campanha / Landing</h2>
-                        <span className="text-[11px] text-slate-500">Ou use UTMs diretamente para auto-criação</span>
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-                        <input
-                            required
-                            placeholder="Nome interno (ex: ExoClick Banner 300x250)"
-                            value={form.name}
-                            onChange={e => setForm({ ...form, name: e.target.value })}
-                            className="rounded-xl border border-slate-200 p-2.5 text-xs focus:outline-none focus:border-purple-500"
-                        />
-                        <input
-                            required
-                            placeholder="slug-da-campanha"
-                            value={form.slug}
-                            onChange={e => setForm({ ...form, slug: e.target.value })}
-                            className="rounded-xl border border-slate-200 p-2.5 text-xs focus:outline-none focus:border-purple-500 font-mono"
-                        />
-                        <select
-                            value={form.network}
-                            onChange={e => setForm({ ...form, network: e.target.value as any })}
-                            className="rounded-xl border border-slate-200 p-2.5 text-xs focus:outline-none focus:border-purple-500"
-                        >
-                            <option value="exoclick">ExoClick</option>
-                            <option value="direct">Direto / Orgânico</option>
-                            <option value="other">Outra Rede (Google/Meta/etc)</option>
-                        </select>
-                        <input
-                            required
-                            placeholder="Título da landing page"
-                            value={form.landingHeadline}
-                            onChange={e => setForm({ ...form, landingHeadline: e.target.value })}
-                            className="rounded-xl border border-slate-200 p-2.5 text-xs focus:outline-none focus:border-purple-500 sm:col-span-2"
-                        />
-                        <input
-                            placeholder="Clerk ID da criadora alvo (opcional)"
-                            value={form.targetProfessionalId}
-                            onChange={e => setForm({ ...form, targetProfessionalId: e.target.value })}
-                            className="rounded-xl border border-slate-200 p-2.5 text-xs focus:outline-none focus:border-purple-500"
-                        />
-                        <textarea
-                            required
-                            placeholder="Texto descritivo / chamada da landing"
-                            value={form.landingBody}
-                            onChange={e => setForm({ ...form, landingBody: e.target.value })}
-                            className="rounded-xl border border-slate-200 p-2.5 text-xs focus:outline-none focus:border-purple-500 sm:col-span-2 md:col-span-3 h-20"
-                        />
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                        <button
-                            type="button"
-                            onClick={() => setIsCreateOpen(false)}
-                            className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50"
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            type="submit"
-                            className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-xs"
-                        >
-                            Salvar Campanha
-                        </button>
-                    </div>
-                </form>
-            )}
-
-            {/* Barra de Filtros e Busca */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
-                <div className="relative w-full sm:w-72">
-                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                        type="text"
-                        placeholder="Buscar por nome ou slug..."
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-purple-500"
-                    />
-                </div>
-
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-                        <Filter size={13} />
-                        <span>Rede:</span>
-                    </div>
-                    <select
-                        value={networkFilter}
-                        onChange={e => setNetworkFilter(e.target.value)}
-                        className="text-xs rounded-xl border border-slate-200 px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:border-purple-500"
-                    >
-                        <option value="all">Todas as origens</option>
-                        <option value="exoclick">ExoClick</option>
-                        <option value="direct">Orgânico / Direto</option>
-                        <option value="other">Outros UTMs</option>
-                    </select>
-                </div>
-            </div>
-
-            {/* Tabela de Campanhas */}
-            <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-xs">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs text-slate-600">
-                        <thead className="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
-                            <tr>
-                                <th className="p-3.5 pl-5">Campanha & Origem</th>
-                                <th className="p-3.5">Status</th>
-                                <th className="p-3.5 text-center">Visitas</th>
-                                <th className="p-3.5 text-center">CTA Clicks</th>
-                                <th className="p-3.5 text-center">Cadastros</th>
-                                <th className="p-3.5 text-center">1ª Recarga</th>
-                                <th className="p-3.5 text-right">Receita</th>
-                                <th className="p-3.5 text-center pr-5">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {loading ? (
-                                <tr>
-                                    <td colSpan={8} className="p-8 text-center text-slate-400">
-                                        <div className="flex items-center justify-center gap-2">
-                                            <RefreshCw size={14} className="animate-spin text-purple-600" />
-                                            <span>Carregando campanhas...</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : filteredCampaigns.length === 0 ? (
-                                <tr>
-                                    <td colSpan={8} className="p-10 text-center text-slate-500">
-                                        <Globe size={32} className="mx-auto text-slate-300 mb-2" />
-                                        <p className="font-semibold text-slate-700">Nenhuma campanha encontrada</p>
-                                        <p className="text-[11px] text-slate-400 mt-0.5">
-                                            Tráfego com parâmetros UTM será detectado e listado automaticamente aqui.
-                                        </p>
-                                    </td>
-                                </tr>
+                            {activeCampaign.leads.length === 0 ? (
+                                <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-8 text-center">
+                                    <Users size={32} className="mx-auto text-slate-400 mb-2 opacity-60" />
+                                    <p className="text-sm font-bold text-slate-700">Nenhum cadastro registrado ainda nesta campanha</p>
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                        Assim que um visitante acessar <code className="font-mono text-purple-600">{activeCampaign.entryPoint}</code> e criar conta, ele aparecerá aqui com animação em tempo real.
+                                    </p>
+                                </div>
                             ) : (
-                                filteredCampaigns.map(camp => {
-                                    const isExoclick = camp.network === 'exoclick';
-                                    const isOrganic = camp.slug === 'organico' || camp.network === 'direct';
-
-                                    return (
-                                        <tr key={camp._id} className="hover:bg-slate-50/70 transition-colors">
-                                            <td className="p-3.5 pl-5">
-                                                <div className="flex flex-col">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-bold text-slate-900">{camp.name}</span>
-                                                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wide ${
-                                                            isExoclick
-                                                                ? 'bg-purple-100 text-purple-700 border border-purple-200'
-                                                                : isOrganic
-                                                                    ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                                                                    : 'bg-blue-100 text-blue-700 border border-blue-200'
-                                                        }`}>
-                                                            {camp.network}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex items-center gap-2 mt-0.5">
-                                                        <code className="text-[10px] text-slate-400 font-mono">slug: {camp.slug}</code>
-                                                        <button
-                                                            onClick={() => copyTrackingUrl(camp.slug, camp.network)}
-                                                            className="inline-flex items-center gap-1 text-[10px] text-purple-600 hover:text-purple-800 font-medium"
-                                                            title="Copiar link de rastreamento com UTMs"
-                                                        >
-                                                            {copiedSlug === camp.slug ? (
-                                                                <>
-                                                                    <Check size={11} className="text-emerald-600" />
-                                                                    <span className="text-emerald-600">Copiado!</span>
-                                                                </>
+                                <div className="space-y-3">
+                                    {activeCampaign.leads.map((lead) => {
+                                        const isNew = newLeadIds.has(lead._id);
+                                        return (
+                                            <div
+                                                key={lead._id}
+                                                onClick={() => setSelectedLeadForDetails(lead)}
+                                                className={`p-4 rounded-2xl border transition-all cursor-pointer select-none flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                                                    isNew
+                                                        ? 'bg-purple-50/90 border-purple-400 shadow-md ring-2 ring-purple-400/50 animate-pulse'
+                                                        : 'bg-white hover:bg-purple-50/40 border-slate-200 hover:border-purple-200 shadow-xs'
+                                                }`}
+                                            >
+                                                {/* Info do Usuário */}
+                                                <div className="flex items-center gap-3.5 min-w-[220px]">
+                                                    <div className="relative">
+                                                        <div className="w-11 h-11 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center font-bold text-slate-700 text-sm">
+                                                            {lead.userInfo.photoUrl ? (
+                                                                <img
+                                                                    src={lead.userInfo.photoUrl}
+                                                                    alt={lead.userInfo.username}
+                                                                    className="w-full h-full object-cover"
+                                                                />
                                                             ) : (
-                                                                <>
-                                                                    <Copy size={11} />
-                                                                    <span>Copiar URL UTM</span>
-                                                                </>
+                                                                lead.userInfo.username.slice(0, 2).toUpperCase()
                                                             )}
+                                                        </div>
+                                                        {lead.isOnline ? (
+                                                            <span
+                                                                className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"
+                                                                title="Online agora"
+                                                            />
+                                                        ) : (
+                                                            <span
+                                                                className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-slate-400 border-2 border-white rounded-full"
+                                                                title="Offline"
+                                                            />
+                                                        )}
+                                                    </div>
+
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm font-bold text-slate-900 leading-tight">
+                                                                {lead.userInfo.name || `@${lead.userInfo.username}`}
+                                                            </span>
+                                                            {lead.isOnline ? (
+                                                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                                                    Online
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full">
+                                                                    Saiu da página
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-[11px] text-slate-500 mt-0.5">
+                                                            Cadastro:{' '}
+                                                            <strong className="text-slate-700 font-semibold">
+                                                                {formatTimestamp(lead.signupAt)}
+                                                            </strong>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Última Ação do Lead */}
+                                                <div className="flex-1 max-w-md">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
+                                                        Última Ação
+                                                    </span>
+                                                    <div className="text-xs font-semibold text-slate-800 truncate bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl">
+                                                        {lead.lastAction || 'Navegando no aplicativo'}
+                                                    </div>
+                                                </div>
+
+                                                {/* Resumo do Trajeto (Chips) */}
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span
+                                                        className={`text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1 border ${
+                                                            lead.profilesVisitedCount > 0
+                                                                ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                                                : 'bg-slate-50 text-slate-400 border-slate-200'
+                                                        }`}
+                                                        title="Perfis visitados"
+                                                    >
+                                                        <Compass size={13} />
+                                                        {lead.profilesVisitedCount} perfis
+                                                    </span>
+
+                                                    <span
+                                                        className={`text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1 border ${
+                                                            lead.hasScrolledExplore
+                                                                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                                                : 'bg-slate-50 text-slate-400 border-slate-200'
+                                                        }`}
+                                                        title="Scrollou Explorar"
+                                                    >
+                                                        Scroll: {lead.hasScrolledExplore ? 'Sim' : 'Não'}
+                                                    </span>
+
+                                                    <span
+                                                        className={`text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1 border ${
+                                                            lead.hasNavigatedPastFirstPhoto
+                                                                ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                                                : 'bg-slate-50 text-slate-400 border-slate-200'
+                                                        }`}
+                                                        title="Fotos visualizadas"
+                                                    >
+                                                        <ImageIcon size={13} />
+                                                        {lead.hasNavigatedPastFirstPhoto ? 'Passou fotos' : '1ª foto'}
+                                                    </span>
+
+                                                    {(lead.rechargeTriggers?.length || 0) > 0 && (
+                                                        <span
+                                                            className="text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200"
+                                                            title="Gatilho de recarga acionado"
+                                                        >
+                                                            <CreditCard size={13} />
+                                                            Recarga ({lead.rechargeTriggers.length})
+                                                        </span>
+                                                    )}
+
+                                                    <button
+                                                        type="button"
+                                                        className="inline-flex items-center gap-1 px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition ml-1"
+                                                    >
+                                                        Ver Trajeto
+                                                        <ChevronRight size={14} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    /* Nenhuma campanha em andamento */
+                    <div className="bg-white rounded-3xl border border-slate-200 p-8 text-center shadow-xs">
+                        <div className="w-16 h-16 bg-purple-50 text-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-purple-100">
+                            <Play size={28} className="translate-x-0.5 fill-purple-600" />
+                        </div>
+                        <h2 className="text-xl font-black tracking-tight text-slate-900">
+                            Nenhuma Campanha Sendo Rastreada no Momento
+                        </h2>
+                        <p className="text-sm text-slate-500 max-w-lg mx-auto mt-1 mb-6">
+                            Inicie o rastreamento temporal em uma campanha para começar a capturar os acessos únicos no ponto de entrada e monitorar novos cadastros ao vivo.
+                        </p>
+                        <button
+                            onClick={() => setIsCreateModalOpen(true)}
+                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-sm font-bold rounded-xl shadow-md transition cursor-pointer"
+                        >
+                            <Plus size={16} className="stroke-[2.5]" />
+                            Cadastrar Nova Campanha
+                        </button>
+                    </div>
+                )}
+
+                {/* ══════════════════════════════════════════════════════════════════════
+                    HISTÓRICO DE CAMPANHAS ANTERIORES E RASCUNHOS
+                ══════════════════════════════════════════════════════════════════════ */}
+                <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
+                    <div className="p-6 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                            <h3 className="text-lg font-black tracking-tight text-slate-900">
+                                Histórico de Campanhas ({campaigns.length})
+                            </h3>
+                            <p className="text-xs text-slate-500 font-medium">
+                                Todas as campanhas criadas, métricas consolidadas de tráfego e registros de leads.
+                            </p>
+                        </div>
+                    </div>
+
+                    {campaigns.length === 0 ? (
+                        <div className="p-12 text-center text-slate-400 text-sm">
+                            Nenhuma campanha cadastrada até o momento.
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                                        <th className="py-3.5 px-4">Campanha</th>
+                                        <th className="py-3.5 px-4">Ponto de Entrada</th>
+                                        <th className="py-3.5 px-4">Status</th>
+                                        <th className="py-3.5 px-4 text-right">Impressões</th>
+                                        <th className="py-3.5 px-4 text-right">Cliques (CTR)</th>
+                                        <th className="py-3.5 px-4 text-right">Acessos Únicos</th>
+                                        <th className="py-3.5 px-4 text-right">Cadastros</th>
+                                        <th className="py-3.5 px-4 text-right">Conversão</th>
+                                        <th className="py-3.5 px-4 text-center">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-200">
+                                    {campaigns.map((c) => {
+                                        const isCurrent = activeCampaign?._id === c._id;
+                                        return (
+                                            <tr key={c._id} className="hover:bg-slate-50/70 transition">
+                                                <td className="py-3.5 px-4">
+                                                    <div className="font-bold text-slate-900 text-sm">{c.name}</div>
+                                                    {c.description && (
+                                                        <div className="text-[11px] text-slate-500 truncate max-w-xs">
+                                                            {c.description}
+                                                        </div>
+                                                    )}
+                                                    <div className="text-[10px] text-slate-400 mt-0.5">
+                                                        Criada em {formatTimestamp(c.createdAt)}
+                                                    </div>
+                                                </td>
+
+                                                <td className="py-3.5 px-4">
+                                                    <code className="bg-purple-50 text-purple-700 px-2.5 py-1 rounded-lg font-mono font-bold text-xs border border-purple-100">
+                                                        {c.entryPoint || '/descubra'}
+                                                    </code>
+                                                </td>
+
+                                                <td className="py-3.5 px-4">
+                                                    {c.status === 'tracking' ? (
+                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                                            Ao Vivo
+                                                        </span>
+                                                    ) : c.status === 'completed' ? (
+                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                                            Encerrada
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                                            Rascunho
+                                                        </span>
+                                                    )}
+                                                </td>
+
+                                                <td className="py-3.5 px-4 text-right font-semibold text-slate-700">
+                                                    {c.impressions ? c.impressions.toLocaleString('pt-BR') : '--'}
+                                                </td>
+
+                                                <td className="py-3.5 px-4 text-right">
+                                                    <div className="font-bold text-slate-900">
+                                                        {c.clicks ? c.clicks.toLocaleString('pt-BR') : '--'}
+                                                    </div>
+                                                    {c.impressions > 0 && (
+                                                        <div className="text-[10px] text-slate-500 font-medium">
+                                                            CTR: {c.ctr}%
+                                                        </div>
+                                                    )}
+                                                </td>
+
+                                                <td className="py-3.5 px-4 text-right font-black text-slate-900 text-sm">
+                                                    {c.uniqueVisits.toLocaleString('pt-BR')}
+                                                </td>
+
+                                                <td className="py-3.5 px-4 text-right font-black text-purple-700 text-sm">
+                                                    {c.signups.toLocaleString('pt-BR')}
+                                                </td>
+
+                                                <td className="py-3.5 px-4 text-right font-bold text-slate-800">
+                                                    {c.conversionRate}%
+                                                </td>
+
+                                                <td className="py-3.5 px-4 text-center">
+                                                    <div className="flex items-center justify-center gap-1.5">
+                                                        {c.status !== 'tracking' && (
+                                                            <button
+                                                                onClick={() => handleStartTracking(c._id)}
+                                                                className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition cursor-pointer"
+                                                                title="Iniciar Rastreamento"
+                                                            >
+                                                                <Play size={16} />
+                                                            </button>
+                                                        )}
+
+                                                        <button
+                                                            onClick={() => handleOpenInspectCampaign(c._id)}
+                                                            className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition cursor-pointer"
+                                                            title="Ver Leads & Trajetos"
+                                                        >
+                                                            <Eye size={16} />
+                                                        </button>
+
+                                                        <button
+                                                            onClick={() => setCampaignToDelete(c)}
+                                                            className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                                                            title="Excluir Campanha"
+                                                        >
+                                                            <Trash2 size={16} />
                                                         </button>
                                                     </div>
-                                                </div>
-                                            </td>
-
-                                            <td className="p-3.5">
-                                                <select
-                                                    value={camp.status}
-                                                    onChange={e => void changeStatus(camp._id, e.target.value)}
-                                                    className={`text-[11px] font-bold rounded-lg border px-2 py-1 focus:outline-none ${
-                                                        camp.status === 'active'
-                                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                                            : camp.status === 'paused'
-                                                                ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                                                : camp.status === 'archived'
-                                                                    ? 'bg-slate-100 text-slate-600 border-slate-200'
-                                                                    : 'bg-purple-50 text-purple-700 border-purple-200'
-                                                    }`}
-                                                >
-                                                    <option value="active">Ativa</option>
-                                                    <option value="paused">Pausada</option>
-                                                    <option value="draft">Rascunho</option>
-                                                    <option value="archived">Arquivada</option>
-                                                </select>
-                                            </td>
-
-                                            <td className="p-3.5 text-center font-bold text-slate-800">
-                                                {camp.visits}
-                                            </td>
-
-                                            <td className="p-3.5 text-center">
-                                                <div className="font-bold text-slate-800">{camp.ctaClicks}</div>
-                                                <div className="text-[10px] text-slate-400">{camp.ctaRate}% CTR</div>
-                                            </td>
-
-                                            <td className="p-3.5 text-center">
-                                                <div className="font-bold text-emerald-700">{camp.signups}</div>
-                                                <div className="text-[10px] text-slate-400">{camp.signupRate}% conv.</div>
-                                            </td>
-
-                                            <td className="p-3.5 text-center">
-                                                <div className="font-bold text-purple-700">{camp.recharges}</div>
-                                                <div className="text-[10px] text-slate-400">{camp.rechargeRate}% conv.</div>
-                                            </td>
-
-                                            <td className="p-3.5 text-right font-bold text-slate-900">
-                                                {((camp.rechargeRevenueCents || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                            </td>
-
-                                            <td className="p-3.5 text-center pr-5">
-                                                <div className="flex items-center justify-center gap-1.5">
-                                                    <Link
-                                                        href={`/admin/funnel?campaignId=${camp._id}`}
-                                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 text-[11px] font-bold transition-colors border border-purple-200/80 shadow-2xs"
-                                                    >
-                                                        <Filter size={12} />
-                                                        Ver Funil
-                                                    </Link>
-                                                    <a
-                                                        href={`/descubra?utm_source=${camp.network}&utm_campaign=${camp.slug}`}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                                                        title="Abrir destino"
-                                                    >
-                                                        <ExternalLink size={13} />
-                                                    </a>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
-            </div>
+            </main>
 
-            {/* Modal de Confirmação de Limpeza de Métricas */}
-            {isClearModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 text-slate-900 space-y-4">
-                        <div className="flex items-start gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
-                                <AlertTriangle size={20} />
-                            </div>
+            {/* ══════════════════════════════════════════════════════════════════════
+                MODAL DE CRIAÇÃO DE NOVA CAMPANHA
+            ══════════════════════════════════════════════════════════════════════ */}
+            {isCreateModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-fade-in">
+                    <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-black tracking-tight text-slate-900 flex items-center gap-2">
+                                <Plus size={20} className="text-purple-600" />
+                                Nova Campanha de Tráfego
+                            </h3>
+                            <button
+                                onClick={() => setIsCreateModalOpen(false)}
+                                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleCreateCampaign} className="space-y-4">
                             <div>
-                                <h3 className="text-base font-black text-slate-900">Limpar Métricas de Rastreamento</h3>
-                                <p className="text-xs text-slate-500 font-medium mt-1">
-                                    Esta ação zera as contagens de visitas, cliques de CTA e conversões registradas.
-                                    As campanhas cadastradas e os usuários da plataforma serão preservados intactos.
+                                <label className="text-xs font-bold text-slate-700 block mb-1">
+                                    Nome da Campanha <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="Ex: Exoclick - Banner 300x250 Mulheres BR"
+                                    value={createForm.name}
+                                    onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                                    className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-slate-700 block mb-1">
+                                    Ponto de Entrada (Landing Page) <span className="text-rose-500">*</span>
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="/descubra"
+                                        value={createForm.entryPoint}
+                                        onChange={(e) => setCreateForm({ ...createForm, entryPoint: e.target.value })}
+                                        className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600 font-mono"
+                                    />
+                                </div>
+                                <span className="text-[11px] text-slate-400 mt-1 block">
+                                    Rota da landing page que os visitantes acessam ao clicar no anúncio (padrão: <code className="text-purple-600">/descubra</code>).
+                                </span>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-slate-700 block mb-1">
+                                    Descrição & Criativo (Opcional)
+                                </label>
+                                <textarea
+                                    rows={3}
+                                    placeholder="Escreva informações sobre o anúncio: qual criativo ou banner foi usado no Exoclick, segmentação, dispositivo..."
+                                    value={createForm.description}
+                                    onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
+                                    className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600 resize-none"
+                                />
+                            </div>
+
+                            <div className="pt-2 flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsCreateModalOpen(false)}
+                                    className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={submitting}
+                                    className="px-5 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-xl shadow-xs transition disabled:opacity-50 cursor-pointer"
+                                >
+                                    {submitting ? 'Salvando...' : 'Cadastrar Campanha'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════════════
+                MODAL DE ENCERRAMENTO DE RASTREAMENTO (MÉTRICAS DO TRÁFEGO PAGO)
+            ══════════════════════════════════════════════════════════════════════ */}
+            {isStopModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-fade-in">
+                    <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-black tracking-tight text-slate-900 flex items-center gap-2">
+                                <Square size={18} className="text-rose-500 fill-rose-500" />
+                                Encerrar Rastreamento da Campanha
+                            </h3>
+                            <button
+                                onClick={() => setIsStopModalOpen(false)}
+                                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <p className="text-xs text-slate-500 mb-4">
+                            Ao finalizar o rastreamento, registre as métricas registradas na sua plataforma de tráfego pago (Exoclick) para consolidação do resultado.
+                        </p>
+
+                        <form onSubmit={handleStopTrackingConfirm} className="space-y-4">
+                            <div>
+                                <label className="text-xs font-bold text-slate-700 block mb-1">
+                                    Total de Impressões no Tráfego Pago
+                                </label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    placeholder="Ex: 50000"
+                                    value={stopForm.externalImpressions}
+                                    onChange={(e) => setStopForm({ ...stopForm, externalImpressions: e.target.value })}
+                                    className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-slate-700 block mb-1">
+                                    Total de Cliques no Tráfego Pago
+                                </label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    placeholder="Ex: 1200"
+                                    value={stopForm.externalClicks}
+                                    onChange={(e) => setStopForm({ ...stopForm, externalClicks: e.target.value })}
+                                    className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
+                                />
+                            </div>
+
+                            <div className="pt-2 flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsStopModalOpen(false)}
+                                    className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                                >
+                                    Voltar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={submitting}
+                                    className="px-5 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-xs transition disabled:opacity-50 cursor-pointer"
+                                >
+                                    {submitting ? 'Finalizando...' : 'Encerrar e Salvar'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════════════
+                MODAL DE TRAJETO DETALHADO DO USUÁRIO
+            ══════════════════════════════════════════════════════════════════════ */}
+            {selectedLeadForDetails && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-fade-in">
+                    <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 overflow-hidden">
+                        {/* Header do Lead */}
+                        <div className="p-6 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between">
+                            <div className="flex items-center gap-3.5">
+                                <div className="relative">
+                                    <div className="w-13 h-13 rounded-full bg-purple-100 text-purple-800 border-2 border-white shadow-xs overflow-hidden flex items-center justify-center font-black text-base">
+                                        {selectedLeadForDetails.userInfo.photoUrl ? (
+                                            <img
+                                                src={selectedLeadForDetails.userInfo.photoUrl}
+                                                alt={selectedLeadForDetails.userInfo.username}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            selectedLeadForDetails.userInfo.username.slice(0, 2).toUpperCase()
+                                        )}
+                                    </div>
+                                    {selectedLeadForDetails.isOnline && (
+                                        <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full" />
+                                    )}
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-base font-black text-slate-900">
+                                            {selectedLeadForDetails.userInfo.name || `@${selectedLeadForDetails.userInfo.username}`}
+                                        </h3>
+                                        {selectedLeadForDetails.isOnline ? (
+                                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                                Online agora
+                                            </span>
+                                        ) : (
+                                            <span className="text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full">
+                                                Saiu da página
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-slate-500 font-medium">
+                                        @{selectedLeadForDetails.userInfo.username} • Cadastrado em{' '}
+                                        <strong className="text-slate-700 font-semibold">
+                                            {formatTimestamp(selectedLeadForDetails.signupAt)}
+                                        </strong>
+                                    </p>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => setSelectedLeadForDetails(null)}
+                                className="text-slate-400 hover:text-slate-600 p-2 rounded-xl"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Conteúdo com Scroll */}
+                        <div className="p-6 overflow-y-auto space-y-6 flex-1">
+                            {/* Resumo Rápido em Cards */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                                    <span className="text-slate-400 font-bold block mb-1">1º Perfil Visitado</span>
+                                    <div className="font-bold text-slate-900 truncate">
+                                        {selectedLeadForDetails.firstProfileViewed ? (
+                                            `@${selectedLeadForDetails.firstProfileViewed.username}`
+                                        ) : (
+                                            <span className="text-slate-400 font-normal">Nenhum</span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                                    <span className="text-slate-400 font-bold block mb-1">Scrollou o Explorar?</span>
+                                    <div className="font-bold text-slate-900">
+                                        {selectedLeadForDetails.hasScrolledExplore ? (
+                                            <span className="text-blue-600">Sim ({selectedLeadForDetails.exploreScrollCount}x)</span>
+                                        ) : (
+                                            <span className="text-slate-400 font-normal">Não</span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                                    <span className="text-slate-400 font-bold block mb-1">Fotos da Galeria</span>
+                                    <div className="font-bold text-slate-900">
+                                        {selectedLeadForDetails.hasNavigatedPastFirstPhoto ? (
+                                            <span className="text-indigo-600">Passou entre fotos</span>
+                                        ) : (
+                                            <span className="text-slate-500 font-normal">Ficou só na 1ª foto</span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                                    <span className="text-slate-400 font-bold block mb-1">Total Perfis Visitados</span>
+                                    <div className="font-bold text-purple-700 text-sm">
+                                        {selectedLeadForDetails.profilesVisitedCount} perfis
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                                    <span className="text-slate-400 font-bold block mb-1">Cliques em Mensagem</span>
+                                    <div className="font-bold text-slate-900 text-sm">
+                                        {selectedLeadForDetails.messageButtonClicks?.length || 0} cliques
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                                    <span className="text-slate-400 font-bold block mb-1">Gatilhos de Recarga</span>
+                                    <div className="font-bold text-amber-700 text-sm">
+                                        {selectedLeadForDetails.rechargeTriggers?.length || 0} tentativas
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Lista de Perfis Navegados */}
+                            {selectedLeadForDetails.profilesVisited?.length > 0 && (
+                                <div>
+                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                                        Perfis que visitou ({selectedLeadForDetails.profilesVisited.length})
+                                    </h4>
+                                    <div className="flex flex-wrap gap-2">
+                                        {selectedLeadForDetails.profilesVisited.map((p, idx) => (
+                                            <span
+                                                key={idx}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-800 border border-purple-200 rounded-xl text-xs font-semibold"
+                                            >
+                                                <span>@{p.username}</span>
+                                                {p.count > 1 && (
+                                                    <span className="bg-purple-200 text-purple-900 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+                                                        {p.count}x
+                                                    </span>
+                                                )}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Timeline Completa das Ações do Usuário */}
+                            <div>
+                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+                                    Linha do Tempo Cronológica do Trajeto
+                                </h4>
+
+                                {(!selectedLeadForDetails.timeline || selectedLeadForDetails.timeline.length === 0) ? (
+                                    <p className="text-xs text-slate-400">Nenhum evento adicional registrado.</p>
+                                ) : (
+                                    <div className="relative border-l-2 border-slate-200 ml-3 space-y-4">
+                                        {selectedLeadForDetails.timeline.map((evt, idx) => {
+                                            const isSignup = evt.type === 'signup';
+                                            const isRecharge = evt.type === 'recharge_modal';
+                                            const isMessage = evt.type === 'message_click';
+                                            const isProfile = evt.type === 'profile_view';
+
+                                            return (
+                                                <div key={idx} className="relative pl-6">
+                                                    {/* Marcador na Timeline */}
+                                                    <div
+                                                        className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 border-white ${
+                                                            isSignup
+                                                                ? 'bg-emerald-500'
+                                                                : isRecharge
+                                                                ? 'bg-amber-500'
+                                                                : isMessage
+                                                                ? 'bg-purple-600'
+                                                                : isProfile
+                                                                ? 'bg-blue-500'
+                                                                : 'bg-slate-400'
+                                                        }`}
+                                                    />
+
+                                                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <strong className="text-xs text-slate-900 font-bold">
+                                                                {evt.title}
+                                                            </strong>
+                                                            <span className="text-[10px] text-slate-400 font-mono">
+                                                                {formatTimeOnly(evt.timestamp)}
+                                                            </span>
+                                                        </div>
+                                                        {evt.detail && (
+                                                            <p className="text-xs text-slate-600 mt-1 font-medium">
+                                                                {evt.detail}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+                            <button
+                                onClick={() => setSelectedLeadForDetails(null)}
+                                className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition cursor-pointer"
+                            >
+                                Fechar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════════════
+                MODAL DE INSPEÇÃO DE CAMPANHA DO HISTÓRICO
+            ══════════════════════════════════════════════════════════════════════ */}
+            {isInspectModalOpen && inspectCampaignData && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-fade-in">
+                    <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 overflow-hidden">
+                        <div className="p-6 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-black text-slate-900">
+                                    {inspectCampaignData.campaign.name}
+                                </h3>
+                                <p className="text-xs text-slate-500 font-medium">
+                                    Ponto de entrada: <code className="text-purple-600 font-mono font-bold">{inspectCampaignData.campaign.entryPoint}</code> • {inspectCampaignData.leads.length} cadastros gerados
                                 </p>
                             </div>
-                        </div>
-
-                        <div className="bg-slate-50 rounded-xl border border-slate-200 p-3 space-y-2 text-xs">
-                            <span className="font-bold text-slate-700 block">Campanha a ser redefinida:</span>
-                            <select
-                                value={selectedCampaignToClear}
-                                onChange={e => setSelectedCampaignToClear(e.target.value)}
-                                className="w-full rounded-xl border border-slate-200 p-2 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:border-purple-500"
-                            >
-                                <option value="all">Todas as campanhas e orgânico (Zerar tudo)</option>
-                                {campaigns.map(c => (
-                                    <option key={c._id} value={c._id}>
-                                        {c.name} ({c.network})
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-800 font-medium">
-                            Atenção: Os dados de métricas removidos não poderão ser recuperados após a confirmação.
-                        </div>
-
-                        <div className="flex items-center justify-end gap-2 pt-2">
                             <button
-                                type="button"
-                                onClick={() => setIsClearModalOpen(false)}
-                                disabled={clearing}
-                                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition-colors"
+                                onClick={() => setIsInspectModalOpen(false)}
+                                className="text-slate-400 hover:text-slate-600 p-2 rounded-xl"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto flex-1 space-y-4">
+                            {inspectCampaignData.leads.length === 0 ? (
+                                <p className="text-xs text-slate-400 text-center py-8">
+                                    Nenhum cadastro vinculado registrado nesta campanha.
+                                </p>
+                            ) : (
+                                <div className="space-y-2.5">
+                                    {inspectCampaignData.leads.map((lead) => (
+                                        <div
+                                            key={lead._id}
+                                            onClick={() => {
+                                                setSelectedLeadForDetails(lead);
+                                            }}
+                                            className="p-3.5 bg-slate-50 hover:bg-purple-50/50 border border-slate-200 hover:border-purple-200 rounded-2xl flex items-center justify-between gap-4 cursor-pointer transition"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-800 flex items-center justify-center font-bold text-xs">
+                                                    {lead.userInfo.username.slice(0, 2).toUpperCase()}
+                                                </div>
+                                                <div>
+                                                    <div className="text-xs font-bold text-slate-900">
+                                                        @{lead.userInfo.username}
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-400">
+                                                        {formatTimestamp(lead.signupAt)}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="text-xs text-slate-600 truncate max-w-sm">
+                                                {lead.lastAction || 'Cadastro concluído'}
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg">
+                                                    {lead.profilesVisitedCount} perfis
+                                                </span>
+                                                <ChevronRight size={14} className="text-slate-400" />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+                            <button
+                                onClick={() => setIsInspectModalOpen(false)}
+                                className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition cursor-pointer"
+                            >
+                                Fechar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════════════
+                MODAL DE CONFIRMAÇÃO DE EXCLUSÃO DE CAMPANHA
+            ══════════════════════════════════════════════════════════════════════ */}
+            {campaignToDelete && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-fade-in">
+                    <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
+                        <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4 border border-rose-100">
+                            <Trash2 size={24} />
+                        </div>
+
+                        <h3 className="text-lg font-black text-slate-900 tracking-tight">
+                            Excluir Campanha?
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-1 mb-6 leading-relaxed">
+                            Você tem certeza que deseja excluir a campanha{' '}
+                            <strong className="text-slate-800">{campaignToDelete.name}</strong>?
+                            Todos os dados de visitas, leads e trajetos associados serão permanentemente removidos.
+                        </p>
+
+                        <div className="flex justify-end gap-2">
+                            <button
+                                onClick={() => setCampaignToDelete(null)}
+                                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
                             >
                                 Cancelar
                             </button>
                             <button
-                                type="button"
-                                onClick={() => void handleClearMetrics()}
-                                disabled={clearing}
-                                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition-colors flex items-center gap-1.5 shadow-xs"
+                                onClick={handleDeleteCampaign}
+                                disabled={submitting}
+                                className="px-5 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-xs transition disabled:opacity-50 cursor-pointer"
                             >
-                                {clearing ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                                {clearing ? 'Limpando...' : 'Confirmar Limpeza'}
+                                {submitting ? 'Excluindo...' : 'Sim, Excluir Campanha'}
                             </button>
                         </div>
                     </div>

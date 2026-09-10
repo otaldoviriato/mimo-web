@@ -11,7 +11,6 @@ const PATH_TITLES: Record<string, string> = {
     '/admin': 'Painel Geral',
     '/admin/acquisition': 'Campanhas',
     '/admin/campaigns': 'Campanhas',
-    '/admin/funnel': 'Funil',
     '/admin/clients': 'Gerenciamento de Clientes',
     '/admin/professionals': 'Gerenciamento de Profissionais',
     '/admin/team': 'Gerenciamento de Equipe',

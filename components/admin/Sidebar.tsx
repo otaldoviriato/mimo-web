@@ -53,7 +53,6 @@ const MENU_SECTIONS: MenuSection[] = [
         items: [
             { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
             { href: '/admin/campaigns', label: 'Campanhas', icon: Megaphone },
-            { href: '/admin/funnel', label: 'Funil', icon: Filter },
         ],
     },
     {

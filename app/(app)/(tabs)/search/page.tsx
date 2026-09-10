@@ -8,6 +8,7 @@ import { useMyProfile, useFeaturedUsers, QueryKeys } from '@/hooks/useQueries';
 import { Search, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { trackAcquisitionEvent } from '@/lib/clientAcquisitionAnalytics';
+import { emitCampaignTelemetry } from '@/lib/campaignTelemetry';
 
 const calculateAge = (birthDateString?: string | Date) => {
     if (!birthDateString) return null;
@@ -95,6 +96,33 @@ export default function SearchPage() {
     }, [featuredUsers, loadingFeatured, userData?.isProfessional, username]);
 
     useEffect(() => {
+        if (userData?.isProfessional) return;
+
+        let ticking = false;
+        const handleScroll = () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    const scrollY = window.scrollY || document.documentElement.scrollTop;
+                    const maxScroll = (document.documentElement.scrollHeight - window.innerHeight) || 1;
+                    const depthPercent = Math.min(100, Math.round((scrollY / maxScroll) * 100));
+
+                    if (scrollY > 60) {
+                        emitCampaignTelemetry({
+                            eventType: 'explore_scroll',
+                            scrollDepth: depthPercent,
+                        });
+                    }
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, [userData?.isProfessional]);
+
+    useEffect(() => {
         const target = loadMoreRef.current;
         if (!target || username.trim() || !hasNextPage) return;
 
@@ -114,6 +142,16 @@ export default function SearchPage() {
             trackAcquisitionEvent({
                 eventType: 'explore_profile_viewed',
                 professionalId: user.clerkId,
+            });
+        }
+
+        // Emite telemetria de campanha para visualização de perfil no Explorar
+        if (user.clerkId || user.username) {
+            emitCampaignTelemetry({
+                eventType: 'profile_view',
+                professionalId: user.clerkId,
+                username: user.username,
+                name: user.name,
             });
         }
         try {

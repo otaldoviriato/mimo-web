@@ -64,3 +64,6 @@ export type { ICampaign } from './Campaign';
 
 export { CampaignVisit } from './CampaignVisit';
 export type { ICampaignVisit } from './CampaignVisit';
+
+export { CampaignUserJourney } from './CampaignUserJourney';
+export type { ICampaignUserJourney, ITimelineEvent } from './CampaignUserJourney';
