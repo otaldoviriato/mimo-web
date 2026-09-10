@@ -3,7 +3,7 @@ import { ReceiptConsentModal } from '@/components/ReceiptConsentModal';
 import { requiresReceiptConsent } from '@/lib/receiptBilling';
 
 
-import React, { useEffect, useRef } from 'react';
+import React, { Suspense, useEffect, useRef } from 'react';
 import { useAuth, useUser } from '@clerk/nextjs';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { setupAxiosInterceptors } from '@/services/api';
@@ -621,7 +621,9 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     return (
         <StackNavigationProvider>
-            <AppLayoutContent>{children}</AppLayoutContent>
+            <Suspense fallback={<div className="min-h-screen bg-slate-50" role="status" aria-label="Carregando tela" />}>
+                <AppLayoutContent>{children}</AppLayoutContent>
+            </Suspense>
         </StackNavigationProvider>
     );
 }
