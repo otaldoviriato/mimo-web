@@ -1,0 +1,4786 @@
+'use client';
+import { readStackEntry, replaceStackUrl, stackOverlayState } from '@/lib/stackHistory';
+
+import React, { useState, useEffect, useRef, use } from 'react';
+import axios from 'axios';
+import toast from 'react-hot-toast';
+import { useTransitionRouter } from '@/hooks/useTransitionRouter';
+import { useUser } from '@clerk/nextjs';
+import { useQueryClient } from '@tanstack/react-query';
+import { Avatar } from '@/components/Avatar';
+import { useSocket } from '@/hooks/useSocket';
+import { useChatPricing, useUserById, useUserByUsername, useMyProfile, QueryKeys } from '@/hooks/useQueries';
+import { usePayment } from '@/context/PaymentContext';
+import { Drawer } from 'vaul';
+import { AudioRecorder, type AudioRecorderStatus } from '@/components/AudioRecorder';
+import { AudioPlayer } from '@/components/AudioPlayer';
+import { MessageStatusTicks } from '@/components/MessageStatusTicks';
+import { MediaComposerSheet } from '@/components/MediaComposerSheet';
+import { PendingReceiptBalloon } from '@/components/PendingReceiptBalloon';
+import { LargeMessageConfirmModal } from '@/components/LargeMessageConfirmModal';
+import { decryptMessageText } from '@/lib/messageCipher';
+import { trackAcquisitionEvent } from '@/lib/clientAcquisitionAnalytics';
+import { FirstMessageNotificationModal } from '@/components/FirstMessageNotificationModal';
+import { userApi } from '@/services/api';
+import { AlertTriangle, ShieldCheck, Wallet, Clock, MessageCircle, LockKeyhole } from 'lucide-react';
+
+interface Message {
+    _id: string;
+    senderId: string;
+    receiverId: string;
+    content: string;
+    encryptedContent?: string;
+    encryptedAudioUrl?: string;
+    charCount: number;
+    equivalentCharCount?: number;
+    billingStatus?: 'free' | 'pending' | 'paid';
+    isContentLocked?: boolean;
+    receiptChargeCents?: number;
+    cost: number;
+    timestamp: string;
+    settledAt?: string | Date;
+    isRead?: boolean;
+    isDelivered?: boolean;
+    isLockedImage?: boolean;
+    lockedImagePrice?: number;
+    originalImageUrl?: string;
+    blurredImageUrl?: string;
+    isVideo?: boolean;
+    videoUrl?: string;
+    thumbnailUrl?: string;
+    isAudio?: boolean;
+    audioUrl?: string;
+    audioDuration?: number;
+    isGift?: boolean;
+    isSystem?: boolean;
+    receiverEarnings?: number;
+    status?: 'sending' | 'sent' | 'error';
+    tempId?: string;
+    replyToId?: string | null;
+    replyToContent?: string | null;
+    replyToSenderId?: string | null;
+    isTemporary?: boolean;
+    expiresAt?: string | Date;
+    expiryMinutes?: number;
+    isExpired?: boolean;
+    awaitingBalance?: boolean;
+    viewAttemptedAt?: string | Date;
+}
+
+interface UploadTask {
+    tempId: string;
+    progress: number;
+    status: 'uploading' | 'success' | 'error';
+    error?: string;
+}
+
+interface ChatPageProps {
+    params?: Promise<{ userId: string }>;
+    userId?: string;
+    initialUser?: any;
+    giftCode?: string;
+    onBack?: () => void;
+    isSubPage?: boolean;
+    isClosing?: boolean;
+}
+
+interface CachedRoom {
+    participants: string[];
+    otherUser?: {
+        balance?: number;
+    };
+    monetizationDisabled?: boolean;
+}
+
+interface CachedCurrentUser {
+    balance?: number;
+    [key: string]: unknown;
+}
+
+function formatMediaDuration(durationInSeconds?: number) {
+    if (!durationInSeconds || !Number.isFinite(durationInSeconds) || durationInSeconds <= 0) {
+        return '';
+    }
+
+    const totalSeconds = Math.round(durationInSeconds);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function getReplyPreviewContent(msg: Message | null | undefined): string {
+    if (!msg) return '';
+    if (msg.isContentLocked) return '🔒 Mensagem bloqueada';
+    if (msg.isGift) return '🎁 Presente';
+    if (msg.isLockedImage) return '📸 Imagem bloqueada';
+    if (msg.originalImageUrl) return '📸 Imagem';
+    if (msg.isVideo) return '🎥 Vídeo';
+    if (msg.audioUrl) return '🎵 Mensagem de voz';
+    return msg.content || '';
+}
+
+function unlockMessageIfEligible(
+    msg: Message,
+    currentUserId: string,
+    currentBalance: number,
+    currentThreshold: number,
+    roomId: string,
+    declinedMessageIds?: Set<string>
+): Message {
+    // Se a mensagem já foi destrancada, NUNCA re-bloquear!
+    if (msg.isContentLocked === false && msg.billingStatus === 'paid') {
+        return msg;
+    }
+
+    if (
+        msg.billingStatus === 'pending' &&
+        msg.receiverId === currentUserId &&
+        (msg.encryptedContent || msg.encryptedAudioUrl)
+    ) {
+        const requiredCost = msg.receiptChargeCents || 0;
+        const charTotal = msg.equivalentCharCount ?? msg.charCount ?? 0;
+        const isLong = charTotal > currentThreshold;
+        const wasDeclined = declinedMessageIds?.has(msg._id);
+
+        // Se tem saldo suficiente e não é mensagem longa pendente de confirmação (ou já confirmada):
+        if (currentBalance >= requiredCost && (!isLong || wasDeclined === false)) {
+            const seed = String(msg._id || msg.tempId || msg.timestamp || '');
+            const decryptedContent = msg.encryptedContent
+                ? decryptMessageText(msg.encryptedContent, roomId, seed)
+                : msg.content;
+            const decryptedAudioUrl = msg.encryptedAudioUrl
+                ? decryptMessageText(msg.encryptedAudioUrl, roomId, seed)
+                : msg.audioUrl;
+
+            return {
+                ...msg,
+                content: decryptedContent || msg.content,
+                audioUrl: decryptedAudioUrl || msg.audioUrl,
+                billingStatus: 'paid',
+                isContentLocked: false,
+                awaitingBalance: false,
+            };
+        }
+    }
+    return msg;
+}
+
+function mergeMessagePreservingUnlocked(current: Message, incoming: Message): Message {
+    const isCurrentlyUnlocked = current.isContentLocked === false && current.billingStatus === 'paid';
+    const isIncomingPending = incoming.isContentLocked === true || incoming.billingStatus === 'pending';
+
+    let merged = { ...incoming };
+
+    // Regra de ouro da monotonicidade: se a mensagem já foi destrancada na tela localmente,
+    // NENHUM snapshot de rede desatualizado ou em trânsito pode re-bloqueá-la ou apagar o conteúdo descriptografado.
+    if (isCurrentlyUnlocked && isIncomingPending) {
+        merged.isContentLocked = false;
+        merged.billingStatus = 'paid';
+        merged.awaitingBalance = false;
+        if (current.content) {
+            merged.content = current.content;
+        }
+        if (current.audioUrl) {
+            merged.audioUrl = current.audioUrl;
+        }
+    } else if (incoming.isContentLocked && current.isContentLocked === false && current.content) {
+        merged.isContentLocked = false;
+        merged.content = current.content;
+        if (current.audioUrl) merged.audioUrl = current.audioUrl;
+        merged.awaitingBalance = false;
+    }
+
+    // Preservar monotonicidade de leitura, entrega e envio otimista
+    merged.isRead = !!(current.isRead || incoming.isRead);
+    merged.isDelivered = !!(merged.isRead || current.isDelivered || incoming.isDelivered);
+    if (current.status === 'sending' && incoming.status !== 'error') {
+        merged.status = 'sent';
+    }
+
+    return merged;
+}
+
+function sortMessagesStable(msgs: Message[]): Message[] {
+    return [...msgs].sort((a, b) => {
+        const timeA = new Date(a.timestamp).getTime();
+        const timeB = new Date(b.timestamp).getTime();
+        if (timeA !== timeB) {
+            return timeA - timeB;
+        }
+        if (!a.tempId && b.tempId) return -1;
+        if (a.tempId && !b.tempId) return 1;
+        return String(a._id).localeCompare(String(b._id));
+    });
+}
+
+function LockedMediaTypeBadge({ isVideo, duration }: { isVideo?: boolean; duration?: number }) {
+    const formattedDuration = isVideo ? formatMediaDuration(duration) : '';
+
+    return (
+        <div className="absolute left-2 top-2 z-20 flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/55 px-2 py-1 text-white shadow-sm backdrop-blur-md">
+            {isVideo ? (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M8 5v14l11-7z" />
+                </svg>
+            ) : (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <path d="M21 15l-5-5L5 21" />
+                </svg>
+            )}
+            <span className="text-[9px] font-bold uppercase leading-none tracking-wider">
+                {isVideo ? 'Vídeo' : 'Foto'}
+            </span>
+            {formattedDuration && (
+                <span className="text-[9px] font-semibold leading-none text-white/80">
+                    {formattedDuration}
+                </span>
+            )}
+        </div>
+    );
+}
+
+function formatLastSeen(
+    isOnline?: boolean,
+    lastSeenDateStr?: string | Date,
+    latestMessageTimestamp?: string | Date
+) {
+    if (isOnline) return 'online';
+
+    let date: Date | null = null;
+
+    if (lastSeenDateStr) {
+        const parsed = new Date(lastSeenDateStr);
+        if (!isNaN(parsed.getTime())) {
+            date = parsed;
+        }
+    }
+
+    if (latestMessageTimestamp) {
+        const msgDate = new Date(latestMessageTimestamp);
+        if (!isNaN(msgDate.getTime())) {
+            if (!date || msgDate.getTime() > date.getTime()) {
+                date = msgDate;
+            }
+        }
+    }
+
+    if (!date) return '';
+
+    try {
+        const now = new Date();
+        const isToday = date.getDate() === now.getDate() &&
+            date.getMonth() === now.getMonth() &&
+            date.getFullYear() === now.getFullYear();
+
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+        const isYesterday = date.getDate() === yesterday.getDate() &&
+            date.getMonth() === yesterday.getMonth() &&
+            date.getFullYear() === yesterday.getFullYear();
+
+        const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+        if (isToday) {
+            return `visto por último hoje às ${timeStr}`;
+        } else if (isYesterday) {
+            return `visto por último ontem às ${timeStr}`;
+        } else {
+            const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            return `visto por último em ${dateStr} às ${timeStr}`;
+        }
+    } catch (e) {
+        return '';
+    }
+}
+
+function formatFollowUpCountdown(ms: number): string {
+    if (ms <= 0) return 'em instantes';
+    const totalMinutes = Math.ceil(ms / (60 * 1000));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (hours > 1) {
+        return `${hours} horas`;
+    }
+    if (hours === 1) {
+        return minutes > 0 ? `1 hora e ${minutes} min` : '1 hora';
+    }
+    return `${Math.max(1, minutes)} minutos`;
+}
+
+function formatSeparatorDate(timestamp: string | Date) {
+    try {
+        const date = new Date(timestamp);
+        const today = new Date();
+        
+        const dDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const dToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        
+        // Ontem
+        const dYesterday = new Date(dToday);
+        dYesterday.setDate(dYesterday.getDate() - 1);
+        
+        if (dDate.getTime() === dToday.getTime()) {
+            return 'Hoje';
+        }
+        
+        if (dDate.getTime() === dYesterday.getTime()) {
+            return 'Ontem';
+        }
+        
+        // Se for do mesmo ano, exibe apenas dia e mês por extenso. Caso contrário, exibe o ano também.
+        if (date.getFullYear() === today.getFullYear()) {
+            return date.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' });
+        }
+        
+        return date.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+    } catch {
+        return '';
+    }
+}
+
+interface EarningsIndicatorProps {
+    messageId: string;
+    receiverEarnings?: number;
+    cost: number;
+    isSelected: boolean;
+    isNew: boolean;
+    isSettled?: boolean;
+    timestamp?: string;
+    settledAt?: string | Date;
+}
+
+function EarningsIndicator({
+    messageId,
+    receiverEarnings,
+    cost,
+    isSelected,
+    isNew,
+    isSettled,
+    timestamp,
+    settledAt,
+}: EarningsIndicatorProps) {
+    const [shown, setShown] = useState(false);
+
+    // Se o valor de ganhos da profissional não estiver explícito, deriva a partir do custo (ex: 80% do valor cobrado)
+    const effectiveEarnings = (receiverEarnings && receiverEarnings > 0)
+        ? receiverEarnings
+        : (cost && cost > 0 ? Math.round(cost * 0.8) : 0);
+
+    useEffect(() => {
+        // Dispara a animação se a mensagem acabou de ser cobrada/liquidada (isSettled),
+        // se o settledAt for recente (< 25s), se for nova mensagem (isNew) ou se o envio for recente (< 25s)
+        const isRecent = timestamp ? (Date.now() - new Date(timestamp).getTime() < 25000) : false;
+        const isSettledRecent = settledAt ? (Date.now() - new Date(settledAt).getTime() < 25000) : false;
+
+        if (isSettled || isSettledRecent || isNew || isRecent) {
+            const enterTimer = setTimeout(() => {
+                setShown(true);
+            }, 60);
+
+            // Fica alguns segundos visível e volta deslizando suavemente para trás do balão
+            const exitTimer = setTimeout(() => {
+                setShown(false);
+            }, 3800);
+
+            return () => {
+                clearTimeout(enterTimer);
+                clearTimeout(exitTimer);
+            };
+        }
+    }, [isSettled, isNew, timestamp, settledAt]);
+
+    const isVisible = isSelected || shown;
+
+    if (!effectiveEarnings || effectiveEarnings <= 0) return null;
+
+    return (
+        <div
+            className={`self-end mb-1 z-0 overflow-hidden transition-all duration-500 ease-out flex items-center ${
+                isVisible
+                    ? 'max-w-[120px] opacity-100 mr-2'
+                    : 'max-w-0 opacity-0 mr-0 pointer-events-none'
+            }`}
+        >
+            <span
+                className={`transform transition-transform duration-500 ease-out ${
+                    isVisible ? 'translate-x-0' : 'translate-x-full'
+                } text-[11px] font-semibold text-emerald-500 whitespace-nowrap select-none`}
+            >
+                + R$ {(effectiveEarnings / 100).toFixed(2).replace('.', ',')}
+            </span>
+        </div>
+    );
+}
+
+interface MediaEarningsIndicatorProps {
+    messageId: string;
+    receiverEarnings?: number;
+    cost: number;
+    isSelected: boolean;
+    isNew: boolean;
+}
+
+function MediaEarningsIndicator({ messageId, receiverEarnings, cost, isSelected, isNew }: MediaEarningsIndicatorProps) {
+    // No marketplace-first, ganhos não são por mídia avulsa; popup "+ R$" desativado
+    return null;
+}
+
+
+const VideoPlayer = ({ src, isActive, controlsVisible }: { src: string; isActive: boolean; controlsVisible: boolean }) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        if (isActive) {
+            video.currentTime = 0;
+            video.play().catch(err => {
+                console.log("Autoplay blocked or failed:", err);
+            });
+        } else {
+            video.pause();
+            video.currentTime = 0;
+        }
+    }, [isActive]);
+
+    return (
+        <video
+            ref={videoRef}
+            src={src}
+            controls={controlsVisible}
+            playsInline
+            className="max-w-full max-h-full object-contain animate-in fade-in duration-200"
+            onClick={e => e.stopPropagation()}
+        />
+    );
+};
+
+function TemporaryMediaBadge({ expiresAt, onExpire, className }: { expiresAt: string | Date; onExpire?: () => void; className?: string }) {
+    const [timeLeft, setTimeLeft] = useState('');
+    const [isExpired, setIsExpired] = useState(false);
+
+    useEffect(() => {
+        const calculateTimeLeft = () => {
+            const difference = new Date(expiresAt).getTime() - Date.now();
+            if (difference <= 0) {
+                setTimeLeft('Expirado');
+                setIsExpired(true);
+                if (onExpire) onExpire();
+                return;
+            }
+
+            const seconds = Math.floor(difference / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+            const days = Math.floor(hours / 24);
+
+            if (days > 0) {
+                setTimeLeft(`Expira em ${days}d`);
+            } else if (hours > 0) {
+                setTimeLeft(`Expira em ${hours}h`);
+            } else if (minutes > 0) {
+                setTimeLeft(`Expira em ${minutes}m`);
+            } else {
+                setTimeLeft(`Expira em ${seconds}s`);
+            }
+        };
+
+        calculateTimeLeft();
+        const interval = setInterval(calculateTimeLeft, 1000);
+        return () => clearInterval(interval);
+    }, [expiresAt, onExpire]);
+
+    if (isExpired) return null;
+
+    return (
+        <div className={className || "absolute right-2 top-2 z-20 flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/55 px-2 py-1 text-white shadow-sm backdrop-blur-md"}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-amber-450">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+            </svg>
+            <span className="text-[9px] font-bold uppercase leading-none tracking-wider text-amber-200">
+                {timeLeft}
+            </span>
+        </div>
+    );
+}
+
+const compressImage = (file: File, maxW = 1600, maxH = 1600, quality = 0.82): Promise<File> => {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target?.result as string;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > maxW) {
+                        height = Math.round((height * maxW) / width);
+                        width = maxW;
+                    }
+                } else {
+                    if (height > maxH) {
+                        width = Math.round((width * maxH) / height);
+                        height = maxH;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    resolve(file); // Fallback se falhar
+                    return;
+                }
+                ctx.drawImage(img, 0, 0, width, height);
+                canvas.toBlob(
+                    (blob) => {
+                        if (!blob) {
+                            resolve(file);
+                            return;
+                        }
+                        const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+                            type: 'image/jpeg',
+                            lastModified: Date.now()
+                        });
+                        resolve(compressedFile);
+                    },
+                    'image/jpeg',
+                    quality
+                );
+            };
+            img.onerror = () => resolve(file);
+        };
+        reader.onerror = () => resolve(file);
+    });
+};
+
+function CollapsibleTextMessage({ content, isMine }: { content: string; isMine: boolean }) {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const THRESHOLD = 300;
+    const MAX_LINES = 5;
+
+    const lines = content.split('\n');
+    const isLong = content.length > THRESHOLD || lines.length > MAX_LINES;
+
+    if (!isLong) {
+        return (
+            <span className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                {content}
+            </span>
+        );
+    }
+
+    let previewContent = content;
+    if (!isExpanded) {
+        if (lines.length > MAX_LINES) {
+            previewContent = lines.slice(0, MAX_LINES).join('\n');
+            if (previewContent.length > THRESHOLD) {
+                previewContent = previewContent.slice(0, THRESHOLD);
+            }
+        } else {
+            previewContent = content.slice(0, THRESHOLD);
+        }
+    }
+
+    return (
+        <span className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+            {isExpanded ? content : `${previewContent.trim()}...`}
+            {' '}
+            <button
+                type="button"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setIsExpanded((prev) => !prev);
+                }}
+                className={`inline-flex items-center text-xs font-bold underline ml-1 cursor-pointer select-none ${
+                    isMine ? 'text-purple-200 hover:text-white' : 'text-purple-600 hover:text-purple-800'
+                }`}
+            >
+                {isExpanded ? 'Ver menos' : 'Ver mais'}
+            </button>
+        </span>
+    );
+}
+
+export default function ChatPage({ params, userId: propUserId, initialUser: propInitialUser, giftCode: propGiftCode, onBack, isSubPage = false, isClosing = false }: ChatPageProps) {
+    const resolvedParams = params ? use(params) : null;
+    const otherUserId = propUserId || resolvedParams?.userId || '';
+    const { openRechargeModal } = usePayment();
+    const router = useTransitionRouter();
+
+    const reportMessageAttempt = () => {
+        const profId = receiver?.clerkId || otherUserId;
+        if (profId) {
+            trackAcquisitionEvent({
+                eventType: 'message_attempt',
+                professionalId: profId,
+            });
+        }
+    };
+    const queryClient = useQueryClient();
+    const { user } = useUser();
+    const { socket, connected, socketService, socketVersion } = useSocket(user?.id);
+
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [loadingMessages, setLoadingMessages] = useState(true);
+    const [hasMore, setHasMore] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [messageText, setMessageText] = useState('');
+    const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+    const [monetizationDisabled, setMonetizationDisabled] = useState(false);
+    const [largeMessageThreshold, setLargeMessageThreshold] = useState(100);
+    const [pendingLongMessageToConfirm, setPendingLongMessageToConfirm] = useState<Message | null>(null);
+    const declinedLongMessageIdsRef = useRef<Set<string>>(new Set());
+    const [showFirstMessageNotifModal, setShowFirstMessageNotifModal] = useState<boolean>(false);
+
+    const triggerFirstMessageModalIfEligible = () => {
+        const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
+        if (!isClientToProfessional) return;
+
+        const storageKey = `mimo_first_msg_notif_modal_shown_${user?.id}`;
+        if (typeof window !== 'undefined' && localStorage.getItem(storageKey)) {
+            return;
+        }
+
+        if (userData?.hasSentFirstMessage) {
+            return;
+        }
+
+        setTimeout(() => {
+            setShowFirstMessageNotifModal(true);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(storageKey, 'true');
+            }
+            void userApi.updateMe({ hasSentFirstMessage: true }).catch(() => undefined);
+        }, 700);
+    };
+
+    // Se por qualquer eventualidade uma mensagem bloqueada entrar em resposta, anula o estado
+    useEffect(() => {
+        if (replyingTo?.isContentLocked) {
+            setReplyingTo(null);
+        }
+    }, [replyingTo]);
+    const [audioRecordingStatus, setAudioRecordingStatus] = useState<AudioRecorderStatus>('idle');
+
+    // Refs para o gesto de swipe para responder
+    const swipingMessage = useRef<Message | null>(null);
+    const swipingElement = useRef<HTMLElement | null>(null);
+    const swipeDistance = useRef<number>(0);
+    const swipeTriggered = useRef<boolean>(false);
+    const [sending, setSending] = useState(false);
+    const [newIncomingMessageIds, setNewIncomingMessageIds] = useState<Set<string>>(new Set());
+    const [justSettledMessageIds, setJustSettledMessageIds] = useState<Set<string>>(new Set());
+    const previousMessageStatusRef = useRef<Map<string, string>>(new Map());
+
+    // Detecta mensagens que transitam de 'pending' para 'paid' (quando o cliente recarrega o saldo)
+    useEffect(() => {
+        const newlySettled: string[] = [];
+        messages.forEach((msg) => {
+            const prevStatus = previousMessageStatusRef.current.get(msg._id);
+            if (prevStatus === 'pending' && msg.billingStatus === 'paid') {
+                newlySettled.push(msg._id);
+            }
+            if (msg._id && msg.billingStatus) {
+                previousMessageStatusRef.current.set(msg._id, msg.billingStatus);
+            }
+        });
+
+        if (newlySettled.length > 0) {
+            setJustSettledMessageIds((prev) => {
+                const next = new Set(prev);
+                newlySettled.forEach((id) => next.add(id));
+                return next;
+            });
+        }
+    }, [messages]);
+    const [showNewMessagesBadge, setShowNewMessagesBadge] = useState(false);
+    const [newUnlockedMediaIds, setNewUnlockedMediaIds] = useState<Set<string>>(new Set());
+    const [isTyping, setIsTyping] = useState(false);
+    const [menuVisible, setMenuVisible] = useState(false);
+    const [giftModalVisible, setGiftModalVisible] = useState(false);
+    const [giftAmountStr, setGiftAmountStr] = useState('');
+    const [sendingGift, setSendingGift] = useState(false);
+    const [attachMenuVisible, setAttachMenuVisible] = useState(false);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [isVideo, setIsVideo] = useState(false);
+    const [uploadingMedia, setUploadingMedia] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+    const [uploadTasks, setUploadTasks] = useState<Record<string, UploadTask>>({});
+    const [showFreeMediaConfirm, setShowFreeMediaConfirm] = useState(false);
+    const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
+    const [galleryVisible, setGalleryVisible] = useState(false);
+    const [allMediaItemsLoaded, setAllMediaItemsLoaded] = useState<any[]>([]);
+    const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
+    const [fullscreenLockedMessage, setFullscreenLockedMessage] = useState<Message | null>(null);
+    const [videoDurations, setVideoDurations] = useState<Record<string, number>>({});
+    const swipeTouchStartX = useRef<number | null>(null);
+    const swipeTouchStartY = useRef<number | null>(null);
+    const [touchOffset, setTouchOffset] = useState(0);
+    const touchOffsetRef = useRef(0);
+    const [isDragging, setIsDragging] = useState(false);
+    const [isInputFocused, setIsInputFocused] = useState(false);
+    const swipeLockedRef = useRef<'horizontal' | 'vertical' | null>(null);
+    const [controlsVisible, setControlsVisible] = useState(true);
+    const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+    const [unlockModalVisible, setUnlockModalVisible] = useState(false);
+    const [unlockData, setUnlockData] = useState<{ id: string; price: number; isVideo: boolean } | null>(null);
+    const [unlocking, setUnlocking] = useState(false);
+    const [isLeaving, setIsLeaving] = useState(false);
+    const [useNativeTransition, setUseNativeTransition] = useState(false);
+    const [viewportStyle, setViewportStyle] = useState<React.CSSProperties>({});
+    const [lowBalanceThresholdInCents, setLowBalanceThresholdInCents] = useState(1000);
+    const chatRootRef = useRef<HTMLDivElement>(null);
+
+    const isViewerOpen = fullscreenIndex !== null || fullscreenLockedMessage !== null;
+
+    useEffect(() => {
+        if (!isViewerOpen || typeof window === 'undefined') return;
+
+        const ownerKey = readStackEntry(window.history.state)?.screens.at(-1)?.key;
+        let closedByHistory = false;
+        window.history.pushState(stackOverlayState({ mimoViewerOpen: true }), '');
+
+        const handlePopState = () => {
+            if (window.history.state?.mimoViewerOpen &&
+                readStackEntry(window.history.state)?.screens.at(-1)?.key === ownerKey) return;
+            closedByHistory = true;
+            setFullscreenIndex(null);
+            setFullscreenLockedMessage(null);
+        };
+
+        window.addEventListener('popstate', handlePopState);
+
+        return () => {
+            window.removeEventListener('popstate', handlePopState);
+            
+            // Se o fechamento foi disparado manualmente (ex: botão X) e o histórico 
+            // ainda estiver no estado da galeria, voltamos no histórico para limpá-lo.
+            if (!closedByHistory && window.history.state?.mimoViewerOpen &&
+                readStackEntry(window.history.state)?.screens.at(-1)?.key === ownerKey) {
+                window.history.back();
+            }
+        };
+    }, [isViewerOpen]);
+
+    const isSelectionActive = selectedMessageIds.size > 0;
+
+    useEffect(() => {
+        if (!isSelectionActive || typeof window === 'undefined') return;
+
+        const ownerKey = readStackEntry(window.history.state)?.screens.at(-1)?.key;
+        let closedByHistory = false;
+        window.history.pushState(stackOverlayState({ mimoMessageSelectionOpen: true }), '');
+
+        const handlePopState = () => {
+            if (window.history.state?.mimoMessageSelectionOpen &&
+                readStackEntry(window.history.state)?.screens.at(-1)?.key === ownerKey) return;
+            closedByHistory = true;
+            setSelectedMessageIds(new Set());
+        };
+
+        window.addEventListener('popstate', handlePopState);
+
+        return () => {
+            window.removeEventListener('popstate', handlePopState);
+            
+            // Se a seleção foi limpa manualmente (ex: clicando em "X" ou limpando os IDs) 
+            // e o histórico ainda estiver no estado de seleção, voltamos no histórico para limpá-lo.
+            if (!closedByHistory && window.history.state?.mimoMessageSelectionOpen &&
+                readStackEntry(window.history.state)?.screens.at(-1)?.key === ownerKey) {
+                window.history.back();
+            }
+        };
+    }, [isSelectionActive]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || !window.visualViewport) return;
+
+        const handleResize = () => {
+            requestAnimationFrame(() => {
+                const vv = window.visualViewport;
+                if (!vv) return;
+
+                setViewportStyle({
+                    height: `${vv.height}px`,
+                    transform: `translateY(${vv.offsetTop}px)`,
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                });
+            });
+        };
+
+        window.visualViewport.addEventListener('resize', handleResize);
+        window.visualViewport.addEventListener('scroll', handleResize);
+        
+        // Execute immediately
+        handleResize();
+
+        // Extra fallback to ensure it runs a little bit after focus events to handle keyboard animations
+        const handleFocus = () => {
+            setTimeout(handleResize, 100);
+            setTimeout(handleResize, 300);
+        };
+        
+        document.addEventListener('focusin', handleFocus);
+        document.addEventListener('focusout', handleFocus);
+
+        return () => {
+            window.visualViewport?.removeEventListener('resize', handleResize);
+            window.visualViewport?.removeEventListener('scroll', handleResize);
+            document.removeEventListener('focusin', handleFocus);
+            document.removeEventListener('focusout', handleFocus);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (typeof document !== 'undefined' && 'startViewTransition' in document) {
+            setUseNativeTransition(true);
+        }
+    }, []);
+
+    const pressTimer = useRef<any>(null);
+    const longPressActivated = useRef(false);
+    const touchStartCoords = useRef<{ x: number; y: number } | null>(null);
+    // Stores a file selected before userData finished loading, so we can decide
+    // professional vs non-professional routing once userData becomes available.
+    const pendingMediaRef = useRef<{ file: File; isVideoFile: boolean } | null>(null);
+
+    const { data: userData, refetch: refetchMyProfile } = useMyProfile();
+    const isRouteClerkId = otherUserId.startsWith('user_');
+    const cleanedRouteUsername = isRouteClerkId ? '' : otherUserId.toLowerCase().replace(/^@/, '');
+
+    const { data: fetchedReceiverById, isLoading: loadingReceiverById } = useUserById(isRouteClerkId ? otherUserId : undefined);
+    const { data: fetchedReceiverByUsername, isLoading: loadingReceiverByUsername } = useUserByUsername(!isRouteClerkId && cleanedRouteUsername ? cleanedRouteUsername : undefined);
+    const isResolvingReceiver = isRouteClerkId ? loadingReceiverById : loadingReceiverByUsername;
+    const receiver = fetchedReceiverById || fetchedReceiverByUsername || propInitialUser;
+    const targetClerkId = receiver?.clerkId || (isRouteClerkId ? otherUserId : '');
+
+    useEffect(() => {
+        if (propInitialUser && targetClerkId) {
+            queryClient.setQueryData(QueryKeys.userById(targetClerkId), (old: any) => ({
+                ...(old || {}),
+                ...propInitialUser,
+            }));
+        }
+    }, [propInitialUser, targetClerkId, queryClient]);
+
+    // Se a rota acessada tiver o Clerk ID (ex: /chat/user_123), substitui na barra do navegador pela rota amigável (/chat/username)
+    useEffect(() => {
+        if (typeof window !== 'undefined' && receiver?.username && isRouteClerkId) {
+            const currentPath = window.location.pathname;
+            if (currentPath.includes(`/chat/${otherUserId}`)) {
+                const friendlyUrl = currentPath.replace(`/chat/${otherUserId}`, `/chat/${receiver.username}`);
+                replaceStackUrl(friendlyUrl + window.location.search + window.location.hash);
+            }
+        }
+    }, [receiver?.username, isRouteClerkId, otherUserId]);
+
+    const targetProfessionalId = userData?.isProfessional ? (userData.clerkId || user?.id) : (receiver?.isProfessional ? receiver.clerkId : undefined);
+    const { data: chatPricing } = useChatPricing(targetProfessionalId);
+    const balance = userData?.balance ?? 0;
+    const formattedBalance = (balance / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const cachedRoom = user?.id && targetClerkId
+        ? queryClient.getQueryData<CachedRoom[]>(QueryKeys.rooms(user.id))?.find((room) => room.participants.includes(targetClerkId) || (otherUserId && room.participants.includes(otherUserId)))
+        : undefined;
+    const receiverBalance = receiver?.balance ?? cachedRoom?.otherUser?.balance ?? 0;
+
+    const decrementLocalBalance = (amountInCents: number) => {
+        if (amountInCents <= 0) return;
+        queryClient.setQueryData(QueryKeys.me, (old: CachedCurrentUser | null | undefined) =>
+            old ? { ...old, balance: Math.max(0, (old.balance ?? 0) - amountInCents) } : old
+        );
+    };
+
+    useEffect(() => {
+        fetch('/api/settings/payments')
+            .then((r) => r.json())
+            .then((data) => {
+                if (typeof data?.lowBalanceThresholdInCents === 'number') {
+                    setLowBalanceThresholdInCents(data.lowBalanceThresholdInCents);
+                }
+            })
+            .catch(() => undefined);
+    }, []);
+
+    const latestPartnerMessage = React.useMemo(() => {
+        const partnerId = targetClerkId || otherUserId;
+        return messages.filter(m => m.senderId === partnerId || (targetClerkId && m.senderId === otherUserId)).slice(-1)[0];
+    }, [messages, otherUserId, targetClerkId]);
+
+    const ACTIVE_CONVERSATION_WINDOW_MS = 5 * 60 * 1000; // 5 minutos de janela para conversa ativa
+
+    const isClientActiveInConversation = React.useMemo(() => {
+        if (receiver?.isOnline) return true;
+        if (!latestPartnerMessage?.timestamp) return false;
+        const diffMs = Date.now() - new Date(latestPartnerMessage.timestamp).getTime();
+        return diffMs >= 0 && diffMs < ACTIVE_CONVERSATION_WINDOW_MS;
+    }, [receiver?.isOnline, latestPartnerMessage?.timestamp]);
+
+    const [timerTick, setTimerTick] = useState(0);
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setTimerTick(t => t + 1);
+        }, 30000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const offlineTurnStats = React.useMemo(() => {
+        return {
+            canSend: true,
+            isLimitReached: false,
+            limitType: 'none' as const,
+            remainingChars: 10000,
+            totalProCharsSinceClient: 0,
+            maxBillableChars: 10000,
+            maxOnlineCumulativeChars: 10000,
+            attemptNumber: 1,
+            maxAttempts: 99,
+            isExhausted: false,
+            msUntilNextAttempt: 0,
+        };
+    }, []);
+
+    // Lista derivada das mídias históricas carregadas combinadas com as mídias das mensagens locais
+    const mediaItems = React.useMemo(() => {
+        const now = new Date();
+
+        // 1. Filtrar mídias históricas que por ventura já expiraram
+        const validHistorical = allMediaItemsLoaded.filter(item => {
+            if (item.isTemporary && item.expiresAt) {
+                const expiresTime = new Date(item.expiresAt).getTime();
+                if (expiresTime > 0 && expiresTime < now.getTime()) {
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        // 2. Extrair mídias locais válidas (não expiradas e não bloqueadas)
+        const localMedias = messages
+            .filter(m => {
+                if (m.isLockedImage) return false; // locked não entra
+                if (m.isExpired) return false;
+                if (m.isTemporary && m.expiresAt) {
+                    const expiresTime = new Date(m.expiresAt).getTime();
+                    if (expiresTime > 0 && expiresTime < now.getTime()) {
+                        return false;
+                    }
+                }
+                return m.originalImageUrl || (m.isVideo && m.videoUrl);
+            })
+            .map(m => ({
+                messageId: m._id,
+                url: m.isVideo ? m.videoUrl! : m.originalImageUrl!,
+                thumbnailUrl: m.isVideo ? m.thumbnailUrl : m.originalImageUrl,
+                isVideo: !!m.isVideo,
+                isTemporary: m.isTemporary,
+                expiresAt: m.expiresAt,
+            }));
+
+        // 3. Enriquecer itens da galeria histórica com propriedades locais se houver correspondência
+        const enrichedHistorical = validHistorical.map(histItem => {
+            const localMatch = localMedias.find(lm => lm.url === histItem.url);
+            if (localMatch) {
+                return {
+                    ...histItem,
+                    messageId: localMatch.messageId,
+                    isTemporary: localMatch.isTemporary,
+                    expiresAt: localMatch.expiresAt
+                };
+            }
+            return histItem;
+        });
+
+        const loadedUrls = new Set(enrichedHistorical.map(item => item.url));
+        const newLocalMedias = localMedias.filter(item => !loadedUrls.has(item.url));
+
+        return [...enrichedHistorical, ...newLocalMedias];
+    }, [allMediaItemsLoaded, messages]);
+
+    // Efeito para fechar o visualizador de tela cheia se a mídia ativa expirar ou for removida da lista
+    useEffect(() => {
+        if (fullscreenIndex !== null) {
+            // Se o index ficou fora dos limites ou se a mídia sumiu do array (por expiração)
+            if (!mediaItems[fullscreenIndex]) {
+                setFullscreenIndex(null);
+                return;
+            }
+            
+            const activeItem = mediaItems[fullscreenIndex];
+            if (activeItem.isTemporary && activeItem.expiresAt) {
+                const expiresTime = new Date(activeItem.expiresAt).getTime();
+                if (expiresTime > 0 && expiresTime < Date.now()) {
+                    setFullscreenIndex(null);
+                }
+            }
+        }
+    }, [fullscreenIndex, mediaItems]);
+
+    useEffect(() => {
+        const videosToMeasure = messages.filter((message) => (
+            message.isVideo &&
+            message.videoUrl &&
+            !videoDurations[message._id]
+        ));
+
+        if (!videosToMeasure.length) return;
+
+        const createdVideos: HTMLVideoElement[] = [];
+
+        videosToMeasure.forEach((message) => {
+            const video = document.createElement('video');
+            createdVideos.push(video);
+            video.preload = 'metadata';
+            video.src = message.videoUrl!;
+
+            video.onloadedmetadata = () => {
+                if (Number.isFinite(video.duration) && video.duration > 0) {
+                    setVideoDurations((prev) => (
+                        prev[message._id] ? prev : { ...prev, [message._id]: video.duration }
+                    ));
+                }
+            };
+
+            video.onerror = () => {
+                video.removeAttribute('src');
+                video.load();
+            };
+        });
+
+        return () => {
+            createdVideos.forEach((video) => {
+                video.onloadedmetadata = null;
+                video.onerror = null;
+                video.removeAttribute('src');
+                video.load();
+            });
+        };
+    }, [messages, videoDurations]);
+
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
+    const isFirstLoadRef = useRef(true);
+    const lastMessageIdRef = useRef<string | null>(null);
+    const loadingMoreRef = useRef(false);
+    const inputRef = useRef<HTMLTextAreaElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const videoFileInputRef = useRef<HTMLInputElement>(null);
+    const typingTimeoutRef = useRef<any>(null);
+    const partnerTypingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Fila serial de envio para garantir ordem cronológica rigorosa e evitar que mensagens sumam
+    const lastSentTimestampRef = useRef<number>(0);
+    const sendQueueRef = useRef<Array<{
+        content: string;
+        otherUserId: string;
+        roomId: string;
+        tempId: string;
+        replyToId?: string;
+        replyToContent?: string;
+        replyToSenderId?: string;
+    }>>([]);
+    const isProcessingQueueRef = useRef<boolean>(false);
+
+    const [couponClaimModal, setCouponClaimModal] = useState(false);
+    const [couponClaimAmount, setCouponClaimAmount] = useState<number | null>(null);
+    const couponClaimedRef = useRef(false);
+
+    useEffect(() => {
+        const root = chatRootRef.current;
+        if (!root) return;
+
+        const handleTouchMove = (e: TouchEvent) => {
+            // Se algum modal ou visualizador de imagem interno estiver aberto, não impedimos o toque
+            const isAnyModalOrViewerOpen = 
+                (fullscreenIndex !== null || fullscreenLockedMessage !== null) || 
+                giftModalVisible || 
+                detailsModalVisible || 
+                unlockModalVisible || 
+                couponClaimModal || 
+                galleryVisible;
+
+            if (isAnyModalOrViewerOpen) return;
+
+            const container = messagesContainerRef.current;
+            if (!container) return;
+
+            // Verifica se o toque se originou dentro do container de mensagens ou seus filhos
+            const isTouchInsideMessages = container.contains(e.target as Node);
+
+            if (isTouchInsideMessages) {
+                // Se está dentro das mensagens, permitimos a rolagem apenas se houver overflow vertical
+                const hasOverflow = container.scrollHeight > container.clientHeight;
+                if (!hasOverflow) {
+                    // Sem overflow (poucas mensagens), previne o scroll elástico do viewport/body
+                    e.preventDefault();
+                }
+            } else {
+                // Se o toque está fora (header, fundo vazio da sala, input area)
+                // Permitimos touchmove apenas se o target for um input, textarea ou elementos interativos
+                const target = e.target as HTMLElement;
+                const isInteractive = 
+                    target.tagName === 'TEXTAREA' || 
+                    target.tagName === 'INPUT' || 
+                    target.closest('input, textarea, select');
+                
+                if (!isInteractive) {
+                    e.preventDefault();
+                }
+            }
+        };
+
+        // Registramos o event listener como passive: false para podermos chamar e.preventDefault()
+        root.addEventListener('touchmove', handleTouchMove, { passive: false });
+
+        return () => {
+            root.removeEventListener('touchmove', handleTouchMove);
+        };
+    }, [
+        fullscreenIndex, 
+        fullscreenLockedMessage, 
+        giftModalVisible, 
+        detailsModalVisible, 
+        unlockModalVisible, 
+        couponClaimModal, 
+        galleryVisible
+    ]);
+
+    // Efeito para resgatar cupom na tela de chat
+    useEffect(() => {
+        if (!user?.id || couponClaimedRef.current) return;
+
+        // Ordem de prioridade para encontrar o código do cupom:
+        // 1. Prop direta (passada pelo layout virtual via pushVirtual params) — mais confiável
+        // 2. localStorage (sobrevive a redirects OAuth no PWA)
+        // 3. sessionStorage (fallback legado)
+        // 4. URL query param (usuário já logado acessando o link diretamente)
+        const fromProp = propGiftCode;
+        const fromLocalStorage = localStorage.getItem('mimo_pending_gift');
+        const fromSessionStorage = sessionStorage.getItem('mimo_pending_gift');
+        const fromUrl = new URLSearchParams(window.location.search).get('gift');
+        const code = fromProp || fromLocalStorage || fromSessionStorage || fromUrl;
+        if (!code) return;
+
+        // Trava global de sessão do front-end para evitar requisições concorrentes duplicadas
+        if (typeof window !== 'undefined') {
+            const claims = (window as any).__claimingGiftCodes = (window as any).__claimingGiftCodes || {};
+            if (claims[code]) return;
+            claims[code] = true;
+        }
+
+        couponClaimedRef.current = true;
+        localStorage.removeItem('mimo_pending_gift');
+        sessionStorage.removeItem('mimo_pending_gift');
+
+        // Limpa a URL para remover o query param 'gift'
+        if (fromUrl && typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('gift');
+            replaceStackUrl(url.pathname + url.search + url.hash);
+        }
+
+        fetch('/api/gift/claim', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code }),
+        }).then(async (res) => {
+            if (res.ok) {
+                const data = await res.json();
+                setCouponClaimAmount(typeof data?.amount === 'number' ? data.amount : null);
+                setCouponClaimModal(true);
+                // Invalida os caches do perfil e do saldo
+                queryClient.invalidateQueries({ queryKey: QueryKeys.me });
+                queryClient.invalidateQueries({ queryKey: QueryKeys.balance(user.id) });
+            } else if (typeof window !== 'undefined' && (window as any).__claimingGiftCodes) {
+                // Se falhou, libera a trava global para permitir novas tentativas
+                delete (window as any).__claimingGiftCodes[code];
+            }
+        }).catch((err) => {
+            console.error('Error claiming coupon in chat screen:', err);
+            if (typeof window !== 'undefined' && (window as any).__claimingGiftCodes) {
+                delete (window as any).__claimingGiftCodes[code];
+            }
+        });
+    }, [user?.id, propGiftCode, queryClient]);
+
+    const partnerClerkId = targetClerkId || (isRouteClerkId ? otherUserId : '');
+    const roomId = (user?.id && partnerClerkId) ? [user.id, partnerClerkId].sort().join('_') : '';
+
+    // Carrega mensagens do cache local APENAS no primeiro render da sala e preserva se já houver mensagens
+    useEffect(() => {
+        if (typeof window !== 'undefined' && user?.id && (partnerClerkId || otherUserId)) {
+            const currentRoomId = roomId || [user.id, partnerClerkId || otherUserId].sort().join('_');
+            const keysToTry = [
+                `mimo_messages_${currentRoomId}`,
+                `mimo_messages_${[user.id, otherUserId].sort().join('_')}`,
+            ];
+            let cached: string | null = null;
+            for (const key of keysToTry) {
+                cached = localStorage.getItem(key);
+                if (cached) break;
+            }
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        setMessages((prev) => {
+                            // Se já houver mensagens em memória (inclusive otimistas), NÃO sobrescreve
+                            if (prev.length > 0) return prev;
+                            const normalized = parsed.map((m: any) =>
+                                unlockMessageIfEligible(m, user.id, balance, largeMessageThreshold, currentRoomId, declinedLongMessageIdsRef.current)
+                            );
+                            return normalized;
+                        });
+                        setLoadingMessages(false);
+                    }
+                } catch (e) {
+                    console.error('Erro ao ler mensagens do cache:', e);
+                }
+            }
+        }
+    }, [roomId, user?.id, otherUserId, partnerClerkId]);
+
+    // Fallback HTTP para carregar mensagens da API se o socket atrasar ou falhar (executa apenas ao montar a sala)
+    useEffect(() => {
+        const partner = partnerClerkId || otherUserId;
+        if (!user?.id || !partner) return;
+
+        const currentRoomId = roomId || [user.id, partner].sort().join('_');
+        axios.get(`/api/rooms/${user.id}/messages`, {
+            params: { roomId: currentRoomId, limit: 50 }
+        })
+        .then((res) => {
+            if (Array.isArray(res.data)) {
+                setMessages((prev) => {
+                    const rawList: any[] = res.data;
+                    const normalizedHttp = rawList.map((newMsg: any) => {
+                        const unlocked = unlockMessageIfEligible(newMsg, user.id, balance, largeMessageThreshold, currentRoomId, declinedLongMessageIdsRef.current);
+                        const prevMsg = prev.find((m: any) => m._id === newMsg._id);
+                        if (prevMsg) {
+                            return mergeMessagePreservingUnlocked(prevMsg, unlocked);
+                        }
+                        return unlocked;
+                    });
+
+                    // PRESERVAR mensagens locais/otimistas que estão sendo enviadas
+                    const pendingOptimistic = prev.filter(m => m.status === 'sending' || (m.tempId && !rawList.some(r => r.tempId === m.tempId || r._id === m.tempId)));
+
+                    if (prev.length === 0) {
+                        return sortMessagesStable([...normalizedHttp, ...pendingOptimistic]);
+                    }
+
+                    const existingIds = new Set(normalizedHttp.map(m => m._id));
+                    const remainingPrev = prev.filter(m => !existingIds.has(m._id) && !m.tempId);
+
+                    return sortMessagesStable([...normalizedHttp, ...remainingPrev, ...pendingOptimistic]);
+                });
+                setLoadingMessages(false);
+            }
+        })
+        .catch((err) => {
+            console.error('Erro no fallback HTTP de mensagens:', err);
+        })
+        .finally(() => {
+            setLoadingMessages(false);
+        });
+    }, [roomId, user?.id, otherUserId, partnerClerkId]);
+
+    // Atualiza apenas o destrancamento em memória quando o saldo ou o limite de caracteres muda (SEM resetar cache ou estado)
+    useEffect(() => {
+        if (!user?.id) return;
+        setMessages((prev) => {
+            let changed = false;
+            const updated = prev.map((msg) => {
+                const rechecked = unlockMessageIfEligible(msg, user.id, balance, largeMessageThreshold, roomId, declinedLongMessageIdsRef.current);
+                if (rechecked.isContentLocked !== msg.isContentLocked || rechecked.billingStatus !== msg.billingStatus) {
+                    changed = true;
+                    return rechecked;
+                }
+                return msg;
+            });
+            return changed ? updated : prev;
+        });
+
+        // Se for o cliente e o saldo for positivo, notifica o servidor para liquidar no MongoDB
+        if (!userData?.isProfessional && balance > 0 && socket && roomId) {
+            socket.emit('confirm_view_messages', { roomId });
+        }
+    }, [balance, largeMessageThreshold, user?.id, roomId, userData?.isProfessional, socket]);
+
+    // Salva apenas as últimas 50 mensagens confirmadas no cache local para não sobrecarregar o armazenamento
+    useEffect(() => {
+        const partner = partnerClerkId || otherUserId;
+        if (typeof window !== 'undefined' && user?.id && partner && !loadingMessages) {
+            const currentRoomId = roomId || [user.id, partner].sort().join('_');
+            const confirmedMessages = messages.filter(m => !m.tempId && m.status !== 'sending');
+            const recentMessages = confirmedMessages.slice(-50);
+            if (recentMessages.length > 0) {
+                localStorage.setItem(`mimo_messages_${currentRoomId}`, JSON.stringify(recentMessages));
+            }
+        }
+    }, [messages, user?.id, otherUserId, partnerClerkId, loadingMessages, roomId]);
+
+    // Busca mídias históricas do backend quando a galeria for aberta
+    useEffect(() => {
+        if (galleryVisible && roomId && user?.id) {
+            const fetchMedia = async () => {
+                try {
+                    const response = await axios.get(`/api/rooms/${user.id}/media`, {
+                        params: { roomId }
+                    });
+                    setAllMediaItemsLoaded(response.data);
+                } catch (error) {
+                    console.error('Erro ao carregar mídias da galeria:', error);
+                }
+            };
+            fetchMedia();
+        }
+    }, [galleryVisible, roomId, user?.id]);
+
+    // Notifica que o DOM está pronto imediatamente na montagem para iniciar a transição sem delay (estilo nativo)
+    useEffect(() => {
+        if (typeof window !== 'undefined' && (window as any).__resolveTransition) {
+            (window as any).__resolveTransition();
+            (window as any).__resolveTransition = null;
+        }
+    }, []);
+
+    // Prefetch da tela de perfil público para navegação instantânea (resposta tátil imediata)
+    useEffect(() => {
+        if (receiver?.username) {
+            router.prefetch(`/${receiver.username}`);
+        }
+    }, [receiver?.username, router]);
+
+    const scrollToBottom = (behavior: 'auto' | 'smooth' = 'smooth') => {
+        setTimeout(() => {
+            const container = messagesContainerRef.current;
+            if (container) {
+                if (behavior === 'auto') {
+                    container.scrollTop = 0; // No flex-col-reverse, 0 é o final das mensagens (bottom)
+                } else {
+                    container.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            }
+        }, 0);
+    };
+
+    useEffect(() => {
+        if (!loadingMessages && messages.length > 0) {
+            const lastMessage = messages[messages.length - 1];
+            const lastId = lastMessage._id;
+
+            if (isFirstLoadRef.current) {
+                scrollToBottom('auto');
+                isFirstLoadRef.current = false;
+                lastMessageIdRef.current = lastId;
+            } else if (lastMessageIdRef.current !== lastId) {
+                const sentByMe = lastMessage.senderId === user?.id;
+
+                const container = messagesContainerRef.current;
+                let userIsAtBottom = true;
+                if (container) {
+                    const { scrollTop } = container;
+                    userIsAtBottom = Math.abs(scrollTop) < 50;
+                }
+
+                if (sentByMe || userIsAtBottom) {
+                    scrollToBottom('smooth');
+                    setShowNewMessagesBadge(false);
+                } else {
+                    setShowNewMessagesBadge(true);
+                }
+                lastMessageIdRef.current = lastId;
+            }
+        }
+    }, [messages, loadingMessages, user?.id]);
+
+    useEffect(() => {
+        const partner = partnerClerkId || (isRouteClerkId ? otherUserId : '');
+        if (!socket || !user?.id || !partner) return;
+
+        socketService.joinRoom(user.id, partner);
+
+        socket.on('room_joined', (data: { messages: Message[]; monetizationDisabled?: boolean; largeMessageThreshold?: number }) => {
+            if (data.largeMessageThreshold) {
+                setLargeMessageThreshold(data.largeMessageThreshold);
+            }
+            const currentThreshold = data.largeMessageThreshold || largeMessageThreshold;
+
+            setMessages((prev) => {
+                const unlockedMessages = data.messages.map((newMsg) => {
+                    const unlocked = unlockMessageIfEligible(newMsg, user.id, balance, currentThreshold, roomId, declinedLongMessageIdsRef.current);
+                    const prevMsg = prev.find(m => m._id === newMsg._id);
+                    if (prevMsg) {
+                        return mergeMessagePreservingUnlocked(prevMsg, unlocked);
+                    }
+                    return unlocked;
+                });
+
+                // PRESERVA mensagens otimistas que ainda não foram confirmadas pelo servidor
+                const pendingOptimistic = prev.filter(
+                    m => m.status === 'sending' || 
+                    (m.tempId && !data.messages.some(dbM => dbM.tempId === m.tempId || dbM._id === m.tempId))
+                );
+
+                if (pendingOptimistic.length === 0) {
+                    return unlockedMessages;
+                }
+
+                const existingIds = new Set(unlockedMessages.map(m => m._id));
+                const uniquePending = pendingOptimistic.filter(m => !existingIds.has(m._id));
+
+                return sortMessagesStable([...unlockedMessages, ...uniquePending]);
+            });
+
+            // Se o usuário logado for o cliente e houver mensagens pendentes longas que não foram recusadas:
+            if (!userData?.isProfessional) {
+                const pendingLong = data.messages.find(m =>
+                    m.receiverId === user?.id &&
+                    m.billingStatus === 'pending' &&
+                    ((m.equivalentCharCount ?? m.charCount ?? 0) > currentThreshold) &&
+                    !declinedLongMessageIdsRef.current.has(m._id)
+                );
+                if (pendingLong) {
+                    setPendingLongMessageToConfirm(pendingLong);
+                }
+            }
+
+            setLoadingMessages(false);
+            if (data.monetizationDisabled !== undefined) {
+                setMonetizationDisabled(data.monetizationDisabled);
+            }
+            if (data.messages.length < 50) {
+                setHasMore(false);
+            } else {
+                setHasMore(true);
+            }
+            socket.emit('mark_as_read', { roomId });
+
+            // Atualiza cache local de rooms
+            queryClient.setQueryData(QueryKeys.rooms(user.id!), (old: any) => {
+                const currentRooms = Array.isArray(old) ? old : [];
+                const roomExists = currentRooms.some((r: any) => {
+                    const rId = r.roomId ?? [...r.participants].sort().join('_');
+                    return rId === roomId;
+                });
+
+                let updatedRooms = currentRooms.map((r: any) => {
+                    const rId = r.roomId ?? [...r.participants].sort().join('_');
+                    if (rId === roomId) {
+                        return { ...r, unreadCount: { ...r.unreadCount, [user.id!]: 0 } };
+                    }
+                    return r;
+                });
+
+                if (!roomExists && receiver?.isProfessional) {
+                    const pendingRoom = {
+                        _id: `pending-${roomId}`,
+                        roomId,
+                        participants: [user.id!, partner].sort(),
+                        otherUser: receiver,
+                        unreadCount: { [user.id!]: 0 },
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                    };
+                    updatedRooms = [...updatedRooms, pendingRoom];
+
+                    const pendingKey = `mimo_pending_rooms_${user.id!}`;
+                    let pendingRooms: any[] = [];
+                    try {
+                        pendingRooms = JSON.parse(localStorage.getItem(pendingKey) || '[]');
+                    } catch {
+                        pendingRooms = [];
+                    }
+                    localStorage.setItem(pendingKey, JSON.stringify([
+                        ...pendingRooms.filter((r: any) => r.roomId !== roomId),
+                        pendingRoom,
+                    ]));
+                }
+
+                return updatedRooms;
+            });
+        });
+
+        socket.on('user_presence', (data: { userId: string; isOnline: boolean; lastSeen: string }) => {
+            if (data.userId === partner || data.userId === otherUserId) {
+                const targetKey = partnerClerkId || otherUserId;
+                queryClient.setQueryData(QueryKeys.userById(targetKey), (old: any) => {
+                    if (!old) return old;
+                    return {
+                        ...old,
+                        isOnline: data.isOnline,
+                        lastSeen: data.lastSeen
+                    };
+                });
+            }
+        });
+
+        socket.on('monetization_toggled', (data: { roomId: string; disabled: boolean }) => {
+            if (data.roomId === roomId) {
+                setMonetizationDisabled(data.disabled);
+            }
+        });
+
+        socketService.onNewMessage((data: { message: Message; tempId?: string }) => {
+            if ([data.message.senderId, data.message.receiverId].sort().join('_') !== roomId) return;
+
+            const processedMsg = unlockMessageIfEligible(data.message, user.id, balance, largeMessageThreshold, roomId, declinedLongMessageIdsRef.current);
+
+            // Se for recebida para o usuário atual e ainda estiver pendente (ex: mensagem longa):
+            if (processedMsg.receiverId === user?.id && processedMsg.billingStatus === 'pending') {
+                const charTotal = processedMsg.equivalentCharCount ?? processedMsg.charCount ?? 0;
+                if (charTotal > largeMessageThreshold && !declinedLongMessageIdsRef.current.has(processedMsg._id)) {
+                    setPendingLongMessageToConfirm(processedMsg);
+                }
+            }
+
+            setMessages((prev) => {
+                // Se for uma mensagem que nós enviamos (tem tempId), atualiza a mensagem otimista
+                if (data.tempId) {
+                    const index = prev.findIndex(m => m.tempId === data.tempId || m._id === data.tempId);
+                    if (index !== -1) {
+                        const existing = prev[index];
+                        const newMessages = [...prev];
+                        // Preservar monotonicidade: estado mais avançado sempre prevalece
+                        const isRead = !!(existing.isRead || processedMsg.isRead);
+                        const isDelivered = !!(isRead || existing.isDelivered || processedMsg.isDelivered);
+                        const awaitingBalance = !!(existing.awaitingBalance || processedMsg.awaitingBalance);
+                        newMessages[index] = {
+                            ...processedMsg,
+                            isRead,
+                            isDelivered,
+                            awaitingBalance,
+                            status: 'sent' as const,
+                        };
+                        if (processedMsg._id) {
+                            setNewIncomingMessageIds((prevIds) => {
+                                const nextIds = new Set(prevIds);
+                                nextIds.add(processedMsg._id);
+                                return nextIds;
+                            });
+                        }
+                        return newMessages;
+                    }
+                }
+
+                // Se a mensagem já existe (evitar duplicatas), atualiza preservando estado destrancado
+                const existingIndex = prev.findIndex(m => m._id === processedMsg._id);
+                if (existingIndex !== -1) {
+                    const existing = prev[existingIndex];
+                    const newMessages = [...prev];
+                    newMessages[existingIndex] = mergeMessagePreservingUnlocked(existing, processedMsg);
+                    return newMessages;
+                }
+
+                const newMessages = sortMessagesStable([...prev, { ...processedMsg, status: 'sent' as const }]);
+                if (processedMsg.receiverId === user?.id) {
+                    socket.emit('mark_as_read', { roomId });
+                    setNewIncomingMessageIds((prevIds) => {
+                        const nextIds = new Set(prevIds);
+                        nextIds.add(processedMsg._id);
+                        return nextIds;
+                    });
+                }
+                return newMessages;
+            });
+
+            // Atualiza cache local de rooms para refletir a última mensagem recebida/enviada em tempo real
+            queryClient.setQueryData(QueryKeys.rooms(user?.id ?? ''), (old: any) => {
+                if (!old) return old;
+                return old.map((r: any) => {
+                    const rId = r.roomId ?? [...r.participants].sort().join('_');
+                    if (rId === roomId) {
+                        const isPending = data.message?.billingStatus === 'pending' || data.message?.isContentLocked;
+                        const isMe = data.message?.senderId === user?.id;
+                        let safeText = data.message.content.substring(0, 100);
+                        if (isPending) {
+                            safeText = isMe ? 'Aguardando saldo do cliente' : (data.message.isAudio ? '🎙️ Nova mensagem de áudio' : 'Nova mensagem');
+                        }
+                        return {
+                            ...r,
+                            lastMessage: safeText,
+                            lastMessageTime: data.message.timestamp,
+                            updatedAt: data.message.timestamp,
+                            lastMessageSenderId: data.message.senderId,
+                            unreadCount: {
+                                ...r.unreadCount,
+                                [user?.id ?? '']: data.message.receiverId === user?.id ? 0 : (r.unreadCount?.[user?.id ?? ''] ?? 0)
+                            }
+                        };
+                    }
+                    return r;
+                });
+            });
+        });
+
+        socket.on('professional_wallet_updated', () => {
+            queryClient.invalidateQueries({ queryKey: ['wallet', 'dashboard'] });
+            queryClient.invalidateQueries({ queryKey: QueryKeys.me });
+        });
+
+        socket.on('balance_update', (data: { balance: number }) => {
+            queryClient.setQueryData(QueryKeys.me, (old: any) =>
+                old ? { ...old, balance: data.balance } : old
+            );
+            queryClient.invalidateQueries({ queryKey: ['earnings', 'recent'] });
+
+            // Se for cliente e tiver saldo novo > 0:
+            if (!userData?.isProfessional && data.balance > 0) {
+                // Notifica o servidor para liquidar mensagens curtas pendentes:
+                socket.emit('confirm_view_messages', { roomId });
+
+                // E se houver mensagem longa pendente não recusada, abre a modal de confirmação:
+                setMessages((currentMsgs) => {
+                    const pendingLong = currentMsgs.find(m =>
+                        m.receiverId === user?.id &&
+                        m.billingStatus === 'pending' &&
+                        ((m.equivalentCharCount ?? m.charCount ?? 0) > largeMessageThreshold) &&
+                        !declinedLongMessageIdsRef.current.has(m._id)
+                    );
+                    if (pendingLong) {
+                        setPendingLongMessageToConfirm(pendingLong);
+                    }
+                    return currentMsgs;
+                });
+            }
+        });
+
+        socket.on('message_error', (data: { error: string }) => {
+            toast.error(data.error);
+            setSending(false);
+            queryClient.invalidateQueries({ queryKey: QueryKeys.me });
+        });
+
+        socket.on('user_typing', (data: { isTyping: boolean }) => {
+            if (partnerTypingTimeoutRef.current) {
+                clearTimeout(partnerTypingTimeoutRef.current);
+                partnerTypingTimeoutRef.current = null;
+            }
+
+            if (data.isTyping) {
+                setIsTyping(true);
+                // Fallback automático de 5s caso o evento isTyping: false nunca chegue
+                partnerTypingTimeoutRef.current = setTimeout(() => {
+                    setIsTyping(false);
+                    partnerTypingTimeoutRef.current = null;
+                }, 5000);
+            } else {
+                // Ao parar de digitar, adicionamos um atraso de 2s para ocultar
+                // Isso previne que a tela pisque se o usuário parar e recomeçar logo em seguida
+                partnerTypingTimeoutRef.current = setTimeout(() => {
+                    setIsTyping(false);
+                    partnerTypingTimeoutRef.current = null;
+                }, 2000);
+            }
+        });
+
+        socket.on('messages_read', (data: { roomId: string; readBy: string }) => {
+            if (data.roomId === roomId) {
+                setMessages((prev) => prev.map((msg) => {
+                    if (msg.senderId === user?.id && data.readBy !== user?.id) {
+                        return { ...msg, isRead: true, isDelivered: true, status: 'sent' as const };
+                    }
+                    return msg;
+                }));
+            }
+        });
+
+        socket.on('messages_delivered', (data: { roomId: string; receiverId: string }) => {
+            if (data.roomId === roomId && data.receiverId !== user?.id) {
+                setMessages((prev) => prev.map((msg) => {
+                    if (msg.senderId === user?.id && !msg.isDelivered) {
+                        return { ...msg, isDelivered: true, status: (msg.status === 'sending' ? ('sent' as const) : msg.status) };
+                    }
+                    return msg;
+                }));
+            }
+        });
+
+        socket.on('messages_awaiting_balance', (data: { roomId: string; clientId: string; messageIds?: string[] }) => {
+            if (data.roomId === roomId) {
+                setMessages((prev) => prev.map((msg) => {
+                    // Se a mensagem já está destrancada na tela, não marca como aguardando saldo
+                    if (msg.billingStatus === 'paid' || msg.isContentLocked === false) {
+                        return msg;
+                    }
+                    if (msg.billingStatus === 'pending' && (!data.messageIds || data.messageIds.includes(msg._id))) {
+                        return { ...msg, awaitingBalance: true };
+                    }
+                    return msg;
+                }));
+            }
+        });
+
+        socket.on('message_updated', (data: { message: Message }) => {
+            setMessages((prev) => {
+                const oldMsg = prev.find(m => m._id === data.message._id);
+                if (oldMsg) {
+                    const wasLocked = oldMsg.isLockedImage;
+                    const isLockedNow = data.message.isLockedImage;
+                    if (wasLocked && !isLockedNow && oldMsg.senderId === user?.id && (data.message.lockedImagePrice || 0) > 0) {
+                        setNewUnlockedMediaIds((prevIds) => {
+                            const nextIds = new Set(prevIds);
+                            nextIds.add(data.message._id);
+                            return nextIds;
+                        });
+                    }
+                    if (oldMsg.billingStatus === 'pending' && data.message.billingStatus === 'paid') {
+                        setJustSettledMessageIds((prevIds) => {
+                            const nextIds = new Set(prevIds);
+                            nextIds.add(data.message._id);
+                            return nextIds;
+                        });
+                        setNewIncomingMessageIds((prevIds) => {
+                            const nextIds = new Set(prevIds);
+                            nextIds.add(data.message._id);
+                            return nextIds;
+                        });
+                    }
+                }
+                return prev.map(m => m._id === data.message._id ? (oldMsg ? mergeMessagePreservingUnlocked(oldMsg, data.message) : data.message) : m);
+            });
+        });
+
+        socket.on('message_deleted', (data: { messageId: string }) => {
+            setMessages((prev) => prev.filter(m => m._id !== data.messageId));
+        });
+
+        // Listener para room_read (caso seja marcado como lido de outro lugar)
+        socket.on('room_read', (data: { roomId: string; userId: string }) => {
+            if (data.roomId === roomId && data.userId === user?.id) {
+                queryClient.setQueryData(QueryKeys.rooms(user.id!), (old: any) => {
+                    if (!old) return old;
+                    return old.map((r: any) => {
+                        const rId = r.roomId ?? [...r.participants].sort().join('_');
+                        if (rId === roomId) {
+                            return { ...r, unreadCount: { ...r.unreadCount, [user.id!]: 0 } };
+                        }
+                        return r;
+                    });
+                });
+                queryClient.invalidateQueries({ queryKey: ['earnings', 'recent'] });
+            }
+        });
+
+        return () => {
+            socketService.leaveRoom(roomId);
+            socket.off('room_joined');
+            socket.off('user_presence');
+            socket.off('monetization_toggled');
+            socketService.offNewMessage();
+            socket.off('balance_update');
+            socket.off('message_error');
+            socket.off('user_typing');
+            socket.off('messages_read');
+            socket.off('messages_delivered');
+            socket.off('messages_awaiting_balance');
+            socket.off('message_updated');
+            socket.off('message_deleted');
+            socket.off('room_read');
+
+            if (partnerTypingTimeoutRef.current) {
+                clearTimeout(partnerTypingTimeoutRef.current);
+                partnerTypingTimeoutRef.current = null;
+            }
+        };
+    }, [socket, socketVersion, roomId, otherUserId, partnerClerkId, isRouteClerkId, user?.id, queryClient]);
+
+    // Handles the edge case where the user selects a file before userData finishes
+    // loading. Once userData is available we decide: auto-send (non-professional)
+    // or let the price modal appear (professional — selectedFile is already set).
+    useEffect(() => {
+        const pending = pendingMediaRef.current;
+        if (!pending || userData === undefined) return;
+        pendingMediaRef.current = null;
+        if (userData.isProfessional === false) {
+            setSelectedFile(null);
+            setPreviewUrl(null);
+            
+            const file = pending.file;
+            const isVideoFile = pending.isVideoFile;
+            
+            (async () => {
+                let localPreview = '';
+                if (isVideoFile) {
+                    localPreview = await generateVideoThumbnail(file);
+                } else {
+                    localPreview = URL.createObjectURL(file);
+                }
+                
+                const tempId = `temp-media-${Date.now()}`;
+                const newMsg: Message = {
+                    _id: tempId,
+                    tempId: tempId,
+                    senderId: user?.id ?? '',
+                    receiverId: partnerClerkId || otherUserId,
+                    content: isVideoFile ? 'Vídeo' : 'Foto',
+                    charCount: 0,
+                    cost: 0,
+                    timestamp: new Date().toISOString(),
+                    status: 'sending',
+                    isVideo: isVideoFile,
+                    thumbnailUrl: isVideoFile ? localPreview : undefined,
+                    originalImageUrl: !isVideoFile ? localPreview : undefined,
+                    isLockedImage: false,
+                    lockedImagePrice: 0
+                };
+                setMessages(prev => [...prev, newMsg]);
+
+                startMediaUpload(file, isVideoFile, 0, tempId, localPreview);
+            })();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userData]);
+
+    const waitForVideoEvent = (video: HTMLVideoElement, eventName: keyof HTMLVideoElementEventMap, timeoutMs: number) => {
+        return new Promise<void>((resolve, reject) => {
+            const timeoutId = window.setTimeout(() => {
+                cleanup();
+                reject(new Error(`Timeout waiting for ${eventName}`));
+            }, timeoutMs);
+
+            const onEvent = () => {
+                cleanup();
+                resolve();
+            };
+
+            const onError = () => {
+                cleanup();
+                reject(new Error('Video failed to load'));
+            };
+
+            const cleanup = () => {
+                window.clearTimeout(timeoutId);
+                video.removeEventListener(eventName, onEvent);
+                video.removeEventListener('error', onError);
+            };
+
+            video.addEventListener(eventName, onEvent, { once: true });
+            video.addEventListener('error', onError, { once: true });
+        });
+    };
+
+    const waitForVideoFrame = () => {
+        return new Promise<void>((resolve) => {
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        });
+    };
+
+    const isCanvasMostlyBlack = (canvas: HTMLCanvasElement) => {
+        const sampleWidth = Math.min(80, canvas.width);
+        const sampleHeight = Math.min(80, canvas.height);
+        const sampleCanvas = document.createElement('canvas');
+        sampleCanvas.width = sampleWidth;
+        sampleCanvas.height = sampleHeight;
+
+        const sampleCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
+        if (!sampleCtx) return true;
+
+        sampleCtx.drawImage(canvas, 0, 0, sampleWidth, sampleHeight);
+        const imageData = sampleCtx.getImageData(0, 0, sampleWidth, sampleHeight).data;
+        let darkPixels = 0;
+        let visiblePixels = 0;
+
+        for (let i = 0; i < imageData.length; i += 4) {
+            const alpha = imageData[i + 3];
+            if (alpha < 16) continue;
+
+            visiblePixels += 1;
+            const brightness = (imageData[i] + imageData[i + 1] + imageData[i + 2]) / 3;
+            if (brightness < 8) darkPixels += 1;
+        }
+
+        if (visiblePixels === 0) return true;
+        return darkPixels / visiblePixels > 0.985;
+    };
+
+    const buildThumbnailSeekTimes = (duration: number) => {
+        const fallbackTimes = [0.5, 1.5, 3, 5, 8];
+        if (!Number.isFinite(duration) || duration <= 0) return fallbackTimes;
+
+        return Array.from(new Set([
+            Math.min(0.5, Math.max(duration - 0.1, 0)),
+            Math.min(1.5, Math.max(duration - 0.1, 0)),
+            duration * 0.05,
+            duration * 0.12,
+            duration * 0.25,
+            duration * 0.5,
+        ].map(time => Number(Math.max(0, Math.min(duration - 0.1, time)).toFixed(2)))));
+    };
+
+    const captureVideoThumbnailAt = async (video: HTMLVideoElement, time: number) => {
+        if (Math.abs(video.currentTime - time) > 0.05) {
+            const seeked = waitForVideoEvent(video, 'seeked', 5000);
+            video.currentTime = time;
+            await seeked;
+        }
+
+        await waitForVideoFrame();
+
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth || 320;
+        canvas.height = video.videoHeight || 240;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return '';
+
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        if (isCanvasMostlyBlack(canvas)) return '';
+
+        return canvas.toDataURL('image/jpeg', 0.86);
+    };
+
+    const generateVideoThumbnail = async (file: File): Promise<string> => {
+        return new Promise((resolve) => {
+            const video = document.createElement('video');
+            video.preload = 'auto';
+            video.muted = true;
+            video.playsInline = true;
+
+            const timeoutId = setTimeout(() => {
+                cleanup();
+                resolve('');
+            }, 12000);
+
+            const cleanup = () => {
+                clearTimeout(timeoutId);
+                try {
+                    URL.revokeObjectURL(video.src);
+                } catch {}
+            };
+
+            const loadAndCapture = async () => {
+                try {
+                    await waitForVideoEvent(video, 'loadedmetadata', 5000);
+                    await waitForVideoEvent(video, 'loadeddata', 5000).catch(() => undefined);
+
+                    for (const seekTime of buildThumbnailSeekTimes(video.duration)) {
+                        const thumbnail = await captureVideoThumbnailAt(video, Number(seekTime));
+                        if (thumbnail) {
+                            cleanup();
+                            resolve(thumbnail);
+                            return;
+                        }
+                    }
+
+                    cleanup();
+                    resolve('');
+                } catch {
+                    cleanup();
+                    resolve('');
+                }
+            };
+
+            try {
+                video.src = URL.createObjectURL(file);
+                video.load();
+                loadAndCapture();
+            } catch {
+                cleanup();
+                resolve('');
+            }
+        });
+    };
+
+    const startMediaUpload = async (
+        file: File,
+        isVideoFile: boolean,
+        priceInCents: number,
+        tempId: string,
+        localPreviewUrl: string,
+        isTemporaryMedia: boolean = false,
+        expiryMinutes: number = 0
+    ) => {
+        setUploadTasks(prev => ({
+            ...prev,
+            [tempId]: { tempId, progress: 0, status: 'uploading' }
+        }));
+
+        try {
+            let finalVideoUrl = '';
+            
+            if (isVideoFile) {
+                const signedRes = await fetch('/api/chats/media/signed-url', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        roomId,
+                        contentType: file.type,
+                        fileName: file.name,
+                        isVideo: true
+                    })
+                });
+                
+                if (!signedRes.ok) {
+                    const errJson = await signedRes.json().catch(() => ({}));
+                    throw new Error(errJson.error || 'Falha ao obter URL assinada para o vídeo');
+                }
+                const signedData = await signedRes.json();
+                
+                if (signedData.signedUrl) {
+                    await axios.put(signedData.signedUrl, file, {
+                        headers: { 'Content-Type': file.type },
+                        onUploadProgress: (progressEvent) => {
+                            const percentCompleted = Math.round(
+                                (progressEvent.loaded * 100) / (progressEvent.total || 1)
+                            );
+                            setUploadTasks(prev => {
+                                if (!prev[tempId]) return prev;
+                                return {
+                                    ...prev,
+                                    [tempId]: { ...prev[tempId], progress: Math.min(90, Math.round(percentCompleted * 0.9)) }
+                                };
+                            });
+                        }
+                    });
+                    finalVideoUrl = signedData.publicUrl;
+                } else {
+                    throw new Error('Signed URL vazia');
+                }
+            }
+
+            let uploadFile = file;
+            if (!isVideoFile) {
+                try {
+                    uploadFile = await compressImage(file);
+                } catch (err) {
+                    console.error("Falha ao compactar imagem no cliente:", err);
+                }
+            }
+
+            const formData = new FormData();
+            if (isVideoFile) {
+                formData.append('videoUrl', finalVideoUrl);
+            } else {
+                formData.append('file', uploadFile);
+            }
+            
+            const effectivePartnerId = partnerClerkId || otherUserId;
+            const effectiveRoomId = roomId || (user?.id && effectivePartnerId ? [user.id, effectivePartnerId].sort().join('_') : roomId);
+            formData.append('roomId', effectiveRoomId);
+            formData.append('receiverId', effectivePartnerId);
+            formData.append('lockedPrice', (priceInCents / 100).toString());
+            formData.append('isVideo', isVideoFile.toString());
+            formData.append('tempId', tempId);
+            formData.append('isTemporary', isTemporaryMedia.toString());
+            formData.append('expiryMinutes', expiryMinutes.toString());
+
+            
+            if (isVideoFile) {
+                let thumbUrl = localPreviewUrl;
+                if (!thumbUrl || thumbUrl.startsWith('blob:')) {
+                    thumbUrl = await generateVideoThumbnail(file);
+                }
+                if (thumbUrl && !thumbUrl.startsWith('blob:')) {
+                    const thumbBlob = await (await fetch(thumbUrl)).blob();
+                    formData.append('thumbnail', new File([thumbBlob], 'thumb.jpg', { type: 'image/jpeg' }));
+                }
+            }
+
+            const res = await axios.post('/api/chats/media', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                onUploadProgress: (progressEvent) => {
+                    if (!isVideoFile) {
+                        const percentCompleted = Math.round(
+                            (progressEvent.loaded * 100) / (progressEvent.total || 1)
+                        );
+                        setUploadTasks(prev => {
+                            if (!prev[tempId]) return prev;
+                            return {
+                                ...prev,
+                                [tempId]: { ...prev[tempId], progress: percentCompleted }
+                            };
+                        });
+                    } else {
+                        setUploadTasks(prev => {
+                            if (!prev[tempId]) return prev;
+                            return {
+                                ...prev,
+                                [tempId]: { ...prev[tempId], progress: 95 }
+                            };
+                        });
+                    }
+                }
+            });
+
+            const data = res.data;
+            if (!data.success) {
+                throw new Error(data.error || 'Erro ao processar mídia');
+            }
+            triggerFirstMessageModalIfEligible();
+
+            setUploadTasks(prev => {
+                const next = { ...prev };
+                delete next[tempId];
+                return next;
+            });
+
+        } catch (e: any) {
+            console.error('Erro no upload em background:', e);
+            let errMsg = 'Erro no upload';
+            if (e.response?.data) {
+                const data = e.response.data;
+                if (typeof data.error === 'string') {
+                    errMsg = data.error;
+                } else if (data.error && typeof data.error === 'object') {
+                    errMsg = data.error.message || JSON.stringify(data.error);
+                } else if (typeof data.message === 'string') {
+                    errMsg = data.message;
+                } else if (data.message && typeof data.message === 'object') {
+                    errMsg = data.message.message || JSON.stringify(data.message);
+                } else {
+                    errMsg = JSON.stringify(data);
+                }
+            } else if (e.message?.includes('Network Error')) {
+                errMsg = 'Erro de rede. Verifique sua conexão.';
+            } else {
+                errMsg = e.message || 'Erro desconhecido';
+            }
+            
+            // Exibir alerta explicativo do erro
+            toast.error(`Falha no envio de mídia: ${errMsg}`);
+
+            setUploadTasks(prev => {
+                if (!prev[tempId]) return prev;
+                return {
+                    ...prev,
+                    [tempId]: { ...prev[tempId], status: 'error', error: errMsg }
+                };
+            });
+            setMessages(prev => prev.map(m => m.tempId === tempId ? { ...m, status: 'error' } : m));
+        }
+    };
+
+    const handleStartPress = (msg: Message, e: React.TouchEvent | React.MouseEvent) => {
+        longPressActivated.current = false;
+
+        // Mensagens bloqueadas (aguardando saldo) não podem ser respondidas
+        if (msg.isContentLocked) {
+            swipingMessage.current = null;
+            swipingElement.current = null;
+            swipeDistance.current = 0;
+            swipeTriggered.current = false;
+            return;
+        }
+
+        swipingMessage.current = msg;
+        swipingElement.current = e.currentTarget.querySelector('.reply-swipe-balloon') as HTMLElement;
+        swipeDistance.current = 0;
+        swipeTriggered.current = false;
+
+        let clientX = 0;
+        let clientY = 0;
+        if ('touches' in e) {
+            if (e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            }
+        } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+        touchStartCoords.current = { x: clientX, y: clientY };
+
+        if (pressTimer.current) clearTimeout(pressTimer.current);
+
+        pressTimer.current = setTimeout(() => {
+            longPressActivated.current = true;
+            if (swipeDistance.current > 10) return;
+            setSelectedMessageIds(prev => {
+                const next = new Set(prev);
+                next.add(msg._id);
+                return next;
+            });
+        }, 500);
+    };
+
+    const handleMovePress = (e: React.TouchEvent | React.MouseEvent) => {
+        if (!touchStartCoords.current) return;
+
+        let clientX = 0;
+        let clientY = 0;
+        if ('touches' in e) {
+            if (e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            }
+        } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+
+        const deltaX = clientX - touchStartCoords.current.x;
+        const deltaY = clientY - touchStartCoords.current.y;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+        if (distance > 10) {
+            if (pressTimer.current) {
+                clearTimeout(pressTimer.current);
+                pressTimer.current = null;
+            }
+        }
+
+        if (selectedMessageIds.size === 0 && deltaX > 5 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
+            if (pressTimer.current) {
+                clearTimeout(pressTimer.current);
+                pressTimer.current = null;
+            }
+
+            if (swipingElement.current) {
+                const currentDistance = Math.min(deltaX, 60);
+                swipeDistance.current = currentDistance;
+                swipingElement.current.style.transform = `translateX(${currentDistance}px)`;
+                swipingElement.current.style.transition = 'none';
+
+                const replyIcon = e.currentTarget.querySelector('.reply-icon-indicator') as HTMLElement;
+                if (replyIcon) {
+                    const ratio = Math.min(deltaX / 45, 1);
+                    replyIcon.style.opacity = `${ratio}`;
+                    replyIcon.style.transform = `translateY(-50%) scale(${0.75 + ratio * 0.25})`;
+                    
+                    if (deltaX >= 45) {
+                        replyIcon.style.color = '#7c3aed';
+                        const innerDiv = replyIcon.querySelector('div');
+                        if (innerDiv) {
+                            innerDiv.style.backgroundColor = '#ede9fe';
+                            innerDiv.style.borderColor = '#c084fc';
+                        }
+                        
+                        if (!swipeTriggered.current) {
+                            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                                navigator.vibrate(10);
+                            }
+                            swipeTriggered.current = true;
+                        }
+                    } else {
+                        replyIcon.style.color = '#9ca3af';
+                        const innerDiv = replyIcon.querySelector('div');
+                        if (innerDiv) {
+                            innerDiv.style.backgroundColor = '#f3f4f6';
+                            innerDiv.style.borderColor = '#e5e7eb';
+                        }
+                        swipeTriggered.current = false;
+                    }
+                }
+            }
+        }
+    };
+
+    const handleEndPress = (e: React.TouchEvent | React.MouseEvent) => {
+        if (pressTimer.current) {
+            clearTimeout(pressTimer.current);
+            pressTimer.current = null;
+        }
+        touchStartCoords.current = null;
+
+        if (swipingElement.current) {
+            swipingElement.current.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
+            swipingElement.current.style.transform = 'translateX(0px)';
+
+            const replyIcon = e.currentTarget.querySelector('.reply-icon-indicator') as HTMLElement;
+            if (replyIcon) {
+                replyIcon.style.transition = 'all 0.2s ease';
+                replyIcon.style.opacity = '0';
+                replyIcon.style.transform = 'translateY(-50%) scale(0.75)';
+            }
+
+            if (swipeDistance.current >= 45 && swipingMessage.current && !swipingMessage.current.isContentLocked) {
+                setReplyingTo(swipingMessage.current);
+                setTimeout(() => {
+                    inputRef.current?.focus();
+                }, 50);
+            }
+        }
+
+        swipingMessage.current = null;
+        swipingElement.current = null;
+        swipeDistance.current = 0;
+        swipeTriggered.current = false;
+    };
+
+    const handleMessageDoubleClick = (msg: Message, e: React.MouseEvent) => {
+        if (selectedMessageIds.size > 0 || msg.isContentLocked) return;
+        e.stopPropagation();
+        setReplyingTo(msg);
+        setTimeout(() => {
+            inputRef.current?.focus();
+        }, 50);
+    };
+
+    // Click em modo de seleção: toggle da mensagem no set
+    const handleMessageClick = (msgId: string) => {
+        // Se foi um long press, ignora o click disparado logo após soltar
+        if (longPressActivated.current) {
+            longPressActivated.current = false;
+            return;
+        }
+        if (selectedMessageIds.size > 0) {
+            setSelectedMessageIds(prev => {
+                const next = new Set(prev);
+                if (next.has(msgId)) {
+                    next.delete(msgId);
+                } else {
+                    next.add(msgId);
+                }
+                return next;
+            });
+        }
+    };
+
+    const handleDeleteMessage = () => {
+        if (!selectedMessageIds.size || !socket) return;
+        // Remove imediatamente do estado local
+        setMessages(prev => prev.filter(m => !selectedMessageIds.has(m._id)));
+        // Emite para o servidor fazer o soft delete de cada mensagem
+        selectedMessageIds.forEach(id => {
+            socket.emit('delete_message', { messageId: id });
+        });
+        setSelectedMessageIds(new Set());
+    };
+
+    function MessageSkeleton() {
+    return (
+        <div className="flex-1 overflow-y-auto px-4 py-8 flex flex-col gap-6">
+            {[...Array(8)].map((_, i) => {
+                const isMine = i % 3 === 0;
+                return (
+                    <div key={i} className={`flex ${isMine ? 'justify-end' : 'justify-start'} animate-pulse`}>
+                        <div className={`
+                            h-14 rounded-2xl 
+                            ${isMine ? 'bg-purple-100 w-[60%] rounded-br-sm' : 'bg-gray-100 w-[45%] rounded-bl-sm'}
+                        `} />
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+ 
+    const loadMoreMessages = async () => {
+        if (loadingMoreRef.current || !hasMore || messages.length === 0) return;
+        loadingMoreRef.current = true;
+        setLoadingMore(true);
+
+        try {
+            const oldestMessage = messages[0];
+            const before = oldestMessage.timestamp;
+
+            const response = await axios.get(`/api/rooms/${user?.id}/messages`, {
+                params: {
+                    roomId,
+                    before,
+                    limit: 50
+                }
+            });
+
+            const newMessages = response.data;
+
+            if (newMessages && Array.isArray(newMessages)) {
+                if (newMessages.length < 50) {
+                    setHasMore(false);
+                }
+                if (newMessages.length > 0) {
+                    setMessages(prev => {
+                        const existingIds = new Set(prev.map(m => m._id));
+                        const uniqueNewMessages = newMessages.filter(m => !existingIds.has(m._id));
+                        return [...uniqueNewMessages, ...prev];
+                    });
+                }
+            } else {
+                setHasMore(false);
+            }
+        } catch (error) {
+            console.error('Erro ao carregar mais mensagens:', error);
+        } finally {
+            loadingMoreRef.current = false;
+            setLoadingMore(false);
+        }
+    };
+
+    const handleScroll = async (e: React.UIEvent<HTMLDivElement>) => {
+        const container = e.currentTarget;
+        const { scrollTop, scrollHeight, clientHeight } = container;
+
+        const scrollOffset = Math.abs(scrollTop);
+
+        if (scrollOffset < 50) {
+            setShowNewMessagesBadge(false);
+        }
+
+        // Em flex-col-reverse, no topo visual (mensagens antigas) o valor absoluto do scrollTop
+        // se aproxima de scrollHeight - clientHeight.
+        const isNearTop = scrollHeight - clientHeight - scrollOffset < 100;
+
+        if (isNearTop && hasMore && !loadingMoreRef.current && messages.length > 0) {
+            await loadMoreMessages();
+        }
+    };
+
+    const handleConfirmLongMessage = (msg: Message) => {
+        if (!roomId || !msg._id) return;
+        if (socket) {
+            socket.emit('confirm_view_messages', {
+                roomId,
+                messageIds: [msg._id],
+            });
+        }
+        setPendingLongMessageToConfirm(null);
+        if (msg.encryptedContent || msg.encryptedAudioUrl) {
+            const seed = String(msg._id || msg.tempId || msg.timestamp || '');
+            const decryptedContent = msg.encryptedContent
+                ? decryptMessageText(msg.encryptedContent, roomId, seed)
+                : msg.content;
+            const decryptedAudioUrl = msg.encryptedAudioUrl
+                ? decryptMessageText(msg.encryptedAudioUrl, roomId, seed)
+                : msg.audioUrl;
+            setMessages(prev => prev.map(m => m._id === msg._id ? {
+                ...m,
+                content: decryptedContent || m.content,
+                audioUrl: decryptedAudioUrl || m.audioUrl,
+                billingStatus: 'paid',
+                isContentLocked: false,
+            } : m));
+        }
+    };
+
+    const handleDeclineLongMessage = (msgId?: string) => {
+        if (msgId) {
+            declinedLongMessageIdsRef.current.add(msgId);
+        }
+        setPendingLongMessageToConfirm(null);
+    };
+
+    const handleUnlockPendingMessage = (item: Message) => {
+        const cost = item.receiptChargeCents ?? 0;
+        const charTotal = item.equivalentCharCount ?? item.charCount ?? 0;
+        const isLong = charTotal > largeMessageThreshold;
+
+        if (balance < cost) {
+            if (socket && roomId) {
+                socket.emit('report_view_attempt', { roomId, messageId: item._id });
+            }
+            openRechargeModal({
+                currentBalanceInCents: balance,
+                requiredAmountInCents: cost,
+            });
+            return;
+        }
+
+        if (isLong) {
+            setPendingLongMessageToConfirm(item);
+        } else {
+            // Mensagem curta com saldo suficiente: liquida e visualiza imediatamente
+            if (socket && roomId && item._id) {
+                socket.emit('confirm_view_messages', {
+                    roomId,
+                    messageIds: [item._id],
+                });
+            }
+            if (item.encryptedContent || item.encryptedAudioUrl) {
+                const seed = String(item._id || item.tempId || item.timestamp || '');
+                const decryptedContent = item.encryptedContent
+                    ? decryptMessageText(item.encryptedContent, roomId, seed)
+                    : item.content;
+                const decryptedAudioUrl = item.encryptedAudioUrl
+                    ? decryptMessageText(item.encryptedAudioUrl, roomId, seed)
+                    : item.audioUrl;
+                setMessages(prev => prev.map(m => m._id === item._id ? {
+                    ...m,
+                    content: decryptedContent || m.content,
+                    audioUrl: decryptedAudioUrl || m.audioUrl,
+                    billingStatus: 'paid',
+                    isContentLocked: false,
+                } : m));
+            }
+        }
+    };
+
+    const processSendQueue = async () => {
+        if (isProcessingQueueRef.current) return;
+        isProcessingQueueRef.current = true;
+
+        try {
+            while (sendQueueRef.current.length > 0) {
+                const item = sendQueueRef.current.shift();
+                if (!item) break;
+
+                socketService.sendMessage(
+                    item.content,
+                    item.otherUserId,
+                    item.roomId,
+                    item.tempId,
+                    item.replyToId,
+                    item.replyToContent,
+                    item.replyToSenderId
+                );
+
+                // Aguarda o ACK do servidor garantindo que a mensagem foi processada e transmitida
+                // antes de despachar a próxima mensagem da fila (elimina inversão no wire)
+                if (item.tempId) {
+                    const ack = await socketService.waitForAck(item.tempId, 2500);
+                    if (ack.success) {
+                        setMessages(prev => prev.map(m => {
+                            if (m.tempId === item.tempId || m._id === item.tempId) {
+                                return {
+                                    ...m,
+                                    status: 'sent' as const,
+                                };
+                            }
+                            return m;
+                        }));
+                        triggerFirstMessageModalIfEligible();
+                    }
+                }
+
+                // Pequeno espaçamento adicional de 20ms entre envios seriais
+                if (sendQueueRef.current.length > 0) {
+                    await new Promise(resolve => setTimeout(resolve, 20));
+                }
+            }
+        } finally {
+            isProcessingQueueRef.current = false;
+        }
+    };
+
+    const handleRetryMessage = (msg: Message) => {
+        if (msg.status !== 'error' || !msg.content) return;
+
+        setMessages(prev => prev.map(m => (m._id === msg._id || m.tempId === msg.tempId) ? { ...m, status: 'sending' as const } : m));
+
+        const effectivePartnerId = partnerClerkId || otherUserId;
+        sendQueueRef.current.push({
+            content: msg.content,
+            otherUserId: effectivePartnerId,
+            roomId,
+            tempId: msg.tempId || msg._id,
+            replyToId: msg.replyToId || undefined,
+            replyToContent: msg.replyToContent || undefined,
+            replyToSenderId: msg.replyToSenderId || undefined
+        });
+
+        processSendQueue();
+    };
+
+    const handleSend = async () => {
+        const text = messageText.trim();
+        if (!text || sending) {
+            return;
+        }
+
+        const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
+        if (isClientToProfessional && balance <= 0) {
+            reportMessageAttempt();
+            openRechargeModal('ZERO_BALANCE_START');
+            return;
+        }
+
+        const charCount = text.length;
+        const costInCents = 0;
+
+        // Timestamp estritamente crescente para ordem cronológica consistente
+        const safeTimestampMs = Math.max(Date.now(), (lastSentTimestampRef.current || 0) + 1);
+        lastSentTimestampRef.current = safeTimestampMs;
+        const timestampIso = new Date(safeTimestampMs).toISOString();
+
+        const effectivePartnerId = partnerClerkId || otherUserId;
+        const tempId = `temp-${safeTimestampMs}-${Math.random().toString(36).slice(2, 7)}`;
+        const newMsg: Message = {
+            _id: tempId,
+            tempId: tempId,
+            senderId: user?.id ?? '',
+            receiverId: effectivePartnerId,
+            content: text,
+            charCount: charCount,
+            cost: costInCents,
+            timestamp: timestampIso,
+            status: 'sending',
+            ...(replyingTo ? {
+                replyToId: replyingTo._id,
+                replyToContent: getReplyPreviewContent(replyingTo),
+                replyToSenderId: replyingTo.senderId
+            } : {})
+        };
+
+        // UI Otimista Imediata: entra instantaneamente na lista e limpa o input
+        setMessages(prev => sortMessagesStable([...prev, newMsg]));
+        setMessageText('');
+        if (inputRef.current) {
+            inputRef.current.style.height = 'auto';
+        }
+        inputRef.current?.focus();
+
+        decrementLocalBalance(costInCents);
+        const replySnapshot = replyingTo;
+        setReplyingTo(null);
+
+        // Enfileira para despacho serial garantido
+        sendQueueRef.current.push({
+            content: text,
+            otherUserId: effectivePartnerId,
+            roomId,
+            tempId,
+            replyToId: replySnapshot?._id,
+            replyToContent: replySnapshot ? getReplyPreviewContent(replySnapshot) : undefined,
+            replyToSenderId: replySnapshot?.senderId
+        });
+
+        processSendQueue();
+
+        if (socket) {
+            socket.emit('mark_as_read', { roomId });
+        }
+
+        // Timeout fail-safe de 15 segundos para falha de rede
+        setTimeout(() => {
+            setMessages(prev => {
+                const target = prev.find(m => m.tempId === tempId || m._id === tempId);
+                if (target && target.status === 'sending') {
+                    return prev.map(m => (m.tempId === tempId || m._id === tempId) ? { ...m, status: 'error' as const } : m);
+                }
+                return prev;
+            });
+        }, 15000);
+
+        // Atualiza cache local de rooms
+        queryClient.setQueryData(QueryKeys.rooms(user?.id ?? ''), (old: any) => {
+            if (!old) return old;
+            return old.map((r: any) => {
+                const rId = r.roomId ?? [...r.participants].sort().join('_');
+                if (rId === roomId) {
+                    return {
+                        ...r,
+                        lastMessage: text.substring(0, 100),
+                        lastMessageTime: timestampIso,
+                        updatedAt: timestampIso,
+                        lastMessageSenderId: user?.id,
+                        unreadCount: { ...r.unreadCount, [user?.id ?? '']: 0 }
+                    };
+                }
+                return r;
+            });
+        });
+    };
+
+    const handleSendAudio = async (audioBlob: Blob, durationInSeconds: number) => {
+        const isTeamMemberInvolved = userData?.isTeam || receiver?.isTeam;
+        const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
+        if (isClientToProfessional && balance <= 0) {
+            reportMessageAttempt();
+            openRechargeModal('ZERO_BALANCE_START');
+            return;
+        }
+
+        const tempId = `temp-audio-${Date.now()}`;
+        const previewUrl = URL.createObjectURL(audioBlob);
+        const estimatedAudioCostInCents = 0;
+
+        const effectivePartnerId = partnerClerkId || otherUserId;
+        const effectiveRoomId = roomId || (user?.id && effectivePartnerId ? [user.id, effectivePartnerId].sort().join('_') : roomId);
+        const newMsg: Message = {
+            _id: tempId,
+            tempId: tempId,
+            senderId: user?.id ?? '',
+            receiverId: effectivePartnerId,
+            content: '🎙️ Mensagem de áudio',
+            charCount: 0,
+            cost: estimatedAudioCostInCents,
+            timestamp: new Date().toISOString(),
+            status: 'sending',
+            isAudio: true,
+            audioUrl: previewUrl,
+            audioDuration: durationInSeconds,
+        };
+
+        setMessages(prev => [...prev, newMsg]);
+
+        try {
+            const formData = new FormData();
+            formData.append('file', new File([audioBlob], `audio.webm`, { type: audioBlob.type }));
+            formData.append('roomId', effectiveRoomId);
+            formData.append('receiverId', effectivePartnerId);
+            formData.append('duration', durationInSeconds.toString());
+            formData.append('tempId', tempId);
+
+            const res = await axios.post('/api/chats/audio', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            if (!res.data.success) {
+                throw new Error(res.data.error || 'Erro ao enviar áudio');
+            }
+            triggerFirstMessageModalIfEligible();
+        } catch (e: any) {
+            console.error('Erro ao enviar áudio:', e);
+            const serverError: string | undefined = e.response?.data?.error;
+            setMessages(prev => prev.map(m => m.tempId === tempId ? { ...m, status: 'error' } : m));
+            if (serverError?.toLowerCase().includes('saldo insuficiente')) {
+                openRechargeModal(
+                    userData?.hasWelcomeCreditEnded
+                        ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
+                        : 'Você não tem saldo suficiente para enviar esta mensagem de áudio. Por favor, recarregue sua carteira.'
+                );
+            } else {
+                toast.error(`Falha ao enviar mensagem de áudio: ${serverError || e.message || 'Erro de rede'}`);
+            }
+        }
+    };
+
+    const handleTyping = (text: string) => {
+        setMessageText(text);
+        if (socket) {
+            const effectivePartnerId = partnerClerkId || otherUserId;
+            const effectiveRoomId = roomId || (user?.id && effectivePartnerId ? [user.id, effectivePartnerId].sort().join('_') : roomId);
+            socket.emit('typing', { roomId: effectiveRoomId, isTyping: true, receiverId: effectivePartnerId });
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = setTimeout(() => {
+                socket.emit('typing', { roomId: effectiveRoomId, isTyping: false, receiverId: effectivePartnerId });
+            }, 1000);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
+        }
+    };
+
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
+        if (!e.target.files || e.target.files.length === 0) return;
+
+        const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
+        if (isClientToProfessional && balance <= 0) {
+            e.target.value = '';
+            reportMessageAttempt();
+            openRechargeModal('ZERO_BALANCE_START');
+            return;
+        }
+
+        const file = e.target.files[0];
+        const isVideoFile = type === 'video';
+
+        setSelectedFile(file);
+        setIsVideo(isVideoFile);
+
+        let localPreview = '';
+        if (isVideoFile) {
+            localPreview = await generateVideoThumbnail(file);
+            setPreviewUrl(localPreview);
+        } else {
+            localPreview = URL.createObjectURL(file);
+            setPreviewUrl(localPreview);
+        }
+
+        if (userData === undefined) {
+            // userData hasn't loaded yet — defer the routing decision to the
+            // useEffect above so we never auto-send for a professional by mistake.
+            pendingMediaRef.current = { file, isVideoFile };
+            return;
+        }
+
+        // userData is loaded: only auto-send when we are 100% sure the user
+        // is NOT a professional. Using strict `=== false` prevents the case
+        // where userData is undefined from being treated as "non-professional".
+        if (userData.isProfessional === false) {
+            setSelectedFile(null);
+            setPreviewUrl(null);
+
+            const effectivePartnerId = partnerClerkId || otherUserId;
+            const tempId = `temp-media-${Date.now()}`;
+            const newMsg: Message = {
+                _id: tempId,
+                tempId: tempId,
+                senderId: user?.id ?? '',
+                receiverId: effectivePartnerId,
+                content: isVideoFile ? 'Vídeo' : 'Foto',
+                charCount: 0,
+                cost: 0,
+                timestamp: new Date().toISOString(),
+                status: 'sending',
+                isVideo: isVideoFile,
+                thumbnailUrl: isVideoFile ? localPreview : undefined,
+                originalImageUrl: !isVideoFile ? localPreview : undefined,
+                isLockedImage: false,
+                lockedImagePrice: 0
+            };
+            setMessages(prev => [...prev, newMsg]);
+
+            startMediaUpload(file, isVideoFile, 0, tempId, localPreview);
+        }
+        // isProfessional === true: the price modal renders because selectedFile is set.
+    };
+
+    // Envia a mídia selecionada (selectedFile) com o preço/duração já definidos.
+    // Usado pelo MediaComposerSheet (profissional configurou preço/duração) e pelo
+    // fallback no compose bar (envio durante a janela em que userData ainda está carregando).
+    const sendSelectedMedia = async (priceInCents: number, isTemporaryMedia: boolean, expiryMinutes: number, coverFrameDataUrl?: string) => {
+        if (!selectedFile) return;
+
+        const file = selectedFile;
+        const isVideoFile = isVideo;
+        const preview = coverFrameDataUrl || previewUrl || '';
+
+        setSelectedFile(null);
+        setPreviewUrl(null);
+
+        const effectivePartnerId = partnerClerkId || otherUserId;
+        const tempId = `temp-media-${Date.now()}`;
+        const newMsg: Message = {
+            _id: tempId,
+            tempId: tempId,
+            senderId: user?.id ?? '',
+            receiverId: effectivePartnerId,
+            content: isVideoFile ? 'Vídeo' : 'Foto',
+            charCount: 0,
+            cost: 0,
+            timestamp: new Date().toISOString(),
+            status: 'sending',
+            isVideo: isVideoFile,
+            thumbnailUrl: isVideoFile ? preview : undefined,
+            originalImageUrl: !isVideoFile ? preview : undefined,
+            isLockedImage: priceInCents > 0 || isTemporaryMedia,
+            lockedImagePrice: priceInCents,
+            isTemporary: isTemporaryMedia,
+            expiryMinutes: expiryMinutes,
+            expiresAt: undefined,
+        };
+        setMessages(prev => [...prev, newMsg]);
+
+        startMediaUpload(file, isVideoFile, priceInCents, tempId, preview, isTemporaryMedia, expiryMinutes);
+    };
+
+    const executeUnlock = async (messageId: string) => {
+        setUnlocking(true);
+        try {
+            const res = await fetch(`/api/chats/message/${messageId}/unlock`, { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            const data = await res.json();
+            if (data.success) {
+                // Atualiza a mensagem localmente no estado
+                setMessages(prev => prev.map(m => m._id === messageId ? data.message : m));
+                return true;
+            } else {
+                toast.error(data.error || 'Erro ao desbloquear conteúdo');
+                return false;
+            }
+        } catch (e) {
+            toast.error('Erro na requisição');
+            return false;
+        } finally {
+            setUnlocking(false);
+        }
+    };
+
+    const handleUnlockImage = async (messageId: string, priceInCents: number, isVideoMessage: boolean = false) => {
+        if (priceInCents === 0) {
+            // Desbloqueia mídias grátis temporárias instantaneamente
+            await executeUnlock(messageId);
+            return;
+        }
+
+        if (balance < priceInCents) {
+            openRechargeModal(
+                userData?.hasWelcomeCreditEnded
+                    ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
+                    : 'Você não tem saldo suficiente para desbloquear este conteúdo. Por favor, recarregue sua carteira.'
+            );
+            return;
+        }
+        setUnlockData({ id: messageId, price: priceInCents, isVideo: isVideoMessage });
+        setUnlockModalVisible(true);
+    };
+
+    const confirmUnlock = async () => {
+        if (!unlockData) return;
+        
+        if (balance < unlockData.price) {
+            setUnlockModalVisible(false);
+            openRechargeModal(
+                userData?.hasWelcomeCreditEnded
+                    ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
+                    : 'Você não tem saldo suficiente para desbloquear este conteúdo. Por favor, recarregue sua carteira.'
+            );
+            return;
+        }
+
+        const success = await executeUnlock(unlockData.id);
+        if (success) {
+            setUnlockModalVisible(false);
+            setUnlockData(null);
+        }
+    };
+
+    const handleSendGift = async () => {
+        if (!giftAmountStr || parseFloat(giftAmountStr) <= 0) return;
+        
+        const giftAmountInCents = parseFloat(giftAmountStr) * 100;
+        if (balance < giftAmountInCents) {
+            setGiftModalVisible(false);
+            openRechargeModal(
+                userData?.hasWelcomeCreditEnded
+                    ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
+                    : 'Você não tem saldo suficiente para enviar este presente. Por favor, recarregue sua carteira.'
+            );
+            return;
+        }
+
+        setSendingGift(true);
+        try {
+            const effectivePartnerId = partnerClerkId || otherUserId;
+            const effectiveRoomId = roomId || (user?.id && effectivePartnerId ? [user.id, effectivePartnerId].sort().join('_') : roomId);
+            const res = await fetch('/api/chats/gift', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    roomId: effectiveRoomId,
+                    receiverId: effectivePartnerId,
+                    amount: giftAmountStr
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setGiftModalVisible(false);
+                setGiftAmountStr('');
+            } else {
+                if (data.error?.toLowerCase().includes('saldo') || data.error?.toLowerCase().includes('insuficiente')) {
+                    setGiftModalVisible(false);
+                    openRechargeModal(
+                        userData?.hasWelcomeCreditEnded
+                            ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
+                            : 'Você não tem saldo suficiente para enviar este presente. Por favor, recarregue sua carteira.'
+                    );
+                } else {
+                    toast.error(data.error || 'Erro ao enviar presente');
+                }
+            }
+        } catch (e) {
+            toast.error('Erro de conexão');
+        } finally {
+            setSendingGift(false);
+        }
+    };
+
+    const handleBack = () => {
+        if (onBack) {
+            onBack();
+        } else if (useNativeTransition) {
+            router.back();
+        } else {
+            setIsLeaving(true);
+            setTimeout(() => {
+                router.push('/chats');
+            }, 220);
+        }
+    };
+
+    const charCount = messageText.trim().length;
+    const isSubscriber = chatPricing?.isSubscriber ?? false;
+    const isTeamMemberInvolved = userData?.isTeam || receiver?.isTeam;
+    const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
+    const currentRate = 0; // Client sends are free; prices describe incoming messages only.
+    let estimatedCostInCents = 0;
+    if (charCount > 0 && receiver?.isProfessional && !monetizationDisabled && !isTeamMemberInvolved) {
+        estimatedCostInCents = Math.max(1, Math.ceil(charCount * currentRate * 100));
+    }
+
+    // Preço do áudio: preço por caractere x multiplicador configurável, por segundo.
+    const audioPriceMultiplier = chatPricing?.audioPriceMultiplier ?? 5;
+    const audioCostPerSecondInCents = currentRate > 0 ? (currentRate * 100 * audioPriceMultiplier) : 0;
+    // Quantos segundos de áudio o saldo atual do cliente consegue pagar (undefined = sem limite, mensagem gratuita).
+    const maxAudioDurationSeconds = (audioCostPerSecondInCents > 0 && !isTeamMemberInvolved)
+        ? Math.floor(balance / audioCostPerSecondInCents)
+        : (isClientToProfessional && balance <= 0 ? 0 : undefined);
+    // Se o saldo for > 0, exibe quando estiver abaixo do limite configurado.
+    // Se o saldo for == 0, só exibe quando houver pelo menos uma mensagem da profissional recebida ou bloqueada (pois agora há motivo para recarregar).
+    const partnerIdForFilter = partnerClerkId || otherUserId;
+    const hasProfessionalMessage = messages.some(
+        (m) => (!m.isSystem && (m.senderId === partnerIdForFilter || (partnerClerkId && m.senderId === otherUserId))) || m.isContentLocked
+    );
+
+    const isBalanceLowOrZeroWithReason = balance > 0
+        ? balance <= lowBalanceThresholdInCents
+        : hasProfessionalMessage;
+
+    const shouldShowLowBalanceAlert = !userData?.isProfessional &&
+        !userData?.isTeam &&
+        !receiver?.isTeam &&
+        receiver?.isProfessional &&
+        !monetizationDisabled &&
+        lowBalanceThresholdInCents > 0 &&
+        isBalanceLowOrZeroWithReason;
+
+    const isClosingOrLeaving = isClosing || isLeaving;
+
+    const layoutClass = isSubPage
+        ? 'fixed inset-0 z-50 w-full h-full'
+        : 'w-full h-full';
+
+    const animationClass = isSubPage
+        ? '' // A div externa do layout já gerencia as animações de slide-in/out da subpágina
+        : (useNativeTransition ? '' : (isClosingOrLeaving ? 'animate-android-slide-out' : 'animate-android-slide-in'));
+
+    // Um usuário nunca pode conversar consigo mesmo, nem com outro usuário do mesmo tipo
+    // (profissional com profissional, cliente com cliente). O servidor também bloqueia isso,
+    // mas escondemos a UI de chat aqui para não exibir uma conversa inválida.
+    const isSelfChat = !!user?.id && (user.id === partnerClerkId || user.id === otherUserId);
+    const isSameUserType = !!userData && !!receiver && !userData.isTeam && !receiver.isTeam && !!userData.isProfessional === !!receiver.isProfessional;
+    if (isSelfChat || isSameUserType) {
+        return (
+            <div
+                className={`flex flex-col items-center justify-center gap-4 bg-gray-50 ${layoutClass} ${animationClass} p-6 text-center`}
+                style={{ ...viewportStyle, overscrollBehaviorY: 'none' }}
+            >
+                <p className="text-gray-700 font-medium">
+            {isSelfChat
+                        ? 'Você não pode conversar com você mesmo.'
+                        : 'Esta conversa não está disponível.'}
+                </p>
+                <button
+                    onClick={handleBack}
+                    className="py-2.5 px-5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold text-sm transition-all"
+                >
+                    Voltar
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <div 
+            ref={chatRootRef}
+            className={`flex flex-col bg-gray-50 overflow-hidden ${layoutClass} ${animationClass}`}
+            style={{ ...viewportStyle, overscrollBehaviorY: 'none' }}
+        >
+            {/* Header */}
+            <div className="shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 z-20 sticky top-0 shadow-md flex items-center gap-2">
+                {selectedMessageIds.size > 0 ? (
+                    <>
+                        <button
+                            onClick={() => setSelectedMessageIds(new Set())}
+                            className="text-white hover:bg-white/10 transition-colors p-2 -ml-2 rounded-full"
+                        >
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                        </button>
+                        <div className="flex-1">
+                            <p className="text-white font-bold">{selectedMessageIds.size} selecionada{selectedMessageIds.size > 1 ? 's' : ''}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={handleDeleteMessage}
+                                className="text-red-300 hover:text-red-100 p-2 hover:bg-white/10 rounded-full transition-colors"
+                                title="Excluir"
+                            >
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                                </svg>
+                            </button>
+                            {selectedMessageIds.size === 1 && (
+                                <button
+                                    onClick={() => setDetailsModalVisible(true)}
+                                    className="text-white/90 hover:text-white p-2 hover:bg-white/10 rounded-full transition-colors"
+                                    title="Detalhes"
+                                >
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <button
+                            onClick={handleBack}
+                            className="text-white hover:bg-white/10 transition-colors p-2 -ml-2 rounded-full"
+                        >
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                        </button>
+                        <button 
+                            onClick={() => {
+                                const target = receiver?.username || receiver?.clerkId || otherUserId;
+                                router.push(`/chat/${target}/info`);
+                            }}
+                            className="flex-1 flex items-center gap-3.5 min-w-0 text-left py-0.5"
+                        >
+                            <div className={`relative shrink-0 ${!receiver ? 'animate-pulse' : ''}`}>
+                                <Avatar uri={receiver?.photoUrl} size={44} />
+                                {receiver?.isOnline && (
+                                    <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-purple-600 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
+                                )}
+                            </div>
+                            <div className={`flex-1 min-w-0 ${!receiver ? 'animate-pulse' : ''}`}>
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                    <p className="text-base font-bold text-white truncate tracking-tight">
+                                        {receiver?.isDeleted ? 'Usuário Excluído' : (receiver?.name || receiver?.username || (isResolvingReceiver ? 'Carregando...' : (otherUserId ? 'Usuário' : 'Conversa')))}
+                                    </p>
+                                    {!receiver?.isDeleted && receiver?.isTeam && (
+                                        <span className="text-[10px] bg-emerald-500/90 text-white font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider shrink-0 flex items-center gap-1 border border-white/20">
+                                            <ShieldCheck className="w-3 h-3 text-white" />
+                                            Equipe Mimo ✓
+                                        </span>
+                                    )}
+                                    {!receiver?.isDeleted && receiver?.isProfessional && receiver?.identityStatus === 'approved' && (
+                                        <ShieldCheck className="w-4 h-4 text-white shrink-0" />
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    {!connected ? (
+                                        <span className="text-[10px] text-white/50 font-bold uppercase tracking-widest">Conectando...</span>
+                                    ) : isTyping ? (
+                                        <span className="text-[11px] text-emerald-300 font-bold animate-pulse tracking-wide lowercase">digitando...</span>
+                                    ) : !receiver?.isDeleted && receiver?.isOnline ? (
+                                        <span className="text-[11px] text-emerald-300 font-semibold tracking-wide lowercase">
+                                            online
+                                        </span>
+                                    ) : (
+                                        <span className="text-[10px] text-white/65 font-medium truncate tracking-tight normal-case">
+                                            {receiver ? formatLastSeen(receiver.isOnline, receiver.lastSeen, latestPartnerMessage?.timestamp) : (receiver?.username ? `@${receiver.username}` : 'Ver informações')}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </button>
+
+                        <div className="flex items-center gap-2">
+                            {!connected && (
+                                <svg className="animate-spin h-4 w-4 text-white/60" viewBox="0 0 24 24" fill="none">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                            )}
+
+                            <div className="relative">
+                                <button
+                                    onClick={() => setMenuVisible(!menuVisible)}
+                                    className="text-white/80 hover:text-white p-2 hover:bg-white/10 rounded-full active:scale-95 transition-all"
+                                >
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                        <circle cx="12" cy="5" r="1.5" />
+                                        <circle cx="12" cy="12" r="1.5" />
+                                        <circle cx="12" cy="19" r="1.5" />
+                                    </svg>
+                                </button>
+
+                                {menuVisible && (
+                                    <>
+                                        <div className="fixed inset-0 z-10" onClick={() => setMenuVisible(false)} />
+                                        <div className="absolute right-0 top-8 bg-white rounded-xl shadow-lg border border-gray-100 w-56 z-20 overflow-hidden select-none">
+                                            {!userData?.isProfessional && (
+                                                <>
+                                                    <button
+                                                        onClick={() => {
+                                                            setMenuVisible(false);
+                                                            openRechargeModal();
+                                                        }}
+                                                        className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                                    >
+                                                        <Wallet className="w-4 h-4 text-purple-600 shrink-0" />
+                                                        <span className="flex-1 text-left font-medium">Carteira</span>
+                                                        <span className="text-xs text-gray-400 font-normal">R$ {(balance / 100).toFixed(2).replace('.', ',')}</span>
+                                                    </button>
+                                                    <div className="border-t border-gray-100" />
+                                                </>
+                                            )}
+                                            <button
+                                                onClick={() => setMenuVisible(false)}
+                                                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-red-500 hover:bg-red-50 transition-colors"
+                                            >
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+                                                    <path d="M4.93 4.93l14.14 14.14" stroke="currentColor" strokeWidth="2" />
+                                                </svg>
+                                                <span className="font-medium">Bloquear</span>
+                                            </button>
+                                            <div className="border-t border-gray-100" />
+                                            <button
+                                                onClick={() => setMenuVisible(false)}
+                                                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                            >
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                                    <path d="M3 3l18 18M11.05 4.05C5.5 4.56 1 9.4 1 15.22V17h2c0-4.43 3.06-8.14 7.18-9.14M17.77 6.23a10.1 10.1 0 0 1 4.23 8v1.74h-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                                </svg>
+                                                <span className="font-medium">Denunciar</span>
+                                            </button>
+                                            {userData?.isAdmin && (
+                                                <>
+                                                    <div className="border-t border-gray-100" />
+                                                    <button
+                                                        onClick={() => {
+                                                            setMenuVisible(false);
+                                                            socket?.emit('toggle_monetization', { roomId, disabled: !monetizationDisabled });
+                                                        }}
+                                                        className="flex items-center gap-3 w-full px-4 py-3 text-sm text-purple-700 hover:bg-purple-50 transition-colors font-semibold whitespace-nowrap"
+                                                    >
+                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                            {monetizationDisabled ? (
+                                                                <>
+                                                                    <circle cx="12" cy="12" r="10" />
+                                                                    <line x1="12" y1="8" x2="12" y2="16" />
+                                                                    <line x1="8" y1="12" x2="16" y2="12" />
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <circle cx="12" cy="12" r="10" />
+                                                                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                                                                </>
+                                                            )}
+                                                        </svg>
+                                                        {monetizationDisabled ? 'Habilitar Monetização' : 'Desabilitar Monetização'}
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </>
+                )}
+            </div>
+
+            {(receiver?.isTeam || userData?.isTeam) && (
+                <div className="shrink-0 z-10 flex items-center justify-center gap-2 border-b border-emerald-200/80 bg-emerald-50 px-4 py-2 text-center text-xs font-bold text-emerald-800">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Conversa Oficial com a Equipe Mimo — Atendimento e suporte de ativação gratuito</span>
+                </div>
+            )}
+
+            {shouldShowLowBalanceAlert && (
+                <button
+                    type="button"
+                    onClick={() => openRechargeModal({ currentBalanceInCents: balance })}
+                    className="shrink-0 z-10 flex w-full items-center gap-2.5 border-b border-amber-100 bg-amber-50/80 px-4 py-2 text-left text-amber-950 transition-colors hover:bg-amber-50 active:bg-amber-100"
+                >
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-100/80 text-amber-700 ring-1 ring-amber-200/70">
+                        <AlertTriangle size={13} strokeWidth={2.2} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                        <span className="block text-xs font-semibold leading-4">
+                            {balance === 0 ? 'Sem saldo' : 'Saldo baixo'}
+                        </span>
+                        <span className="block whitespace-normal text-[11px] font-medium leading-3.5 text-amber-800">
+                            {balance === 0
+                                ? 'Saldo zerado. Toque para recarregar.'
+                                : `Saldo atual: ${formattedBalance}. Toque para recarregar.`}
+                        </span>
+                    </span>
+                </button>
+            )}
+
+            {/* Messages Container Wrapper */}
+            <div className="flex-1 relative overflow-hidden flex flex-col">
+                {/* Messages */}
+                <div 
+                    ref={messagesContainerRef} 
+                    onScroll={handleScroll} 
+                    className={`flex-1 overflow-y-auto overflow-x-hidden flex flex-col ${
+                        loadingMessages 
+                            ? '' 
+                            : messages.length === 0 
+                                ? 'justify-center items-center' 
+                                : 'flex-col-reverse'
+                    } gap-1`}
+                    style={{ overscrollBehaviorY: 'contain' }}
+                >
+                {loadingMessages ? (
+                    <MessageSkeleton />
+                ) : messages.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in duration-300 w-full max-w-sm">
+                        <div className="relative mb-3">
+                            <Avatar uri={receiver?.photoUrl} size={84} />
+                            {receiver?.isOnline && (
+                                <span className="absolute bottom-0.5 right-0.5 block h-4 w-4 rounded-full bg-emerald-400 ring-2 ring-white shadow-sm" />
+                            )}
+                        </div>
+                        <h3 className="text-base font-bold text-slate-800 tracking-tight">
+                            {receiver?.name || (receiver?.username ? `@${receiver.username}` : 'Criadora Mimo')}
+                        </h3>
+                        {receiver?.username && (
+                            <p className="text-xs text-slate-400 font-medium mb-4">@{receiver.username}</p>
+                        )}
+
+                        {receiver?.isProfessional && (
+                            <div className="w-full bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-xs flex flex-col gap-2.5 text-left mb-4">
+                                <div className="flex items-center gap-2.5 text-xs font-semibold text-slate-800">
+                                    <Clock className="w-4 h-4 text-purple-600 shrink-0" />
+                                    <span>
+                                        {receiver.avgResponseTimeMinutes && receiver.avgResponseTimeMinutes <= 60
+                                            ? 'Costuma responder em menos de 1h'
+                                            : 'Geralmente responde no mesmo dia'}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2.5 text-xs font-semibold text-slate-800">
+                                    <MessageCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                                    <span>Responde a quase todas as mensagens</span>
+                                </div>
+                            </div>
+                        )}
+
+                        <p className="text-xs text-slate-400 max-w-[240px] leading-relaxed">
+                            Envie uma mensagem para iniciar a conversa.
+                        </p>
+                    </div>
+                ) : (
+                    <>
+                        <div ref={messagesEndRef} />
+                        <div className="px-4 py-3 flex flex-col-reverse gap-0.5">
+                {isTyping && (
+                    <div className="flex justify-start">
+                        <div className="bg-white text-gray-900 shadow-sm rounded-2xl rounded-bl-sm px-3 py-1.5">
+                            <div className="flex items-center gap-1 h-[22.75px]">
+                                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {[...messages].reverse().map((item, index, arr) => {
+                    const isMine = item.senderId === user?.id;
+                    const isLocked = item.isLockedImage;
+                    const isAudio = !!item.isAudio;
+                    const isText = !item.isGift && !isLocked && !item.originalImageUrl && !item.isVideo && !item.isSystem && !isAudio;
+                    
+                    const nextItem = arr[index + 1];
+                    let shouldShowSeparator = false;
+                    if (!nextItem) {
+                        shouldShowSeparator = true;
+                    } else {
+                        const currentDate = new Date(item.timestamp);
+                        const nextDate = new Date(nextItem.timestamp);
+                        if (
+                            currentDate.getFullYear() !== nextDate.getFullYear() ||
+                            currentDate.getMonth() !== nextDate.getMonth() ||
+                            currentDate.getDate() !== nextDate.getDate()
+                        ) {
+                            shouldShowSeparator = true;
+                        }
+                    }
+                    
+                    return (
+                        <React.Fragment key={item._id}>
+                            {item.isSystem ? (
+                                <div className="flex justify-center my-2.5 w-full px-6 select-none animate-in fade-in duration-300">
+                                    <span className="text-[10.5px] text-slate-400 font-medium text-center max-w-[80%] leading-relaxed">
+                                        {item.content}
+                                    </span>
+                                </div>
+                            ) : (
+                                <div
+                                    id={`msg-${item._id}`}
+                                className={`flex ${isMine ? 'justify-end' : 'justify-start'} items-end ${isText ? 'mb-0.5' : 'mb-2'} -mx-4 px-4 py-0.5 transition-colors duration-300 ${selectedMessageIds.has(item._id) ? 'bg-purple-100/50' : ''} select-none no-select relative`}
+                                style={{ touchAction: 'pan-y' }}
+                                onMouseDown={(e) => handleStartPress(item, e)}
+                                onMouseMove={handleMovePress}
+                                onMouseUp={(e) => handleEndPress(e)}
+                                onMouseLeave={(e) => handleEndPress(e)}
+                                onTouchStart={(e) => handleStartPress(item, e)}
+                                onTouchMove={handleMovePress}
+                                onTouchEnd={(e) => handleEndPress(e)}
+                                onClick={() => handleMessageClick(item._id)}
+                                onDoubleClick={(e) => handleMessageDoubleClick(item, e)}
+                            >
+                                {/* Ícone de resposta revelado pelo swipe */}
+                                {!item.isContentLocked && (
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center justify-center opacity-0 scale-75 transition-all duration-150 reply-icon-indicator pointer-events-none z-0">
+                                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 shadow-sm border border-gray-200">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="9 17 4 12 9 7" />
+                                                <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {item.isGift ? (
+                                    <div
+                                        className={`reply-swipe-balloon max-w-[85%] rounded-[2rem] overflow-hidden shadow-md border-2 relative z-10 ${
+                                            isMine 
+                                                ? 'bg-purple-600 border-purple-500 rounded-br-none' 
+                                                : 'bg-white border-purple-50 border-2 rounded-bl-none'
+                                        }`}
+                                    >
+                                        {/* Balão de mensagem respondida em Presente */}
+                                        {item.replyToId && (
+                                            <div 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const targetEl = document.getElementById(`msg-${item.replyToId}`);
+                                                    if (targetEl) {
+                                                        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                        targetEl.classList.add('bg-purple-100/50');
+                                                        setTimeout(() => {
+                                                            targetEl.classList.remove('bg-purple-100/50');
+                                                        }, 1500);
+                                                    }
+                                                }}
+                                                className={`cursor-pointer m-3 mb-1 p-2 rounded-lg text-[11px] border-l-4 ${
+                                                    isMine 
+                                                        ? 'bg-white/15 border-white/50 text-white/95' 
+                                                        : 'bg-purple-50/70 border-purple-600 text-gray-600'
+                                                } flex flex-col gap-0.5 max-w-full`}
+                                            >
+                                                <span className={`font-black ${isMine ? 'text-white' : 'text-purple-700'}`}>
+                                                    {item.replyToSenderId === user?.id ? 'Você' : (receiver?.name || receiver?.username || 'Usuário')}
+                                                </span>
+                                                <span className="truncate max-w-full">
+                                                    {item.replyToContent}
+                                                </span>
+                                            </div>
+                                        )}
+                                        <div className="px-6 py-6 flex flex-col items-center gap-4">
+                                            <div className="relative group">
+                                                <div className={`absolute inset-0 blur-2xl opacity-20 ${isMine ? 'bg-white' : 'bg-purple-600'}`} />
+                                                <img 
+                                                    src="/assets/gift.png" 
+                                                    alt="Gift" 
+                                                    className="w-24 h-24 object-contain relative drop-shadow-xl animate-bounce" 
+                                                    style={{ animationDuration: '4s' }} 
+                                                />
+                                            </div>
+                                            
+                                            <div className="text-center">
+                                                <p className={`text-[11px] font-black uppercase tracking-[0.2em] mb-2 ${isMine ? 'text-purple-200' : 'text-purple-500'}`}>
+                                                    {isMine ? 'Mimo Enviado' : 'Você recebeu um presente'}
+                                                </p>
+                                                <p className={`text-4xl font-black tracking-tight ${isMine ? 'text-white' : 'text-gray-900'}`}>
+                                                    R$ {(item.cost / 100).toFixed(2)}
+                                                </p>
+                                            </div>
+    
+                                            {!isMine && (
+                                                <div className="mt-2 px-4 py-1.5 bg-green-500/10 rounded-full border border-green-500/20 flex items-center gap-2">
+                                                    <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                                                    <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">
+                                                        Saldo Adicionado
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+    
+                                        <div className={`px-5 py-3 flex items-end justify-between gap-4 ${isMine ? 'bg-purple-700/40' : 'bg-gray-50/50'}`}>
+                                            <div className="flex-1" />
+                                            <div className="flex items-center gap-2 mb-[-1px]">
+                                                <span className={`text-[10px] font-medium ${isMine ? 'text-purple-200/70' : 'text-gray-400'}`}>
+                                                    {(() => {
+                                                        try {
+                                                            return new Date(item.timestamp).toLocaleTimeString('pt-BR', {
+                                                                hour: '2-digit',
+                                                                minute: '2-digit',
+                                                            });
+                                                        } catch { return ''; }
+                                                    })()}
+                                                </span>
+                                                {isMine && (
+                                                    <MessageStatusTicks
+                                                        status={item.status}
+                                                        isRead={item.isRead}
+                                                        isDelivered={item.isDelivered}
+                                                        onRetry={() => handleRetryMessage(item)}
+                                                    />
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {isMine && userData?.isProfessional && item.lockedImagePrice! > 0 && !isLocked && (
+                                            <MediaEarningsIndicator
+                                                messageId={item._id}
+                                                receiverEarnings={item.receiverEarnings}
+                                                cost={item.lockedImagePrice || 0}
+                                                isSelected={selectedMessageIds.has(item._id)}
+                                                isNew={newUnlockedMediaIds.has(item._id)}
+                                            />
+                                        )}
+                                        {isMine && userData?.isProfessional && item.billingStatus === 'paid' && (
+                                            <EarningsIndicator
+                                                messageId={item._id}
+                                                receiverEarnings={item.receiverEarnings}
+                                                cost={item.cost}
+                                                isSelected={selectedMessageIds.has(item._id)}
+                                                isNew={newIncomingMessageIds.has(item._id)}
+                                                isSettled={justSettledMessageIds.has(item._id)}
+                                                timestamp={item.timestamp}
+                                                settledAt={item.settledAt}
+                                            />
+                                        )}
+                                        <div
+                                            className={`${item.isContentLocked ? '' : 'reply-swipe-balloon'} relative z-10 max-w-[75%] ${isLocked || item.originalImageUrl || item.isVideo || item.isExpired || item.isContentLocked ? 'p-0 bg-transparent shadow-none' : (isAudio ? 'p-3' : 'px-3 py-1.5')} rounded-2xl ${
+                                            (!isLocked && !item.originalImageUrl && !item.isVideo && !item.isExpired && !item.isContentLocked) 
+                                         ? (isMine 
+                                             ? (item.billingStatus === 'pending' && item.awaitingBalance 
+                                                 ? 'bg-purple-600/80 border border-purple-400/35 text-white/95 shadow-xs backdrop-blur-xs' 
+                                                 : 'bg-purple-600 text-white') + ' rounded-br-sm' 
+                                             : 'bg-white text-gray-900 shadow-sm rounded-bl-sm')
+                                                : (isMine ? 'rounded-br-sm' : 'rounded-bl-sm')
+                                            }`}
+                                        >
+                                            {/* Balão de mensagem respondida em Mensagem Comum */}
+                                            {item.replyToId && (
+                                                <div 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const targetEl = document.getElementById(`msg-${item.replyToId}`);
+                                                        if (targetEl) {
+                                                            targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                            targetEl.classList.add('bg-purple-100/50');
+                                                            setTimeout(() => {
+                                                                targetEl.classList.remove('bg-purple-100/50');
+                                                            }, 1500);
+                                                        }
+                                                    }}
+                                                    className={`cursor-pointer mb-1.5 p-2 rounded-lg text-[11px] border-l-4 ${
+                                                        isMine 
+                                                            ? 'bg-white/15 border-white/50 text-white/95' 
+                                                            : 'bg-purple-50/70 border-purple-600 text-gray-600'
+                                                    } flex flex-col gap-0.5 max-w-full`}
+                                                >
+                                                    <span className={`font-black ${isMine ? 'text-white' : 'text-purple-700'}`}>
+                                                        {item.replyToSenderId === user?.id ? 'Você' : (receiver?.name || receiver?.username || 'Usuário')}
+                                                    </span>
+                                                    <span className="truncate max-w-full">
+                                                        {item.replyToContent}
+                                                    </span>
+                                                </div>
+                                            )}
+                                    {item.isContentLocked ? (
+                                        <PendingReceiptBalloon
+                                            item={item}
+                                            currentBalanceInCents={balance}
+                                            onOpenRecharge={(requiredCents) =>
+                                                openRechargeModal({
+                                                    currentBalanceInCents: balance,
+                                                    requiredAmountInCents: requiredCents,
+                                                })
+                                            }
+                                            onClickUnlock={handleUnlockPendingMessage}
+                                        />
+                                    ) : isLocked || item.originalImageUrl || item.isVideo || isAudio || item.isExpired ? (
+                                        <>
+                                            {item.isExpired || (item.expiresAt && new Date(item.expiresAt).getTime() > 0 && new Date(item.expiresAt) < new Date()) ? (
+                                                <div className="relative w-60 h-60 rounded-2xl bg-slate-100 flex flex-col items-center justify-center gap-2 text-slate-400 border border-slate-200 shadow-inner">
+                                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400/80">
+                                                        <circle cx="12" cy="12" r="10" />
+                                                        <polyline points="12 6 12 12 16 14" />
+                                                    </svg>
+                                                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Mídia Expirada</span>
+                                                    <span className="text-[9px] text-slate-400 text-center px-4 leading-tight">Esta mídia temporária não está mais disponível.</span>
+                                                </div>
+                                            ) : isAudio ? (
+                                                <div>
+                                                     {isMine && userData?.isProfessional && item.billingStatus === 'pending' && item.awaitingBalance && (
+                                                         <div className="flex items-center gap-1.5 text-[10px] font-medium text-purple-200/90 pb-1 mb-1.5 border-b border-purple-400/25 select-none">
+                                                             <span className="relative flex h-2 w-2 shrink-0">
+                                                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
+                                                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500" />
+                                                             </span>
+                                                             <span>Aguardando saldo do cliente</span>
+                                                         </div>
+                                                     )}
+                                                    <AudioPlayer
+                                                        src={item.audioUrl!}
+                                                        duration={item.audioDuration}
+                                                        isMine={isMine}
+                                                        timestamp={(() => {
+                                                            try {
+                                                                return new Date(item.timestamp).toLocaleTimeString('pt-BR', {
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit',
+                                                                });
+                                                            } catch { return undefined; }
+                                                        })()}
+                                                        isRead={item.isRead}
+                                                        isDelivered={item.isDelivered}
+                                                        status={item.status}
+                                                    />
+                                                </div>
+                                            ) : isLocked ? (
+                                                <div className="relative w-60 h-60 rounded-2xl overflow-hidden cursor-pointer bg-gray-200 shadow-sm flex items-center justify-center" onClick={() => {
+                                                    if (!isMine) {
+                                                        const price = 'lockedImagePrice' in item ? item.lockedImagePrice : (item as any).lockedPrice;
+                                                        handleUnlockImage(item._id, price || 0, item.isVideo);
+                                                    } else {
+                                                        setFullscreenLockedMessage(item);
+                                                    }
+                                                }}>
+                                                    {(item.isVideo ? item.thumbnailUrl : item.originalImageUrl) ? (
+                                                        <img 
+                                                            src={(isMine ? (item.isVideo ? item.thumbnailUrl : item.originalImageUrl) : item.blurredImageUrl) || ''} 
+                                                            className={`w-full h-full object-cover ${isMine ? 'blur-sm scale-102' : ''}`}
+                                                            alt="Locked Media" 
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full bg-purple-950/20 flex flex-col items-center justify-center gap-2 text-purple-600">
+                                                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                                <path d="M23 7l-7 5 7 5V7z" />
+                                                                <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                                                            </svg>
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700/60">Vídeo</span>
+                                                        </div>
+                                                    )}
+
+                                                    <LockedMediaTypeBadge
+                                                        isVideo={item.isVideo}
+                                                        duration={videoDurations[item._id]}
+                                                    />
+
+                                                    {/* Progresso de upload circular para envio em background */}
+                                                    {isMine && item.tempId && uploadTasks[item.tempId] && (
+                                                        <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px] flex flex-col items-center justify-center p-2 z-10">
+                                                            {uploadTasks[item.tempId].status === 'uploading' ? (
+                                                                <div className="w-16 h-16 relative flex items-center justify-center">
+                                                                    <svg className="w-full h-full transform -rotate-90">
+                                                                        <circle
+                                                                            cx="32"
+                                                                            cy="32"
+                                                                            r="24"
+                                                                            stroke="rgba(255, 255, 255, 0.2)"
+                                                                            strokeWidth="3.5"
+                                                                            fill="transparent"
+                                                                        />
+                                                                        <circle
+                                                                            cx="32"
+                                                                            cy="32"
+                                                                            r="24"
+                                                                            stroke="#a855f7"
+                                                                            strokeWidth="3.5"
+                                                                            fill="transparent"
+                                                                            strokeDasharray={2 * Math.PI * 24}
+                                                                            strokeDashoffset={2 * Math.PI * 24 * (1 - (uploadTasks[item.tempId].progress || 0) / 100)}
+                                                                            className="transition-all duration-300 ease-out"
+                                                                        />
+                                                                    </svg>
+                                                                    <span className="absolute text-xs font-black text-white">{uploadTasks[item.tempId].progress}%</span>
+                                                                </div>
+                                                            ) : uploadTasks[item.tempId].status === 'error' ? (
+                                                                <div className="flex flex-col items-center gap-1 text-center">
+                                                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-red-500">
+                                                                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                                                                        <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" strokeWidth="2"/>
+                                                                        <line x1="12" y1="16" x2="12.01" y2="16" stroke="currentColor" strokeWidth="2"/>
+                                                                    </svg>
+                                                                    <span className="text-[10px] font-bold text-white uppercase tracking-wider">Falhou</span>
+                                                                    {uploadTasks[item.tempId].error && (
+                                                                        <span className="text-[8px] font-medium text-red-300 leading-tight break-words px-1 max-w-[95%] text-center">
+                                                                            {uploadTasks[item.tempId].error}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            ) : null}
+                                                        </div>
+                                                    )}
+
+                                                    {!isMine ? (
+                                                        <div className="absolute inset-0 bg-black/40 backdrop-blur-[1.5px] flex flex-col items-center justify-center gap-2">
+                                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="opacity-90 drop-shadow">
+                                                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                                                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                                            </svg>
+                                                            <span className="text-[10px] font-medium uppercase tracking-widest text-white/90 drop-shadow">
+                                                                {item.lockedImagePrice && item.lockedImagePrice > 0 ? 'Desbloquear' : 'Revelar mídia'}
+                                                            </span>
+                                                            {item.lockedImagePrice && item.lockedImagePrice > 0 ? (
+                                                                <span className="text-xs font-semibold text-purple-200 drop-shadow">
+                                                                    R$ {((item.lockedImagePrice || 0) / 100).toFixed(2)}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-xs font-semibold text-amber-200 drop-shadow">
+                                                                    Grátis
+                                                                </span>
+                                                            )}
+                                                            {item.isTemporary && item.expiryMinutes && (
+                                                                <span className="text-[9px] text-white/80 font-bold drop-shadow flex items-center gap-1 mt-0.5">
+                                                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                                        <circle cx="12" cy="12" r="10" />
+                                                                        <polyline points="12 6 12 12 16 14" />
+                                                                    </svg>
+                                                                    Expira após {item.expiryMinutes < 1 ? `${Math.round(item.expiryMinutes * 60)}s` : `${item.expiryMinutes}min`}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        (!item.tempId || !uploadTasks[item.tempId]) && (
+                                                            <div className="absolute top-2 right-2 z-20">
+                                                                <div className="bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 flex items-center gap-1.5 shadow-md">
+                                                                    <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                                                                    <span className="text-[8px] font-bold text-white uppercase tracking-wider">
+                                                                        {item.lockedImagePrice && item.lockedImagePrice > 0 
+                                                                            ? `Aguardando • R$ ${((item.lockedImagePrice || 0) / 100).toFixed(2)}` 
+                                                                            : item.isTemporary && item.expiryMinutes
+                                                                            ? `Aguardando • ${item.expiryMinutes < 1 ? `${Math.round(item.expiryMinutes * 60)}s` : `${item.expiryMinutes}min`}`
+                                                                            : 'Aguardando'
+                                                                        }
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div 
+                                                    className="relative w-60 h-60 rounded-2xl overflow-hidden bg-gray-100 shadow-sm cursor-pointer group flex items-center justify-center"
+                                                    onClick={() => {
+                                                        const url = item.isVideo ? item.videoUrl : item.originalImageUrl;
+                                                        if (url) {
+                                                            const idx = mediaItems.findIndex(m => m.url === url);
+                                                            setFullscreenIndex(idx >= 0 ? idx : 0);
+                                                        }
+                                                    }}
+                                                >
+                                                    {item.isTemporary && item.expiresAt && (
+                                                        <TemporaryMediaBadge 
+                                                            expiresAt={item.expiresAt} 
+                                                            onExpire={() => {
+                                                                setMessages(prev => prev.map(m => m._id === item._id ? { ...m, isExpired: true } : m));
+                                                            }}
+                                                        />
+                                                    )}
+                                                    {(item.isVideo ? item.thumbnailUrl : item.originalImageUrl) ? (
+                                                        <img 
+                                                            src={(item.isVideo ? item.thumbnailUrl : item.originalImageUrl) || ''} 
+                                                            className="w-full h-full object-cover animate-in fade-in duration-300" 
+                                                            alt="Media" 
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full bg-purple-950/20 flex flex-col items-center justify-center gap-2 text-purple-600">
+                                                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                                <path d="M23 7l-7 5 7 5V7z" />
+                                                                <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                                                            </svg>
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700/60">Vídeo</span>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Progresso de upload circular para envio em background */}
+                                                    {isMine && item.tempId && uploadTasks[item.tempId] && (
+                                                        <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px] flex flex-col items-center justify-center p-2 z-10">
+                                                            {uploadTasks[item.tempId].status === 'uploading' ? (
+                                                                <div className="w-16 h-16 relative flex items-center justify-center">
+                                                                    <svg className="w-full h-full transform -rotate-90">
+                                                                        <circle
+                                                                            cx="32"
+                                                                            cy="32"
+                                                                            r="24"
+                                                                            stroke="rgba(255, 255, 255, 0.2)"
+                                                                            strokeWidth="3.5"
+                                                                            fill="transparent"
+                                                                        />
+                                                                        <circle
+                                                                            cx="32"
+                                                                            cy="32"
+                                                                            r="24"
+                                                                            stroke="#a855f7"
+                                                                            strokeWidth="3.5"
+                                                                            fill="transparent"
+                                                                            strokeDasharray={2 * Math.PI * 24}
+                                                                            strokeDashoffset={2 * Math.PI * 24 * (1 - (uploadTasks[item.tempId].progress || 0) / 100)}
+                                                                            className="transition-all duration-300 ease-out"
+                                                                        />
+                                                                    </svg>
+                                                                    <span className="absolute text-xs font-black text-white">{uploadTasks[item.tempId].progress}%</span>
+                                                                </div>
+                                                            ) : uploadTasks[item.tempId].status === 'error' ? (
+                                                                <div className="flex flex-col items-center gap-1 text-center">
+                                                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-red-500">
+                                                                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                                                                        <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" strokeWidth="2"/>
+                                                                        <line x1="12" y1="16" x2="12.01" y2="16" stroke="currentColor" strokeWidth="2"/>
+                                                                    </svg>
+                                                                    <span className="text-[10px] font-bold text-white uppercase tracking-wider">Falhou</span>
+                                                                    {uploadTasks[item.tempId].error && (
+                                                                        <span className="text-[8px] font-medium text-red-300 leading-tight break-words px-1 max-w-[95%] text-center">
+                                                                            {uploadTasks[item.tempId].error}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            ) : null}
+                                                        </div>
+                                                    )}
+
+                                                    {item.isVideo && (!item.tempId || !uploadTasks[item.tempId]) && (
+                                                        <div className="absolute inset-0 flex items-center justify-center">
+                                                            <div className="w-12 h-12 rounded-full bg-black/45 backdrop-blur-sm flex items-center justify-center text-white border border-white/10 group-hover:scale-110 transition-transform">
+                                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                                                    <path d="M8 5v14l11-7z" />
+                                                                </svg>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Badges de informações para a profissional após o desbloqueio */}
+                                                    {isMine && (
+                                                        <LockedMediaTypeBadge
+                                                            isVideo={item.isVideo}
+                                                            duration={videoDurations[item._id]}
+                                                        />
+                                                    )}
+
+                                                    {isMine && item.lockedImagePrice! > 0 && (
+                                                        <div className="absolute top-2 right-2 z-20">
+                                                            <div className="bg-emerald-500/80 backdrop-blur-md px-2 py-1.5 rounded-lg border border-emerald-400/20 flex items-center gap-1.5 shadow-md animate-in fade-in duration-200">
+                                                                <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                                                                <span className="text-[8px] font-black text-white uppercase tracking-wider">
+                                                                    Desbloqueado • R$ {((item.lockedImagePrice || 0) / 100).toFixed(2)}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {!isAudio && (
+                                                <div className="flex items-end justify-between mt-1.5 gap-3 px-2 pb-2">
+                                                    <div className="flex-1 min-w-0" />
+                                                    <div className="flex items-center gap-1.5 mb-[-1px]">
+                                                        <span className={`text-[10px] font-medium ${isMine ? (isAudio ? 'text-purple-200/70' : 'text-gray-500') : 'text-gray-400'}`}>
+                                                        {(() => {
+                                                            try {
+                                                                return new Date(item.timestamp).toLocaleTimeString('pt-BR', {
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit',
+                                                                });
+                                                            } catch { return ''; }
+                                                        })()}
+                                                    </span>
+                                                    {isMine && (
+                                                        <MessageStatusTicks
+                                                            status={item.status}
+                                                            isRead={item.isRead}
+                                                            isDelivered={item.isDelivered}
+                                                            onRetry={() => handleRetryMessage(item)}
+                                                        />
+                                                    )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <div className="relative">
+                                            {isMine && userData?.isProfessional && item.billingStatus === 'pending' && item.awaitingBalance && (
+                                                <div className="flex items-center gap-1.5 text-[10px] font-medium text-purple-200/90 pb-1 mb-1 border-b border-purple-400/25 select-none">
+                                                    <span className="relative flex h-2 w-2 shrink-0">
+                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
+                                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500" />
+                                                    </span>
+                                                    <span>Aguardando saldo do cliente</span>
+                                                </div>
+                                            )}
+                                            <CollapsibleTextMessage content={item.content} isMine={isMine} />
+                                            <div className="inline-flex items-center gap-1.5 float-right mt-2 ml-2 mb-[-2px]">
+                                                <span className={`text-[10px] font-medium ${isMine ? 'text-purple-200/70' : 'text-gray-400'}`}>
+                                                    {(() => {
+                                                        try {
+                                                            return new Date(item.timestamp).toLocaleTimeString('pt-BR', {
+                                                                hour: '2-digit',
+                                                                minute: '2-digit',
+                                                            });
+                                                        } catch { return ''; }
+                                                    })()}
+                                                </span>
+                                                {isMine && (
+                                                    <MessageStatusTicks
+                                                        status={item.status}
+                                                        isRead={item.isRead}
+                                                        isDelivered={item.isDelivered}
+                                                        onRetry={() => handleRetryMessage(item)}
+                                                    />
+                                                )}
+                                            </div>
+                                            <div className="clear-both" />
+                                        </div>
+                                    )}
+                                </div>
+                                </>
+                            )}
+                                </div>
+                            )}
+                            {shouldShowSeparator && (
+                                <div className="flex items-center gap-3 my-6 px-4 w-full">
+                                    <span className="text-[8.5px] font-black uppercase tracking-[0.15em] text-purple-600/75 dark:text-purple-400/80 whitespace-nowrap">
+                                        {formatSeparatorDate(item.timestamp)}
+                                    </span>
+                                    <div className="flex-1 h-[1px] bg-gradient-to-r from-purple-200/40 dark:from-purple-900/30 to-transparent" />
+                                </div>
+                            )}
+                        </React.Fragment>
+                    );
+                })}
+                {loadingMore && (
+                    <div className="flex justify-center py-4 w-full">
+                        <svg className="animate-spin h-6 w-6 text-purple-600" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                    </div>
+                )}
+                        </div>
+                    </>
+                )}
+                </div>
+
+                {/* Badge de novas mensagens */}
+                {showNewMessagesBadge && (
+                    <button
+                        onClick={() => {
+                            scrollToBottom('smooth');
+                            setShowNewMessagesBadge(false);
+                        }}
+                        className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4.5 py-2.5 rounded-full shadow-lg shadow-purple-500/20 hover:shadow-xl hover:shadow-purple-500/35 hover:scale-105 active:scale-95 transition-all duration-300 flex items-center gap-2 z-20 animate-in fade-in slide-in-from-bottom-4"
+                    >
+                        <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span>
+                        </span>
+                        <span className="text-xs font-bold tracking-wide">Novas mensagens</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="animate-bounce mt-0.5">
+                            <path d="M12 5v14M19 12l-7 7-7-7" />
+                        </svg>
+                    </button>
+                )}
+            </div>
+
+            {/* Input area */}
+            <div className={`bg-white border-t border-gray-200 px-4 pt-3 shrink-0 ${
+                isInputFocused ? 'pb-3' : 'pb-[calc(16px+env(safe-area-inset-bottom))]'
+            }`}>
+                {replyingTo && (
+                    <div className="flex items-center justify-between bg-purple-50 border-l-4 border-purple-600 rounded-r-xl p-3 mb-3 animate-in slide-in-from-bottom-2 duration-150">
+                        <div className="flex-1 min-w-0 pr-4">
+                            <p className="text-[11px] font-black text-purple-700 uppercase tracking-wider mb-0.5">
+                                Respondendo a {replyingTo.senderId === user?.id ? 'Você' : (receiver?.name || receiver?.username || 'Usuário')}
+                            </p>
+                            <p className="text-xs text-gray-600 truncate">
+                                {getReplyPreviewContent(replyingTo)}
+                            </p>
+                        </div>
+                        <button 
+                            onClick={() => setReplyingTo(null)}
+                            className="p-1 hover:bg-purple-100 rounded-full transition-colors text-purple-700 active:scale-95 shrink-0"
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                        </button>
+                    </div>
+                )}
+
+
+
+                {/* Sheet de Preview e Configuração da Mídia */}
+                {selectedFile && userData?.isProfessional && (
+                    <MediaComposerSheet
+                        file={selectedFile}
+                        previewUrl={previewUrl}
+                        isVideo={isVideo}
+                        onCancel={() => {
+                            setSelectedFile(null);
+                            setPreviewUrl(null);
+                        }}
+                        onConfirm={(price, isTemp, expiry, coverFrame) => {
+                                                            sendSelectedMedia(price, isTemp, expiry, coverFrame);
+                        }}
+                    />
+                )}
+
+                <div className="flex items-end gap-3">
+                    {audioRecordingStatus === 'idle' && (
+                        <div className="relative shrink-0">
+                            <button
+                                onClick={() => setAttachMenuVisible(!attachMenuVisible)}
+                                disabled={!connected || !!selectedFile}
+                                className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shrink-0 ${
+                                    attachMenuVisible ? 'bg-purple-600 text-white rotate-45' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                }`}
+                            >
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                    <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                            </button>
+
+                            {attachMenuVisible && (
+                                <>
+                                    <div 
+                                        className="fixed inset-0 z-20" 
+                                        onClick={() => setAttachMenuVisible(false)} 
+                                    />
+                                    <div className="absolute bottom-14 left-0 bg-white rounded-2xl shadow-xl border border-gray-100 w-52 overflow-hidden z-30 animate-in slide-in-from-bottom-2 duration-200">
+                                        <button
+                                            onClick={() => {
+                                                setAttachMenuVisible(false);
+                                                fileInputRef.current?.click();
+                                            }}
+                                            className="flex items-center gap-3 w-full px-4 py-3.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors border-b border-gray-50"
+                                        >
+                                            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                                    <circle cx="8.5" cy="8.5" r="1.5" />
+                                                    <path d="M21 15l-5-5L5 21" />
+                                                </svg>
+                                            </div>
+                                            <span className="font-semibold text-xs">Enviar Foto</span>
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setAttachMenuVisible(false);
+                                                videoFileInputRef.current?.click();
+                                            }}
+                                            className="flex items-center gap-3 w-full px-4 py-3.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                        >
+                                            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <path d="M23 7l-7 5 7 5V7z" />
+                                                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                                                </svg>
+                                            </div>
+                                            <span className="font-semibold text-xs">Enviar Vídeo</span>
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
+                    
+                    {audioRecordingStatus === 'idle' && (
+                        <input type="file" className="hidden" ref={fileInputRef} accept="image/*" onChange={(e) => {
+                            handleFileSelect(e, 'image');
+                        }} />
+                    )}
+                    {audioRecordingStatus === 'idle' && (
+                        <input type="file" className="hidden" ref={videoFileInputRef} accept="video/*" onChange={(e) => {
+                            handleFileSelect(e, 'video');
+                        }} />
+                    )}
+
+                    {audioRecordingStatus === 'idle' && (
+                        <div className="flex-1 min-w-0 flex flex-col justify-center rounded-2xl px-3.5 py-2 min-h-[44px] max-h-[140px] transition-all bg-gray-100">
+                            <textarea
+                                ref={inputRef}
+                                value={selectedFile ? "Mídia selecionada para envio..." : messageText}
+                                disabled={!!selectedFile}
+                                onChange={(e) => handleTyping(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                onFocus={() => setIsInputFocused(true)}
+                                onBlur={() => setIsInputFocused(false)}
+                                placeholder="Digite sua mensagem..."
+                                rows={1}
+                                className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none leading-5 py-0.5 disabled:text-gray-400 disabled:cursor-not-allowed"
+                                style={{ maxHeight: '96px' }}
+                                onInput={(e) => {
+                                    const el = e.currentTarget;
+                                    el.style.height = 'auto';
+                                    el.style.height = Math.min(el.scrollHeight, 96) + 'px';
+                                }}
+                            />
+                            {charCount > 0 && !userData?.isProfessional && receiver?.isProfessional && !monetizationDisabled && currentRate > 0 && (
+                                <div className="flex justify-end w-full pt-0.5 select-none animate-in fade-in duration-150">
+                                    <span
+                                        onClick={() => {
+                                            if (balance < estimatedCostInCents) {
+                                                openRechargeModal({
+                                                    currentBalanceInCents: balance,
+                                                    requiredAmountInCents: estimatedCostInCents,
+                                                });
+                                            }
+                                        }}
+                                        className="text-[10px] font-normal select-none tracking-tight text-gray-400"
+                                    >
+                                        R$ {(estimatedCostInCents / 100).toFixed(2).replace('.', ',')}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    
+                    {(audioRecordingStatus === 'idle' && (messageText.trim() || selectedFile)) ? (
+                        <button
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                                if (isClientToProfessional && balance <= 0) {
+                                    reportMessageAttempt();
+                                    openRechargeModal('ZERO_BALANCE_START');
+                                    return;
+                                }
+
+                                if (selectedFile) {
+                                    sendSelectedMedia(0, false, 60);
+                                } else if (charCount > 0 && !userData?.isProfessional && receiver?.isProfessional && !monetizationDisabled && currentRate > 0 && balance < estimatedCostInCents) {
+                                    openRechargeModal({
+                                        currentBalanceInCents: balance,
+                                        requiredAmountInCents: estimatedCostInCents,
+                                    });
+                                } else {
+                                    handleSend();
+                                }
+                            }}
+                            disabled={(!messageText.trim() && !selectedFile) || !connected}
+                            className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shrink-0 select-none ${
+                                (messageText.trim() || selectedFile) && connected
+                                    ? 'bg-purple-600 hover:bg-purple-700 shadow-sm text-white'
+                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                            }`}
+                        >
+                            {sending ? (
+                                <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                            ) : (
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="currentColor shrink-0">
+                                    <path d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                            )}
+                        </button>
+                    ) : (
+                        <AudioRecorder
+                            connected={connected && userData !== undefined}
+                            onSendAudio={handleSendAudio}
+                            onStatusChange={setAudioRecordingStatus}
+                            maxDurationSeconds={maxAudioDurationSeconds}
+                            confirmBeforeSend={false}
+                            costPerSecondInCents={audioCostPerSecondInCents}
+                            onInsufficientBalance={() => {
+                                if (isClientToProfessional && balance <= 0) {
+                                    reportMessageAttempt();
+                                }
+                                openRechargeModal(
+                                    isClientToProfessional && balance <= 0
+                                        ? 'ZERO_BALANCE_START'
+                                        : (userData?.hasWelcomeCreditEnded
+                                            ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
+                                            : 'Você não tem saldo suficiente para enviar uma mensagem de áudio. Por favor, recarregue sua carteira.')
+                                );
+                            }}
+                        />
+                    )}
+                </div>
+
+
+            </div>
+
+            {giftModalVisible && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm flex flex-col items-center shadow-2xl relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-purple-500 to-pink-500" />
+                        <h3 className="font-bold text-xl text-gray-900 mb-4 tracking-tight">Enviar Presente 🎁</h3>
+                        <div className="w-full relative rounded-2xl overflow-hidden mb-6 aspect-square bg-purple-50 flex items-center justify-center">
+                            <img src="/assets/gift.png" className="w-40 h-40 object-contain animate-bounce" style={{ animationDuration: '3s' }} />
+                        </div>
+                        <div className="w-full relative mb-6">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-gray-400">R$</span>
+                            <input type="number" step="0.01" className="bg-gray-50 border border-gray-100 rounded-2xl p-4 pl-10 w-full text-center text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all" placeholder="Valor" value={giftAmountStr} onChange={e => setGiftAmountStr(e.target.value)} />
+                        </div>
+                        <div className="flex gap-3 w-full">
+                            <button className="flex-1 h-12 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-semibold transition-colors" onClick={() => setGiftModalVisible(false)}>Agora não</button>
+                            <button disabled={sendingGift || !giftAmountStr} className="flex-1 h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-semibold flex justify-center items-center transition-colors shadow-lg shadow-purple-600/30 disabled:opacity-50" onClick={handleSendGift}>
+                                {sendingGift ? (
+                                    <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                    </svg>
+                                ) : "Mimar"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {unlockModalVisible && unlockData && (
+                <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm flex flex-col items-center shadow-2xl relative overflow-hidden animate-in zoom-in duration-200">
+                        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-green-400 to-emerald-500" />
+                        <div className="w-16 h-16 rounded-2xl bg-green-50 flex items-center justify-center text-green-500 mb-4">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+                            </svg>
+                        </div>
+                        <h3 className="font-bold text-xl text-gray-900 mb-2 tracking-tight text-center">
+                            Desbloquear {unlockData.isVideo ? 'Vídeo' : 'Foto'}?
+                        </h3>
+                        <p className="text-gray-500 text-sm text-center mb-6">
+                            Você usará seu saldo para liberar este conteúdo exclusivo permanentemente.
+                        </p>
+                        
+                        <div className="w-full bg-gray-50 rounded-2xl p-4 flex flex-col items-center mb-6 border border-gray-100">
+                            <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1">Custo do desbloqueio</span>
+                            <span className="text-3xl font-black text-gray-900 leading-none">
+                                R$ {(unlockData.price / 100).toFixed(2)}
+                            </span>
+                        </div>
+
+                        <div className="flex gap-3 w-full">
+                            <button 
+                                className="flex-1 h-12 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-bold transition-all active:scale-95" 
+                                onClick={() => { setUnlockModalVisible(false); setUnlockData(null); }}
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                disabled={unlocking}
+                                className="flex-1 h-12 bg-green-500 hover:bg-green-600 text-white rounded-2xl font-bold flex justify-center items-center transition-all shadow-lg shadow-green-500/30 active:scale-95 disabled:opacity-50" 
+                                onClick={confirmUnlock}
+                            >
+                                {unlocking ? (
+                                    <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                    </svg>
+                                ) : "Desbloquear"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+
+            {detailsModalVisible && selectedMessageIds.size === 1 && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center backdrop-blur-sm" onClick={() => setDetailsModalVisible(false)}>
+                    <div className="bg-white rounded-t-[2.5rem] w-full max-w-lg p-8 animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
+                        <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-8" />
+                        
+                        <h3 className="text-2xl font-black text-gray-900 mb-6 tracking-tight">Detalhes da Mensagem</h3>
+                        
+                        {(() => {
+                            const selectedId = Array.from(selectedMessageIds)[0];
+                            const msg = messages.find(m => m._id === selectedId);
+                            if (!msg) return null;
+                            const isMine = msg.senderId === user?.id;
+                            const date = new Date(msg.timestamp);
+                            
+                            return (
+                                <div className="space-y-6">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-gray-50 p-4 rounded-2xl">
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Data</p>
+                                            <p className="font-bold text-gray-900">{date.toLocaleDateString('pt-BR')}</p>
+                                        </div>
+                                        <div className="bg-gray-50 p-4 rounded-2xl">
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Horário</p>
+                                            <p className="font-bold text-gray-900">{date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</p>
+                                        </div>
+                                    </div>
+
+                                    {(() => {
+                                        const isMediaUnlock = msg.lockedImagePrice && msg.lockedImagePrice > 0;
+                                        const showAsDebit = isMediaUnlock ? !isMine : isMine;
+                                        const displayAmount = showAsDebit 
+                                            ? msg.cost 
+                                            : (msg.receiverEarnings ?? msg.cost * 0.9);
+
+                                        return (
+                                            <div className="bg-purple-50 p-5 rounded-[2rem] border border-purple-100">
+                                                <div className="flex justify-between items-center mb-4">
+                                                    <p className="text-xs font-bold text-purple-600 uppercase tracking-widest">
+                                                        {showAsDebit ? 'Seu Investimento' : 'Seu Ganho'}
+                                                    </p>
+                                                    <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${showAsDebit ? 'bg-purple-200 text-purple-700' : 'bg-green-200 text-green-700'}`}>
+                                                        {showAsDebit ? 'Débito' : 'Crédito'}
+                                                    </div>
+                                                </div>
+                                                <p className="text-4xl font-black text-gray-900 tracking-tight">
+                                                    R$ {(displayAmount / 100).toFixed(2)}
+                                                </p>
+                                                <p className="text-[10px] text-gray-500 mt-2 font-medium">
+                                                    {isMediaUnlock ? 'Mídia desbloqueada' : `${msg.charCount} caracteres enviados`}
+                                                </p>
+                                            </div>
+                                        );
+                                    })()}
+
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between text-sm py-2 border-b border-gray-100">
+                                            <span className="text-gray-500">Status</span>
+                                            <span className="font-bold text-gray-900">{msg.isRead ? 'Visualizada' : 'Entregue'}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm py-2 border-b border-gray-100">
+                                            <span className="text-gray-500">ID da Mensagem</span>
+                                            <span className="text-[10px] font-mono text-gray-400">{msg._id}</span>
+                                        </div>
+                                    </div>
+
+                                    <button 
+                                        onClick={() => setDetailsModalVisible(false)}
+                                        className="w-full h-14 bg-gray-900 text-white rounded-2xl font-bold mt-4 hover:bg-gray-800 transition-colors"
+                                    >
+                                        Fechar
+                                    </button>
+                                </div>
+                            );
+                        })()}
+                    </div>
+                </div>
+            )}
+
+            {/* ===== VIEWER FULLSCREEN COM SWIPE ===== */}
+            {fullscreenIndex !== null && mediaItems.length > 0 && (() => {
+                const goPrev = () => setFullscreenIndex(i => (i !== null && i > 0 ? i - 1 : i));
+                const goNext = () => setFullscreenIndex(i => (i !== null && i < mediaItems.length - 1 ? i + 1 : i));
+                const canPrev = fullscreenIndex > 0;
+                const canNext = fullscreenIndex < mediaItems.length - 1;
+
+                const handleTouchStart = (e: React.TouchEvent) => {
+                    swipeTouchStartX.current = e.touches[0].clientX;
+                    swipeTouchStartY.current = e.touches[0].clientY;
+                    swipeLockedRef.current = null;
+                    touchOffsetRef.current = 0;
+                    setTouchOffset(0);
+                    setIsDragging(true);
+                };
+
+                const handleTouchMove = (e: React.TouchEvent) => {
+                    if (swipeTouchStartX.current === null || swipeTouchStartY.current === null) return;
+                    
+                    const deltaX = e.touches[0].clientX - swipeTouchStartX.current;
+                    const deltaY = e.touches[0].clientY - swipeTouchStartY.current;
+                    
+                    // Determina a direção bloqueada na primeira movimentação significativa
+                    if (swipeLockedRef.current === null && (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5)) {
+                        swipeLockedRef.current = Math.abs(deltaX) >= Math.abs(deltaY) ? 'horizontal' : 'vertical';
+                    }
+                    
+                    // Só processa movimento horizontal bloqueado
+                    if (swipeLockedRef.current !== 'horizontal') return;
+                    
+                    let offset = deltaX;
+                    if (!canPrev && deltaX > 0) {
+                        offset = deltaX * 0.3;
+                    } else if (!canNext && deltaX < 0) {
+                        offset = deltaX * 0.3;
+                    }
+                    
+                    touchOffsetRef.current = offset;
+                    setTouchOffset(offset);
+                };
+
+                const handleTouchEnd = () => {
+                    setIsDragging(false);
+                    const threshold = window.innerWidth * 0.08;
+                    const finalOffset = touchOffsetRef.current;
+
+                    touchOffsetRef.current = 0;
+                    setTouchOffset(0);
+                    swipeTouchStartX.current = null;
+                    swipeTouchStartY.current = null;
+                    swipeLockedRef.current = null;
+
+                    if (finalOffset < -threshold && canNext) {
+                        goNext();
+                    } else if (finalOffset > threshold && canPrev) {
+                        goPrev();
+                    }
+                };
+
+                // Toque simples: 3 zonas de 33% cada
+                const handleSlideClick = (e: React.MouseEvent) => {
+                    if (Math.abs(touchOffsetRef.current) > 5) return;
+                    const x = e.clientX;
+                    const w = window.innerWidth;
+                    if (x < w * 0.33) {
+                        if (canPrev) goPrev();
+                    } else if (x > w * 0.67) {
+                        if (canNext) goNext();
+                    } else {
+                        setControlsVisible(v => !v);
+                    }
+                };
+
+                return (
+                    <div
+                        className="fixed inset-0 z-[100] bg-black flex flex-col select-none overflow-hidden"
+                    >
+                        {/* Container dos Slides que preenche tudo */}
+                        <div 
+                            className="absolute inset-0 z-0 overflow-hidden"
+                            onTouchStart={handleTouchStart}
+                            onTouchMove={handleTouchMove}
+                            onTouchEnd={handleTouchEnd}
+                        >
+                            <div 
+                                className="flex h-full absolute top-0 left-0"
+                                style={{
+                                    transform: `translateX(calc(${-fullscreenIndex * 100}vw + ${touchOffset}px))`,
+                                    transition: isDragging ? 'none' : 'transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+                                    width: `${mediaItems.length * 100}vw`
+                                }}
+                            >
+                                {mediaItems.map((item, idx) => (
+                                    <div 
+                                        key={idx} 
+                                        className="h-full flex-shrink-0 flex items-center justify-center"
+                                        style={{ width: '100vw' }}
+                                        onClick={handleSlideClick}
+                                    >
+                                        {item.isVideo ? (
+                                            <VideoPlayer
+                                                key={item.url}
+                                                src={item.url}
+                                                isActive={idx === fullscreenIndex}
+                                                controlsVisible={controlsVisible}
+                                            />
+                                        ) : (
+                                            <img
+                                                key={item.url}
+                                                src={item.url}
+                                                className="max-w-full max-h-full object-contain"
+                                                alt={`Mídia ${idx + 1}`}
+                                            />
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Controles flutuantes — somem após 1s de inatividade */}
+                        <div
+                            className="absolute inset-0 z-20 pointer-events-none"
+                            style={{
+                                opacity: controlsVisible ? 1 : 0,
+                                transition: 'opacity 400ms ease'
+                            }}
+                        >
+                            {/* Topo flutuante */}
+                            <div 
+                                className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pb-2 bg-gradient-to-b from-black/60 to-transparent" 
+                                style={{ paddingTop: 'max(24px, env(safe-area-inset-top))' }}
+                            >
+                                <button
+                                    className="w-10 h-10 rounded-full bg-black/45 flex items-center justify-center text-white hover:bg-black/60 active:scale-95 transition-all pointer-events-auto backdrop-blur-sm"
+                                    onClick={() => setFullscreenIndex(null)}
+                                >
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18"/>
+                                        <line x1="6" y1="6" x2="18" y2="18"/>
+                                    </svg>
+                                </button>
+                                <span className="text-white/80 text-sm font-semibold tracking-wide bg-black/45 px-3 py-1.5 rounded-full backdrop-blur-sm">
+                                    {fullscreenIndex + 1} / {mediaItems.length}
+                                </span>
+                                {(() => {
+                                    const activeItem = mediaItems[fullscreenIndex];
+                                    if (activeItem?.isTemporary && activeItem?.expiresAt) {
+                                        return (
+                                            <div className="pointer-events-auto flex items-center justify-end">
+                                                <TemporaryMediaBadge 
+                                                    expiresAt={activeItem.expiresAt} 
+                                                    className="flex items-center gap-1 bg-black/45 px-2.5 py-1 text-white shadow-sm rounded-full border border-white/10 text-[9px] font-bold uppercase tracking-wider backdrop-blur-sm whitespace-nowrap"
+                                                    onExpire={() => {
+                                                        if (activeItem.messageId) {
+                                                            setMessages(prev => prev.map(m => m._id === activeItem.messageId ? { ...m, isExpired: true } : m));
+                                                        }
+                                                        setFullscreenIndex(null);
+                                                    }}
+                                                />
+                                            </div>
+                                        );
+                                    }
+                                    return <div className="w-10" />;
+                                })()}
+                            </div>
+
+                            {/* Seta esquerda */}
+                            {canPrev && (
+                                <button
+                                    className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/45 hover:bg-black/60 active:scale-95 transition-all flex items-center justify-center text-white backdrop-blur-sm pointer-events-auto"
+                                    onClick={e => { e.stopPropagation(); goPrev(); }}
+                                >
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M15 18l-6-6 6-6"/>
+                                    </svg>
+                                </button>
+                            )}
+
+                            {/* Seta direita */}
+                            {canNext && (
+                                <button
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/45 hover:bg-black/60 active:scale-95 transition-all flex items-center justify-center text-white backdrop-blur-sm pointer-events-auto"
+                                    onClick={e => { e.stopPropagation(); goNext(); }}
+                                >
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M9 18l6-6-6-6"/>
+                                    </svg>
+                                </button>
+                            )}
+
+                            {/* Dots de paginação */}
+                            {mediaItems.length > 1 && mediaItems.length <= 20 && (
+                                <div className="absolute bottom-6 left-0 right-0 flex items-center justify-center gap-1.5 py-2">
+                                    {mediaItems.map((_, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => setFullscreenIndex(i)}
+                                            className={`rounded-full transition-all pointer-events-auto ${
+                                                i === fullscreenIndex
+                                                    ? 'w-5 h-2 bg-white'
+                                                    : 'w-2 h-2 bg-white/30 hover:bg-white/50'
+                                            }`}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* ===== VIEWER FULLSCREEN DEDICADO PARA MÍDIA BLOQUEADA (PROFISSIONAL) ===== */}
+            {fullscreenLockedMessage !== null && (() => {
+                const isVideo = !!fullscreenLockedMessage.isVideo;
+                const mediaUrl = isVideo ? fullscreenLockedMessage.videoUrl : fullscreenLockedMessage.originalImageUrl;
+                
+                return (
+                    <div className="fixed inset-0 z-[100] bg-black flex flex-col select-none overflow-hidden animate-in fade-in duration-200">
+                        {/* Container da mídia */}
+                        <div className="absolute inset-0 z-0 flex items-center justify-center" onClick={() => setControlsVisible(v => !v)}>
+                            {isVideo ? (
+                                <VideoPlayer
+                                    key={mediaUrl}
+                                    src={mediaUrl!}
+                                    isActive={true}
+                                    controlsVisible={controlsVisible}
+                                />
+                            ) : (
+                                <img
+                                    key={mediaUrl}
+                                    src={mediaUrl!}
+                                    className="max-w-full max-h-full object-contain"
+                                    alt="Mídia Bloqueada"
+                                />
+                            )}
+                        </div>
+
+                        {/* Controles flutuantes */}
+                        <div
+                            className="absolute inset-0 z-20 pointer-events-none"
+                            style={{
+                                opacity: controlsVisible ? 1 : 0,
+                                transition: 'opacity 400ms ease'
+                            }}
+                        >
+                            {/* Topo flutuante */}
+                            <div 
+                                className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pb-2 bg-gradient-to-b from-black/60 to-transparent" 
+                                style={{ paddingTop: 'max(24px, env(safe-area-inset-top))' }}
+                            >
+                                <button
+                                    className="w-10 h-10 rounded-full bg-black/45 flex items-center justify-center text-white hover:bg-black/60 active:scale-95 transition-all pointer-events-auto backdrop-blur-sm"
+                                    onClick={() => setFullscreenLockedMessage(null)}
+                                >
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18"/>
+                                        <line x1="6" y1="6" x2="18" y2="18"/>
+                                    </svg>
+                                </button>
+                                
+                                <div className="pointer-events-auto flex items-center gap-1.5 bg-black/55 border border-white/10 px-3 py-1.5 rounded-full backdrop-blur-md shadow-md animate-in fade-in duration-300">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                                    <span className="text-[10px] font-bold text-white uppercase tracking-wider">
+                                        Aguardando Abertura • R$ {((fullscreenLockedMessage.lockedImagePrice || 0) / 100).toFixed(2)}
+                                    </span>
+                                </div>
+                                <div className="w-10" />
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* ===== GALERIA DE MÍDIA (Vaul Drawer) ===== */}
+            <Drawer.Root open={galleryVisible} onOpenChange={setGalleryVisible}>
+                <Drawer.Portal>
+                    <Drawer.Overlay className="fixed inset-0 z-[100] bg-black/60" />
+                    <Drawer.Content className="fixed inset-x-0 bottom-0 z-[101] flex flex-col bg-white rounded-t-[32px] max-h-[78vh] w-full max-w-lg mx-auto outline-none shadow-2xl">
+                        {/* Header Fixo */}
+                        <div className="w-full flex-shrink-0 px-6 pt-6 pb-4 bg-white rounded-t-[32px]">
+                            {/* Handle */}
+                            <div className="mx-auto w-12 h-1.5 rounded-full bg-gray-200 mb-6" />
+
+                            {/* Header */}
+                            <div className="flex items-center justify-between">
+                                <Drawer.Title className="text-xl font-bold text-gray-900">Mídia Compartilhada</Drawer.Title>
+                                <span className="text-sm text-gray-400 font-medium">
+                                    {mediaItems.length === 0
+                                        ? 'Nenhum item'
+                                        : `${mediaItems.length} ${mediaItems.length === 1 ? 'item' : 'itens'}`
+                                    }
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Conteúdo Rolável */}
+                        <div className="w-full flex-1 overflow-y-auto flex flex-col px-6 pb-8 min-h-0">
+
+                            {/* Grid de thumbnails */}
+                            {mediaItems.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-16 gap-4">
+                                    <div className="w-16 h-16 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-300">
+                                        <svg width="28" height="28" viewBox="0 0 18 18" fill="none">
+                                            <rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor"/>
+                                            <rect x="11" y="1" width="6" height="6" rx="1.5" fill="currentColor"/>
+                                            <rect x="1" y="11" width="6" height="6" rx="1.5" fill="currentColor"/>
+                                            <rect x="11" y="11" width="6" height="6" rx="1.5" fill="currentColor"/>
+                                        </svg>
+                                    </div>
+                                    <p className="text-gray-400 text-sm font-medium text-center">
+                                        Nenhuma imagem ou vídeo enviado ainda
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-3 gap-1">
+                                    {mediaItems.map((item, idx) => (
+                                        <button
+                                            key={idx}
+                                            className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 active:opacity-70 transition-opacity"
+                                            onClick={() => {
+                                                setGalleryVisible(false);
+                                                setFullscreenIndex(idx);
+                                            }}
+                                        >
+                                            <img
+                                                src={item.thumbnailUrl || item.url}
+                                                alt={`Mídia ${idx + 1}`}
+                                                className="w-full h-full object-cover"
+                                            />
+                                            {item.isVideo && (
+                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                    <div className="w-8 h-8 rounded-full bg-black/45 backdrop-blur-sm flex items-center justify-center">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
+                                                            <path d="M8 5v14l11-7z"/>
+                                                        </svg>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </Drawer.Content>
+                </Drawer.Portal>
+            </Drawer.Root>
+
+            {/* Modal de crédito promocional (cupom) resgatado */}
+            {couponClaimModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-5 select-none no-select">
+                    <div
+                        className="absolute inset-0 bg-purple-950/35 backdrop-blur-[2px] animate-in fade-in duration-200"
+                        onClick={() => setCouponClaimModal(false)}
+                    />
+                    <div className="relative w-full max-w-[360px] animate-in fade-in slide-in-from-bottom-6 zoom-in-95 duration-300">
+                        <div className="relative overflow-hidden rounded-[28px] border border-purple-100 bg-white text-gray-900 shadow-2xl">
+                            <button
+                                type="button"
+                                aria-label="Fechar"
+                                onClick={() => setCouponClaimModal(false)}
+                                className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-800"
+                            >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+
+                            <div className="h-1.5 bg-gradient-to-r from-purple-600 via-fuchsia-500 to-purple-500" />
+
+                            <div className="px-6 pb-6 pt-7">
+                                <div className="mb-5 flex items-start gap-4">
+                                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 ring-1 ring-purple-100">
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                                            <rect x="2" y="5" width="20" height="14" rx="2" ry="2"></rect>
+                                            <line x1="2" y1="10" x2="22" y2="10"></line>
+                                        </svg>
+                                    </div>
+                                    <div className="min-w-0 pr-7">
+                                        <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-purple-500">Saldo promocional</p>
+                                        <h2 className="text-[22px] font-semibold leading-tight tracking-normal text-gray-900">Crédito liberado para você</h2>
+                                    </div>
+                                </div>
+
+                                <div className="mb-5 rounded-2xl border border-purple-100 bg-purple-50/60 px-5 py-4">
+                                    <div className="flex items-end justify-between gap-4">
+                                        <div>
+                                            <p className="mb-1 text-sm text-gray-500">Valor adicionado</p>
+                                            <p className="text-[42px] font-semibold leading-none tracking-normal text-purple-700">
+                                                {((couponClaimAmount ?? 5000) / 100).toLocaleString('pt-BR', {
+                                                    style: 'currency',
+                                                    currency: 'BRL',
+                                                    maximumFractionDigits: 0,
+                                                })}
+                                            </p>
+                                        </div>
+                                        <svg className="mb-1 shrink-0 text-emerald-500" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                        </svg>
+                                    </div>
+                                    <div className="mt-4 h-px bg-purple-100" />
+                                    <p className="mt-4 text-sm leading-relaxed text-gray-600">
+                                        O valor já entrou no seu saldo e pode ser usado nas conversas e conteúdos do app.
+                                    </p>
+                                </div>
+
+                                <button
+                                    onClick={() => setCouponClaimModal(false)}
+                                    className="w-full rounded-2xl bg-purple-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-purple-600/20 transition-colors hover:bg-purple-700 active:scale-[0.99]"
+                                >
+                                    Continuar no chat
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <LargeMessageConfirmModal
+                isOpen={Boolean(pendingLongMessageToConfirm)}
+                onClose={() => handleDeclineLongMessage(pendingLongMessageToConfirm?._id)}
+                onConfirm={() => {
+                    if (pendingLongMessageToConfirm) {
+                        handleConfirmLongMessage(pendingLongMessageToConfirm);
+                    }
+                }}
+                onRecharge={() => {
+                    if (pendingLongMessageToConfirm) {
+                        const cost = pendingLongMessageToConfirm.receiptChargeCents ?? 0;
+                        handleDeclineLongMessage(pendingLongMessageToConfirm._id);
+                        openRechargeModal({
+                            currentBalanceInCents: balance,
+                            requiredAmountInCents: cost,
+                        });
+                    }
+                }}
+                senderName={receiver?.name || receiver?.username || 'Criadora'}
+                isAudio={Boolean(pendingLongMessageToConfirm?.isAudio || pendingLongMessageToConfirm?.audioUrl)}
+                audioDuration={pendingLongMessageToConfirm?.audioDuration}
+                charCount={pendingLongMessageToConfirm?.equivalentCharCount || pendingLongMessageToConfirm?.charCount || 0}
+                costInCents={pendingLongMessageToConfirm?.receiptChargeCents || 0}
+                userBalanceInCents={balance}
+            />
+
+            <FirstMessageNotificationModal
+                isOpen={showFirstMessageNotifModal}
+                onClose={() => setShowFirstMessageNotifModal(false)}
+                professionalName={receiver?.name || receiver?.username}
+            />
+        </div>
+    );
+}

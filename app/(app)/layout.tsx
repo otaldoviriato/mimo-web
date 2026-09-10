@@ -5,20 +5,21 @@ import { requiresReceiptConsent } from '@/lib/receiptBilling';
 
 import React, { useEffect, useRef } from 'react';
 import { useAuth, useUser } from '@clerk/nextjs';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { setupAxiosInterceptors } from '@/services/api';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { NotificationPromptModal } from '@/components';
 import { StackNavigationProvider, useStackNavigation } from '@/context/StackNavigationContext';
-import { isReservedRoute } from '@/hooks/useTransitionRouter';
+import { isStackBasePath, readStackEntry, resolveStackRoute } from '@/lib/stackHistory';
+import { StackBase } from '@/components/StackBase';
 import { useMyProfile, useChatRooms, QueryKeys } from '@/hooks/useQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSocket } from '@/hooks/useSocket';
 import { usePageTitleNotifications } from '@/hooks/usePageTitleNotifications';
-import ChatPage from './chat/[userId]/page';
-import ChatInfoPage from './chat/[userId]/info/page';
-import UserProfilePage from './[username]/page';
-import SettingsPage from './settings/page';
+import ChatPage from '@/components/screens/ChatScreen';
+import ChatInfoPage from '@/components/screens/ChatInfoScreen';
+import UserProfilePage from '@/components/screens/UserProfileScreen';
+import SettingsPage from '@/components/screens/SettingsScreen';
 import { REFERRAL_STORAGE_KEY, getReferralFromSearchParams } from '@/lib/referral';
 import { calculateOnboardingStep } from '@/lib/onboarding';
 import { consumePostAuthRedirect, storePostAuthRedirect } from '@/lib/postAuthRedirect';
@@ -46,7 +47,9 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
     const { handleRequestPermission } = usePushNotifications();
-    const { screens, popVirtual, pushVirtual } = useStackNavigation();
+    const { screens, basePath, popVirtual, initialize } = useStackNavigation();
+    const searchParams = useSearchParams();
+    const pendingRedirectHandled = useRef(false);
     const screensRef = useRef(screens);
     const [isNavInitialized, setIsNavInitialized] = React.useState(false);
     const [isProfessionalReleased, setIsProfessionalReleased] = React.useState<boolean | null>(null);
@@ -244,131 +247,33 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
 
 
-    // Inicialização de roteamento para Deep Links no carregamento inicial da sessão
+    // Build ancestry and browser entries together before exposing the destination.
     useEffect(() => {
         if (!isLoaded || !isSignedIn || !isFullyCompleted || pathname === '/onboarding') return;
-
-        const initDeepLinkRoute = async () => {
-            if (typeof window === 'undefined') return;
-
-            // Se houver um redirecionamento pendente no localStorage (pós-login), usamos ele!
-            // Usamos localStorage em vez de sessionStorage para sobreviver a redirects OAuth no PWA.
-            const pendingRedirect = localStorage.getItem('mimo_redirect_after_login');
-            if (pendingRedirect) {
-                const safePendingRedirect = consumePostAuthRedirect();
-                
-                // Se o redirecionamento pendente for para configurações, ignoramos para evitar
-                // o redirecionamento incorreto e o bug do botão de voltar para o Google OAuth.
-                if (safePendingRedirect === '/settings' || safePendingRedirect.startsWith('/settings?')) {
-                    setIsNavInitialized(true);
-                    return;
+        let cancelled = false;
+        // Run after Next's parent effects install the public History API adapter.
+        queueMicrotask(() => {
+            if (cancelled) return;
+            let href = window.location.pathname + window.location.search + window.location.hash;
+            if (!pendingRedirectHandled.current) {
+                pendingRedirectHandled.current = true;
+                if (localStorage.getItem('mimo_redirect_after_login')) {
+                    const pending = consumePostAuthRedirect();
+                    if (pending !== href) {
+                        if (resolveStackRoute(pending)) {
+                            href = pending;
+                        } else {
+                            router.replace(pending);
+                            return;
+                        }
+                    }
                 }
-
-                // Se o redirecionamento pendente corresponder exatamente à rota atual, não navegamos novamente para evitar travamentos
-                const currentPath = window.location.pathname;
-                if (safePendingRedirect === currentPath || (safePendingRedirect === '/chats' && currentPath === '/chats')) {
-                    setIsNavInitialized(true);
-                    return;
-                }
-
-                // Marcamos um flag para que o initDeepLinkRoute não reprocesse a URL
-                // depois que o router.replace levar para a nova página (ex: /juaccioli/chat)
-                (window as any).__mimo_handled_pending_redirect = true;
-                (window as any).__mimo_nav_initialized = true;
-                router.replace(safePendingRedirect);
-                // A página [username]/chat tem sua própria tela de loading enquanto resolve o username.
-                // Não precisamos de splash screen extra — inicializamos imediatamente.
-                setIsNavInitialized(true);
-                return;
             }
-
-            // Se já inicializamos o roteamento nesta sessão do app, não repetimos
-            if ((window as any).__mimo_nav_initialized) {
-                setIsNavInitialized(true);
-                return;
-            }
-            (window as any).__mimo_nav_initialized = true;
-
-            const currentPath = window.location.pathname;
-
-            // 1. Caso seja rota de chat: /chat/userId ou /chat/username
-            const chatMatch = currentPath.match(/^\/chat\/([^\/]+)$/);
-            if (chatMatch) {
-                const identifier = chatMatch[1];
-                const giftParam = new URLSearchParams(window.location.search).get('gift');
-                const giftQuery = giftParam ? `&gift=${encodeURIComponent(giftParam)}` : '';
-                // Redireciona fisicamente para /chats com openChat para que o layout abra a tela virtual
-                // por cima de forma consistente e evite o bug de voltar do histórico.
-                router.replace(`/chats?openChat=${identifier}${giftQuery}`);
-                setIsNavInitialized(true);
-                return;
-            }
-
-            // 2. Caso seja rota de configurações: /settings
-            if (currentPath === '/settings') {
-                router.replace('/profile?openSettings=true');
-                setIsNavInitialized(true);
-                return;
-            }
-
-            // 3. Caso seja rota de perfil público: /[username]
-            // ATENÇÃO: Rotas como /juaccioli/chat são tratadas pela própria página [username]/chat.
-            // Aqui tratamos apenas o caso /[username] sem subrotas adicionais.
-            const cleanedPath = currentPath.replace(/^\//, '');
-            // Ignora caminhos com sub-segmentos (ex: juaccioli/chat) — a página cuida disso
-            if (cleanedPath.length > 0 && !cleanedPath.includes('/') && !isReservedRoute(currentPath)) {
-                const username = cleanedPath.replace(/^@/, '');
-                router.replace(`/chats?openProfile=${username}`);
-                setIsNavInitialized(true);
-                return;
-            }
-
-            // Se for uma rota base ou qualquer outra, apenas inicializa
+            initialize(href);
             setIsNavInitialized(true);
-        };
-
-        initDeepLinkRoute();
-    }, [isLoaded, isSignedIn]);
-
-    // Escuta parâmetros de busca (query params) para abrir salas de chat ou perfis virtuais
-    useEffect(() => {
-        if (typeof window === 'undefined' || !isNavInitialized) return;
-
-        const params = new URLSearchParams(window.location.search);
-        const openChatId = params.get('openChat');
-        const openProfileUsername = params.get('openProfile');
-        const openSettings = params.get('openSettings');
-        const giftCode = params.get('gift');
-
-        if (openChatId) {
-            // Remove os query params da URL silenciosamente para não reabrir o chat ao atualizar a página
-            const url = new URL(window.location.href);
-            url.searchParams.delete('openChat');
-            url.searchParams.delete('gift');
-            window.history.replaceState({}, '', url.pathname + url.search);
-
-            const isClerk = openChatId.startsWith('user_');
-            pushVirtual('chat', {
-                userId: openChatId,
-                username: !isClerk ? openChatId : undefined,
-                giftCode: giftCode || undefined
-            });
-        } else if (openProfileUsername) {
-            // Remove os query params da URL silenciosamente para não reabrir o perfil ao atualizar a página
-            const url = new URL(window.location.href);
-            url.searchParams.delete('openProfile');
-            window.history.replaceState({}, '', url.pathname + url.search);
-
-            pushVirtual('profile', { username: openProfileUsername });
-        } else if (openSettings) {
-            // Remove os query params da URL silenciosamente para não reabrir as configurações ao atualizar a página
-            const url = new URL(window.location.href);
-            url.searchParams.delete('openSettings');
-            window.history.replaceState({}, '', url.pathname + url.search);
-
-            pushVirtual('settings', {});
-        }
-    }, [pathname, isNavInitialized, pushVirtual]);
+        });
+        return () => { cancelled = true; };
+    }, [isLoaded, isSignedIn, isFullyCompleted, pathname, searchParams, initialize, router]);
 
     useEffect(() => {
         // Se a rota for o chat, deixamos a própria página de chat gerenciar a resolução
@@ -495,7 +400,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             isFullyCompleted &&
             roomsLoaded &&
             !userData?.isProfessional &&
-            pathname === '/chats'
+            pathname === '/chats' &&
+            !readStackEntry(window.history.state)
         ) {
             const hasPostLoginFlag = typeof window !== 'undefined' && localStorage.getItem('mimo_post_login_check_rooms') === 'true';
             const hasNotNavigatedYet = typeof window !== 'undefined' && !sessionStorage.getItem('mimo_has_navigated_chats');
@@ -529,6 +435,10 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     // (flash visual). A leitura de localStorage é segura aqui porque este componente
     // é 'use client' e nunca executa no servidor.
     //
+    if (!shouldBlockAppRender && !isNavInitialized) {
+        return <div className="min-h-screen bg-slate-50" role="status" aria-label="Carregando tela" />;
+    }
+
     if (shouldBlockAppRender) {
         return (
             <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gradient-to-br from-[#4C1D95] via-[#6D28D9] to-[#8B5CF6] select-none">
@@ -545,8 +455,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
     return (
         <div className="bg-slate-50 min-h-screen w-full relative overflow-hidden">
-            <div className={isProfessionalReleased === false ? 'opacity-0 pointer-events-none' : 'opacity-100 transition-opacity duration-500'}>
-                {children}
+            <div inert={screens.length > 0} aria-hidden={screens.length > 0 || undefined} className={isProfessionalReleased === false ? 'opacity-0 pointer-events-none' : 'opacity-100 transition-opacity duration-500'}>
+                {basePath || isStackBasePath(pathname) ? <StackBase path={basePath || pathname} active={screens.every(screen => screen.isClosing)} /> : children}
             </div>
 
             {/* Animação Premium de Acesso Liberado */}
@@ -586,11 +496,14 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             
             {/* Pilha de Telas Virtuais */}
             {screens.map((screen) => {
+                if (!screen.mounted) return null;
                 const isClosing = screen.isClosing;
-                const animationClass = isClosing ? 'animate-android-slide-out' : 'animate-android-slide-in';
+                const animationClass = isClosing ? 'animate-android-slide-out' : screen.animate ? 'animate-android-slide-in' : '';
                 return (
                     <div
                         key={screen.key}
+                        inert={screen !== screens[screens.length - 1] || !!screen.isClosing}
+                        aria-hidden={screen !== screens[screens.length - 1] || !!screen.isClosing || undefined}
                         className={`fixed inset-0 z-50 w-full h-full bg-white select-none no-select ${animationClass}`}
                     >
                         {screen.type === 'chat' && (

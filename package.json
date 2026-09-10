@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:navigation": "node scripts/test-stack-navigation.cjs",
+    "test:navigation:browser": "next dev tests/navigation-browser --webpack --hostname 127.0.0.1 --port 3010"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.2.1",

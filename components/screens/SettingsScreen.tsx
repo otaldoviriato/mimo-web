@@ -1,0 +1,1221 @@
+'use client';
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useUser, useClerk } from '@clerk/nextjs';
+import { useTransitionRouter } from '@/hooks/useTransitionRouter';
+import { useMyProfile, useUpdateProfile } from '@/hooks/useQueries';
+import { usePWA } from '@/context/PWAContext';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { formatCPF, formatPhone } from '@/components/RechargeModal';
+import Link from 'next/link';
+import { ShieldCheck, RefreshCw, AlertCircle, Lock, Pencil, ChevronRight, CircleDollarSign, Loader2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { clearMimoClientSession } from '@/lib/clientSession';
+import toast from 'react-hot-toast';
+
+function SkeletonField() {
+    return (
+        <div className="px-4 py-3.5 border-b border-gray-50 animate-pulse">
+            <div className="h-3 w-20 bg-gray-200 rounded mb-2" />
+            <div className="h-5 w-40 bg-gray-100 rounded" />
+        </div>
+    );
+}
+
+const formatDate = (dateString?: string | Date) => {
+    if (!dateString) return '';
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return '';
+        const day = String(date.getUTCDate()).padStart(2, '0');
+        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const year = date.getUTCFullYear();
+        return `${day}/${month}/${year}`;
+    } catch {
+        return '';
+    }
+};
+
+const BRAZILIAN_STATES = [
+    { uf: 'AC', name: 'Acre' },
+    { uf: 'AL', name: 'Alagoas' },
+    { uf: 'AP', name: 'Amapá' },
+    { uf: 'AM', name: 'Amazonas' },
+    { uf: 'BA', name: 'Bahia' },
+    { uf: 'CE', name: 'Ceará' },
+    { uf: 'DF', name: 'Distrito Federal' },
+    { uf: 'ES', name: 'Espírito Santo' },
+    { uf: 'GO', name: 'Goiás' },
+    { uf: 'MA', name: 'Maranhão' },
+    { uf: 'MT', name: 'Mato Grosso' },
+    { uf: 'MS', name: 'Mato Grosso do Sul' },
+    { uf: 'MG', name: 'Minas Gerais' },
+    { uf: 'PA', name: 'Pará' },
+    { uf: 'PB', name: 'Paraíba' },
+    { uf: 'PR', name: 'Paraná' },
+    { uf: 'PE', name: 'Pernambuco' },
+    { uf: 'PI', name: 'Piauí' },
+    { uf: 'RJ', name: 'Rio de Janeiro' },
+    { uf: 'RN', name: 'Rio Grande do Norte' },
+    { uf: 'RS', name: 'Rio Grande do Sul' },
+    { uf: 'RO', name: 'Rondônia' },
+    { uf: 'RR', name: 'Roraima' },
+    { uf: 'SC', name: 'Santa Catarina' },
+    { uf: 'SP', name: 'São Paulo' },
+    { uf: 'SE', name: 'Sergipe' },
+    { uf: 'TO', name: 'Tocantins' },
+];
+
+const formatPriceBRL = (value: string | number) => {
+    let valStr = '';
+    if (typeof value === 'number') {
+        valStr = value.toFixed(2).replace(/\D/g, '');
+    } else {
+        valStr = value.replace(/\D/g, '');
+    }
+    if (!valStr || valStr === '00') return 'R$ 0,00';
+    valStr = valStr.replace(/^0+/, '');
+    if (valStr.length < 3) {
+        valStr = valStr.padStart(3, '0');
+    }
+    const cents = valStr.slice(-2);
+    const whole = valStr.slice(0, -2);
+    const formattedWhole = parseInt(whole, 10).toLocaleString('pt-BR');
+    return `R$ ${formattedWhole},${cents}`;
+};
+
+interface SettingsPageProps {
+    isSubPage?: boolean;
+    onBack?: () => void;
+    isClosing?: boolean;
+}
+
+export default function SettingsPage({ isSubPage = false, onBack, isClosing = false }: SettingsPageProps) {
+    const { user } = useUser();
+    const { signOut } = useClerk();
+    const router = useTransitionRouter();
+    const queryClient = useQueryClient();
+    const { isInstallable, promptInstall, mounted, isStandalone } = usePWA();
+    const { permission: notificationPermission, handleRequestPermission } = usePushNotifications();
+
+    const { data: userData, isLoading: loadingProfile } = useMyProfile();
+    const updateProfileMutation = useUpdateProfile();
+
+    const [username, setUsername] = useState('');
+    const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+    const usernameCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [name, setName] = useState('');
+    const [taxId, setTaxId] = useState('');
+    const [phone, setPhone] = useState('');
+    const [subscriptionPrice, setSubscriptionPrice] = useState('');
+    const [isSubscriptionEnabled, setIsSubscriptionEnabled] = useState(false);
+    const [bio, setBio] = useState('');
+    const [hideFromExplore, setHideFromExplore] = useState(false);
+    const [savingHideFromExplore, setSavingHideFromExplore] = useState(false);
+    
+    const [loading, setLoading] = useState(false);
+    const [saveError, setSaveError] = useState('');
+    const [saveSuccess, setSaveSuccess] = useState(false);
+    const [loadingSubscription, setLoadingSubscription] = useState(false);
+    const [saveSubscriptionError, setSaveSubscriptionError] = useState('');
+    const [saveSubscriptionSuccess, setSaveSubscriptionSuccess] = useState(false);
+    const [isAboutExpanded, setIsAboutExpanded] = useState(false);
+    const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(true);
+    const [savingEmailPref, setSavingEmailPref] = useState(false);
+    const [newUserNotificationsEnabled, setNewUserNotificationsEnabled] = useState(false);
+    const [savingNewUserPref, setSavingNewUserPref] = useState(false);
+    const [isSecurityExpanded, setIsSecurityExpanded] = useState(false);
+    const [accountAction, setAccountAction] = useState<'suspend' | 'delete' | null>(null);
+    const [accountActionLoading, setAccountActionLoading] = useState(false);
+    const [accountActionError, setAccountActionError] = useState('');
+
+    const [birthDate, setBirthDate] = useState('');
+    const [state, setState] = useState('');
+    const [city, setCity] = useState('');
+    const [citiesList, setCitiesList] = useState<string[]>([]);
+    const [loadingCities, setLoadingCities] = useState(false);
+    const [citySearchQuery, setCitySearchQuery] = useState('');
+    const [showCityDropdown, setShowCityDropdown] = useState(false);
+
+    const hasPopulated = useRef(false);
+
+    // Resolve a transição de visualização imediatamente para não travar a animação de slide-in
+    useEffect(() => {
+        if (typeof window !== 'undefined' && (window as any).__resolveTransition) {
+            (window as any).__resolveTransition();
+            (window as any).__resolveTransition = null;
+        }
+    }, []);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && window.location.hash === '#subscription') {
+            const timer = setTimeout(() => {
+                const element = document.getElementById('subscription');
+                element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 350);
+            return () => clearTimeout(timer);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (userData && !hasPopulated.current) {
+            setUsername(userData.username || '');
+            setName(userData.name || '');
+            setTaxId(userData.taxId ? formatCPF(userData.taxId) : '');
+            setPhone(userData.phone ? formatPhone(userData.phone) : '');
+            setSubscriptionPrice(userData.subscriptionPrice ? formatPriceBRL(userData.subscriptionPrice) : 'R$ 0,00');
+            setIsSubscriptionEnabled(userData.isSubscriptionEnabled ?? false);
+            setBio(userData.bio || '');
+            setEmailNotificationsEnabled(userData.emailNotificationsEnabled ?? true);
+            setNewUserNotificationsEnabled(userData.newUserNotificationsEnabled ?? false);
+            setHideFromExplore(userData.hideFromExplore === true);
+            setBirthDate(userData.birthDate ? new Date(userData.birthDate).toISOString().split('T')[0] : '');
+            setState(userData.state || '');
+            setCity(userData.city || '');
+            setCitySearchQuery(userData.city || '');
+            hasPopulated.current = true;
+        }
+    }, [userData]);
+
+    useEffect(() => {
+        if (userData) {
+            if (userData.emailNotificationsEnabled !== undefined) {
+                setEmailNotificationsEnabled(userData.emailNotificationsEnabled);
+            }
+            if (userData.newUserNotificationsEnabled !== undefined) {
+                setNewUserNotificationsEnabled(userData.newUserNotificationsEnabled);
+            }
+            if (userData.hideFromExplore !== undefined) {
+                setHideFromExplore(userData.hideFromExplore === true);
+            }
+        }
+    }, [userData?.emailNotificationsEnabled, userData?.newUserNotificationsEnabled, userData?.hideFromExplore]);
+
+    useEffect(() => {
+        if (!state) {
+            setCitiesList([]);
+            return;
+        }
+
+        const fetchCities = async () => {
+            setLoadingCities(true);
+            try {
+                const response = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${state}/municipios`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const names = data.map((item: any) => item.nome).sort((a: string, b: string) => a.localeCompare(b));
+                    setCitiesList(names);
+                }
+            } catch (err) {
+                console.error('Erro ao buscar cidades do IBGE:', err);
+            } finally {
+                setLoadingCities(false);
+            }
+        };
+
+        fetchCities();
+    }, [state]);
+
+    const handleSaveAll = async () => {
+        if (usernameStatus === 'checking') {
+            setSaveError('Aguarde a verificação do nome de usuário.');
+            return;
+        }
+        if (usernameStatus === 'taken') {
+            setSaveError('Este nome de usuário já está em uso. Escolha outro.');
+            return;
+        }
+
+        setLoading(true);
+        setSaveError('');
+        setSaveSuccess(false);
+
+        try {
+            const updateData: any = {
+                name: name.trim(),
+                username: username.trim(),
+                city: city ? city.trim() : '',
+                state: state ? state.trim() : '',
+            };
+
+            await updateProfileMutation.mutateAsync(updateData);
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 3000);
+        } catch (error: any) {
+            if (error.response?.status === 409) {
+                setSaveError('Nome de usuário já está em uso');
+            } else {
+                setSaveError('Erro ao salvar alterações');
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSaveSubscription = async () => {
+        setLoadingSubscription(true);
+        setSaveSubscriptionError('');
+        setSaveSubscriptionSuccess(false);
+
+        try {
+            const limitMax = userData?.maxSubscriptionPrice ?? 200;
+            const limitMin = userData?.minSubscriptionPrice ?? 10;
+            const price = Number(subscriptionPrice.replace(/\D/g, '')) / 100;
+
+            if (isSubscriptionEnabled) {
+                if (price <= 0) {
+                    setSaveSubscriptionError('O preço da assinatura deve ser maior que zero');
+                    setLoadingSubscription(false);
+                    return;
+                }
+                if (price < limitMin) {
+                    setSaveSubscriptionError(`O preço da assinatura não pode ser menor que o valor mínimo de R$ ${limitMin.toFixed(2)}`);
+                    setLoadingSubscription(false);
+                    return;
+                }
+            }
+
+            if (price > limitMax) {
+                setSaveSubscriptionError(`O preço da assinatura não pode ser maior que R$ ${limitMax.toFixed(2)}`);
+                setLoadingSubscription(false);
+                return;
+            }
+
+            const updateData: any = {
+                isSubscriptionEnabled,
+                subscriptionPrice: price
+            };
+
+            await updateProfileMutation.mutateAsync(updateData);
+            setSaveSubscriptionSuccess(true);
+            setTimeout(() => setSaveSubscriptionSuccess(false), 3000);
+        } catch (error: any) {
+            setSaveSubscriptionError('Erro ao salvar alterações de assinatura');
+        } finally {
+            setLoadingSubscription(false);
+        }
+    };
+    const handleLogout = async () => {
+        if (confirm('Tem certeza que deseja sair da sua conta?')) {
+            clearMimoClientSession(queryClient);
+            await signOut(() => router.replace('/login'));
+        }
+    };
+
+    const closeAccountActionModal = () => {
+        if (accountActionLoading) return;
+        setAccountAction(null);
+        setAccountActionError('');
+    };
+
+    const handleAccountActionConfirm = async () => {
+        if (!accountAction) return;
+
+        setAccountActionLoading(true);
+        setAccountActionError('');
+
+        try {
+            const response = await fetch('/api/users/me/account', {
+                method: accountAction === 'suspend' ? 'PATCH' : 'DELETE',
+            });
+
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || 'Não foi possível concluir a ação.');
+            }
+
+            clearMimoClientSession(queryClient);
+            try {
+                await signOut();
+            } catch (signOutErr) {
+                console.warn('Aviso no signOut pós-exclusão:', signOutErr);
+            }
+            router.replace('/login');
+        } catch (error: any) {
+            setAccountActionError(error.message || 'Não foi possível concluir a ação.');
+        } finally {
+            setAccountActionLoading(false);
+        }
+    };
+
+    const initialUsername = userData?.username || '';
+
+    const checkUsernameAvailability = useCallback(async (val: string) => {
+        if (!val || val === initialUsername || val.length < 2 || !/^[a-z0-9._-]+$/.test(val)) {
+            setUsernameStatus('idle');
+            return;
+        }
+        setUsernameStatus('checking');
+        try {
+            const res = await fetch(`/api/users/check-username?username=${encodeURIComponent(val)}`);
+            if (!res.ok) {
+                setUsernameStatus('idle');
+                return;
+            }
+            const data = await res.json();
+            setUsernameStatus(data.available ? 'available' : 'taken');
+        } catch {
+            setUsernameStatus('idle');
+        }
+    }, [initialUsername]);
+
+    const handleUsernameChange = (value: string) => {
+        const clean = value.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+        setUsername(clean);
+        setUsernameStatus('idle');
+        if (usernameCheckTimerRef.current) clearTimeout(usernameCheckTimerRef.current);
+        usernameCheckTimerRef.current = setTimeout(() => checkUsernameAvailability(clean), 450);
+    };
+
+    const profileIsProfessional = !!userData?.isProfessional;
+
+    const initialName = userData?.name || '';
+    const initialPhone = userData?.phone ? formatPhone(userData?.phone) : '';
+    const initialBio = userData?.bio || '';
+    const initialBirthDate = userData?.birthDate ? new Date(userData.birthDate).toISOString().split('T')[0] : '';
+    const initialCity = userData?.city || '';
+    const initialState = userData?.state || '';
+
+    const hasPersonalChanges =
+        name !== initialName ||
+        username !== initialUsername ||
+        city !== initialCity ||
+        state !== initialState;
+
+    const initialSubscriptionPrice = userData?.subscriptionPrice ?? 0;
+    const initialIsSubscriptionEnabled = userData?.isSubscriptionEnabled ?? false;
+
+    const currentSubscriptionPriceClean = Number(subscriptionPrice.replace(/\D/g, '')) / 100;
+
+    const hasSubscriptionChanges =
+        profileIsProfessional && (
+            currentSubscriptionPriceClean !== initialSubscriptionPrice ||
+            isSubscriptionEnabled !== initialIsSubscriptionEnabled
+        );
+
+    const layoutClass = isSubPage
+        ? 'w-full h-full'
+        : 'min-h-screen w-full';
+
+    return (
+        <div className={`bg-gray-50 flex flex-col overflow-y-auto ${layoutClass}`}>
+            {/* Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between sticky top-0 z-20 shadow-md">
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => {
+                            if (isSubPage && onBack) {
+                                onBack();
+                            } else {
+                                router.back();
+                            }
+                        }}
+                        className="text-white hover:bg-white/10 transition-colors p-2 -ml-2 rounded-full flex items-center justify-center"
+                        title="Voltar"
+                    >
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                    </button>
+                    <h1 className="text-2xl font-black text-white tracking-tighter">Mimo</h1>
+                    <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">Configurações</span>
+                </div>
+            </div>
+
+            <div className="p-4 flex flex-col gap-4 max-w-md w-full mx-auto pb-12">
+                {loadingProfile && !userData ? (
+                    <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Dados do Perfil</p>
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                            <SkeletonField />
+                            <SkeletonField />
+                            <SkeletonField />
+                            <SkeletonField />
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        {/* ── ATALHO: EDITAR PERFIL (Profissionais) ── */}
+                        {profileIsProfessional && (
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Perfil</p>
+                                <div 
+                                    onClick={() => router.push('/profile/edit')}
+                                    className="bg-white rounded-2xl border border-gray-100 shadow-xs p-4 flex items-center justify-between hover:border-purple-200 active:scale-[0.99] transition-all cursor-pointer group"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0 text-purple-600 group-hover:scale-105 transition-transform">
+                                            <Pencil className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-bold text-gray-900 group-hover:text-purple-700 transition-colors">Editar Perfil</h3>
+                                            <p className="text-xs text-gray-400">Fotos do perfil, biografia e galeria privada</p>
+                                        </div>
+                                    </div>
+                                    <ChevronRight className="w-5 h-5 text-gray-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── SEÇÃO: INFORMAÇÕES PESSOAIS (Nome, Username, Localização) ── */}
+                        <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Informações Pessoais</p>
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-50">
+                                {/* Nome de exibição */}
+                                <div className="px-4 py-3.5">
+                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Nome de Exibição</label>
+                                    <input
+                                        className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
+                                        placeholder="Seu nome ou apelido"
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                    />
+                                </div>
+
+                                {/* Username */}
+                                <div className="px-4 py-3.5">
+                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Username</label>
+                                    <div className="flex items-center gap-1">
+                                        <span className="text-sm text-gray-300 select-none">@</span>
+                                        <input
+                                            className="flex-1 text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
+                                            placeholder="username"
+                                            value={username}
+                                            onChange={(e) => handleUsernameChange(e.target.value)}
+                                            autoCapitalize="none"
+                                            autoCorrect="off"
+                                        />
+                                        {usernameStatus === 'checking' && (
+                                            <RefreshCw className="animate-spin w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                        )}
+                                        {usernameStatus === 'available' && (
+                                            <span className="text-[11px] font-bold text-emerald-600">Disponível</span>
+                                        )}
+                                        {usernameStatus === 'taken' && (
+                                            <span className="text-[11px] font-bold text-rose-500">Em uso</span>
+                                        )}
+                                    </div>
+                                    {usernameStatus === 'taken' && (
+                                        <p className="text-[10px] font-semibold text-rose-500 mt-1">Este nome de usuário já está em uso</p>
+                                    )}
+                                </div>
+
+                                {/* Estado */}
+                                <div className="px-4 py-3.5">
+                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Estado (Naturalidade)</label>
+                                    <select
+                                        value={state}
+                                        onChange={(e) => {
+                                            setState(e.target.value);
+                                            setCity('');
+                                            setCitySearchQuery('');
+                                        }}
+                                        className="w-full text-sm text-gray-900 font-medium bg-transparent focus:outline-none cursor-pointer"
+                                    >
+                                        <option value="">Selecione seu Estado</option>
+                                        {BRAZILIAN_STATES.map(s => (
+                                            <option key={s.uf} value={s.uf}>{s.name} ({s.uf})</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Cidade */}
+                                <div className="px-4 py-3.5">
+                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Cidade / Município</label>
+                                    <input
+                                        placeholder="Digite sua cidade"
+                                        className="w-full text-sm text-gray-900 font-medium bg-transparent focus:outline-none"
+                                        value={city}
+                                        onChange={(e) => setCity(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Botão Salvar Informações Pessoais */}
+                            {(hasPersonalChanges || loading || saveSuccess || saveError) && (
+                                <div className="mt-2 flex flex-col gap-2">
+                                    {saveError && (
+                                        <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-100 rounded-xl">
+                                            <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                                            <p className="text-xs text-red-600 font-medium">{saveError}</p>
+                                        </div>
+                                    )}
+                                    {saveSuccess && (
+                                        <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-100 rounded-xl">
+                                            <span className="text-xs text-green-700 font-medium">Informações salvas com sucesso!</span>
+                                        </div>
+                                    )}
+                                    {hasPersonalChanges && (
+                                        <button
+                                            onClick={handleSaveAll}
+                                            disabled={loading}
+                                            className="w-full h-10 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white text-sm font-semibold transition-all shadow-sm active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+                                        >
+                                            {loading ? (
+                                                <RefreshCw className="animate-spin w-4 h-4 text-white" />
+                                            ) : (
+                                                <span>Salvar Dados Pessoais</span>
+                                            )}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ── SEÇÃO: DADOS DE CADASTRO (Bloqueados) ── */}
+                        <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Dados de Cadastro (Bloqueados)</p>
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-50">
+                                <div className="px-4 py-3.5 bg-slate-50/60">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">E-mail</label>
+                                        <span className="text-[9px] font-bold text-gray-400 bg-gray-200/70 px-2 py-0.5 rounded-full flex items-center gap-1 border border-gray-300/40 select-none">
+                                            <Lock className="w-2.5 h-2.5 text-gray-500" />
+                                            Bloqueado
+                                        </span>
+                                    </div>
+                                    <input
+                                        className="w-full text-sm text-gray-600 font-semibold bg-transparent focus:outline-none cursor-not-allowed select-none"
+                                        value={userData?.email || ''}
+                                        readOnly
+                                        disabled
+                                    />
+                                </div>
+
+                                <div className="px-4 py-3.5 bg-slate-50/60">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">CPF</label>
+                                        <span className="text-[9px] font-bold text-gray-400 bg-gray-200/70 px-2 py-0.5 rounded-full flex items-center gap-1 border border-gray-300/40 select-none">
+                                            <Lock className="w-2.5 h-2.5 text-gray-500" />
+                                            Bloqueado
+                                        </span>
+                                    </div>
+                                    <input
+                                        className="w-full text-sm text-gray-600 font-semibold bg-transparent focus:outline-none cursor-not-allowed select-none"
+                                        placeholder="Não informado"
+                                        value={taxId}
+                                        readOnly
+                                        disabled
+                                    />
+                                </div>
+
+                                <div className="px-4 py-3.5 bg-slate-50/60">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Data de Nascimento</label>
+                                        <span className="text-[9px] font-bold text-gray-400 bg-gray-200/70 px-2 py-0.5 rounded-full flex items-center gap-1 border border-gray-300/40 select-none">
+                                            <Lock className="w-2.5 h-2.5 text-gray-500" />
+                                            Bloqueado
+                                        </span>
+                                    </div>
+                                    <input
+                                        className="w-full text-sm text-gray-600 font-semibold bg-transparent focus:outline-none cursor-not-allowed select-none"
+                                        value={birthDate ? formatDate(birthDate) : 'Não informada'}
+                                        readOnly
+                                        disabled
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ── SEÇÃO: VERIFICAÇÃO DE IDENTIDADE (Exibida apenas se NÃO for verificado) ── */}
+                        {profileIsProfessional && userData?.identityStatus !== 'approved' && (
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Verificação de Identidade (Selo de Verificado)</p>
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-4 space-y-3.5">
+                                {userData?.identityStatus === 'approved' ? (
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0 text-purple-600">
+                                            <ShieldCheck className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                                                Identidade Verificada
+                                            </h4>
+                                            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                                                Parabéns! Seu perfil foi verificado com sucesso e você possui o selo de autenticidade ao lado do seu nome.
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : userData?.identityStatus === 'pending' ? (
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0 text-amber-600">
+                                            <RefreshCw className="w-5 h-5 animate-spin" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-bold text-gray-900">Sob Análise</h4>
+                                            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                                                Seus documentos foram enviados e estão sendo analisados pela nossa equipe. Esse processo costuma levar até 48 horas.
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : userData?.identityStatus === 'rejected' ? (
+                                    <div className="space-y-3">
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-red-50 border border-red-100 flex items-center justify-center shrink-0 text-red-600">
+                                                <AlertCircle className="w-5 h-5" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="text-sm font-bold text-gray-900">Verificação Rejeitada</h4>
+                                                <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                                                    Infelizmente não foi possível validar seus documentos.
+                                                </p>
+                                                {userData?.notes && (
+                                                    <div className="mt-2 bg-red-50/55 border border-red-100 rounded-xl p-3">
+                                                        <p className="text-[11px] font-bold text-red-800 uppercase tracking-wider">Motivo:</p>
+                                                        <p className="text-xs text-red-700 mt-0.5 leading-relaxed italic">"{userData.notes}"</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => router.push('/verificacao-identidade')}
+                                            className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition-all active:scale-[0.99] flex items-center justify-center gap-1.5 cursor-pointer shadow-sm shadow-purple-600/10"
+                                        >
+                                            <RefreshCw className="w-3.5 h-3.5" />
+                                            Reenviar Documentos
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0 text-purple-600">
+                                                <ShieldCheck className="w-5 h-5" />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-sm font-bold text-gray-900">Verifique seu Perfil</h4>
+                                                <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                                                    Envie seus documentos de identificação para obter o selo de verificado ao lado do seu nome, mostrando a todos que seu perfil é autêntico.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => router.push('/verificacao-identidade')}
+                                            className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 text-white font-extrabold rounded-xl text-xs transition-all active:scale-[0.99] flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-purple-600/10"
+                                        >
+                                            <ShieldCheck className="w-3.5 h-3.5" />
+                                            Verificar Identidade
+                                        </button>
+                                    </div>
+                                )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── SEÇÃO: PREÇOS E GANHOS (Profissionais) ── */}
+                        {/* ── CARD 1: OFERECER ASSINATURA ── */}
+                        {profileIsProfessional && (
+                            <div id="subscription">
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Oferecer Assinatura</p>
+                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-50">
+                                    {/* Toggle Habilitar Assinatura */}
+                                    <div className="px-4 py-3.5 flex items-center justify-between">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-8 h-8 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-500">
+                                                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>
+                                                </svg>
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium text-gray-800">Oferecer Assinatura</p>
+                                                <p className="text-[10px] text-gray-400 leading-snug">
+                                                    Permita que os usuários assinem seu perfil para acessar sua galeria privada
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            id="subscription-enabled-toggle"
+                                            type="button"
+                                            onClick={() => setIsSubscriptionEnabled(!isSubscriptionEnabled)}
+                                            className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${
+                                                isSubscriptionEnabled ? 'bg-purple-600' : 'bg-gray-200'
+                                            }`}
+                                            aria-label="Habilitar assinatura no perfil"
+                                            role="switch"
+                                            aria-checked={isSubscriptionEnabled}
+                                        >
+                                            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                                                isSubscriptionEnabled ? 'translate-x-5' : 'translate-x-0'
+                                            }`} />
+                                        </button>
+                                    </div>
+
+                                    {/* Preço da Assinatura e Desconto (Exibe apenas se habilitado) */}
+                                    {isSubscriptionEnabled && (
+                                        <>
+                                            <div className="px-4 py-3.5 bg-slate-50/30 transition-all">
+                                                <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Preço da Assinatura Mensal</label>
+                                                <input
+                                                    className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
+                                                    placeholder="R$ 0,00"
+                                                    value={subscriptionPrice}
+                                                    onChange={(e) => setSubscriptionPrice(formatPriceBRL(e.target.value))}
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                />
+                                                <div className="flex flex-col gap-0.5 mt-1">
+                                                    <span className="text-[9px] text-gray-400">
+                                                        Valor mínimo permitido: R$ {(userData?.minSubscriptionPrice ?? 10).toFixed(2)}
+                                                    </span>
+                                                    <span className="text-[9px] text-gray-400">
+                                                        Valor máximo permitido: R$ {(userData?.maxSubscriptionPrice ?? 200).toFixed(2)}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                        </>
+                                    )}
+
+                                    {/* Botão Salvar Assinatura */}
+                                    {(hasSubscriptionChanges || loadingSubscription || saveSubscriptionSuccess || saveSubscriptionError) && (
+                                        <div className="px-4 pb-5 pt-3.5 flex flex-col gap-2 bg-white">
+                                            {saveSubscriptionError && (
+                                                <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-100 rounded-xl">
+                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                                    <p className="text-xs text-red-600 font-medium">{saveSubscriptionError}</p>
+                                                </div>
+                                            )}
+                                            {saveSubscriptionSuccess && (
+                                                <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-100 rounded-xl">
+                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-600 shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
+                                                    <p className="text-xs text-green-700 font-medium">Assinatura atualizada com sucesso</p>
+                                                </div>
+                                            )}
+                                            {(hasSubscriptionChanges || loadingSubscription) && (
+                                                <button
+                                                    onClick={handleSaveSubscription}
+                                                    disabled={loadingSubscription || !hasSubscriptionChanges}
+                                                    className="w-full h-10 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors active:scale-[0.98] flex items-center justify-center gap-2"
+                                                >
+                                                    {loadingSubscription ? (
+                                                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                                    ) : (
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                                    )}
+                                                    Salvar Assinatura
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                        {/* SEÇÃO: NOTIFICAÇÕES ── */}
+                        <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Notificações</p>
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col divide-y divide-gray-50">
+                                {/* Toggle 1: Alerta de novas mensagens */}
+                                <div className="px-4 py-3.5 flex items-center justify-between">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="w-8 h-8 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-500">
+                                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                            </svg>
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-medium text-gray-800">Alerta de novas mensagens</p>
+                                            <p className="text-[10px] text-gray-400 leading-snug">
+                                                Receba alertas quando iniciarem uma nova conversa ou te responderem offline
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        id="email-notifications-toggle"
+                                        type="button"
+                                        onClick={async () => {
+                                            const newValue = !emailNotificationsEnabled;
+                                            setEmailNotificationsEnabled(newValue);
+                                            setSavingEmailPref(true);
+                                            try {
+                                                await updateProfileMutation.mutateAsync({ emailNotificationsEnabled: newValue });
+                                            } catch {
+                                                setEmailNotificationsEnabled(!newValue);
+                                            } finally {
+                                                setSavingEmailPref(false);
+                                            }
+                                        }}
+                                        disabled={savingEmailPref}
+                                        className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-60 ${
+                                            emailNotificationsEnabled ? 'bg-purple-600' : 'bg-gray-200'
+                                        }`}
+                                        aria-label="Ativar alertas de novas mensagens"
+                                        role="switch"
+                                        aria-checked={emailNotificationsEnabled}
+                                    >
+                                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                                            emailNotificationsEnabled ? 'translate-x-5' : 'translate-x-0'
+                                        }`} />
+                                    </button>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        {/* ── SEÇÃO: PRIVACIDADE ── */}
+                        {profileIsProfessional && (
+                            <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Privacidade</p>
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col divide-y divide-gray-50">
+                                
+                                {/* Toggle Exibir no Explorar */}
+                                <div className="px-4 py-3.5 flex items-center justify-between">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="w-8 h-8 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-500">
+                                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                                                <line x1="1" y1="1" x2="23" y2="23"/>
+                                            </svg>
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-medium text-gray-800">Ocultar meu perfil do explorar</p>
+                                            <p className="text-[10px] text-gray-400 leading-snug">
+                                                Ocultar seu perfil das sugestões do explorar (seu perfil continuará acessível por busca direta)
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        id="show-in-explore-toggle"
+                                        type="button"
+                                        onClick={async () => {
+                                            const newValue = !hideFromExplore;
+                                            setHideFromExplore(newValue);
+                                            setSavingHideFromExplore(true);
+                                            try {
+                                                await updateProfileMutation.mutateAsync({ hideFromExplore: newValue });
+                                                toast.success(newValue ? 'Perfil ocultado do explorar' : 'Perfil visível no explorar');
+                                            } catch {
+                                                setHideFromExplore(!newValue);
+                                                toast.error('Erro ao atualizar privacidade');
+                                            } finally {
+                                                setSavingHideFromExplore(false);
+                                            }
+                                        }}
+                                        disabled={savingHideFromExplore}
+                                        className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-60 ${
+                                            hideFromExplore ? 'bg-purple-600' : 'bg-gray-200'
+                                        }`}
+                                        aria-label="Ocultar meu perfil do explorar"
+                                        role="switch"
+                                        aria-checked={hideFromExplore}
+                                    >
+                                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                                            hideFromExplore ? 'translate-x-5' : 'translate-x-0'
+                                        }`} />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        )}
+
+                        {/* ── SEÇÃO: PREFERÊNCIAS DO DISPOSITIVO ── */}
+                        {mounted && (notificationPermission !== 'granted' || (isInstallable && !isStandalone)) && (
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Este Dispositivo</p>
+                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                                    {/* Notificações */}
+                                    {notificationPermission !== 'granted' && (
+                                        <div className={`px-4 py-3.5 flex items-center justify-between ${isInstallable && !isStandalone ? 'border-b border-gray-50' : ''}`}>
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-500">
+                                                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                                                    </svg>
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-medium text-gray-800">Notificações</p>
+                                                    <p className="text-[10px] text-gray-400 leading-snug">
+                                                        {notificationPermission === 'denied'
+                                                            ? 'Bloqueadas pelo navegador'
+                                                            : 'Alertas de novas mensagens'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            {notificationPermission === 'denied' ? (
+                                                <span className="shrink-0 text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-100 px-2 py-1 rounded-lg">Bloqueado</span>
+                                            ) : (
+                                                <button
+                                                    onClick={handleRequestPermission}
+                                                    className="shrink-0 h-7 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-semibold transition-colors"
+                                                >
+                                                    Ativar
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Instalar app (PWA) */}
+                                    {isInstallable && (
+                                        <div className="px-4 py-3.5 flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-500">
+                                                        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>
+                                                    </svg>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-800">Instalar Aplicativo</p>
+                                                    <p className="text-[10px] text-gray-400">Acesso rápido na tela inicial</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={promptInstall}
+                                                className="shrink-0 h-7 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-semibold transition-colors"
+                                            >
+                                                Instalar
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── SEÇÃO: SOBRE O APP ── */}
+
+
+                        <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Mais Informações</p>
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                                <button
+                                    onClick={() => setIsAboutExpanded(!isAboutExpanded)}
+                                    className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center">
+                                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
+                                                <circle cx="12" cy="12" r="10"/>
+                                                <line x1="12" y1="16" x2="12" y2="12"/>
+                                                <line x1="12" y1="8" x2="12.01" y2="8"/>
+                                            </svg>
+                                        </div>
+                                        <span className="text-sm font-medium text-gray-800">Sobre o MimoChat</span>
+                                    </div>
+                                    <svg
+                                        width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                                        className={`text-gray-400 transition-transform duration-200 ${isAboutExpanded ? 'rotate-180' : ''}`}
+                                    >
+                                        <polyline points="6 9 12 15 18 9"/>
+                                    </svg>
+                                </button>
+                                {isAboutExpanded && (
+                                    <div className="border-t border-gray-100 bg-gray-50/30 animate-in fade-in slide-in-from-top-1 duration-150">
+                                        <div className="px-4 py-2.5 flex items-center justify-between border-b border-gray-100">
+                                            <span className="text-xs text-gray-400">Versão</span>
+                                            <span className="text-xs font-semibold text-gray-700 tabular-nums">1.0.0</span>
+                                        </div>
+                                        <div className="px-4 py-2.5 flex items-center justify-between">
+                                            <span className="text-xs text-gray-400">ID do Usuário</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[11px] font-mono text-gray-600 truncate max-w-[130px]">{user?.id}</span>
+                                                <button
+                                                    onClick={() => { if (user?.id) { navigator.clipboard.writeText(user.id); alert('ID copiado!'); } }}
+                                                    className="text-[10px] font-semibold text-purple-600 hover:text-purple-700"
+                                                >
+                                                    Copiar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Links de Conformidade Legal */}
+                                <div className="border-t border-gray-100 flex flex-col">
+                                    <Link
+                                        href="/ajuda"
+                                        className="px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center">
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
+                                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                                </svg>
+                                            </div>
+                                            <span className="text-sm font-medium text-gray-800">Central de Ajuda & Suporte</span>
+                                        </div>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-gray-400">
+                                            <polyline points="9 18 15 12 9 6"/>
+                                        </svg>
+                                    </Link>
+                                    <Link
+                                        href="/termos-de-uso"
+                                        target="_blank"
+                                        className="px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center">
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
+                                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                                    <polyline points="14 2 14 8 20 8"/>
+                                                    <line x1="16" y1="13" x2="8" y2="13"/>
+                                                    <line x1="16" y1="17" x2="8" y2="17"/>
+                                                    <polyline points="10 9 9 9 8 9"/>
+                                                </svg>
+                                            </div>
+                                            <span className="text-sm font-medium text-gray-800">Termos de Uso</span>
+                                        </div>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-gray-400">
+                                            <polyline points="9 18 15 12 9 6"/>
+                                        </svg>
+                                    </Link>
+                                    <Link
+                                        href="/politica-de-privacidade"
+                                        target="_blank"
+                                        className="px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center">
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
+                                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                                </svg>
+                                            </div>
+                                            <span className="text-sm font-medium text-gray-800">Política de Privacidade</span>
+                                        </div>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-gray-400">
+                                            <polyline points="9 18 15 12 9 6"/>
+                                        </svg>
+                                    </Link>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ── SEÇÃO: CONTA ── */}
+                        <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Conta</p>
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                                <button
+                                    onClick={handleLogout}
+                                    className="w-full px-4 py-3.5 flex items-center gap-3 hover:bg-gray-50 active:bg-gray-100 transition-colors border-b border-gray-50"
+                                >
+                                    <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-500">
+                                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                                        </svg>
+                                    </div>
+                                    <span className="text-sm font-medium text-gray-800">Sair da conta</span>
+                                </button>
+                                <button
+                                    onClick={() => setIsSecurityExpanded(!isSecurityExpanded)}
+                                    className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
+                                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                            </svg>
+                                        </div>
+                                        <span className="text-sm font-medium text-gray-800">Segurança da conta</span>
+                                    </div>
+                                    <svg
+                                        width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                                        className={`text-gray-400 transition-transform duration-200 ${isSecurityExpanded ? 'rotate-180' : ''}`}
+                                    >
+                                        <polyline points="6 9 12 15 18 9"/>
+                                    </svg>
+                                </button>
+                                {isSecurityExpanded && (
+                                    <div className="border-t border-gray-100 bg-gray-50/50 animate-in fade-in slide-in-from-top-1 duration-150">
+                                        <button
+                                            onClick={() => setAccountAction('suspend')}
+                                            className="w-full pl-12 pr-4 py-2.5 flex items-center gap-3 hover:bg-amber-50/60 active:bg-amber-100 transition-colors border-b border-gray-100"
+                                        >
+                                            <div className="w-7 h-7 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-600">
+                                                    <circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/>
+                                                </svg>
+                                            </div>
+                                            <div className="min-w-0 text-left">
+                                                <span className="block text-[13px] font-medium text-gray-700">Suspender conta</span>
+                                                <span className="block text-[9.5px] text-gray-400">Desativa o acesso até reativação manual</span>
+                                            </div>
+                                        </button>
+                                        <button
+                                            onClick={() => setAccountAction('delete')}
+                                            className="w-full pl-12 pr-4 py-2.5 flex items-center gap-3 hover:bg-red-50/60 active:bg-red-100 transition-colors"
+                                        >
+                                            <div className="w-7 h-7 rounded-lg bg-red-50 border border-red-100 flex items-center justify-center shrink-0">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500">
+                                                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+                                                </svg>
+                                            </div>
+                                            <div className="min-w-0 text-left">
+                                                <span className="block text-[13px] font-medium text-red-500">Excluir conta</span>
+                                                <span className="block text-[9.5px] text-red-400">Remove seu usuário do banco de dados</span>
+                                            </div>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* ── FOOTER FORMAL ── */}
+                        <div className="mt-7 mb-2 flex flex-col items-center justify-center gap-2 text-center px-4">
+                            <a
+                                href="https://www.instagram.com/mimochat.oficial/"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 text-gray-500 hover:text-pink-600 transition-colors"
+                            >
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 hover:text-pink-500 transition-colors">
+                                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+                                </svg>
+                                <span className="text-xs font-semibold">@mimochat.oficial</span>
+                            </a>
+                            <div className="flex flex-col gap-1 text-[10px] text-gray-400">
+                                <p>© {new Date().getFullYear()} MimoChat. Todos os direitos reservados.</p>
+                                <p>LEAD CONTEUDOS DIGITAIS LTDA | CNPJ: 60.312.273/0001-01</p>
+                            </div>
+                        </div>
+                    </>
+                )}
+            </div>
+
+
+            {accountAction && (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm">
+                    <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+                        <div className={`mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full ${accountAction === 'delete' ? 'bg-red-50 text-red-500' : 'bg-amber-50 text-amber-600'}`}>
+                            {accountAction === 'delete' ? (
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+                                </svg>
+                            ) : (
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/>
+                                </svg>
+                            )}
+                        </div>
+                        <h2 className="text-center text-base font-bold text-gray-900">
+                            {accountAction === 'delete' ? 'Excluir conta?' : 'Suspender conta?'}
+                        </h2>
+                        <p className="mt-2 text-center text-xs leading-relaxed text-gray-500">
+                            {accountAction === 'delete'
+                                ? 'Seu usuário será removido do banco de dados do Mimo. Esta ação não pode ser desfeita por você.'
+                                : 'Sua conta será marcada como suspensa e você será desconectado agora.'}
+                        </p>
+                        {accountActionError && (
+                            <p className="mt-3 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-medium text-red-600">
+                                {accountActionError}
+                            </p>
+                        )}
+                        <div className="mt-5 flex gap-2">
+                            <button
+                                onClick={closeAccountActionModal}
+                                disabled={accountActionLoading}
+                                className="h-10 flex-1 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 disabled:opacity-60"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleAccountActionConfirm}
+                                disabled={accountActionLoading}
+                                className={`h-10 flex-1 rounded-xl text-xs font-bold text-white disabled:opacity-60 ${accountAction === 'delete' ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-500 hover:bg-amber-600'}`}
+                            >
+                                {accountActionLoading ? 'Aguarde...' : accountAction === 'delete' ? 'Excluir' : 'Suspender'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}

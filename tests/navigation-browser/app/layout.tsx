@@ -1,0 +1,2 @@
+import Harness from './harness';
+export default function Layout({children}: {children: React.ReactNode}) { return <html><body style={{fontFamily:'sans-serif',background:'#f8fafc',color:'#0f172a',padding:32}}><Harness>{children}</Harness></body></html>; }

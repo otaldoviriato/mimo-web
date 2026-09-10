@@ -2,7 +2,7 @@
 
 import { useRouter as useNextRouter } from 'next/navigation';
 import { useStackNavigation } from '@/context/StackNavigationContext';
-import { isReservedRoute } from '@/lib/routes';
+import { resolveStackRoute } from '@/lib/stackHistory';
 
 export { isReservedRoute } from '@/lib/routes';
 
@@ -18,56 +18,17 @@ export function useTransitionRouter() {
     }
 
     const push = (href: string, meta?: any) => {
-        if (stackNav) {
-            // 1. Verifica se é rota de informações do chat (/chat/userId/info)
-            const chatInfoMatch = href.match(/^\/chat\/([^\/]+)\/info$/);
-            if (chatInfoMatch) {
-                const userId = chatInfoMatch[1];
-                const initialUser = meta?.initialUser ?? (meta && !meta.giftCode ? meta : undefined);
-                stackNav.pushVirtual('chatInfo', {
-                    userId,
-                    username: meta?.username || initialUser?.username || (!userId.startsWith('user_') ? userId : undefined),
-                    initialUser,
-                });
-                return;
-            }
-
-            // 2. Verifica se é rota de chat (/chat/userId)
-            const chatMatch = href.match(/^\/chat\/([^\/]+)$/);
-            if (chatMatch) {
-                const userId = chatMatch[1];
-                const initialUser = meta?.initialUser ?? (meta && !meta.giftCode ? meta : undefined);
-                if (initialUser && typeof window !== 'undefined') {
-                    try {
-                        localStorage.setItem(`mimo_user_${userId}`, JSON.stringify(initialUser));
-                    } catch {
-                        // ignore
-                    }
-                }
-                stackNav.pushVirtual('chat', {
-                    userId,
-                    username: meta?.username || initialUser?.username || (!userId.startsWith('user_') ? userId : undefined),
-                    initialUser,
-                    giftCode: meta?.giftCode,
-                });
-                return;
-            }
-
-            // 2. Verifica se é rota de perfil público (/[username])
-            // Remove o prefixo / e @ se houver
-            const cleanedPath = href.replace(/^\//, '');
-            if (!isReservedRoute(href) && cleanedPath.length > 0) {
-                const username = cleanedPath.replace(/^@/, '');
-                const initialUser = meta?.initialUser ?? (meta && !meta.giftCode ? meta : undefined);
-                stackNav.pushVirtual('profile', { username, initialUser });
-                return;
-            }
-
-            // 3. Verifica se é rota de configurações (/settings)
-            if (href === '/settings') {
-                stackNav.pushVirtual('settings', {});
-                return;
-            }
+        const route = resolveStackRoute(href);
+        const target = route?.screens[route.screens.length - 1];
+        if (stackNav && target) {
+            const initialUser = meta?.initialUser ?? (meta && !meta.giftCode ? meta : undefined);
+            stackNav.pushVirtual(target.type, {
+                ...target.params,
+                username: meta?.username || initialUser?.username || target.params.username,
+                initialUser,
+                giftCode: meta?.giftCode || target.params.giftCode,
+            });
+            return;
         }
 
         // Fallback para View Transitions nativas
@@ -114,7 +75,7 @@ export function useTransitionRouter() {
         if (stackNav && stackNav.isVirtualActive) {
             // Se a pilha virtual está ativa, voltar retrocede o histórico do navegador.
             // O event listener de popstate no StackNavigationContext vai capturar e fechar a tela virtual.
-            router.back();
+            stackNav.popVirtual();
             return;
         }
 
