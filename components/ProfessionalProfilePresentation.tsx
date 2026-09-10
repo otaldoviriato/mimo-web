@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { ChevronLeft, ChevronRight, Eye, EyeOff, Lock, Pause, Play, ShieldCheck, Pencil, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Eye, EyeOff, Lock, Pause, Play, ShieldCheck, Pencil, RotateCcw, Clock } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 
@@ -245,17 +245,20 @@ export function ProfessionalProfilePresentation({
                     <p className="mt-1 break-all text-sm text-slate-500">@{user.username}</p>
                     {(user.messagesLastWeekCount ?? 0) > 0 && <p className="mt-3 text-xs text-slate-500">Atividade nos últimos 7 dias</p>}
 
-                    {/* Badge de disponibilidade para visitantes */}
+                    {/* Indicador de disponibilidade para visitantes */}
                     {!isOwner && isAvailable && (
-                        <div className="mt-3 inline-flex items-center gap-2.5 rounded-full border border-emerald-200 bg-emerald-50 px-3.5 py-1.5 shadow-2xs">
-                            <span className="relative flex h-2 w-2 shrink-0">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                            </span>
-                            <div className="flex flex-col leading-tight">
-                                <span className="text-xs font-bold text-emerald-700">Disponível agora</span>
-                                <span className="text-[10px] font-medium text-emerald-600/80">Responde em até {responseTime} min</span>
+                        <div className="mt-3 flex flex-col items-start gap-1.5">
+                            <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 shadow-2xs">
+                                <span className="relative flex h-2 w-2 shrink-0">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                </span>
+                                <span>Disponível</span>
                             </div>
+                            <p className="flex items-center gap-1.5 text-xs text-slate-500">
+                                <Clock size={13} className="text-emerald-600 shrink-0" />
+                                <span>Responde em até <strong className="font-semibold text-slate-700">{responseTime} minutos</strong></span>
+                            </p>
                         </div>
                     )}
 

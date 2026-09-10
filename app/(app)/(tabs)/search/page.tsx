@@ -195,9 +195,9 @@ export default function SearchPage() {
                 {/* Overlay gradiente escuro suave na parte inferior */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
 
-                {/* Badge de Disponibilidade (topo direito) - Exibido apenas se a profissional estiver disponível */}
+                {/* Badge de Disponibilidade (canto superior direito) - Exibido apenas se a profissional estiver disponível */}
                 {user.isAvailable && (
-                    <div className="absolute top-2.5 left-2.5 bg-white/95 text-emerald-700 border border-emerald-200/80 text-[10.5px] font-bold px-2.5 py-1 rounded-full shadow-md flex items-center gap-1.5 z-10 backdrop-blur-xs">
+                    <div className="absolute top-2.5 right-2.5 bg-white/95 text-emerald-700 border border-emerald-200/80 text-[10.5px] font-bold px-2.5 py-1 rounded-full shadow-md flex items-center gap-1.5 z-10 backdrop-blur-xs">
                         <span className="relative flex h-2 w-2 shrink-0">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
