@@ -65,7 +65,18 @@ export async function POST(request: NextRequest) {
             else network = 'other';
         }
 
-        if (cleanLandingPage === '/descubra' || rawSlug === 'descubra') {
+        const attributedSlug = rawSlug && !['descubra', 'organico'].includes(rawSlug)
+            ? sanitizeSlug(rawSlug)
+            : utmCampaign
+                ? sanitizeSlug(utmCampaign)
+                : '';
+
+        if (attributedSlug) {
+            targetSlug = attributedSlug;
+            campaignName = utmCampaign
+                ? `Campanha: ${utmCampaign}`
+                : `Campanha: ${rawSlug}`;
+        } else if (cleanLandingPage === '/descubra' || rawSlug === 'descubra') {
             targetSlug = 'descubra';
             campaignName = 'Landing Page: /descubra';
         } else if (cleanLandingPage.startsWith('/c/')) {
@@ -95,13 +106,10 @@ export async function POST(request: NextRequest) {
         }
 
         // 1. Procura se já existe a campanha no banco
-        let campaign = await Campaign.findOne({
-            $or: [
-                { slug: targetSlug },
-                ...(rawSlug ? [{ slug: sanitizeSlug(rawSlug) }] : []),
-                ...(utmCampaign ? [{ externalCampaignId: utmCampaign }] : []),
-            ]
-        });
+        let campaign = await Campaign.findOne({ slug: targetSlug });
+        if (!campaign && utmCampaign) {
+            campaign = await Campaign.findOne({ externalCampaignId: utmCampaign });
+        }
 
         // 2. Se não existir, cria automaticamente
         if (!campaign) {
@@ -118,10 +126,10 @@ export async function POST(request: NextRequest) {
                     conversionGoals: ['landing_view', 'cta_click', 'signup', 'explore_profile_view', 'first_message_sent', 'first_message_received', 'first_recharge'],
                     createdBy: 'system_auto_landing',
                 });
-            } catch (err: any) {
+            } catch (error: unknown) {
                 // Em caso de colisão de índice unique concorrente, busca novamente
                 campaign = await Campaign.findOne({ slug: targetSlug });
-                if (!campaign) throw err;
+                if (!campaign) throw error;
             }
         }
 
@@ -148,12 +156,9 @@ export async function POST(request: NextRequest) {
                     },
                     targetProfessionalId: campaign.targetProfessionalId || null,
                 },
-                $set: {
-                    ...(cleanLandingPage ? { landingPage: cleanLandingPage } : {}),
-                    ...(event === 'cta_clicked' ? { ctaClickedAt: now } : {}),
-                },
+                ...(event === 'cta_clicked' ? { $set: { ctaClickedAt: now } } : {}),
             },
-            { upsert: true, new: true },
+            { upsert: true, returnDocument: 'after' },
         );
 
         let targetProfessional = null;
@@ -180,7 +185,7 @@ export async function POST(request: NextRequest) {
             visitId: visit._id,
             targetProfessional,
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Erro ao registrar visita de campanha:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
