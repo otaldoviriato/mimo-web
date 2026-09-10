@@ -654,24 +654,9 @@ export default function ProfilePage() {
                             </div>
 
                             {mySubscriptions.length === 0 ? (
-                                <div className="rounded-xl bg-slate-50 border border-dashed border-slate-200 p-4 text-center flex flex-col items-center gap-2">
-                                    <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center">
-                                        <Crown className="w-4 h-4" />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-bold text-slate-800">Apoie suas criadoras favoritas</p>
-                                        <p className="text-[11px] text-slate-500 max-w-xs mt-0.5">
-                                            Assinantes têm respostas prioritárias no chat e acesso exclusivo a conteúdos.
-                                        </p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => router.push('/search')}
-                                        className="mt-1 text-xs font-bold text-purple-600 hover:text-purple-700 active:scale-95 transition-all cursor-pointer"
-                                    >
-                                        Explorar perfis →
-                                    </button>
-                                </div>
+                                <p className="text-xs text-slate-400 font-medium text-center py-4">
+                                    Nenhuma assinatura efetuada ainda.
+                                </p>
                             ) : (
                                 <div className="flex flex-col gap-2">
                                     {mySubscriptions.map((sub) => {
