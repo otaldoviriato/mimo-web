@@ -7,9 +7,10 @@ interface PWAContextType {
     isInstallable: boolean;
     isIOS: boolean;
     isStandalone: boolean;
+    isInstalled: boolean;
     mounted: boolean;
     hasDeferredPrompt: boolean;
-    promptInstall: () => Promise<void>;
+    promptInstall: () => Promise<'accepted' | 'dismissed' | null>;
 }
 
 const PWAContext = createContext<PWAContextType | undefined>(undefined);
@@ -23,6 +24,7 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
     const [isInstallable, setIsInstallable] = useState(false);
     const [isIOS, setIsIOS] = useState(false);
     const [isStandalone, setIsStandalone] = useState(false);
+    const [isInstalled, setIsInstalled] = useState(false);
     const [mounted, setMounted] = useState(false);
     const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
     const [installModal, setInstallModal] = useState<InstallModalType | null>(null);
@@ -71,7 +73,17 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
             if (!ios) setIsInstallable(true);
         };
 
+        // Dispara quando o Chrome confirma que o app foi instalado com sucesso
+        const handleAppInstalled = () => {
+            setIsInstalled(true);
+            setDeferredPrompt(null);
+            setIsInstallable(false);
+            // Sinaliza para o modal que pode agir após a instalação
+            window.dispatchEvent(new CustomEvent('pwa_app_installed'));
+        };
+
         window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+        window.addEventListener('appinstalled', handleAppInstalled);
 
         // O botão de instalar aparece sempre — o comportamento ao clicar é que varia:
         // standalone → alerta de "já instalado" | ios → modal de passos | sem prompt → modal de indisponível
@@ -79,21 +91,22 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
 
         return () => {
             window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+            window.removeEventListener('appinstalled', handleAppInstalled);
             document.removeEventListener('touchstart', preventZoom);
             document.removeEventListener('gesturestart', preventGesture);
             document.removeEventListener('gesturechange', preventGesture);
         };
     }, []);
 
-    const promptInstall = async () => {
+    const promptInstall = async (): Promise<'accepted' | 'dismissed' | null> => {
         if (isStandalone) {
             alert('O Mimo já está instalado neste dispositivo.');
-            return;
+            return null;
         }
 
         if (isIOS) {
             setInstallModal('ios');
-            return;
+            return null;
         }
 
         if (deferredPrompt) {
@@ -104,18 +117,21 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
                 if (outcome === 'accepted') {
                     setIsInstallable(false);
                 }
+                return outcome;
             } catch {
                 // Prompt já consumido ou inválido; mostra modal de indisponibilidade
                 setDeferredPrompt(null);
                 setInstallModal('unavailable');
+                return null;
             }
         } else {
             setInstallModal('unavailable');
+            return null;
         }
     };
 
     return (
-        <PWAContext.Provider value={{ isInstallable, isIOS, isStandalone, mounted, hasDeferredPrompt: deferredPrompt !== null, promptInstall }}>
+        <PWAContext.Provider value={{ isInstallable, isIOS, isStandalone, isInstalled, mounted, hasDeferredPrompt: deferredPrompt !== null, promptInstall }}>
             {children}
             {installModal && (
                 <InstallPWAModal type={installModal} onClose={() => setInstallModal(null)} />
