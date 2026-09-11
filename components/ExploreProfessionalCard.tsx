@@ -28,21 +28,24 @@ export function ExploreProfessionalCard({ professionalId, name, photoUrl, online
 
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
 
-            {freeIntroEnabled && (
-                <div className="absolute top-2.5 left-2.5 bg-purple-600 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-md z-10">
-                    Conheça grátis
-                </div>
-            )}
-
-            {online && (
-                <div className="absolute top-2.5 right-2.5 bg-white text-emerald-600 border border-emerald-100 text-[10.5px] font-bold px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1.5 z-10">
-                    <span className="relative flex h-1.5 w-1.5 shrink-0">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+            {/* Badges superiores em linha horizontal garantindo espaçamento e sem sobreposição */}
+            <div className="absolute top-2 inset-x-2 flex items-center justify-between gap-1 pointer-events-none z-20">
+                {freeIntroEnabled ? (
+                    <span className="bg-purple-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-md whitespace-nowrap pointer-events-auto">
+                        Conheça grátis
                     </span>
-                    <span className="leading-none whitespace-nowrap">Online</span>
-                </div>
-            )}
+                ) : <span />}
+
+                {online && (
+                    <span className="bg-white text-emerald-600 border border-emerald-100 text-[9px] font-bold px-2 py-0.5 rounded-full shadow-md flex items-center gap-1 whitespace-nowrap shrink-0 pointer-events-auto">
+                        <span className="relative flex h-1.5 w-1.5 shrink-0">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                        </span>
+                        Online
+                    </span>
+                )}
+            </div>
 
             <div className="absolute bottom-0 inset-x-0 p-3 text-white flex flex-col gap-0.5 z-10">
                 <h3 className="text-sm sm:text-base font-black tracking-tight leading-tight truncate drop-shadow-sm">
