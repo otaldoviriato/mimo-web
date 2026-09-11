@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
                 isSuspended: { $ne: true },
                 hideFromExplore: { $ne: true },
             })
-                .select('clerkId username name email photoUrl coverUrl identityStatus subscriptionPrice bio createdAt avgResponseTimeMinutes isOnline lastSeen lastAccessAt birthDate city state accessCount')
+                .select('clerkId username name email photoUrl coverUrl identityStatus subscriptionPrice bio createdAt avgResponseTimeMinutes freeIntroEnabled isOnline lastSeen lastAccessAt birthDate city state accessCount')
                 .sort({ isOnline: -1, lastSeen: -1, lastAccessAt: -1, createdAt: -1, accessCount: -1 })
                 .limit(100)
                 .lean(),
@@ -84,6 +84,7 @@ export async function GET(request: NextRequest) {
                 publicPhotos: publicPhotos.slice(0, 4),
                 publicPhotosCount: publicPhotos.length,
                 avgResponseTimeMinutes: user.avgResponseTimeMinutes ?? null,
+                freeIntroEnabled: user.freeIntroEnabled === true,
                 isOnline: user.isOnline === true,
                 lastSeen: user.lastSeen ?? user.lastAccessAt ?? null,
                 lastActiveTime,

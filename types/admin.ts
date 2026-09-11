@@ -18,6 +18,8 @@ export interface SettingsData {
     pixEnabled: boolean;
     creditCardEnabled: boolean;
     couponsEnabled: boolean;
+    freeIntroReplyLimit: number;
+    freeIntroTimeoutMinutes: number;
     chatSessionTimeoutMinutes: number;
     earningsSessionInactivityMinutes?: number;
     earningsSessionMinimumCents?: number;

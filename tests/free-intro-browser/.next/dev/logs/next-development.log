@@ -1,0 +1,4 @@
+{"timestamp":"00:00:13.737","source":"Server","level":"LOG","message":""}
+{"timestamp":"00:00:40.478","source":"Server","level":"LOG","message":"○ Compiling / ..."}
+{"timestamp":"00:00:48.332","source":"Browser","level":"INFO","message":"%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"}
+{"timestamp":"00:00:49.347","source":"Server","level":"ERROR","message":"⨯ Error: ENOENT: no such file or directory, open 'C:\\Users\\viria\\Documents\\public\\assets\\isabella.png'"}

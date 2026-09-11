@@ -1,6 +1,8 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IAppSettings extends Document {
+    freeIntroReplyLimit: number;
+    freeIntroTimeoutMinutes: number;
     maxBillableMessageChars: number;
     key: string;
     platformFeePercentage: number;
@@ -62,6 +64,8 @@ export interface IAppSettings extends Document {
 }
 
 const AppSettingsSchema = new Schema<IAppSettings>({
+    freeIntroReplyLimit: { type: Number, default: 3, min: 1, max: 100, validate: Number.isSafeInteger },
+    freeIntroTimeoutMinutes: { type: Number, default: 10, min: 1, max: 1440, validate: Number.isSafeInteger },
     largeMessageWarningThresholdChars: { type: Number, default: 100, min: 20, max: 10000 },
     maxBillableMessageChars: { type: Number, default: 50, min: 1, max: 10000 },
     maxOnlineCumulativeChars: { type: Number, default: 500, min: 10, max: 20000 },

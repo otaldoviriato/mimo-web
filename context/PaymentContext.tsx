@@ -12,6 +12,7 @@ export interface RechargeModalContext {
 type RechargeModalInput = string | RechargeModalContext | React.SyntheticEvent;
 
 interface PaymentContextType {
+    isRechargeOpen: boolean;
     openRechargeModal: (input?: RechargeModalInput) => void;
 }
 
@@ -88,7 +89,7 @@ export function PaymentProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <PaymentContext.Provider value={{ openRechargeModal }}>
+        <PaymentContext.Provider value={{ openRechargeModal, isRechargeOpen: isModalVisible }}>
             {children}
             <RechargeModal
                 visible={isModalVisible}

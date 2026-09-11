@@ -1,7 +1,10 @@
 'use client';
 import { readStackEntry, replaceStackUrl, stackOverlayState } from '@/lib/stackHistory';
 
+import { FreeIntroNotice } from '@/components/FreeIntroNotice';
+import { useFreeIntro } from '@/hooks/useFreeIntro';
 import React, { useState, useEffect, useRef, use } from 'react';
+import { usePathname } from 'next/navigation';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
@@ -18,7 +21,6 @@ import { MessageStatusTicks } from '@/components/MessageStatusTicks';
 import { MediaComposerSheet } from '@/components/MediaComposerSheet';
 import { PendingReceiptBalloon } from '@/components/PendingReceiptBalloon';
 import { LargeMessageConfirmModal } from '@/components/LargeMessageConfirmModal';
-import { decryptMessageText } from '@/lib/messageCipher';
 import { trackAcquisitionEvent } from '@/lib/clientAcquisitionAnalytics';
 import { emitCampaignTelemetry } from '@/lib/campaignTelemetry';
 import { FirstMessageNotificationModal } from '@/components/FirstMessageNotificationModal';
@@ -121,49 +123,8 @@ function getReplyPreviewContent(msg: Message | null | undefined): string {
     return msg.content || '';
 }
 
-function unlockMessageIfEligible(
-    msg: Message,
-    currentUserId: string,
-    currentBalance: number,
-    currentThreshold: number,
-    roomId: string,
-    declinedMessageIds?: Set<string>
-): Message {
-    // Se a mensagem já foi destrancada, NUNCA re-bloquear!
-    if (msg.isContentLocked === false && msg.billingStatus === 'paid') {
-        return msg;
-    }
-
-    if (
-        msg.billingStatus === 'pending' &&
-        msg.receiverId === currentUserId &&
-        (msg.encryptedContent || msg.encryptedAudioUrl)
-    ) {
-        const requiredCost = msg.receiptChargeCents || 0;
-        const charTotal = msg.equivalentCharCount ?? msg.charCount ?? 0;
-        const isLong = charTotal > currentThreshold;
-        const wasDeclined = declinedMessageIds?.has(msg._id);
-
-        // Se tem saldo suficiente e não é mensagem longa pendente de confirmação (ou já confirmada):
-        if (currentBalance >= requiredCost && (!isLong || wasDeclined === false)) {
-            const seed = String(msg._id || msg.tempId || msg.timestamp || '');
-            const decryptedContent = msg.encryptedContent
-                ? decryptMessageText(msg.encryptedContent, roomId, seed)
-                : msg.content;
-            const decryptedAudioUrl = msg.encryptedAudioUrl
-                ? decryptMessageText(msg.encryptedAudioUrl, roomId, seed)
-                : msg.audioUrl;
-
-            return {
-                ...msg,
-                content: decryptedContent || msg.content,
-                audioUrl: decryptedAudioUrl || msg.audioUrl,
-                billingStatus: 'paid',
-                isContentLocked: false,
-                awaitingBalance: false,
-            };
-        }
-    }
+function unlockMessageIfEligible(msg: Message, ..._context: unknown[]): Message {
+    if (msg.billingStatus === 'paid' || msg.billingStatus === 'free') return { ...msg, isContentLocked: false };
     return msg;
 }
 
@@ -615,8 +576,10 @@ function CollapsibleTextMessage({ content, isMine }: { content: string; isMine: 
 export default function ChatPage({ params, userId: propUserId, initialUser: propInitialUser, giftCode: propGiftCode, onBack, isSubPage = false, isClosing = false }: ChatPageProps) {
     const resolvedParams = params ? use(params) : null;
     const otherUserId = propUserId || resolvedParams?.userId || '';
-    const { openRechargeModal } = usePayment();
+    const { openRechargeModal, isRechargeOpen } = usePayment();
     const router = useTransitionRouter();
+    const currentPathname = usePathname();
+    const chatVisibleRef = useRef(false);
 
     const reportMessageAttempt = () => {
         const profId = receiver?.clerkId || otherUserId;
@@ -874,6 +837,9 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     const isResolvingReceiver = isRouteClerkId ? loadingReceiverById : loadingReceiverByUsername;
     const receiver = fetchedReceiverById || fetchedReceiverByUsername || propInitialUser;
     const targetClerkId = receiver?.clerkId || (isRouteClerkId ? otherUserId : '');
+    const { data: freeIntro, isLoading: freeIntroQueryLoading } = useFreeIntro(targetClerkId);
+    const introAllowsText = !!freeIntro?.eligible || !!freeIntro?.grant;
+    const introTextOnly = !!freeIntro?.textOnly;
 
     useEffect(() => {
         if (propInitialUser && targetClerkId) {
@@ -1225,6 +1191,24 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
     const partnerClerkId = targetClerkId || (isRouteClerkId ? otherUserId : '');
     const roomId = (user?.id && partnerClerkId) ? [user.id, partnerClerkId].sort().join('_') : '';
+    const activeChat = !isClosing && !isLeaving && !isRechargeOpen && !!currentPathname?.includes('/chat/');
+    useEffect(() => {
+        if (!socket || !roomId) return;
+        const updateVisibility = () => {
+            const visible = activeChat && document.visibilityState === 'visible';
+            chatVisibleRef.current = visible;
+            socket.emit('chat_visibility', { roomId, visible });
+            if (visible && balance > 0 && !userData?.isProfessional) socket.emit('confirm_view_messages', { roomId });
+        };
+        updateVisibility();
+        socket.on('room_joined', updateVisibility);
+        document.addEventListener('visibilitychange', updateVisibility);
+        return () => {
+            socket.off('room_joined', updateVisibility);
+            document.removeEventListener('visibilitychange', updateVisibility);
+        };
+    }, [socket, roomId, activeChat, balance, userData?.isProfessional]);
+
 
     // Carrega mensagens do cache local APENAS no primeiro render da sala e preserva se já houver mensagens
     useEffect(() => {
@@ -1322,7 +1306,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         });
 
         // Se for o cliente e o saldo for positivo, notifica o servidor para liquidar no MongoDB
-        if (!userData?.isProfessional && balance > 0 && socket && roomId) {
+        if (chatVisibleRef.current && !userData?.isProfessional && balance > 0 && socket && roomId) {
             socket.emit('confirm_view_messages', { roomId });
         }
     }, [balance, largeMessageThreshold, user?.id, roomId, userData?.isProfessional, socket]);
@@ -1646,7 +1630,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             queryClient.invalidateQueries({ queryKey: ['earnings', 'recent'] });
 
             // Se for cliente e tiver saldo novo > 0:
-            if (!userData?.isProfessional && data.balance > 0) {
+            if (chatVisibleRef.current && !userData?.isProfessional && data.balance > 0) {
                 // Notifica o servidor para liquidar mensagens curtas pendentes:
                 socket.emit('confirm_view_messages', { roomId });
 
@@ -2445,22 +2429,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             });
         }
         setPendingLongMessageToConfirm(null);
-        if (msg.encryptedContent || msg.encryptedAudioUrl) {
-            const seed = String(msg._id || msg.tempId || msg.timestamp || '');
-            const decryptedContent = msg.encryptedContent
-                ? decryptMessageText(msg.encryptedContent, roomId, seed)
-                : msg.content;
-            const decryptedAudioUrl = msg.encryptedAudioUrl
-                ? decryptMessageText(msg.encryptedAudioUrl, roomId, seed)
-                : msg.audioUrl;
-            setMessages(prev => prev.map(m => m._id === msg._id ? {
-                ...m,
-                content: decryptedContent || m.content,
-                audioUrl: decryptedAudioUrl || m.audioUrl,
-                billingStatus: 'paid',
-                isContentLocked: false,
-            } : m));
-        }
+        
     };
 
     const handleDeclineLongMessage = (msgId?: string) => {
@@ -2496,22 +2465,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     messageIds: [item._id],
                 });
             }
-            if (item.encryptedContent || item.encryptedAudioUrl) {
-                const seed = String(item._id || item.tempId || item.timestamp || '');
-                const decryptedContent = item.encryptedContent
-                    ? decryptMessageText(item.encryptedContent, roomId, seed)
-                    : item.content;
-                const decryptedAudioUrl = item.encryptedAudioUrl
-                    ? decryptMessageText(item.encryptedAudioUrl, roomId, seed)
-                    : item.audioUrl;
-                setMessages(prev => prev.map(m => m._id === item._id ? {
-                    ...m,
-                    content: decryptedContent || m.content,
-                    audioUrl: decryptedAudioUrl || m.audioUrl,
-                    billingStatus: 'paid',
-                    isContentLocked: false,
-                } : m));
-            }
+            
         }
     };
 
@@ -2588,7 +2542,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         }
 
         const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
-        if (isClientToProfessional && balance <= 0) {
+        if (isClientToProfessional && !introAllowsText && !freeIntroQueryLoading && balance <= 0) {
             reportMessageAttempt();
             openRechargeModal('ZERO_BALANCE_START');
             return;
@@ -2682,9 +2636,10 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     };
 
     const handleSendAudio = async (audioBlob: Blob, durationInSeconds: number) => {
+        if (introTextOnly) { toast.error('Durante as respostas gratuitas, envie somente texto.'); return; }
         const isTeamMemberInvolved = userData?.isTeam || receiver?.isTeam;
         const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
-        if (isClientToProfessional && balance <= 0) {
+        if (isClientToProfessional && !introAllowsText && !freeIntroQueryLoading && balance <= 0) {
             reportMessageAttempt();
             openRechargeModal('ZERO_BALANCE_START');
             return;
@@ -2766,10 +2721,11 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     };
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
+        if (introTextOnly) { e.target.value = ''; toast.error('Durante as respostas gratuitas, envie somente texto.'); return; }
         if (!e.target.files || e.target.files.length === 0) return;
 
         const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
-        if (isClientToProfessional && balance <= 0) {
+        if (isClientToProfessional && !introAllowsText && !freeIntroQueryLoading && balance <= 0) {
             e.target.value = '';
             reportMessageAttempt();
             openRechargeModal('ZERO_BALANCE_START');
@@ -2834,6 +2790,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     // Usado pelo MediaComposerSheet (profissional configurou preço/duração) e pelo
     // fallback no compose bar (envio durante a janela em que userData ainda está carregando).
     const sendSelectedMedia = async (priceInCents: number, isTemporaryMedia: boolean, expiryMinutes: number, coverFrameDataUrl?: string) => {
+        if (introTextOnly) { toast.error('Durante as respostas gratuitas, envie somente texto.'); return; }
         if (!selectedFile) return;
 
         const file = selectedFile;
@@ -2933,6 +2890,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     };
 
     const handleSendGift = async () => {
+        if (introTextOnly) { toast.error('Durante as respostas gratuitas, envie somente texto.'); return; }
         if (!giftAmountStr || parseFloat(giftAmountStr) <= 0) return;
         
         const giftAmountInCents = parseFloat(giftAmountStr) * 100;
@@ -3011,7 +2969,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     // Quantos segundos de áudio o saldo atual do cliente consegue pagar (undefined = sem limite, mensagem gratuita).
     const maxAudioDurationSeconds = (audioCostPerSecondInCents > 0 && !isTeamMemberInvolved)
         ? Math.floor(balance / audioCostPerSecondInCents)
-        : (isClientToProfessional && balance <= 0 ? 0 : undefined);
+        : (isClientToProfessional && !introAllowsText && !freeIntroQueryLoading && balance <= 0 ? 0 : undefined);
     // Se o saldo for > 0, exibe quando estiver abaixo do limite configurado.
     // Se o saldo for == 0, só exibe quando houver pelo menos uma mensagem da profissional recebida ou bloqueada (pois agora há motivo para recarregar).
     const partnerIdForFilter = partnerClerkId || otherUserId;
@@ -3023,7 +2981,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         ? balance <= lowBalanceThresholdInCents
         : hasProfessionalMessage;
 
-    const shouldShowLowBalanceAlert = !userData?.isProfessional &&
+    const shouldShowLowBalanceAlert = !introTextOnly && !userData?.isProfessional &&
         !userData?.isTeam &&
         !receiver?.isTeam &&
         receiver?.isProfessional &&
@@ -3293,6 +3251,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 </button>
             )}
 
+            <FreeIntroNotice state={freeIntro} />
             {/* Messages Container Wrapper */}
             <div className="flex-1 relative overflow-hidden flex flex-col">
                 {/* Messages */}
@@ -4014,7 +3973,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         <div className="relative shrink-0">
                             <button
                                 onClick={() => setAttachMenuVisible(!attachMenuVisible)}
-                                disabled={!connected || !!selectedFile}
+                                disabled={introTextOnly || !connected || !!selectedFile}
                                 className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shrink-0 ${
                                     attachMenuVisible ? 'bg-purple-600 text-white rotate-45' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                                 }`}
@@ -4123,7 +4082,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         <button
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
-                                if (isClientToProfessional && balance <= 0) {
+                                if (isClientToProfessional && !introAllowsText && !freeIntroQueryLoading && balance <= 0) {
                                     reportMessageAttempt();
                                     openRechargeModal('ZERO_BALANCE_START');
                                     return;
@@ -4160,18 +4119,18 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         </button>
                     ) : (
                         <AudioRecorder
-                            connected={connected && userData !== undefined}
+                            connected={!introTextOnly && connected && userData !== undefined}
                             onSendAudio={handleSendAudio}
                             onStatusChange={setAudioRecordingStatus}
                             maxDurationSeconds={maxAudioDurationSeconds}
                             confirmBeforeSend={false}
                             costPerSecondInCents={audioCostPerSecondInCents}
                             onInsufficientBalance={() => {
-                                if (isClientToProfessional && balance <= 0) {
+                                if (isClientToProfessional && !introAllowsText && !freeIntroQueryLoading && balance <= 0) {
                                     reportMessageAttempt();
                                 }
                                 openRechargeModal(
-                                    isClientToProfessional && balance <= 0
+                                    isClientToProfessional && !introAllowsText && !freeIntroQueryLoading && balance <= 0
                                         ? 'ZERO_BALANCE_START'
                                         : (userData?.hasWelcomeCreditEnded
                                             ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'

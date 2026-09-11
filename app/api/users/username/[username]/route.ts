@@ -50,7 +50,7 @@ export async function GET(
         await connectToDatabase();
 
         let user = await User.findOne({ username: cleanUsername }).select(
-            'clerkId username name email photoUrl coverUrl isProfessional professionalStatus identityStatus subscriptionPrice isSubscriptionEnabled chargePerCharSubscribers chargePerCharNonSubscribers subscribers balance bio avgResponseTimeMinutes isOnline lastSeen birthDate city state isTeam teamTitle'
+            'clerkId username name email photoUrl coverUrl isProfessional professionalStatus identityStatus subscriptionPrice isSubscriptionEnabled chargePerCharSubscribers chargePerCharNonSubscribers subscribers balance bio avgResponseTimeMinutes freeIntroEnabled isOnline lastSeen birthDate city state isTeam teamTitle'
         );
 
         if (!user) {
@@ -424,6 +424,7 @@ export async function GET(
                 messagesLastWeekCount: user.isProfessional ? messagesLastWeekCount : 0,
                 mediaGiftsLastWeekCount: user.isProfessional ? mediaGiftsLastWeekCount : 0,
                 teamActivationContact,
+                freeIntroEnabled: user.freeIntroEnabled === true,
             },
         });
     } catch (error: any) {

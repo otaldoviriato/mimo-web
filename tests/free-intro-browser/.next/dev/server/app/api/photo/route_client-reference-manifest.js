@@ -1,0 +1,1 @@
+globalThis.__RSC_MANIFEST=(globalThis.__RSC_MANIFEST||{});globalThis.__RSC_MANIFEST["/api/photo/route"]={"moduleLoading":{"prefix":"/_next/"},"ssrModuleMapping":{},"edgeSSRModuleMapping":{},"clientModules":{},"entryCSSFiles":{"C:\\Users\\viria\\Documents\\mimo\\mimo-web\\tests\\free-intro-browser\\app\\api\\photo\\route":[]},"rscModuleMapping":{},"edgeRscModuleMapping":{}};

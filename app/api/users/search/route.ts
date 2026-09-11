@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
             }),
             ...queryFilter
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        }).select('clerkId username name email photoUrl coverUrl isProfessional identityStatus subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers bio createdAt avgResponseTimeMinutes isOnline lastSeen birthDate city state').limit(40).lean() as any[];
+        }).select('clerkId username name email photoUrl coverUrl isProfessional identityStatus subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers bio createdAt avgResponseTimeMinutes freeIntroEnabled isOnline lastSeen birthDate city state').limit(40).lean() as any[];
 
         if (!foundUsers || foundUsers.length === 0) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -229,6 +229,7 @@ export async function GET(request: NextRequest) {
                 publicPhotos: publicPhotos.slice(0, 4),
                 avgResponseTimeMinutes: u.avgResponseTimeMinutes ?? null,
                 score,
+                freeIntroEnabled: u.freeIntroEnabled === true,
                 isOnline: isOnlineNow,
                 lastSeen: u.lastSeen ?? null,
                 birthDate: u.birthDate ?? null,

@@ -1,5 +1,7 @@
 'use client';
 
+import { ExploreProfessionalCard } from '@/components/ExploreProfessionalCard';
+import { useFreeIntro } from '@/hooks/useFreeIntro';
 import React, { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
@@ -28,12 +30,22 @@ const calculateAge = (birthDateString?: string | Date) => {
 };
 
 export default function SearchPage() {
+    const { socket: introSocket } = useFreeIntro();
     const router = useTransitionRouter();
     const queryClient = useQueryClient();
     const { data: userData, isLoading: loadingProfile } = useMyProfile();
     const [username, setUsername] = useState('');
     const [loading, setLoading] = useState(false);
     const [foundUsers, setFoundUsers] = useState<any[]>([]);
+    useEffect(() => {
+        if (!introSocket) return;
+        const update = (event: { professionalId: string; enabled: boolean }) => {
+            setFoundUsers(current => current.map(profile => profile.clerkId === event.professionalId ? { ...profile, freeIntroEnabled: event.enabled } : profile));
+            void queryClient.invalidateQueries({ queryKey: ['users', 'featured'] });
+        };
+        introSocket.on('free_intro_offer_updated', update);
+        return () => { introSocket.off('free_intro_offer_updated', update); };
+    }, [introSocket, queryClient]);
     const {
         data: featuredUsers = [],
         isLoading: loadingFeatured,
@@ -213,44 +225,7 @@ export default function SearchPage() {
             : (user.name || `@${user.username}`);
         const mainPhoto = user.photoUrl || (user.publicPhotos && user.publicPhotos[0]) || '/Logo.svg';
 
-        return (
-            <button
-                type="button"
-                key={user.clerkId}
-                data-explore-professional-id={!username.trim() ? user.clerkId : undefined}
-                onClick={() => handleOpenProfile(user)}
-                aria-label={`Abrir ${user.name || user.username}`}
-                className="relative aspect-[3/4] rounded-2xl overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 cursor-pointer active:scale-[0.98] border border-slate-200/80 bg-slate-100 group text-left focus-visible:outline-2 focus-visible:outline-purple-600 focus-visible:outline-offset-2"
-            >
-                {/* Imagem de fundo */}
-                <img
-                    src={mainPhoto}
-                    alt={user.name || user.username}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-
-                {/* Overlay gradiente escuro suave na parte inferior */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
-
-                {/* Badge Online (canto superior direito) */}
-                {user.isOnline && (
-                    <div className="absolute top-2.5 right-2.5 bg-white text-emerald-600 border border-emerald-100 text-[10.5px] font-bold px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1.5 z-10">
-                        <span className="relative flex h-1.5 w-1.5 shrink-0">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-                        </span>
-                        <span className="leading-none whitespace-nowrap">Online</span>
-                    </div>
-                )}
-
-                {/* Conteúdo inferior com Nome e Idade */}
-                <div className="absolute bottom-0 inset-x-0 p-3 text-white flex flex-col gap-0.5 z-10">
-                    <h3 className="text-sm sm:text-base font-black tracking-tight leading-tight truncate drop-shadow-sm">
-                        {displayName}
-                    </h3>
-                </div>
-            </button>
-        );
+        return <ExploreProfessionalCard key={user.clerkId} professionalId={user.clerkId} name={displayName} photoUrl={mainPhoto} online={!!user.isOnline} freeIntroEnabled={!!user.freeIntroEnabled} trackExposure={!username.trim()} onClick={() => handleOpenProfile(user)} />;
     };
 
     if (userData?.isProfessional) {

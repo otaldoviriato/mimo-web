@@ -55,24 +55,23 @@ export function lockedMessagePreview(content: string, seed: string = ''): string
     }).join('');
 }
 
-import { encryptMessageText } from './messageCipher';
 
 // Never send plain pending content, audio URLs or quoted text to the paying recipient.
-// Send encryptedContent and encryptedAudioUrl so the client can decrypt instantly upon payment/balance.
 export function messageForViewer<T extends Record<string, any>>(message: T, viewerId?: string): T {
     if (message.billingStatus !== 'pending' || viewerId === message.senderId) return message;
     const seed = String(message._id || message.tempId || message.timestamp || '');
-    const roomId = String(message.roomId || '');
     const rawContent = String(message.content ?? '');
 
-    const encryptedContent = rawContent ? encryptMessageText(rawContent, roomId, seed) : undefined;
-    const encryptedAudioUrl = message.audioUrl ? encryptMessageText(String(message.audioUrl), roomId, seed) : undefined;
 
     return {
         ...message,
         content: message.isAudio ? '' : lockedMessagePreview(rawContent, seed),
-        encryptedContent,
-        encryptedAudioUrl,
+        encryptedContent: undefined,
+        encryptedAudioUrl: undefined,
+        originalImageUrl: undefined,
+        videoUrl: undefined,
+        thumbnailUrl: undefined,
+        blurredImageUrl: undefined,
         audioUrl: undefined,
         replyToContent: null,
         replyToId: null,

@@ -16,6 +16,10 @@ export interface ICard {
 }
 
 export interface IUser extends Document {
+    freeIntroEnabled?: boolean;
+    freeIntroEnabledAt?: Date;
+    freeIntroRevision?: number;
+    freeIntroPausedAt?: Date;
     clerkId: string;
     receiptTermsVersion?: string;
     receiptTermsAcceptedAt?: Date;
@@ -85,6 +89,10 @@ export interface IUser extends Document {
 }
 
 const UserSchema = new Schema<IUser>({
+    freeIntroEnabled: { type: Boolean, default: false },
+    freeIntroEnabledAt: Date,
+    freeIntroRevision: { type: Number, default: 0 },
+    freeIntroPausedAt: Date,
     clerkId: {
         type: String,
         required: true,

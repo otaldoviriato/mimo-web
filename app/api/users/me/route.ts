@@ -531,6 +531,7 @@ export async function GET(request: NextRequest) {
                 hasWelcomeCreditEnded,
                 conversationsLastWeekCount,
                 messagesLastWeekCount,
+                freeIntroEnabled: user.freeIntroEnabled === true,
             },
         });
     } catch (error: any) {

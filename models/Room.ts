@@ -1,6 +1,14 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IRoom extends Document {
+    freeIntro?: {
+        professionalId: string;
+        grantedAt: Date;
+        limit: number;
+        used: number;
+        convertedAt?: Date | null;
+        pendingSince?: Date | null;
+    };
     participants: string[];
     lastMessage?: string;
     lastMessageSenderId?: string;
@@ -15,6 +23,17 @@ export interface IRoom extends Document {
 }
 
 const RoomSchema = new Schema<IRoom>({
+    freeIntro: {
+        type: new Schema({
+            professionalId: { type: String, required: true },
+            grantedAt: { type: Date, required: true },
+            limit: { type: Number, required: true, min: 1 },
+            used: { type: Number, default: 0, min: 0 },
+            convertedAt: { type: Date, default: null },
+            pendingSince: { type: Date, default: null },
+        }, { _id: false }),
+        default: undefined,
+    },
     participants: {
         type: [String],
         required: true,
@@ -54,6 +73,7 @@ const RoomSchema = new Schema<IRoom>({
 });
 
 RoomSchema.index({ participants: 1 });
+RoomSchema.index({ 'freeIntro.pendingSince': 1 }, { partialFilterExpression: { 'freeIntro.pendingSince': { $type: 'date' } } });
 
 export const Room = (mongoose.models.Room as mongoose.Model<IRoom>) ||
     mongoose.model<IRoom>('Room', RoomSchema);

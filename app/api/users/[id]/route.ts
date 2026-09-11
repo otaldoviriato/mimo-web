@@ -97,6 +97,7 @@ export async function GET(
                 bio: user.bio || '',
                 isOnline: user.isOnline ?? false,
                 lastSeen: user.lastSeen ?? null,
+                freeIntroEnabled: user.freeIntroEnabled === true,
             },
         });
     } catch (error: any) {
