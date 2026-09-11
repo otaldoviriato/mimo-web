@@ -19,11 +19,35 @@ class SocketService {
     private _newMessageCallback: ((data: any) => void) | null = null;
     private _getToken: (() => Promise<string | null>) | null = null;
 
+    private _connectionListeners = new Set<(connected: boolean) => void>();
+    private _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    public isConnected(): boolean {
+        return !!this.socket?.connected;
+    }
+
+    public onConnectionChange(listener: (connected: boolean) => void): () => void {
+        this._connectionListeners.add(listener);
+        listener(this.isConnected());
+        return () => {
+            this._connectionListeners.delete(listener);
+        };
+    }
+
+    private _notifyConnectionChange(connected: boolean) {
+        for (const listener of this._connectionListeners) {
+            try {
+                listener(connected);
+            } catch (err) {
+                console.error('[SocketService] Erro no listener de conexão:', err);
+            }
+        }
+    }
+
     // ── Detecção de sessão ──────────────────────────────────────────────────
 
     private _markSessionEnded(intentional: boolean) {
         if (typeof window === 'undefined') return;
-        // Não sobrescreve se já marcado (evita duplo-registro na sequência disconnect→disconnect)
         if (!localStorage.getItem(SESSION_KEYS.sessionEnded)) {
             localStorage.setItem(SESSION_KEYS.sessionEnded, String(Date.now()));
         }
@@ -43,21 +67,18 @@ class SocketService {
         let isNewSession = false;
 
         if (!everConnected) {
-            isNewSession = true; // Primeira visita de todos os tempos
+            isNewSession = true;
         } else if (wasIntentional) {
-            isNewSession = true; // Logout ou troca de usuário
+            isNewSession = true;
         } else if (sessionEndedStr) {
-            // Consideramos nova sessão se o socket ficou desconectado > 2 min
             isNewSession = now - Number(sessionEndedStr) > 2 * 60 * 1000;
         }
 
-        // Limpa flags da sessão anterior antes de disparar
         localStorage.removeItem(SESSION_KEYS.intentional);
         localStorage.removeItem(SESSION_KEYS.sessionEnded);
         localStorage.setItem(SESSION_KEYS.everConnected, '1');
 
         if (isNewSession) {
-            // Flag para modais que montarem após este evento
             localStorage.setItem(SESSION_KEYS.newSession, wasIntentional ? 'intentional' : '1');
             window.dispatchEvent(
                 new CustomEvent(NEW_SESSION_EVENT, { detail: { intentional: wasIntentional } })
@@ -65,67 +86,98 @@ class SocketService {
         }
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-
     connect(userId?: string, getToken?: () => Promise<string | null>) {
         const newUserId = userId ?? this._currentUserId;
         if (getToken) this._getToken = getToken;
 
-        // Já está conectado com o mesmo usuário — não faz nada
-        if (this.socket?.connected && this._currentUserId === newUserId) {
-            console.log('[SocketService] Já conectado como', newUserId, '— reutilizando socket');
+        if (this._currentUserId && newUserId && this._currentUserId === newUserId && this.socket) {
+            if (this.socket.connected) {
+                this._notifyConnectionChange(true);
+                return;
+            }
+            if (!this.socket.disconnected) {
+                return;
+            }
+            this.socket.connect();
             return;
         }
 
-        // Troca de usuário com socket ativo — desconecta e reconecta (intencional)
         if (this.socket) {
-            console.log('[SocketService] Desconectando socket anterior...');
             this._markSessionEnded(true);
             this.socket.disconnect();
             this.socket = null;
+            this._notifyConnectionChange(false);
+        }
+
+        if (this._reconnectTimer) {
+            clearTimeout(this._reconnectTimer);
+            this._reconnectTimer = null;
         }
 
         if (newUserId) {
             this._currentUserId = newUserId;
         }
 
-        console.log('[SocketService] Conectando ao Chat Server como', newUserId);
-
         this.socket = io(CHAT_SERVER_URL, {
-            transports: ['websocket'],
+            transports: ['websocket', 'polling'],
             reconnection: true,
             autoConnect: true,
             reconnectionDelay: 1000,
             reconnectionDelayMax: 5000,
             auth: async (callback) => {
-                try {
-                    callback({ token: await this._getToken?.() });
-                } catch {
-                    callback({ token: null });
+                let token: string | null = null;
+                for (let attempt = 0; attempt < 3; attempt++) {
+                    try {
+                        token = (await this._getToken?.()) ?? null;
+                        if (token) break;
+                    } catch {
+                        token = null;
+                    }
+                    if (!token && attempt < 2) {
+                        await new Promise((resolve) => setTimeout(resolve, 250));
+                    }
                 }
+                callback({ token });
             },
         });
 
         this.socket.on('connect', () => {
-            console.log('[SocketService] Socket conectado! Autenticando como', this._currentUserId);
             this._onSocketConnected();
+            this._notifyConnectionChange(true);
+            if (this._reconnectTimer) {
+                clearTimeout(this._reconnectTimer);
+                this._reconnectTimer = null;
+            }
         });
 
         this.socket.on('disconnect', () => {
-            // Desconexão não-intencional (rede, Chrome matou processo, etc.)
             this._markSessionEnded(false);
+            this._notifyConnectionChange(false);
         });
 
         this.socket.on('connect_error', (err) => {
-            console.error('[SocketService] Erro de conexão:', err.message);
+            console.warn('[SocketService] Erro de conexão:', err.message);
+            this._notifyConnectionChange(false);
+
+            if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
+            this._reconnectTimer = setTimeout(() => {
+                if (this.socket && !this.socket.connected) {
+                    this.socket.connect();
+                }
+            }, 1500);
         });
     }
 
     disconnect() {
+        if (this._reconnectTimer) {
+            clearTimeout(this._reconnectTimer);
+            this._reconnectTimer = null;
+        }
         if (this.socket) {
-            this._markSessionEnded(true); // Desconexão explícita (logout)
+            this._markSessionEnded(true);
             this.socket.disconnect();
             this.socket = null;
+            this._notifyConnectionChange(false);
         }
         this._currentUserId = null;
     }
