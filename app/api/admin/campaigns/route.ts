@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
 
         activeCampaignData = {
             ...activeCampaign,
-            uniqueVisits: Math.max(activeCampaign.uniqueVisitorsCount || 0, activeUniqueVisits),
+            uniqueVisits: activeUniqueVisits,
             leads: activeLeads,
             signupsCount: activeLeads.length,
         };
@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
     const formattedCampaigns = campaigns.map(c => {
         const vStats = visitsMap.get(c._id.toString());
         const jCount = journeysMap.get(c._id.toString()) || 0;
-        const uniqueVisits = Math.max(c.uniqueVisitorsCount || 0, vStats?.uniqueVisits ?? 0);
+        const uniqueVisits = vStats?.uniqueVisits ?? (c.uniqueVisitorsCount || 0);
         const signups = Math.max(jCount, vStats?.signups ?? 0);
 
         const impressions = c.externalImpressions || 0;
@@ -211,6 +211,39 @@ export async function PATCH(request: NextRequest) {
                     externalClicks: clicks,
                 }
             },
+            { new: true }
+        );
+        return NextResponse.json({ success: true, campaign });
+    }
+
+    if (action === 'edit' || action === 'update_campaign') {
+        const updateData: any = {};
+        if (body.name) updateData.name = String(body.name).trim();
+        if (body.entryPoint) {
+            let ep = String(body.entryPoint).trim();
+            if (!ep.startsWith('/')) ep = `/${ep}`;
+            updateData.entryPoint = ep;
+        }
+        if (body.description !== undefined) {
+            updateData.description = body.description ? String(body.description).trim() : null;
+        }
+        if (body.externalImpressions !== undefined) {
+            updateData.externalImpressions = Math.max(0, Number(body.externalImpressions) || 0);
+        }
+        if (body.externalClicks !== undefined) {
+            updateData.externalClicks = Math.max(0, Number(body.externalClicks) || 0);
+        }
+        if (body.status && ['draft', 'tracking', 'completed', 'archived', 'active', 'paused'].includes(body.status)) {
+            updateData.status = body.status;
+            if (body.status === 'tracking' && !body.startedAt) {
+                updateData.startedAt = new Date();
+                updateData.endedAt = null;
+            }
+        }
+
+        const campaign = await Campaign.findByIdAndUpdate(
+            id,
+            { $set: updateData },
             { new: true }
         );
         return NextResponse.json({ success: true, campaign });

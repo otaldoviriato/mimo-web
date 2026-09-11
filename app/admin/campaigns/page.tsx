@@ -25,7 +25,7 @@ import {
     Search,
     TrendingUp,
     FileText,
-    Sparkles,
+    Pencil,
     Calendar,
     ArrowUpRight
 } from 'lucide-react';
@@ -125,17 +125,27 @@ export default function CampaignsPage() {
 
     // Modais
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isStopModalOpen, setIsStopModalOpen] = useState(false);
     const [isInspectModalOpen, setIsInspectModalOpen] = useState(false);
     const [selectedLeadForDetails, setSelectedLeadForDetails] = useState<LeadJourney | null>(null);
     const [inspectCampaignData, setInspectCampaignData] = useState<{ campaign: CampaignData; leads: LeadJourney[] } | null>(null);
     const [campaignToDelete, setCampaignToDelete] = useState<CampaignData | null>(null);
+    const [campaignToEdit, setCampaignToEdit] = useState<CampaignData | null>(null);
 
     // Formulários
     const [createForm, setCreateForm] = useState({
         name: '',
         entryPoint: '/descubra',
         description: '',
+    });
+    const [editForm, setEditForm] = useState({
+        name: '',
+        entryPoint: '/descubra',
+        description: '',
+        externalImpressions: '',
+        externalClicks: '',
+        status: 'completed',
     });
     const [stopForm, setStopForm] = useState({
         externalImpressions: '',
@@ -303,6 +313,61 @@ export default function CampaignsPage() {
         }
     };
 
+    const handleOpenEditModal = (c: CampaignData) => {
+        setCampaignToEdit(c);
+        setEditForm({
+            name: c.name || '',
+            entryPoint: c.entryPoint || '/descubra',
+            description: c.description || '',
+            externalImpressions: c.impressions ? String(c.impressions) : '',
+            externalClicks: c.clicks ? String(c.clicks) : '',
+            status: c.status || 'completed',
+        });
+        setIsEditModalOpen(true);
+    };
+
+    const handleSaveEditCampaign = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!campaignToEdit) return;
+        if (!editForm.name.trim()) {
+            toast.error('O nome da campanha é obrigatório');
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            const res = await fetch('/api/admin/campaigns', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: campaignToEdit._id,
+                    action: 'edit',
+                    name: editForm.name,
+                    entryPoint: editForm.entryPoint,
+                    description: editForm.description,
+                    externalImpressions: Number(editForm.externalImpressions) || 0,
+                    externalClicks: Number(editForm.externalClicks) || 0,
+                    status: editForm.status,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao salvar alterações');
+
+            toast.success('Campanha atualizada com sucesso!');
+            setIsEditModalOpen(false);
+            setCampaignToEdit(null);
+            await fetchCampaigns(false);
+
+            if (inspectCampaignData && inspectCampaignData.campaign._id === campaignToEdit._id) {
+                await handleOpenInspectCampaign(campaignToEdit._id);
+            }
+        } catch (err: any) {
+            toast.error(err.message || 'Erro ao atualizar');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
     const handleOpenInspectCampaign = async (campaignId: string) => {
         setSubmitting(true);
         try {
@@ -424,7 +489,16 @@ export default function CampaignsPage() {
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => handleOpenEditModal(activeCampaign)}
+                                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white/15 hover:bg-white/25 active:bg-white/30 text-white text-xs sm:text-sm font-bold rounded-xl transition cursor-pointer border border-white/20"
+                                    title="Editar Dados da Campanha"
+                                >
+                                    <Pencil size={14} />
+                                    Editar
+                                </button>
+
                                 <button
                                     onClick={() => {
                                         setStopForm({ externalImpressions: '', externalClicks: '' });
@@ -863,6 +937,14 @@ export default function CampaignsPage() {
                                                         </button>
 
                                                         <button
+                                                            onClick={() => handleOpenEditModal(c)}
+                                                            className="p-1.5 text-slate-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition cursor-pointer"
+                                                            title="Editar Dados da Campanha"
+                                                        >
+                                                            <Pencil size={15} />
+                                                        </button>
+
+                                                        <button
                                                             onClick={() => setCampaignToDelete(c)}
                                                             className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition cursor-pointer"
                                                             title="Excluir Campanha"
@@ -1264,12 +1346,21 @@ export default function CampaignsPage() {
                                     Ponto de entrada: <code className="text-purple-600 font-mono font-bold">{inspectCampaignData.campaign.entryPoint}</code> • {inspectCampaignData.leads.length} cadastros gerados
                                 </p>
                             </div>
-                            <button
-                                onClick={() => setIsInspectModalOpen(false)}
-                                className="text-slate-400 hover:text-slate-600 p-2 rounded-xl"
-                            >
-                                <X size={20} />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => handleOpenEditModal(inspectCampaignData.campaign)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer shadow-xs"
+                                >
+                                    <Pencil size={13} />
+                                    Editar Dados
+                                </button>
+                                <button
+                                    onClick={() => setIsInspectModalOpen(false)}
+                                    className="text-slate-400 hover:text-slate-600 p-2 rounded-xl cursor-pointer"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
                         </div>
 
                         <div className="p-6 overflow-y-auto flex-1 space-y-4">
@@ -1366,6 +1457,138 @@ export default function CampaignsPage() {
                     </div>
                 </div>
             )}
+
+            {/* ══════════════════════════════════════════════════════════════════════
+                MODAL DE EDIÇÃO DE CAMPANHA (DISPONÍVEL INCLUSIVE DEPOIS DE ENCERRAR)
+            ══════════════════════════════════════════════════════════════════════ */}
+            {isEditModalOpen && campaignToEdit && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-fade-in">
+                    <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 max-h-[92vh] overflow-y-auto">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-black tracking-tight text-slate-900 flex items-center gap-2">
+                                <Pencil size={18} className="text-purple-600" />
+                                Editar Campanha
+                            </h3>
+                            <button
+                                onClick={() => {
+                                    setIsEditModalOpen(false);
+                                    setCampaignToEdit(null);
+                                }}
+                                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveEditCampaign} className="space-y-4">
+                            <div>
+                                <label className="text-xs font-bold text-slate-700 block mb-1">
+                                    Nome da Campanha <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={editForm.name}
+                                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                                    className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-slate-700 block mb-1">
+                                    Ponto de Entrada (Landing Page) <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={editForm.entryPoint}
+                                    onChange={(e) => setEditForm({ ...editForm, entryPoint: e.target.value })}
+                                    className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600 font-mono"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-slate-700 block mb-1">
+                                    Descrição & Criativo
+                                </label>
+                                <textarea
+                                    rows={3}
+                                    placeholder="Anotações sobre banner, criativo, segmentação no Exoclick..."
+                                    value={editForm.description}
+                                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                                    className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600 resize-none"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                                        Total de Impressões
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        placeholder="0"
+                                        value={editForm.externalImpressions}
+                                        onChange={(e) => setEditForm({ ...editForm, externalImpressions: e.target.value })}
+                                        className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                                        Total de Cliques
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        placeholder="0"
+                                        value={editForm.externalClicks}
+                                        onChange={(e) => setEditForm({ ...editForm, externalClicks: e.target.value })}
+                                        className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-slate-700 block mb-1">
+                                    Status da Campanha
+                                </label>
+                                <select
+                                    value={editForm.status}
+                                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                                    className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600 bg-white"
+                                >
+                                    <option value="draft">Rascunho (Não iniciada)</option>
+                                    <option value="tracking">Rastreamento ao Vivo (Ativa)</option>
+                                    <option value="completed">Encerrada / Concluída</option>
+                                </select>
+                            </div>
+
+                            <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsEditModalOpen(false);
+                                        setCampaignToEdit(null);
+                                    }}
+                                    className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={submitting}
+                                    className="px-5 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-xl shadow-xs transition disabled:opacity-50 cursor-pointer"
+                                >
+                                    {submitting ? 'Salvando...' : 'Salvar Alterações'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
+

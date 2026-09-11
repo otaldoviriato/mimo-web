@@ -35,9 +35,13 @@ export function PublicTrafficTracker() {
         const hasUtm = Object.keys(utm).length > 0 || Boolean(clickId) || Boolean(zone);
         const existingAttributionStr = localStorage.getItem(CAMPAIGN_ATTRIBUTION_STORAGE_KEY);
 
-        // Se tiver UTM na URL ou se for um novo visitante sem atribuição:
-        if (hasUtm || (isNewVisitor && !existingAttributionStr)) {
-            const currentLanding = typeof window !== 'undefined' ? window.location.pathname : undefined;
+        // 3. Garante disparo único por rota nesta sessão para evitar duplicações
+        const currentLanding = typeof window !== 'undefined' ? window.location.pathname : '';
+        const sessionKey = `mimo_visit_tracked_${currentLanding}_${visitorId}`;
+        const alreadyTrackedThisSession = sessionStorage.getItem(sessionKey);
+
+        if (!alreadyTrackedThisSession) {
+            sessionStorage.setItem(sessionKey, '1');
             const attribution = {
                 visitorId,
                 clickId,
@@ -53,7 +57,7 @@ export function PublicTrafficTracker() {
 
             localStorage.setItem(CAMPAIGN_ATTRIBUTION_STORAGE_KEY, JSON.stringify(attribution));
 
-            // Registra a visita no backend (criação automática da campanha ou atribuição a orgânico)
+            // Registra a visita no backend de forma única
             void fetch('/api/campaigns/visit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

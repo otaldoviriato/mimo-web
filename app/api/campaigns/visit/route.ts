@@ -153,14 +153,9 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // 3. Upsert do registro de visita e incremento atômico de acessos únicos
+        // 3. Upsert atômico do registro de visita
         const now = new Date();
-        const existingVisit = await CampaignVisit.findOne({ campaignId: campaign._id, visitorId }).select('_id').lean();
-        if (!existingVisit) {
-            await Campaign.updateOne({ _id: campaign._id }, { $inc: { uniqueVisitorsCount: 1 } });
-        }
-
-        const visit = await CampaignVisit.findOneAndUpdate(
+        const visitResult: any = await CampaignVisit.findOneAndUpdate(
             { campaignId: campaign._id, visitorId },
             {
                 $setOnInsert: {
@@ -183,8 +178,16 @@ export async function POST(request: NextRequest) {
                 },
                 ...(event === 'cta_clicked' ? { $set: { ctaClickedAt: now } } : {}),
             },
-            { upsert: true, returnDocument: 'after' },
+            { upsert: true, returnDocument: 'after', rawResult: true }
         );
+
+        const isNewVisit = !visitResult?.lastErrorObject?.updatedExisting;
+        if (isNewVisit) {
+            const actualCount = await CampaignVisit.countDocuments({ campaignId: campaign._id });
+            await Campaign.updateOne({ _id: campaign._id }, { $set: { uniqueVisitorsCount: actualCount } });
+        }
+
+        const visit = visitResult?.value || visitResult;
 
         let targetProfessional = null;
         if (campaign.targetProfessionalId) {
