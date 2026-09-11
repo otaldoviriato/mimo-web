@@ -20,6 +20,14 @@ interface Props {
     onOrderChange?: (orderedIds: string[], hasChanged: boolean) => void;
 }
 
+function triggerHapticFeedback() {
+    if (typeof window !== 'undefined' && 'navigator' in window && typeof navigator.vibrate === 'function') {
+        try {
+            navigator.vibrate(50);
+        } catch {}
+    }
+}
+
 export function ProfilePhotosEditor({ photoUrl, onOrderChange }: Props) {
     const queryClient = useQueryClient();
     const { data: gallery, isLoading, isError } = useMyGallery();
@@ -35,12 +43,12 @@ export function ProfilePhotosEditor({ photoUrl, onOrderChange }: Props) {
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
     const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
     const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null);
+    const [selectingIndex, setSelectingIndex] = useState<number | null>(null);
 
-    // Guarda os IDs iniciais do servidor para saber se houve alteração
     const initialIdsRef = useRef<string[]>([]);
     const hasInitializedRef = useRef(false);
+    const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Pointer events para arrastar tocando/clicando em qualquer lugar da foto
     const pointerDragRef = useRef<{
         startX: number;
         startY: number;
@@ -168,57 +176,96 @@ export function ProfilePhotosEditor({ photoUrl, onOrderChange }: Props) {
         }
     };
 
-    // ─── POINTER EVENTS: CLICAR E ARRASTAR EM QUALQUER LUGAR DA FOTO ───
+    useEffect(() => {
+        return () => {
+            if (longPressTimerRef.current) {
+                clearTimeout(longPressTimerRef.current);
+            }
+        };
+    }, []);
+
+    const LONG_PRESS_DURATION = 350;
+
     const startPointerDrag = (e: React.PointerEvent<HTMLElement>, index: number) => {
         if (e.button !== 0 || busy) return;
 
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+        }
+
         const currentTarget = e.currentTarget;
-        try {
-            currentTarget.setPointerCapture(e.pointerId);
-        } catch {}
+        const pointerId = e.pointerId;
 
         pointerDragRef.current = {
             startX: e.clientX,
             startY: e.clientY,
             index,
             active: false,
-            pointerId: e.pointerId,
+            pointerId,
             element: currentTarget,
         };
+
+        setSelectingIndex(index);
+
+        longPressTimerRef.current = setTimeout(() => {
+            if (!pointerDragRef.current || pointerDragRef.current.index !== index) return;
+
+            triggerHapticFeedback();
+
+            pointerDragRef.current.active = true;
+            try {
+                currentTarget.setPointerCapture(pointerId);
+            } catch {}
+
+            setDraggedIndex(index);
+            setSelectingIndex(null);
+            setDragPosition({ x: pointerDragRef.current.startX, y: pointerDragRef.current.startY });
+        }, LONG_PRESS_DURATION);
     };
 
     const handlePointerMove = (e: React.PointerEvent<HTMLElement>) => {
         if (!pointerDragRef.current) return;
 
-        const dx = e.clientX - pointerDragRef.current.startX;
-        const dy = e.clientY - pointerDragRef.current.startY;
-        const dist = Math.hypot(dx, dy);
+        if (!pointerDragRef.current.active) {
+            const dx = e.clientX - pointerDragRef.current.startX;
+            const dy = e.clientY - pointerDragRef.current.startY;
+            const dist = Math.hypot(dx, dy);
 
-        // Ativa o modo de arraste assim que mover mais de 5 pixels
-        if (!pointerDragRef.current.active && dist > 5) {
-            pointerDragRef.current.active = true;
-            setDraggedIndex(pointerDragRef.current.index);
+            if (dist > 8) {
+                if (longPressTimerRef.current) {
+                    clearTimeout(longPressTimerRef.current);
+                    longPressTimerRef.current = null;
+                }
+                setSelectingIndex(null);
+                pointerDragRef.current = null;
+            }
+            return;
         }
 
-        if (pointerDragRef.current.active) {
-            setDragPosition({ x: e.clientX, y: e.clientY });
+        setDragPosition({ x: e.clientX, y: e.clientY });
 
-            // Identifica qual card está sob o ponteiro
-            const elements = document.elementsFromPoint(e.clientX, e.clientY);
-            for (const el of elements) {
-                const card = el.closest('[data-photo-index]');
-                if (card) {
-                    const targetIdx = Number(card.getAttribute('data-photo-index'));
-                    if (!isNaN(targetIdx) && targetIdx >= 0 && targetIdx < orderedItems.length) {
-                        setDragOverIndex(targetIdx);
-                        break;
-                    }
+        const elements = document.elementsFromPoint(e.clientX, e.clientY);
+        for (const el of elements) {
+            const card = el.closest('[data-photo-index]');
+            if (card) {
+                const targetIdx = Number(card.getAttribute('data-photo-index'));
+                if (!isNaN(targetIdx) && targetIdx >= 0 && targetIdx < orderedItems.length) {
+                    setDragOverIndex(targetIdx);
+                    break;
                 }
             }
         }
     };
 
     const handlePointerUp = (e: React.PointerEvent<HTMLElement>) => {
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+        }
+
+        setSelectingIndex(null);
+
         if (pointerDragRef.current) {
             try {
                 pointerDragRef.current.element.releasePointerCapture(e.pointerId);
@@ -239,11 +286,19 @@ export function ProfilePhotosEditor({ photoUrl, onOrderChange }: Props) {
     };
 
     const handlePointerCancel = (e: React.PointerEvent<HTMLElement>) => {
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+        }
+
+        setSelectingIndex(null);
+
         if (pointerDragRef.current) {
             try {
                 pointerDragRef.current.element.releasePointerCapture(e.pointerId);
             } catch {}
         }
+
         pointerDragRef.current = null;
         setDraggedIndex(null);
         setDragOverIndex(null);
@@ -252,12 +307,11 @@ export function ProfilePhotosEditor({ photoUrl, onOrderChange }: Props) {
 
     return (
         <section aria-label="Fotos do Perfil" className="rounded-2xl border border-slate-100 bg-white p-4 shadow-xs space-y-3">
-            {/* Header limpo */}
             <div className="flex items-center justify-between">
                 <div>
                     <h2 className="text-sm font-bold text-slate-900">Fotos do Perfil</h2>
                     <p className="text-[11px] text-slate-400">
-                        Toque e arraste para reorganizar as fotos. A 1ª foto será o seu perfil.
+                        Segure o dedo sobre a foto para selecionar e reposicionar. A 1ª foto será o seu perfil.
                     </p>
                 </div>
                 {orderedItems.length > 0 && (
@@ -292,6 +346,7 @@ export function ProfilePhotosEditor({ photoUrl, onOrderChange }: Props) {
                     {orderedItems.map((item, index) => {
                         const isDragging = draggedIndex === index;
                         const isDragOver = dragOverIndex === index && draggedIndex !== index;
+                        const isSelecting = selectingIndex === index;
 
                         return (
                             <div
@@ -301,15 +356,17 @@ export function ProfilePhotosEditor({ photoUrl, onOrderChange }: Props) {
                                 onPointerMove={handlePointerMove}
                                 onPointerUp={handlePointerUp}
                                 onPointerCancel={handlePointerCancel}
-                                style={{ touchAction: 'none' }}
-                                className={`group relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 border transition-all select-none touch-none cursor-grab active:cursor-grabbing ${
+                                style={{ touchAction: isDragging ? 'none' : 'pan-y' }}
+                                className={`group relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 border transition-all select-none ${
                                     isDragging 
-                                        ? 'opacity-20 scale-95 ring-2 ring-purple-600 ring-offset-2 border-dashed border-purple-500 z-10' 
+                                        ? 'opacity-20 scale-95 ring-4 ring-purple-600 ring-offset-2 border-dashed border-purple-500 z-10 cursor-grabbing' 
                                         : isDragOver
                                             ? 'border-purple-600 scale-102 ring-4 ring-purple-400/50 shadow-xl z-20 bg-purple-50/20'
-                                            : index === 0
-                                                ? 'border-purple-300 ring-2 ring-purple-100/80 shadow-xs'
-                                                : 'border-slate-200/90 shadow-xs hover:border-purple-200'
+                                            : isSelecting
+                                                ? 'scale-[0.98] ring-2 ring-purple-400 border-purple-400 shadow-sm'
+                                                : index === 0
+                                                    ? 'border-purple-300 ring-2 ring-purple-100/80 shadow-xs'
+                                                    : 'border-slate-200/90 shadow-xs hover:border-purple-200'
                                 }`}
                             >
                                 <Image
