@@ -80,6 +80,14 @@ export function FirstMessageNotificationModal({
         setPushEnabled(isStandalone && permission === 'granted');
     }, [isStandalone, permission]);
 
+    const allEnabled = emailEnabled && pushEnabled;
+
+    useEffect(() => {
+        if (isOpen && allEnabled) {
+            onClose();
+        }
+    }, [isOpen, allEnabled, onClose]);
+
     useEffect(() => {
         const onInstalled = () => {
             setIsInstallingApp(false);
@@ -89,6 +97,10 @@ export function FirstMessageNotificationModal({
         window.addEventListener('pwa_app_installed', onInstalled);
         return () => window.removeEventListener('pwa_app_installed', onInstalled);
     }, []);
+
+    if (allEnabled) {
+        return null;
+    }
 
     const handleToggleEmail = async (next: boolean) => {
         setEmailEnabled(next);

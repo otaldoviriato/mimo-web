@@ -625,6 +625,16 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             return;
         }
 
+        const isEmailEnabled = userData?.emailNotificationsEnabled !== false;
+        const isPushGranted = (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') || Boolean(userData?.hasPushToken);
+        if (isEmailEnabled && isPushGranted) {
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(storageKey, 'true');
+            }
+            void userApi.updateMe({ hasSentFirstMessage: true }).catch(() => undefined);
+            return;
+        }
+
         setTimeout(() => {
             setShowFirstMessageNotifModal(true);
             if (typeof window !== 'undefined') {
