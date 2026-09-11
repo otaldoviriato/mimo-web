@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import { AppSettings } from '@/models/AppSettings';
@@ -27,6 +27,84 @@ function sanitizeSlug(text: string): string {
         .replace(/^-|-$/g, '');
 }
 
+async function enrichLeadsWithUserData(leads: any[]) {
+    if (!leads || leads.length === 0) return leads;
+
+    const userIds = leads.map(l => l.userId).filter(Boolean);
+    if (userIds.length === 0) return leads;
+
+    const dbUsers = await User.find({ clerkId: { $in: userIds } })
+        .select('clerkId name username photoUrl email')
+        .lean();
+    const userMap = new Map(dbUsers.map(u => [u.clerkId, u]));
+
+    let clerkClientInstance: any = null;
+
+    const enriched = await Promise.all(leads.map(async (lead) => {
+        const u = userMap.get(lead.userId);
+        let name = u?.name || lead.userInfo?.name || null;
+        let username = u?.username || lead.userInfo?.username || null;
+        let photoUrl = u?.photoUrl || lead.userInfo?.photoUrl || null;
+        let email = u?.email || lead.userInfo?.email || null;
+
+        // Se o nome está genérico ou vazio, busca direto no Clerk
+        if (!name || name === 'usuario' || !username || username === 'usuario') {
+            try {
+                if (!clerkClientInstance) {
+                    clerkClientInstance = await clerkClient();
+                }
+                const clerkUser = await clerkClientInstance.users.getUser(lead.userId);
+                if (clerkUser) {
+                    const fullName = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ').trim();
+                    if (fullName) name = fullName;
+                    if (clerkUser.username) username = clerkUser.username;
+                    if (clerkUser.imageUrl) photoUrl = clerkUser.imageUrl;
+                    if (clerkUser.emailAddresses?.[0]?.emailAddress) email = clerkUser.emailAddresses[0].emailAddress;
+                }
+            } catch {
+                // Silencioso se usuário não for encontrado no Clerk
+            }
+        }
+
+        if (!name && username && username !== 'usuario') {
+            name = username;
+        } else if (!name) {
+            name = 'Novo Usuário';
+        }
+
+        if (!username || username === 'usuario') {
+            username = email ? email.split('@')[0] : `user_${String(lead.userId).slice(-5)}`;
+        }
+
+        // Atualiza pontualmente no MongoDB para que o dado fique permanentemente salvo
+        if (name !== lead.userInfo?.name || username !== lead.userInfo?.username || photoUrl !== lead.userInfo?.photoUrl) {
+            void CampaignUserJourney.updateOne(
+                { _id: lead._id },
+                {
+                    $set: {
+                        'userInfo.name': name,
+                        'userInfo.username': username,
+                        'userInfo.photoUrl': photoUrl,
+                        'userInfo.email': email,
+                    }
+                }
+            ).catch(() => {});
+        }
+
+        return {
+            ...lead,
+            userInfo: {
+                name,
+                username,
+                photoUrl,
+                email,
+            }
+        };
+    }));
+
+    return enriched;
+}
+
 export async function GET(request: NextRequest) {
     await connectToDatabase();
     if (!await requireAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -42,9 +120,10 @@ export async function GET(request: NextRequest) {
         }
 
         const uniqueVisits = await CampaignVisit.countDocuments({ campaignId: campaign._id });
-        const leads = await CampaignUserJourney.find({ campaignId: campaign._id })
+        const rawLeads = await CampaignUserJourney.find({ campaignId: campaign._id })
             .sort({ signupAt: -1 })
             .lean();
+        const leads = await enrichLeadsWithUserData(rawLeads);
 
         return NextResponse.json({
             campaign: {
@@ -86,10 +165,11 @@ export async function GET(request: NextRequest) {
         }
 
         const activeUniqueVisits = await CampaignVisit.countDocuments({ campaignId: activeCampaign._id });
-        const activeLeads = await CampaignUserJourney.find({ campaignId: activeCampaign._id })
+        const rawActiveLeads = await CampaignUserJourney.find({ campaignId: activeCampaign._id })
             .sort({ signupAt: -1 })
             .limit(300)
             .lean();
+        const activeLeads = await enrichLeadsWithUserData(rawActiveLeads);
 
         activeCampaignData = {
             ...activeCampaign,

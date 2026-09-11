@@ -406,6 +406,25 @@ export default function CampaignsPage() {
         }
     };
 
+    const getUserDisplayName = (lead: LeadJourney) => {
+        const name = lead.userInfo?.name?.trim();
+        const username = lead.userInfo?.username?.trim();
+        if (name && name.toLowerCase() !== 'usuario') return name;
+        if (username && username.toLowerCase() !== 'usuario') return `@${username}`;
+        return 'Novo Usuário';
+    };
+
+    const getUserInitials = (lead: LeadJourney) => {
+        const name = lead.userInfo?.name?.trim();
+        const username = lead.userInfo?.username?.trim();
+        const raw = (name && name.toLowerCase() !== 'usuario' ? name : (username && username.toLowerCase() !== 'usuario' ? username : 'U'));
+        const parts = raw.replace(/^@/, '').split(' ').filter(Boolean);
+        if (parts.length >= 2) {
+            return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+        }
+        return raw.replace(/^@/, '').slice(0, 2).toUpperCase();
+    };
+
     const formatTimestamp = (dateVal?: string | Date | null) => {
         if (!dateVal) return '--';
         const d = new Date(dateVal);
@@ -693,17 +712,17 @@ export default function CampaignsPage() {
                                                 }`}
                                             >
                                                 {/* Info do Usuário */}
-                                                <div className="flex items-center gap-3.5 min-w-[220px]">
+                                                <div className="flex items-center gap-3.5 min-w-[240px]">
                                                     <div className="relative">
-                                                        <div className="w-11 h-11 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center font-bold text-slate-700 text-sm">
+                                                        <div className="w-11 h-11 rounded-full bg-purple-50 border border-purple-200 overflow-hidden flex items-center justify-center font-black text-purple-700 text-xs">
                                                             {lead.userInfo.photoUrl ? (
                                                                 <img
                                                                     src={lead.userInfo.photoUrl}
-                                                                    alt={lead.userInfo.username}
+                                                                    alt={getUserDisplayName(lead)}
                                                                     className="w-full h-full object-cover"
                                                                 />
                                                             ) : (
-                                                                lead.userInfo.username.slice(0, 2).toUpperCase()
+                                                                getUserInitials(lead)
                                                             )}
                                                         </div>
                                                         {lead.isOnline ? (
@@ -721,8 +740,8 @@ export default function CampaignsPage() {
 
                                                     <div>
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-sm font-bold text-slate-900 leading-tight">
-                                                                {lead.userInfo.name || `@${lead.userInfo.username}`}
+                                                            <span className="text-sm font-black text-slate-900 leading-tight">
+                                                                {getUserDisplayName(lead)}
                                                             </span>
                                                             {lead.isOnline ? (
                                                                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
@@ -734,11 +753,16 @@ export default function CampaignsPage() {
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <div className="text-[11px] text-slate-500 mt-0.5">
-                                                            Cadastro:{' '}
-                                                            <strong className="text-slate-700 font-semibold">
-                                                                {formatTimestamp(lead.signupAt)}
-                                                            </strong>
+                                                        <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                                            {lead.userInfo.username && lead.userInfo.username.toLowerCase() !== 'usuario' && (
+                                                                <span className="text-purple-600 font-semibold">@{lead.userInfo.username} •</span>
+                                                            )}
+                                                            <span>
+                                                                Cadastro:{' '}
+                                                                <strong className="text-slate-700 font-semibold">
+                                                                    {formatTimestamp(lead.signupAt)}
+                                                                </strong>
+                                                            </span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1156,15 +1180,15 @@ export default function CampaignsPage() {
                         <div className="p-6 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between">
                             <div className="flex items-center gap-3.5">
                                 <div className="relative">
-                                    <div className="w-13 h-13 rounded-full bg-purple-100 text-purple-800 border-2 border-white shadow-xs overflow-hidden flex items-center justify-center font-black text-base">
+                                    <div className="w-13 h-13 rounded-full bg-purple-100 text-purple-800 border-2 border-white shadow-xs overflow-hidden flex items-center justify-center font-black text-sm">
                                         {selectedLeadForDetails.userInfo.photoUrl ? (
                                             <img
                                                 src={selectedLeadForDetails.userInfo.photoUrl}
-                                                alt={selectedLeadForDetails.userInfo.username}
+                                                alt={getUserDisplayName(selectedLeadForDetails)}
                                                 className="w-full h-full object-cover"
                                             />
                                         ) : (
-                                            selectedLeadForDetails.userInfo.username.slice(0, 2).toUpperCase()
+                                            getUserInitials(selectedLeadForDetails)
                                         )}
                                     </div>
                                     {selectedLeadForDetails.isOnline && (
@@ -1173,8 +1197,8 @@ export default function CampaignsPage() {
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2">
-                                        <h3 className="text-base font-black text-slate-900">
-                                            {selectedLeadForDetails.userInfo.name || `@${selectedLeadForDetails.userInfo.username}`}
+                                        <h3 className="text-base font-black text-slate-900 leading-tight">
+                                            {getUserDisplayName(selectedLeadForDetails)}
                                         </h3>
                                         {selectedLeadForDetails.isOnline ? (
                                             <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
@@ -1186,8 +1210,11 @@ export default function CampaignsPage() {
                                             </span>
                                         )}
                                     </div>
-                                    <p className="text-xs text-slate-500 font-medium">
-                                        @{selectedLeadForDetails.userInfo.username} • Cadastrado em{' '}
+                                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                        {selectedLeadForDetails.userInfo.username && selectedLeadForDetails.userInfo.username.toLowerCase() !== 'usuario' && (
+                                            <span className="text-purple-600 font-semibold">@{selectedLeadForDetails.userInfo.username} • </span>
+                                        )}
+                                        Cadastrado em{' '}
                                         <strong className="text-slate-700 font-semibold">
                                             {formatTimestamp(selectedLeadForDetails.signupAt)}
                                         </strong>
@@ -1410,14 +1437,21 @@ export default function CampaignsPage() {
                                             className="p-3.5 bg-slate-50 hover:bg-purple-50/50 border border-slate-200 hover:border-purple-200 rounded-2xl flex items-center justify-between gap-4 cursor-pointer transition"
                                         >
                                             <div className="flex items-center gap-3">
-                                                <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-800 flex items-center justify-center font-bold text-xs">
-                                                    {lead.userInfo.username.slice(0, 2).toUpperCase()}
+                                                <div className="w-9 h-9 rounded-full bg-purple-50 text-purple-800 border border-purple-200 overflow-hidden flex items-center justify-center font-bold text-xs">
+                                                    {lead.userInfo.photoUrl ? (
+                                                        <img src={lead.userInfo.photoUrl} alt={getUserDisplayName(lead)} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        getUserInitials(lead)
+                                                    )}
                                                 </div>
                                                 <div>
                                                     <div className="text-xs font-bold text-slate-900">
-                                                        @{lead.userInfo.username}
+                                                        {getUserDisplayName(lead)}
                                                     </div>
                                                     <div className="text-[10px] text-slate-400">
+                                                        {lead.userInfo.username && lead.userInfo.username.toLowerCase() !== 'usuario' && (
+                                                            <span>@{lead.userInfo.username} • </span>
+                                                        )}
                                                         {formatTimestamp(lead.signupAt)}
                                                     </div>
                                                 </div>

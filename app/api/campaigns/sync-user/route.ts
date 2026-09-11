@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { AppSettings } from '@/models/AppSettings';
 import { Campaign } from '@/models/Campaign';
@@ -88,6 +88,46 @@ export async function POST(request: NextRequest) {
             });
         }
 
+        let name = user?.name || null;
+        let username = user?.username || null;
+        let photoUrl = user?.photoUrl || null;
+        let email = user?.email || null;
+
+        // Se o documento no banco ainda não foi populado pelo webhook ou não tem nome, consulta o Clerk diretamente
+        if (!name || !username || username === 'usuario') {
+            try {
+                const client = await clerkClient();
+                const clerkUser = await client.users.getUser(userId);
+                if (clerkUser) {
+                    const fullName = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ').trim();
+                    if (fullName) name = fullName;
+                    if (!username && clerkUser.username) username = clerkUser.username;
+                    if (!email && clerkUser.emailAddresses?.[0]?.emailAddress) {
+                        email = clerkUser.emailAddresses[0].emailAddress;
+                    }
+                    if (!photoUrl && clerkUser.imageUrl) photoUrl = clerkUser.imageUrl;
+                }
+            } catch (err) {
+                console.warn('Aviso: falha ao buscar dados no Clerk para sync-user:', err);
+            }
+        }
+
+        // Se ainda não houver username definido, deriva do email ou do id
+        if (!username || username === 'usuario') {
+            if (email && email.includes('@')) {
+                username = email.split('@')[0];
+            } else if (name) {
+                username = name.toLowerCase().replace(/\s+/g, '');
+            } else {
+                username = `usuario_${userId.slice(-5)}`;
+            }
+        }
+
+        // Se ainda não houver nome, usa o username
+        if (!name) {
+            name = username;
+        }
+
         const signupDate = user?.createdAt || new Date();
 
         // 6. Vincula a visita do visitorId ao userId autenticado de forma pontual
@@ -106,7 +146,7 @@ export async function POST(request: NextRequest) {
         const existingJourney = await CampaignUserJourney.findOne({
             campaignId: activeCampaign._id,
             userId,
-        }).select('_id').lean();
+        }).select('_id userInfo').lean();
 
         if (!existingJourney) {
             await CampaignUserJourney.create({
@@ -114,10 +154,10 @@ export async function POST(request: NextRequest) {
                 userId,
                 visitorId,
                 userInfo: {
-                    username: user?.username || 'usuario',
-                    name: user?.name || null,
-                    photoUrl: user?.photoUrl || null,
-                    email: user?.email || null,
+                    username,
+                    name,
+                    photoUrl,
+                    email,
                 },
                 signupAt: signupDate,
                 isOnline: true,
@@ -134,6 +174,19 @@ export async function POST(request: NextRequest) {
                 }],
             });
             journeyCreated = true;
+        } else if (name && (!existingJourney.userInfo?.name || existingJourney.userInfo?.username === 'usuario')) {
+            // Atualiza o nome real se anteriormente estava genérico
+            await CampaignUserJourney.updateOne(
+                { _id: existingJourney._id },
+                {
+                    $set: {
+                        'userInfo.name': name,
+                        'userInfo.username': username,
+                        'userInfo.photoUrl': photoUrl,
+                        'userInfo.email': email,
+                    }
+                }
+            );
         }
 
         return NextResponse.json({
