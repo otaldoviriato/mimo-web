@@ -23,34 +23,18 @@ export async function POST(request: NextRequest) {
 
         await connectToDatabase();
 
-        // Busca a jornada do usuário mais recente (priorizando a vinculada à campanha ativa ou mais recente)
+        // Busca a jornada do usuário mais recente vinculada a campanhas
         const journey = await CampaignUserJourney.findOne({ userId: effectiveUserId })
             .sort({ signupAt: -1 })
             .select('_id campaignId firstProfileViewed profilesVisited hasNavigatedPastFirstPhoto')
             .lean();
 
         if (!journey) {
-            // Se ainda não tem jornada criada (ex: cadastro recente não sincronizou), tenta achar a campanha ativa
-            const activeCampaign = await Campaign.findOne({ status: 'tracking' }).sort({ startedAt: -1 }).select('_id').lean();
-            if (!activeCampaign) {
-                return NextResponse.json({ success: true, ignored: true, reason: 'Nenhuma jornada ou campanha ativa' });
-            }
-
-            // Cria a jornada inicial para não perder o evento
-            await CampaignUserJourney.create({
-                campaignId: activeCampaign._id,
-                userId: effectiveUserId,
-                signupAt: new Date(),
-                isOnline: true,
-                lastActiveAt: new Date(),
-                lastAction: 'Iniciou navegação pós-cadastro',
-                timeline: [{
-                    type: 'custom',
-                    title: 'Entrou no aplicativo',
-                    timestamp: new Date(),
-                }],
+            return NextResponse.json({
+                success: true,
+                ignored: true,
+                reason: 'Usuário não possui jornada ativa de campanha vinculada',
             });
-            return NextResponse.json({ success: true, created: true });
         }
 
         const now = new Date();

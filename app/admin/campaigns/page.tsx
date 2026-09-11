@@ -383,6 +383,29 @@ export default function CampaignsPage() {
         }
     };
 
+    const handleDeleteLead = async (leadId: string) => {
+        if (!confirm('Deseja realmente remover este lead desta campanha?')) return;
+        setSubmitting(true);
+        try {
+            const res = await fetch(`/api/admin/campaigns?leadId=${leadId}`, {
+                method: 'DELETE',
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao remover lead');
+
+            toast.success('Lead removido da campanha');
+            setSelectedLeadForDetails(null);
+            await fetchCampaigns(false);
+            if (inspectCampaignData) {
+                await handleOpenInspectCampaign(inspectCampaignData.campaign._id);
+            }
+        } catch (err: any) {
+            toast.error(err.message || 'Erro ao remover lead');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
     const formatTimestamp = (dateVal?: string | Date | null) => {
         if (!dateVal) return '--';
         const d = new Date(dateVal);
@@ -1319,7 +1342,15 @@ export default function CampaignsPage() {
                             </div>
                         </div>
 
-                        <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+                        <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+                            <button
+                                onClick={() => handleDeleteLead(selectedLeadForDetails._id)}
+                                disabled={submitting}
+                                className="inline-flex items-center gap-1.5 px-4 py-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
+                            >
+                                <Trash2 size={14} />
+                                Remover Lead Desta Campanha
+                            </button>
                             <button
                                 onClick={() => setSelectedLeadForDetails(null)}
                                 className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition cursor-pointer"

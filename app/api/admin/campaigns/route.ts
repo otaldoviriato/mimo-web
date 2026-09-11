@@ -61,6 +61,30 @@ export async function GET(request: NextRequest) {
     let activeCampaignData = null;
 
     if (activeCampaign) {
+        // Higieniza registros inválidos que possam ter sido vinculados indevidamente à campanha em tracking:
+        // 1. Leads cujo signupAt seja anterior ao início da campanha (usuários antigos pré-existentes)
+        if (activeCampaign.startedAt) {
+            const minAllowedDate = new Date(new Date(activeCampaign.startedAt).getTime() - 15000);
+            await CampaignUserJourney.deleteMany({
+                campaignId: activeCampaign._id,
+                signupAt: { $lt: minAllowedDate },
+            });
+        }
+
+        // 2. Leads que não possuem visita correspondente no ponto de entrada desta campanha
+        const validVisits = await CampaignVisit.find({ campaignId: activeCampaign._id }).select('visitorId userId').lean();
+        const validVisitorIds = new Set(validVisits.map(v => v.visitorId).filter(Boolean));
+        const validUserIds = new Set(validVisits.map(v => v.userId).filter(Boolean));
+
+        const activeJourneys = await CampaignUserJourney.find({ campaignId: activeCampaign._id }).select('_id userId visitorId').lean();
+        const invalidJourneyIds = activeJourneys
+            .filter(j => (!j.visitorId || !validVisitorIds.has(j.visitorId)) && (!j.userId || !validUserIds.has(j.userId)))
+            .map(j => j._id);
+
+        if (invalidJourneyIds.length > 0) {
+            await CampaignUserJourney.deleteMany({ _id: { $in: invalidJourneyIds } });
+        }
+
         const activeUniqueVisits = await CampaignVisit.countDocuments({ campaignId: activeCampaign._id });
         const activeLeads = await CampaignUserJourney.find({ campaignId: activeCampaign._id })
             .sort({ signupAt: -1 })
@@ -284,14 +308,22 @@ export async function DELETE(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     let id = searchParams.get('id');
+    const leadId = searchParams.get('leadId');
 
-    if (!id) {
-        const body = await request.json().catch(() => ({}));
+    let body: any = {};
+    if (!id && !leadId) {
+        body = await request.json().catch(() => ({}));
         id = body.id;
     }
 
+    const effectiveLeadId = leadId || body.leadId;
+    if (effectiveLeadId) {
+        await CampaignUserJourney.findByIdAndDelete(effectiveLeadId);
+        return NextResponse.json({ success: true, message: 'Lead removido com sucesso.' });
+    }
+
     if (!id) {
-        return NextResponse.json({ error: 'ID da campanha é obrigatório para exclusão' }, { status: 400 });
+        return NextResponse.json({ error: 'ID da campanha ou leadId é obrigatório para exclusão' }, { status: 400 });
     }
 
     // Exclui a campanha e seus registros filhos (leads de jornada e visitas)

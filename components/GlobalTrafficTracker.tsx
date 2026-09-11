@@ -1,21 +1,32 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { CAMPAIGN_ATTRIBUTION_STORAGE_KEY } from './CampaignVisitTracker';
 import { emitCampaignTelemetry } from '@/lib/campaignTelemetry';
 
 export function PublicTrafficTracker() {
+    const pathname = usePathname();
+    const trackedInThisRender = useRef<Set<string>>(new Set());
+
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
         // 1. Garante visitorId estável
         let visitorId = localStorage.getItem('mimo_visitor_id');
-        const isNewVisitor = !visitorId;
         if (!visitorId) {
             visitorId = crypto.randomUUID();
             localStorage.setItem('mimo_visitor_id', visitorId);
         }
+
+        const currentLanding = pathname || (typeof window !== 'undefined' ? window.location.pathname : '');
+
+        // Evita reenvios simultâneos repetidos no mesmo ciclo de vida React
+        if (trackedInThisRender.current.has(currentLanding)) {
+            return;
+        }
+        trackedInThisRender.current.add(currentLanding);
 
         // 2. Extrai parâmetros de rastreamento da URL
         const urlParams = new URLSearchParams(window.location.search);
@@ -33,40 +44,31 @@ export function PublicTrafficTracker() {
         const variation = urlParams.get('variation_id') || urlParams.get('variation') || utm.utm_content || undefined;
 
         const hasUtm = Object.keys(utm).length > 0 || Boolean(clickId) || Boolean(zone);
-        const existingAttributionStr = localStorage.getItem(CAMPAIGN_ATTRIBUTION_STORAGE_KEY);
 
-        // 3. Garante disparo único por rota nesta sessão para evitar duplicações
-        const currentLanding = typeof window !== 'undefined' ? window.location.pathname : '';
-        const sessionKey = `mimo_visit_tracked_${currentLanding}_${visitorId}`;
-        const alreadyTrackedThisSession = sessionStorage.getItem(sessionKey);
+        const attribution = {
+            visitorId,
+            clickId,
+            site,
+            zone,
+            creative,
+            variation,
+            utm,
+            landingPage: currentLanding,
+            slug: hasUtm ? (utm.utm_campaign || utm.utm_source || 'utm-traffic') : 'organico',
+            capturedAt: new Date().toISOString(),
+        };
 
-        if (!alreadyTrackedThisSession) {
-            sessionStorage.setItem(sessionKey, '1');
-            const attribution = {
-                visitorId,
-                clickId,
-                site,
-                zone,
-                creative,
-                variation,
-                utm,
-                landingPage: currentLanding,
-                slug: hasUtm ? (utm.utm_campaign || utm.utm_source || 'utm-traffic') : 'organico',
-                capturedAt: new Date().toISOString(),
-            };
+        localStorage.setItem(CAMPAIGN_ATTRIBUTION_STORAGE_KEY, JSON.stringify(attribution));
 
-            localStorage.setItem(CAMPAIGN_ATTRIBUTION_STORAGE_KEY, JSON.stringify(attribution));
-
-            // Registra a visita no backend de forma única
-            void fetch('/api/campaigns/visit', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(attribution),
-                keepalive: true,
-            }).catch(() => {
-                // Silencioso em caso de erro de rede
-            });
-        }
+        // Registra a visita no backend de forma atômica
+        void fetch('/api/campaigns/visit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(attribution),
+            keepalive: true,
+        }).catch(() => {
+            // Silencioso em caso de erro de rede
+        });
 
         // 3. Listener global de CTA clicks (Etapa 2 do Funil)
         const recordCta = (event: MouseEvent) => {
@@ -78,12 +80,12 @@ export function PublicTrafficTracker() {
             if (!currentAttribution) {
                 currentAttribution = {
                     visitorId: localStorage.getItem('mimo_visitor_id') || visitorId,
-                    landingPage: typeof window !== 'undefined' ? window.location.pathname : undefined,
+                    landingPage: currentLanding,
                     slug: 'organico',
                     utm: {},
                 };
-            } else if (!currentAttribution.landingPage && typeof window !== 'undefined') {
-                currentAttribution.landingPage = window.location.pathname;
+            } else if (!currentAttribution.landingPage) {
+                currentAttribution.landingPage = currentLanding;
             }
 
             void fetch('/api/campaigns/visit', {
@@ -96,7 +98,7 @@ export function PublicTrafficTracker() {
 
         document.addEventListener('click', recordCta, { passive: true });
         return () => document.removeEventListener('click', recordCta);
-    }, []);
+    }, [pathname]);
 
     return null;
 }

@@ -105,24 +105,24 @@ export async function POST(request: NextRequest) {
             network = 'direct';
         }
 
-        // 1. Verifica primeiro se existe uma campanha ativa com status 'tracking' cujo ponto de entrada é esta página
-        let campaign = await Campaign.findOne({
-            status: 'tracking',
-            $or: [
-                { entryPoint: cleanLandingPage },
-                { entryPoint: cleanLandingPage === '/descubra' ? 'descubra' : cleanLandingPage },
-                ...(cleanLandingPage === '/descubra' ? [{ entryPoint: '/descubra' }] : [])
-            ]
-        }).sort({ startedAt: -1 });
+        const normalizedLanding = cleanLandingPage.replace(/^\//, '').replace(/\/$/, '').toLowerCase();
 
-        // Se não houver campanha tracking específica da rota, verifica se existe qualquer campanha tracking ativa
-        if (!campaign && cleanLandingPage === '/descubra') {
-            campaign = await Campaign.findOne({ status: 'tracking' }).sort({ startedAt: -1 });
+        // 1. Localiza campanhas em status 'tracking' (rastreamento temporal ativo)
+        const trackingCampaigns = await Campaign.find({ status: 'tracking' }).sort({ startedAt: -1 });
+
+        let campaign: any = trackingCampaigns.find(c => {
+            const ep = String(c.entryPoint || '').trim().replace(/^\//, '').replace(/\/$/, '').toLowerCase();
+            return ep === normalizedLanding || (normalizedLanding === 'descubra' && (!ep || ep === 'descubra'));
+        });
+
+        // Se houver campanha em tracking ativa e a rota for /descubra, vincula à campanha em tracking
+        if (!campaign && normalizedLanding === 'descubra' && trackingCampaigns.length > 0) {
+            campaign = trackingCampaigns[0];
         }
 
-        // Se não houver campanha em rastreamento temporal ativo, busca por slug ou id externo (comportamento clássico)
+        // Se não houver campanha em rastreamento temporal para esta rota, busca por slug específico ou UTM
         if (!campaign) {
-            if (targetSlug) {
+            if (targetSlug && targetSlug !== 'organico') {
                 campaign = await Campaign.findOne({ slug: targetSlug });
             }
             if (!campaign && utmCampaign) {
@@ -130,8 +130,19 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // 2. Se ainda não existir nenhuma campanha, cria automaticamente fallback
+        // 2. Se não encontrou campanha e a rota não é de landing/campanha nem tem UTM, ignora de forma limpa
         if (!campaign) {
+            const isCampaignLanding = cleanLandingPage === '/descubra' || cleanLandingPage.startsWith('/c/');
+            const hasExplicitCampaignParam = Boolean(utmCampaign || clickId || zoneId);
+
+            if (!isCampaignLanding && !hasExplicitCampaignParam) {
+                return NextResponse.json({
+                    success: true,
+                    ignored: true,
+                    reason: 'Nenhuma campanha associada a esta rota',
+                });
+            }
+
             try {
                 campaign = await Campaign.create({
                     name: campaignName,
