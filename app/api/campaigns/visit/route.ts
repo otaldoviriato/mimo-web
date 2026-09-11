@@ -130,38 +130,13 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // 2. Se não encontrou campanha e a rota não é de landing/campanha nem tem UTM, ignora de forma limpa
+        // 2. Se não encontrou nenhuma campanha manual correspondente cadastrada, JAMAIS cria automaticamente
         if (!campaign) {
-            const isCampaignLanding = cleanLandingPage === '/descubra' || cleanLandingPage.startsWith('/c/');
-            const hasExplicitCampaignParam = Boolean(utmCampaign || clickId || zoneId);
-
-            if (!isCampaignLanding && !hasExplicitCampaignParam) {
-                return NextResponse.json({
-                    success: true,
-                    ignored: true,
-                    reason: 'Nenhuma campanha associada a esta rota',
-                });
-            }
-
-            try {
-                campaign = await Campaign.create({
-                    name: campaignName,
-                    slug: targetSlug || `campanha-${Date.now()}`,
-                    entryPoint: cleanLandingPage,
-                    status: 'active',
-                    network,
-                    externalCampaignId: utmCampaign || null,
-                    externalVariationId: variationId || null,
-                    landingHeadline: campaignName,
-                    landingBody: `Campanha detectada pela rota ${cleanLandingPage}.`,
-                    uniqueVisitorsCount: 0,
-                    conversionGoals: ['landing_view', 'cta_click', 'signup', 'explore_profile_view', 'first_message_sent', 'first_message_received', 'first_recharge'],
-                    createdBy: 'system_auto_landing',
-                });
-            } catch (error: unknown) {
-                campaign = await Campaign.findOne({ slug: targetSlug });
-                if (!campaign) throw error;
-            }
+            return NextResponse.json({
+                success: true,
+                ignored: true,
+                reason: 'Nenhuma campanha manual cadastrada para esta rota',
+            });
         }
 
         // 3. Upsert atômico do registro de visita

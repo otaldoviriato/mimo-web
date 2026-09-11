@@ -99,8 +99,28 @@ export async function GET(request: NextRequest) {
         };
     }
 
-    // 2. Busca histórico geral de campanhas
-    const campaigns = await Campaign.find().sort({ createdAt: -1 }).lean();
+    // 2. Exclui e limpa quaisquer campanhas que tenham sido geradas automaticamente pelo antigo fallback
+    const autoCampaigns = await Campaign.find({
+        $or: [
+            { createdBy: 'system_auto_landing' },
+            { name: { $regex: /^Ponto de Entrada: \//i } }
+        ]
+    }).select('_id').lean();
+
+    if (autoCampaigns.length > 0) {
+        const autoIds = autoCampaigns.map(c => c._id);
+        await Promise.all([
+            CampaignUserJourney.deleteMany({ campaignId: { $in: autoIds } }),
+            CampaignVisit.deleteMany({ campaignId: { $in: autoIds } }),
+            Campaign.deleteMany({ _id: { $in: autoIds } }),
+        ]);
+    }
+
+    // 3. Busca histórico geral SOMENTE de campanhas cadastradas manualmente
+    const campaigns = await Campaign.find({
+        createdBy: { $ne: 'system_auto_landing' },
+        name: { $not: /^Ponto de Entrada: \//i }
+    }).sort({ createdAt: -1 }).lean();
 
     // Agregação de acessos únicos e cadastros por campanha
     const visitsCounts = await CampaignVisit.aggregate([

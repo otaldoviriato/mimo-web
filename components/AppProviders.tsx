@@ -29,7 +29,6 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
 
     return (
         <ClerkProvider>
-            <PublicTrafficTracker />
             <AuthenticatedTrafficSync />
             <QueryProvider>
                 <PWAProvider>
