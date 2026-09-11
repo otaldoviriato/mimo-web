@@ -32,7 +32,7 @@ export function FreeIntroConversationsControl({ division, onDivisionChange, clie
                         }`}
                     >
                         <span>{value === 'clients' ? 'Clientes' : 'Grátis'}</span>
-                        {unread > 0 && (
+                        {!isSelected && unread > 0 && (
                             <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-purple-600 text-white text-[11px] font-black leading-none shadow-xs">
                                 {displayUnread}
                             </span>
