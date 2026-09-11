@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { useUser } from '@clerk/nextjs';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Avatar } from '@/components/Avatar';
-import { useMyProfile, useUpdateProfile, useUploadPhoto, useMyGallery, useUploadToGallery, useDeleteFromGallery, useDepositHistory, useChatRooms, useUpdateGalleryItemVisibility, useMySubscriptions, useCancelSubscription, useResumeSubscription, type MySubscription } from '@/hooks/useQueries';
+import { useMyProfile, useUploadPhoto, useMyGallery, useUploadToGallery, useDeleteFromGallery, useDepositHistory, useChatRooms, useUpdateGalleryItemVisibility, useMySubscriptions, useCancelSubscription, useResumeSubscription, type MySubscription } from '@/hooks/useQueries';
 import { ImageCropper } from '@/components/ImageCropper';
 import { usePayment } from '@/context/PaymentContext';
 import { PullToRefresh } from '@/components';
@@ -35,16 +35,6 @@ export default function ProfilePage() {
     const { data: subscriptionsData, refetch: refetchSubscriptions } = useMySubscriptions();
     const cancelSubscriptionMutation = useCancelSubscription();
     const resumeSubscriptionMutation = useResumeSubscription();
-    const updateProfileMutation = useUpdateProfile();
-
-    const handleToggleAvailability = useCallback(async (enable: boolean) => {
-        try {
-            await updateProfileMutation.mutateAsync({ isAvailable: enable });
-            toast.success(enable ? 'Disponibilidade ativada com sucesso!' : 'Disponibilidade desativada.');
-        } catch (err: any) {
-            toast.error(err?.response?.data?.error || 'Erro ao alterar disponibilidade.');
-        }
-    }, [updateProfileMutation]);
 
     const onRefreshCreator = useCallback(async () => {
         await Promise.all([
@@ -372,10 +362,7 @@ export default function ProfilePage() {
                             subscriptionPrice: userData?.subscriptionPrice,
                             chargePerCharSubscribers: userData?.chargePerCharSubscribers,
                             chargePerCharNonSubscribers: userData?.chargePerCharNonSubscribers,
-                            isAvailable: userData?.isAvailable,
-                            availableUntil: userData?.availableUntil,
-                            availabilityResponseTimeMinutes: userData?.availabilityResponseTimeMinutes,
-                            availabilityDurationHours: userData?.availabilityDurationHours,
+                            isOnline: userData?.isOnline,
                         }}
                         publicItems={publicGalleryItems}
                         exclusiveItems={exclusiveGalleryItems}
@@ -384,8 +371,6 @@ export default function ProfilePage() {
                         isOwner={true}
                         loadingGallery={loadingProfile}
                         subscribing={false}
-                        onToggleAvailability={handleToggleAvailability}
-                        updatingAvailability={updateProfileMutation.isPending}
                         headerActions={
                             <>
                                 <button

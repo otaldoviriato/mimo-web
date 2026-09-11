@@ -19,7 +19,7 @@ export async function GET() {
         professionalStatus: 'approved',
         isSuspended: { $ne: true },
         hideFromExplore: { $ne: true },
-    }).select('clerkId username name photoUrl coverUrl bio isAvailable availableUntil isOnline lastSeen lastAccessAt createdAt accessCount').sort({ isOnline: -1, lastSeen: -1, lastAccessAt: -1, createdAt: -1, accessCount: -1 }).lean();
+    }).select('clerkId username name photoUrl coverUrl bio isOnline lastSeen lastAccessAt createdAt accessCount').sort({ isOnline: -1, lastSeen: -1, lastAccessAt: -1, createdAt: -1, accessCount: -1 }).lean();
     const ids = professionals.map(user => user.clerkId);
     const photos = await GalleryItem.find({ ownerId: { $in: ids }, galleryType: 'public', visibility: 'public', mediaType: 'photo' }).lean();
     const photoMap = new Map<string, string[]>();
@@ -27,8 +27,6 @@ export async function GET() {
     return NextResponse.json({ users: rankExploreUsers(professionals.map(user => ({
         ...user,
         id: user._id,
-        isAvailable: Boolean(user.isAvailable && user.availableUntil && new Date(user.availableUntil).getTime() > Date.now()),
-        availableUntil: user.availableUntil ? new Date(user.availableUntil).toISOString() : null,
         isOnline: user.isOnline === true,
         lastActiveTime: Math.max(
             user.lastSeen ? new Date(user.lastSeen).getTime() : 0,

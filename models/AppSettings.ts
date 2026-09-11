@@ -57,8 +57,6 @@ export interface IAppSettings extends Document {
     offlineFollowUpMaxAttempts: number;
     maxOnlineCumulativeChars: number;
     largeMessageWarningThresholdChars?: number;
-    availabilityResponseTimeMinutes: number;
-    availabilityDurationHours: number;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -367,18 +365,6 @@ const AppSettingsSchema = new Schema<IAppSettings>({
         required: true,
         default: ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'],
     },
-    availabilityResponseTimeMinutes: {
-        type: Number,
-        default: 10,
-        min: 1,
-        max: 120,
-    },
-    availabilityDurationHours: {
-        type: Number,
-        default: 4,
-        min: 1,
-        max: 24,
-    }
 }, {
     timestamps: true,
 });

@@ -81,8 +81,6 @@ async function getOrCreateSettings() {
         if (settings.offlineEmailCooldownMinutes === undefined) { settings.offlineEmailCooldownMinutes = 15; updated = true; }
         if (settings.activeUserThresholdDays === undefined) { settings.activeUserThresholdDays = 7; updated = true; }
         if (settings.largeMessageWarningThresholdChars === undefined) { settings.largeMessageWarningThresholdChars = 100; updated = true; }
-        if (settings.availabilityResponseTimeMinutes === undefined) { settings.availabilityResponseTimeMinutes = 10; updated = true; }
-        if (settings.availabilityDurationHours === undefined) { settings.availabilityDurationHours = 4; updated = true; }
         if (updated) {
             await settings.save();
         }
@@ -202,8 +200,6 @@ export async function PUT(request: NextRequest) {
             offlineEmailCooldownMinutes,
             activeUserThresholdDays,
             largeMessageWarningThresholdChars,
-            availabilityResponseTimeMinutes,
-            availabilityDurationHours,
         } = body;
 
         // Validações básicas
@@ -468,23 +464,6 @@ export async function PUT(request: NextRequest) {
             }
             settings.activeUnrechargedClientHoursThreshold = val;
         }
-
-        if (availabilityResponseTimeMinutes !== undefined) {
-            const val = Number(availabilityResponseTimeMinutes);
-            if (isNaN(val) || val < 1 || val > 120) {
-                return NextResponse.json({ error: 'Tempo de resposta da disponibilidade deve ser entre 1 e 120 minutos' }, { status: 400 });
-            }
-            settings.availabilityResponseTimeMinutes = Math.round(val);
-        }
-
-        if (availabilityDurationHours !== undefined) {
-            const val = Number(availabilityDurationHours);
-            if (isNaN(val) || val < 1 || val > 24) {
-                return NextResponse.json({ error: 'Duração da disponibilidade deve ser entre 1 e 24 horas' }, { status: 400 });
-            }
-            settings.availabilityDurationHours = Math.round(val);
-        }
-
 
         // Validação de consistência
         if (settings.minPublicPhotos > settings.maxPublicPhotos) {
