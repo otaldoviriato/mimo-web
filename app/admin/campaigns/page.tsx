@@ -90,6 +90,15 @@ interface LeadJourney {
         reason?: string | null;
         timestamp: string | Date;
     }>;
+    hasSentFreeMessage?: boolean;
+    freeMessagesCount?: number;
+    hasExhaustedFreeIntro?: boolean;
+    hasAttemptedPaidMessage?: boolean;
+    paidMessageAttemptsCount?: number;
+    hasAttemptedHiddenMessage?: boolean;
+    hiddenMessageAttemptsCount?: number;
+    hasOpenedRechargeModal?: boolean;
+    rechargeModalOpensCount?: number;
     timeline: TimelineEvent[];
 }
 
@@ -641,7 +650,7 @@ export default function CampaignsPage() {
                                         <TrendingUp size={18} />
                                     </div>
                                 </div>
-                                <div className="space-y-2.5 my-3 text-xs">
+                                <div className="space-y-2 my-3 text-xs">
                                     <div className="flex justify-between items-center py-1 border-b border-slate-100">
                                         <span className="text-slate-600 font-medium">Scrollaram o Explorar:</span>
                                         <strong className="text-slate-900 font-bold">
@@ -660,10 +669,34 @@ export default function CampaignsPage() {
                                             {activeCampaign.leads.filter(l => l.hasNavigatedPastFirstPhoto).length}
                                         </strong>
                                     </div>
-                                    <div className="flex justify-between items-center py-1">
-                                        <span className="text-slate-600 font-medium">Acionaram Gatilho de Recarga:</span>
+                                    <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                                        <span className="text-slate-600 font-medium">Enviaram Mensagem Grátis:</span>
+                                        <strong className="text-emerald-700 font-bold">
+                                            {activeCampaign.leads.filter(l => l.hasSentFreeMessage || (l.freeMessagesCount || 0) > 0).length}
+                                        </strong>
+                                    </div>
+                                    <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                                        <span className="text-slate-600 font-medium">Esgotaram as 3 Mensagens Grátis:</span>
+                                        <strong className="text-amber-700 font-bold">
+                                            {activeCampaign.leads.filter(l => l.hasExhaustedFreeIntro).length}
+                                        </strong>
+                                    </div>
+                                    <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                                        <span className="text-slate-600 font-medium">Tentaram Mensagem Paga:</span>
                                         <strong className="text-purple-700 font-bold">
-                                            {activeCampaign.leads.filter(l => (l.rechargeTriggers?.length || 0) > 0).length}
+                                            {activeCampaign.leads.filter(l => l.hasAttemptedPaidMessage || (l.paidMessageAttemptsCount || 0) > 0).length}
+                                        </strong>
+                                    </div>
+                                    <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                                        <span className="text-slate-600 font-medium">Tentaram Ver Mensagem Oculta:</span>
+                                        <strong className="text-rose-700 font-bold">
+                                            {activeCampaign.leads.filter(l => l.hasAttemptedHiddenMessage || (l.hiddenMessageAttemptsCount || 0) > 0).length}
+                                        </strong>
+                                    </div>
+                                    <div className="flex justify-between items-center py-1">
+                                        <span className="text-slate-600 font-medium">Abriram Modal de Recarga:</span>
+                                        <strong className="text-amber-700 font-bold">
+                                            {activeCampaign.leads.filter(l => l.hasOpenedRechargeModal || (l.rechargeTriggers?.length || 0) > 0 || (l.rechargeModalOpensCount || 0) > 0).length}
                                         </strong>
                                     </div>
                                 </div>
@@ -814,13 +847,53 @@ export default function CampaignsPage() {
                                                         {lead.hasNavigatedPastFirstPhoto ? 'Passou fotos' : '1ª foto'}
                                                     </span>
 
-                                                    {(lead.rechargeTriggers?.length || 0) > 0 && (
+                                                    {(lead.hasSentFreeMessage || (lead.freeMessagesCount || 0) > 0) && (
+                                                        <span
+                                                            className="text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                                            title="Enviou mensagem grátis"
+                                                        >
+                                                            <MessageSquare size={13} />
+                                                            Grátis ({lead.freeMessagesCount || 1})
+                                                        </span>
+                                                    )}
+
+                                                    {lead.hasExhaustedFreeIntro && (
+                                                        <span
+                                                            className="text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200"
+                                                            title="Esgotou as 3 mensagens grátis"
+                                                        >
+                                                            <CheckCircle2 size={13} />
+                                                            3 Grátis Fim
+                                                        </span>
+                                                    )}
+
+                                                    {(lead.hasAttemptedPaidMessage || (lead.paidMessageAttemptsCount || 0) > 0) && (
+                                                        <span
+                                                            className="text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1 bg-purple-50 text-purple-700 border border-purple-200"
+                                                            title="Tentou ou enviou mensagem paga"
+                                                        >
+                                                            <MessageSquare size={13} />
+                                                            Msg Paga ({lead.paidMessageAttemptsCount || 1})
+                                                        </span>
+                                                    )}
+
+                                                    {(lead.hasAttemptedHiddenMessage || (lead.hiddenMessageAttemptsCount || 0) > 0) && (
+                                                        <span
+                                                            className="text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1 bg-rose-50 text-rose-700 border border-rose-200"
+                                                            title="Tentou ver mensagem oculta sem saldo"
+                                                        >
+                                                            <Eye size={13} />
+                                                            Tentou Oculta ({lead.hiddenMessageAttemptsCount || 1})
+                                                        </span>
+                                                    )}
+
+                                                    {(lead.hasOpenedRechargeModal || (lead.rechargeTriggers?.length || 0) > 0 || (lead.rechargeModalOpensCount || 0) > 0) && (
                                                         <span
                                                             className="text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200"
-                                                            title="Gatilho de recarga acionado"
+                                                            title="Abriu modal de recarga"
                                                         >
                                                             <CreditCard size={13} />
-                                                            Recarga ({lead.rechargeTriggers.length})
+                                                            Recarga ({lead.rechargeModalOpensCount || lead.rechargeTriggers?.length || 1})
                                                         </span>
                                                     )}
 
@@ -1260,7 +1333,7 @@ export default function CampaignsPage() {
                                     <span className="text-slate-400 font-bold block mb-1">Fotos da Galeria</span>
                                     <div className="font-bold text-slate-900">
                                         {selectedLeadForDetails.hasNavigatedPastFirstPhoto ? (
-                                            <span className="text-indigo-600">Passou entre fotos</span>
+                                            <span className="text-indigo-600">Passou fotos</span>
                                         ) : (
                                             <span className="text-slate-500 font-normal">Ficou só na 1ª foto</span>
                                         )}
@@ -1275,16 +1348,57 @@ export default function CampaignsPage() {
                                 </div>
 
                                 <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
-                                    <span className="text-slate-400 font-bold block mb-1">Cliques em Mensagem</span>
-                                    <div className="font-bold text-slate-900 text-sm">
-                                        {selectedLeadForDetails.messageButtonClicks?.length || 0} cliques
+                                    <span className="text-slate-400 font-bold block mb-1">Enviou Mensagem Grátis?</span>
+                                    <div className="font-bold text-sm">
+                                        {(selectedLeadForDetails.hasSentFreeMessage || (selectedLeadForDetails.freeMessagesCount || 0) > 0) ? (
+                                            <span className="text-emerald-700">Sim ({selectedLeadForDetails.freeMessagesCount || 1} msgs)</span>
+                                        ) : (
+                                            <span className="text-slate-400 font-normal">Não</span>
+                                        )}
                                     </div>
                                 </div>
 
                                 <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
-                                    <span className="text-slate-400 font-bold block mb-1">Gatilhos de Recarga</span>
-                                    <div className="font-bold text-amber-700 text-sm">
-                                        {selectedLeadForDetails.rechargeTriggers?.length || 0} tentativas
+                                    <span className="text-slate-400 font-bold block mb-1">Esgotou as 3 Grátis?</span>
+                                    <div className="font-bold text-sm">
+                                        {selectedLeadForDetails.hasExhaustedFreeIntro ? (
+                                            <span className="text-amber-800 font-black">Sim (3/3 esgotadas)</span>
+                                        ) : (
+                                            <span className="text-slate-400 font-normal">Não</span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                                    <span className="text-slate-400 font-bold block mb-1">Tentou Mensagem Paga</span>
+                                    <div className="font-bold text-sm">
+                                        {(selectedLeadForDetails.hasAttemptedPaidMessage || (selectedLeadForDetails.paidMessageAttemptsCount || 0) > 0) ? (
+                                            <span className="text-purple-700">{selectedLeadForDetails.paidMessageAttemptsCount || 1} tentativas</span>
+                                        ) : (
+                                            <span className="text-slate-400 font-normal">Não</span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                                    <span className="text-slate-400 font-bold block mb-1">Tentou Ver Msg Oculta</span>
+                                    <div className="font-bold text-sm">
+                                        {(selectedLeadForDetails.hasAttemptedHiddenMessage || (selectedLeadForDetails.hiddenMessageAttemptsCount || 0) > 0) ? (
+                                            <span className="text-rose-700">{selectedLeadForDetails.hiddenMessageAttemptsCount || 1} tentativas</span>
+                                        ) : (
+                                            <span className="text-slate-400 font-normal">Não</span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                                    <span className="text-slate-400 font-bold block mb-1">Abriu Modal de Recarga</span>
+                                    <div className="font-bold text-sm">
+                                        {(selectedLeadForDetails.hasOpenedRechargeModal || (selectedLeadForDetails.rechargeTriggers?.length || 0) > 0 || (selectedLeadForDetails.rechargeModalOpensCount || 0) > 0) ? (
+                                            <span className="text-amber-700">{selectedLeadForDetails.rechargeModalOpensCount || selectedLeadForDetails.rechargeTriggers?.length || 1} vezes</span>
+                                        ) : (
+                                            <span className="text-slate-400 font-normal">Não</span>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -1325,38 +1439,75 @@ export default function CampaignsPage() {
                                     <div className="relative border-l-2 border-slate-200 ml-3 space-y-4">
                                         {selectedLeadForDetails.timeline.map((evt, idx) => {
                                             const isSignup = evt.type === 'signup';
-                                            const isRecharge = evt.type === 'recharge_modal';
+                                            const isRecharge = evt.type === 'recharge_modal' || evt.type === 'recharge_modal_opened';
                                             const isMessage = evt.type === 'message_click';
                                             const isProfile = evt.type === 'profile_view';
+                                            const isFreeMsg = evt.type === 'free_message_sent';
+                                            const isFreeExhausted = evt.type === 'free_intro_exhausted';
+                                            const isPaidAttempt = evt.type === 'paid_message_attempt';
+                                            const isHiddenAttempt = evt.type === 'hidden_message_unlock_attempt';
+
+                                            let markerBg = 'bg-slate-400';
+                                            let tagLabel = 'Navegação';
+                                            let tagColor = 'bg-slate-100 text-slate-600 border-slate-200';
+
+                                            if (isSignup) {
+                                                markerBg = 'bg-emerald-500';
+                                                tagLabel = 'Cadastro';
+                                                tagColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                                            } else if (isFreeMsg) {
+                                                markerBg = 'bg-emerald-600';
+                                                tagLabel = 'Mensagem Grátis';
+                                                tagColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                                            } else if (isFreeExhausted) {
+                                                markerBg = 'bg-amber-500';
+                                                tagLabel = '3 Grátis Esgotadas';
+                                                tagColor = 'bg-amber-50 text-amber-800 border-amber-200';
+                                            } else if (isPaidAttempt) {
+                                                markerBg = 'bg-purple-600';
+                                                tagLabel = 'Mensagem Paga';
+                                                tagColor = 'bg-purple-50 text-purple-700 border-purple-200';
+                                            } else if (isHiddenAttempt) {
+                                                markerBg = 'bg-rose-500';
+                                                tagLabel = 'Mensagem Oculta';
+                                                tagColor = 'bg-rose-50 text-rose-700 border-rose-200';
+                                            } else if (isRecharge) {
+                                                markerBg = 'bg-amber-600';
+                                                tagLabel = 'Modal de Recarga';
+                                                tagColor = 'bg-amber-50 text-amber-700 border-amber-200';
+                                            } else if (isMessage) {
+                                                markerBg = 'bg-indigo-600';
+                                                tagLabel = 'Início de Chat';
+                                                tagColor = 'bg-indigo-50 text-indigo-700 border-indigo-200';
+                                            } else if (isProfile) {
+                                                markerBg = 'bg-blue-500';
+                                                tagLabel = 'Perfil Visitado';
+                                                tagColor = 'bg-blue-50 text-blue-700 border-blue-200';
+                                            }
 
                                             return (
                                                 <div key={idx} className="relative pl-6">
                                                     {/* Marcador na Timeline */}
                                                     <div
-                                                        className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 border-white ${
-                                                            isSignup
-                                                                ? 'bg-emerald-500'
-                                                                : isRecharge
-                                                                ? 'bg-amber-500'
-                                                                : isMessage
-                                                                ? 'bg-purple-600'
-                                                                : isProfile
-                                                                ? 'bg-blue-500'
-                                                                : 'bg-slate-400'
-                                                        }`}
+                                                        className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 border-white ${markerBg}`}
                                                     />
 
-                                                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+                                                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
                                                         <div className="flex items-center justify-between gap-2">
-                                                            <strong className="text-xs text-slate-900 font-bold">
-                                                                {evt.title}
-                                                            </strong>
-                                                            <span className="text-[10px] text-slate-400 font-mono">
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${tagColor}`}>
+                                                                    {tagLabel}
+                                                                </span>
+                                                                <strong className="text-xs text-slate-900 font-bold">
+                                                                    {evt.title}
+                                                                </strong>
+                                                            </div>
+                                                            <span className="text-[10px] text-slate-400 font-mono shrink-0">
                                                                 {formatTimeOnly(evt.timestamp)}
                                                             </span>
                                                         </div>
                                                         {evt.detail && (
-                                                            <p className="text-xs text-slate-600 mt-1 font-medium">
+                                                            <p className="text-xs text-slate-600 mt-1.5 font-medium leading-relaxed">
                                                                 {evt.detail}
                                                             </p>
                                                         )}
@@ -1461,11 +1612,36 @@ export default function CampaignsPage() {
                                                 {lead.lastAction || 'Cadastro concluído'}
                                             </div>
 
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg">
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-200">
                                                     {lead.profilesVisitedCount} perfis
                                                 </span>
-                                                <ChevronRight size={14} className="text-slate-400" />
+                                                {(lead.hasSentFreeMessage || (lead.freeMessagesCount || 0) > 0) && (
+                                                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200" title="Enviou mensagem grátis">
+                                                        Grátis ({lead.freeMessagesCount || 1})
+                                                    </span>
+                                                )}
+                                                {lead.hasExhaustedFreeIntro && (
+                                                    <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200" title="Esgotou as 3 mensagens grátis">
+                                                        3 Grátis Fim
+                                                    </span>
+                                                )}
+                                                {(lead.hasAttemptedPaidMessage || (lead.paidMessageAttemptsCount || 0) > 0) && (
+                                                    <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-200" title="Tentou ou enviou mensagem paga">
+                                                        Msg Paga ({lead.paidMessageAttemptsCount || 1})
+                                                    </span>
+                                                )}
+                                                {(lead.hasAttemptedHiddenMessage || (lead.hiddenMessageAttemptsCount || 0) > 0) && (
+                                                    <span className="text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200" title="Tentou ver mensagem oculta sem saldo">
+                                                        Tentou Oculta ({lead.hiddenMessageAttemptsCount || 1})
+                                                    </span>
+                                                )}
+                                                {(lead.hasOpenedRechargeModal || (lead.rechargeTriggers?.length || 0) > 0 || (lead.rechargeModalOpensCount || 0) > 0) && (
+                                                    <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200" title="Abriu modal de recarga">
+                                                        Recarga ({lead.rechargeModalOpensCount || lead.rechargeTriggers?.length || 1})
+                                                    </span>
+                                                )}
+                                                <ChevronRight size={14} className="text-slate-400 ml-1" />
                                             </div>
                                         </div>
                                     ))}

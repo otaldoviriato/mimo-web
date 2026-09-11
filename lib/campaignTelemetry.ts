@@ -6,6 +6,11 @@ type TelemetryEvent =
     | { eventType: 'photo_view'; professionalId: string; username?: string; photoIndex: number; totalPhotos: number }
     | { eventType: 'message_click'; professionalId: string; username?: string }
     | { eventType: 'recharge_trigger'; professionalId: string; username?: string; reason?: string }
+    | { eventType: 'free_message_sent'; professionalId: string; username?: string; text?: string }
+    | { eventType: 'free_intro_exhausted'; professionalId: string; username?: string; totalFree?: number }
+    | { eventType: 'paid_message_attempt'; professionalId: string; username?: string; hasBalance: boolean; balanceCents?: number }
+    | { eventType: 'hidden_message_unlock_attempt'; professionalId: string; username?: string; costCents?: number; balanceCents?: number }
+    | { eventType: 'recharge_modal_opened'; trigger?: string; professionalId?: string; username?: string; requiredCents?: number }
     | { eventType: 'heartbeat' }
     | { eventType: 'page_leave' }
     | { eventType: 'custom'; actionText: string };

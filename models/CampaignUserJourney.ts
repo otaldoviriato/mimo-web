@@ -1,7 +1,19 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface ITimelineEvent {
-    type: 'signup' | 'explore_scroll' | 'profile_view' | 'photo_view' | 'message_click' | 'recharge_modal' | 'custom';
+    type:
+        | 'signup'
+        | 'explore_scroll'
+        | 'profile_view'
+        | 'photo_view'
+        | 'message_click'
+        | 'recharge_modal'
+        | 'free_message_sent'
+        | 'free_intro_exhausted'
+        | 'paid_message_attempt'
+        | 'hidden_message_unlock_attempt'
+        | 'recharge_modal_opened'
+        | 'custom';
     title: string;
     detail?: string | null;
     timestamp: Date;
@@ -64,7 +76,17 @@ export interface ICampaignUserJourney extends Document {
         reason?: string | null;
         timestamp: Date;
     }>;
-    
+
+    hasSentFreeMessage?: boolean;
+    freeMessagesCount?: number;
+    hasExhaustedFreeIntro?: boolean;
+    hasAttemptedPaidMessage?: boolean;
+    paidMessageAttemptsCount?: number;
+    hasAttemptedHiddenMessage?: boolean;
+    hiddenMessageAttemptsCount?: number;
+    hasOpenedRechargeModal?: boolean;
+    rechargeModalOpensCount?: number;
+
     timeline: ITimelineEvent[];
     createdAt: Date;
     updatedAt: Date;
@@ -125,7 +147,17 @@ const schema = new Schema<ICampaignUserJourney>({
         reason: { type: String, default: null },
         timestamp: { type: Date, default: Date.now },
     }],
-    
+
+    hasSentFreeMessage: { type: Boolean, default: false },
+    freeMessagesCount: { type: Number, default: 0 },
+    hasExhaustedFreeIntro: { type: Boolean, default: false },
+    hasAttemptedPaidMessage: { type: Boolean, default: false },
+    paidMessageAttemptsCount: { type: Number, default: 0 },
+    hasAttemptedHiddenMessage: { type: Boolean, default: false },
+    hiddenMessageAttemptsCount: { type: Number, default: 0 },
+    hasOpenedRechargeModal: { type: Boolean, default: false },
+    rechargeModalOpensCount: { type: Number, default: 0 },
+
     timeline: [{
         type: { type: String, required: true },
         title: { type: String, required: true },

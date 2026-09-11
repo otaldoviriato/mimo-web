@@ -850,6 +850,23 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     const { data: freeIntro, isLoading: freeIntroQueryLoading } = useFreeIntro(targetClerkId);
     const introAllowsText = !!freeIntro?.eligible || !!freeIntro?.grant;
     const introTextOnly = !!freeIntro?.textOnly;
+    const freeIntroExhaustedReportedRef = useRef<boolean>(false);
+
+    useEffect(() => {
+        if (!freeIntro?.grant || freeIntro.grant.convertedAt) return;
+        const used = freeIntro.grant.used ?? 0;
+        const limit = freeIntro.grant.limit ?? 3;
+        if (used >= limit && !freeIntroExhaustedReportedRef.current) {
+            freeIntroExhaustedReportedRef.current = true;
+            const profId = receiver?.clerkId || otherUserId;
+            emitCampaignTelemetry({
+                eventType: 'free_intro_exhausted',
+                professionalId: profId,
+                username: receiver?.username,
+                totalFree: limit,
+            });
+        }
+    }, [freeIntro?.grant?.used, freeIntro?.grant?.limit, freeIntro?.grant?.convertedAt, receiver?.clerkId, receiver?.username, otherUserId]);
 
     useEffect(() => {
         if (propInitialUser && targetClerkId) {
@@ -2455,6 +2472,14 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         const isLong = charTotal > largeMessageThreshold;
 
         if (balance < cost) {
+            const profId = receiver?.clerkId || otherUserId;
+            emitCampaignTelemetry({
+                eventType: 'hidden_message_unlock_attempt',
+                professionalId: profId,
+                username: receiver?.username,
+                costCents: cost,
+                balanceCents: balance,
+            });
             if (socket && roomId) {
                 socket.emit('report_view_attempt', { roomId, messageId: item._id });
             }
@@ -2552,10 +2577,38 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         }
 
         const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
+        const effectivePartnerId = partnerClerkId || otherUserId;
+
         if (isClientToProfessional && !introAllowsText && !freeIntroQueryLoading && balance <= 0) {
+            emitCampaignTelemetry({
+                eventType: 'paid_message_attempt',
+                professionalId: effectivePartnerId,
+                username: receiver?.username,
+                hasBalance: false,
+                balanceCents: balance,
+            });
             reportMessageAttempt();
             openRechargeModal('ZERO_BALANCE_START');
             return;
+        }
+
+        if (isClientToProfessional) {
+            if (introAllowsText) {
+                emitCampaignTelemetry({
+                    eventType: 'free_message_sent',
+                    professionalId: effectivePartnerId,
+                    username: receiver?.username,
+                    text: text.substring(0, 50),
+                });
+            } else {
+                emitCampaignTelemetry({
+                    eventType: 'paid_message_attempt',
+                    professionalId: effectivePartnerId,
+                    username: receiver?.username,
+                    hasBalance: true,
+                    balanceCents: balance,
+                });
+            }
         }
 
         const charCount = text.length;
@@ -2566,7 +2619,6 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         lastSentTimestampRef.current = safeTimestampMs;
         const timestampIso = new Date(safeTimestampMs).toISOString();
 
-        const effectivePartnerId = partnerClerkId || otherUserId;
         const tempId = `temp-${safeTimestampMs}-${Math.random().toString(36).slice(2, 7)}`;
         const newMsg: Message = {
             _id: tempId,
@@ -2868,6 +2920,14 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         }
 
         if (balance < priceInCents) {
+            const profId = receiver?.clerkId || otherUserId;
+            emitCampaignTelemetry({
+                eventType: 'hidden_message_unlock_attempt',
+                professionalId: profId,
+                username: receiver?.username,
+                costCents: priceInCents,
+                balanceCents: balance,
+            });
             openRechargeModal(
                 userData?.hasWelcomeCreditEnded
                     ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
@@ -2883,6 +2943,14 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         if (!unlockData) return;
         
         if (balance < unlockData.price) {
+            const profId = receiver?.clerkId || otherUserId;
+            emitCampaignTelemetry({
+                eventType: 'hidden_message_unlock_attempt',
+                professionalId: profId,
+                username: receiver?.username,
+                costCents: unlockData.price,
+                balanceCents: balance,
+            });
             setUnlockModalVisible(false);
             openRechargeModal(
                 userData?.hasWelcomeCreditEnded
