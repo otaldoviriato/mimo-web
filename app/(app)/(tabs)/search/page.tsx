@@ -217,12 +217,13 @@ export default function SearchPage() {
         };
     }, [username]);
 
-    // Renderiza Card da Criadora em Grid 3:4 com foco total na foto, nome, idade e badge de atividade
     const renderCreatorCard = (user: any) => {
         const age = calculateAge(user.birthDate);
-        const displayName = age !== null 
-            ? `${user.name || `@${user.username}`}, ${age}` 
-            : (user.name || `@${user.username}`);
+        const rawName = (user.name || '').trim();
+        const firstName = rawName ? rawName.split(/\s+/)[0] : (user.username ? `@${user.username}` : '');
+        const displayName = age !== null && firstName 
+            ? `${firstName}, ${age}` 
+            : (firstName || user.name || `@${user.username}`);
         const mainPhoto = user.photoUrl || (user.publicPhotos && user.publicPhotos[0]) || '/Logo.svg';
 
         return <ExploreProfessionalCard key={user.clerkId} professionalId={user.clerkId} name={displayName} photoUrl={mainPhoto} online={!!user.isOnline} freeIntroEnabled={!!user.freeIntroEnabled} trackExposure={!username.trim()} onClick={() => handleOpenProfile(user)} />;

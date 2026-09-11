@@ -207,9 +207,11 @@ export default function TabShell({ children, activePath }: { children: React.Rea
                             className="w-8 h-8 object-contain shrink-0"
                         />
                         <h1 className="text-2xl font-black text-white tracking-tighter">Mimo</h1>
-                        <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">
-                            {currentTabLabel}
-                        </span>
+                        {currentTabLabel !== 'Explorar' && (
+                            <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">
+                                {currentTabLabel}
+                            </span>
+                        )}
                     </div>
 
                     <div className="flex items-center gap-1.5">
