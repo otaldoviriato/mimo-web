@@ -9,10 +9,6 @@ export default function AdminSettingsChatPage() {
 
     return (
         <SettingsChatPage
-            freeIntroReplyLimit={settings.freeIntroReplyLimit}
-            setFreeIntroReplyLimit={settings.setFreeIntroReplyLimit}
-            freeIntroTimeoutMinutes={settings.freeIntroTimeoutMinutes}
-            setFreeIntroTimeoutMinutes={settings.setFreeIntroTimeoutMinutes}
             chatSessionTimeoutMinutes={settings.chatSessionTimeoutMinutes}
             setChatSessionTimeoutMinutes={settings.setChatSessionTimeoutMinutes}
             earningsSessionInactivityMinutes={settings.earningsSessionInactivityMinutes}

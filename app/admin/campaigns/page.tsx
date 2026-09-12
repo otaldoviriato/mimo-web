@@ -676,7 +676,7 @@ export default function CampaignsPage() {
                                         </strong>
                                     </div>
                                     <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                                        <span className="text-slate-600 font-medium">Esgotaram as 3 Mensagens Grátis:</span>
+                                        <span className="text-slate-600 font-medium">Esgotaram Mensagens Grátis:</span>
                                         <strong className="text-amber-700 font-bold">
                                             {activeCampaign.leads.filter(l => l.hasExhaustedFreeIntro).length}
                                         </strong>
@@ -860,10 +860,10 @@ export default function CampaignsPage() {
                                                     {lead.hasExhaustedFreeIntro && (
                                                         <span
                                                             className="text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200"
-                                                            title="Esgotou as 3 mensagens grátis"
+                                                            title="Esgotou as mensagens grátis"
                                                         >
                                                             <CheckCircle2 size={13} />
-                                                            3 Grátis Fim
+                                                            Grátis Fim
                                                         </span>
                                                     )}
 
@@ -1622,8 +1622,8 @@ export default function CampaignsPage() {
                                                     </span>
                                                 )}
                                                 {lead.hasExhaustedFreeIntro && (
-                                                    <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200" title="Esgotou as 3 mensagens grátis">
-                                                        3 Grátis Fim
+                                                    <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200" title="Esgotou as mensagens grátis">
+                                                        Grátis Fim
                                                     </span>
                                                 )}
                                                 {(lead.hasAttemptedPaidMessage || (lead.paidMessageAttemptsCount || 0) > 0) && (

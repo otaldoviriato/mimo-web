@@ -6,7 +6,6 @@ import { UnsavedChangesBanner } from './UnsavedChangesBanner';
 import type { UseSettingsReturn } from '@/hooks/admin/useSettings';
 
 type Props = Pick<UseSettingsReturn,
-    | 'freeIntroReplyLimit' | 'setFreeIntroReplyLimit' | 'freeIntroTimeoutMinutes' | 'setFreeIntroTimeoutMinutes'
     | 'chatSessionTimeoutMinutes' | 'setChatSessionTimeoutMinutes'
     | 'earningsSessionInactivityMinutes' | 'setEarningsSessionInactivityMinutes'
     | 'earningsSessionMinimumCents' | 'setEarningsSessionMinimumCents'
@@ -19,7 +18,6 @@ type Props = Pick<UseSettingsReturn,
 >;
 
 export function SettingsChatPage({
-    freeIntroReplyLimit, setFreeIntroReplyLimit, freeIntroTimeoutMinutes, setFreeIntroTimeoutMinutes,
     chatSessionTimeoutMinutes, setChatSessionTimeoutMinutes,
     earningsSessionInactivityMinutes, setEarningsSessionInactivityMinutes,
     earningsSessionMinimumCents, setEarningsSessionMinimumCents,
@@ -42,22 +40,11 @@ export function SettingsChatPage({
                 </div>
                 <div>
                     <h2 className="text-xl font-bold text-slate-800 tracking-tight">Chat & Sessões</h2>
-                    <p className="text-sm text-slate-505 font-medium mt-0.5">
+                    <p className="text-sm text-slate-500 font-medium mt-0.5">
                         Controles de comportamento das sessões de conversa entre usuários e profissionais.
                     </p>
                 </div>
             </div>
-
-            <section className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
-                <h3 className="font-bold text-slate-800">Conheça grátis</h3>
-                <p className="text-sm text-slate-500">A quantidade se aplica somente a novas concessões. As conversas iniciadas preservam suas respostas.</p>
-                <label className="block text-sm">Respostas gratuitas por par
-                    <input aria-label="Respostas gratuitas por par" type="number" min={1} max={100} value={freeIntroReplyLimit} onChange={e => setFreeIntroReplyLimit(Number(e.target.value))} className={inputCls} />
-                </label>
-                <label className="block text-sm">Prazo sem resposta em minutos
-                    <input aria-label="Prazo sem resposta em minutos" type="number" min={1} max={1440} value={freeIntroTimeoutMinutes} onChange={e => setFreeIntroTimeoutMinutes(Number(e.target.value))} className={inputCls} />
-                </label>
-            </section>
             <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm p-6">
                 <div className="py-6">
                     <div className="flex flex-col md:flex-row md:items-start gap-4 md:gap-8">
