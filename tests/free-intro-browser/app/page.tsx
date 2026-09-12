@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { PhotoDragHarness } from './photo-drag';
 import { ExploreProfessionalCard } from '../../../components/ExploreProfessionalCard';
 import { FreeIntroNotice } from '../../../components/FreeIntroNotice';
 import { FreeIntroConversationsControl } from '../../../components/FreeIntroConversationsControl';
@@ -18,6 +19,7 @@ export default function Page() {
     const photo = '/api/photo';
     return <main className="mx-auto max-w-3xl space-y-5 bg-slate-50 p-3 pb-10">
         <h1 className="text-xl font-black text-slate-900">Conheça grátis · validação visual</h1>
+        <PhotoDragHarness />
         <section className="grid grid-cols-2 gap-3" aria-label="Explorar">
             <ExploreProfessionalCard professionalId="pro" name="Isabella, 25" photoUrl={photo} online freeIntroEnabled onClick={() => setDivision('free')} />
             <ExploreProfessionalCard professionalId="other" name="Nome longo de profissional, 28" photoUrl={photo} online={false} freeIntroEnabled onClick={() => setDivision('free')} />

@@ -3,6 +3,7 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
+import { usePhotoDrag } from '@/hooks/usePhotoDrag';
 import { Plus, Trash2, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -40,24 +41,8 @@ export function ProfilePhotosEditor({ photoUrl, onOrderChange }: Props) {
 
     // Estado local das fotos para reordenação puramente no front-end
     const [orderedItems, setOrderedItems] = useState<ProfileGalleryItem[]>([]);
-    const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-    const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
-    const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null);
-    const [selectingIndex, setSelectingIndex] = useState<number | null>(null);
-
     const initialIdsRef = useRef<string[]>([]);
     const hasInitializedRef = useRef(false);
-    const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-    const pointerDragRef = useRef<{
-        startX: number;
-        startY: number;
-        index: number;
-        active: boolean;
-        pointerId: number;
-        element: HTMLElement;
-    } | null>(null);
-
     const busy = uploadGallery.isPending || deletePhoto.isPending || reorderGallery.isPending || uploading;
 
     // Lista de fotos públicas do servidor
@@ -176,134 +161,7 @@ export function ProfilePhotosEditor({ photoUrl, onOrderChange }: Props) {
         }
     };
 
-    useEffect(() => {
-        return () => {
-            if (longPressTimerRef.current) {
-                clearTimeout(longPressTimerRef.current);
-            }
-        };
-    }, []);
-
-    const LONG_PRESS_DURATION = 350;
-
-    const startPointerDrag = (e: React.PointerEvent<HTMLElement>, index: number) => {
-        if (e.button !== 0 || busy) return;
-
-        if (longPressTimerRef.current) {
-            clearTimeout(longPressTimerRef.current);
-            longPressTimerRef.current = null;
-        }
-
-        const currentTarget = e.currentTarget;
-        const pointerId = e.pointerId;
-
-        pointerDragRef.current = {
-            startX: e.clientX,
-            startY: e.clientY,
-            index,
-            active: false,
-            pointerId,
-            element: currentTarget,
-        };
-
-        setSelectingIndex(index);
-
-        longPressTimerRef.current = setTimeout(() => {
-            if (!pointerDragRef.current || pointerDragRef.current.index !== index) return;
-
-            triggerHapticFeedback();
-
-            pointerDragRef.current.active = true;
-            try {
-                currentTarget.setPointerCapture(pointerId);
-            } catch {}
-
-            setDraggedIndex(index);
-            setSelectingIndex(null);
-            setDragPosition({ x: pointerDragRef.current.startX, y: pointerDragRef.current.startY });
-        }, LONG_PRESS_DURATION);
-    };
-
-    const handlePointerMove = (e: React.PointerEvent<HTMLElement>) => {
-        if (!pointerDragRef.current) return;
-
-        if (!pointerDragRef.current.active) {
-            const dx = e.clientX - pointerDragRef.current.startX;
-            const dy = e.clientY - pointerDragRef.current.startY;
-            const dist = Math.hypot(dx, dy);
-
-            if (dist > 8) {
-                if (longPressTimerRef.current) {
-                    clearTimeout(longPressTimerRef.current);
-                    longPressTimerRef.current = null;
-                }
-                setSelectingIndex(null);
-                pointerDragRef.current = null;
-            }
-            return;
-        }
-
-        setDragPosition({ x: e.clientX, y: e.clientY });
-
-        const elements = document.elementsFromPoint(e.clientX, e.clientY);
-        for (const el of elements) {
-            const card = el.closest('[data-photo-index]');
-            if (card) {
-                const targetIdx = Number(card.getAttribute('data-photo-index'));
-                if (!isNaN(targetIdx) && targetIdx >= 0 && targetIdx < orderedItems.length) {
-                    setDragOverIndex(targetIdx);
-                    break;
-                }
-            }
-        }
-    };
-
-    const handlePointerUp = (e: React.PointerEvent<HTMLElement>) => {
-        if (longPressTimerRef.current) {
-            clearTimeout(longPressTimerRef.current);
-            longPressTimerRef.current = null;
-        }
-
-        setSelectingIndex(null);
-
-        if (pointerDragRef.current) {
-            try {
-                pointerDragRef.current.element.releasePointerCapture(e.pointerId);
-            } catch {}
-
-            const fromIdx = pointerDragRef.current.index;
-            const toIdx = dragOverIndex;
-
-            if (pointerDragRef.current.active && fromIdx !== null && toIdx !== null && fromIdx !== toIdx) {
-                applyReorder(fromIdx, toIdx);
-            }
-        }
-
-        pointerDragRef.current = null;
-        setDraggedIndex(null);
-        setDragOverIndex(null);
-        setDragPosition(null);
-    };
-
-    const handlePointerCancel = (e: React.PointerEvent<HTMLElement>) => {
-        if (longPressTimerRef.current) {
-            clearTimeout(longPressTimerRef.current);
-            longPressTimerRef.current = null;
-        }
-
-        setSelectingIndex(null);
-
-        if (pointerDragRef.current) {
-            try {
-                pointerDragRef.current.element.releasePointerCapture(e.pointerId);
-            } catch {}
-        }
-
-        pointerDragRef.current = null;
-        setDraggedIndex(null);
-        setDragOverIndex(null);
-        setDragPosition(null);
-    };
+    const { gridRef, draggedIndex, dragOverIndex, dragPosition, selectingIndex, onPointerDown, onTouchStart } = usePhotoDrag(orderedItems.length, busy, (from, to) => { void applyReorder(from, to); }, triggerHapticFeedback);
 
     return (
         <section aria-label="Fotos do Perfil" className="rounded-2xl border border-slate-100 bg-white p-4 shadow-xs space-y-3">
@@ -342,7 +200,7 @@ export function ProfilePhotosEditor({ photoUrl, onOrderChange }: Props) {
                     Não foi possível carregar suas fotos.
                 </div>
             ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div ref={gridRef} className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {orderedItems.map((item, index) => {
                         const isDragging = draggedIndex === index;
                         const isDragOver = dragOverIndex === index && draggedIndex !== index;
@@ -352,11 +210,9 @@ export function ProfilePhotosEditor({ photoUrl, onOrderChange }: Props) {
                             <div
                                 key={item._id || `photo-${index}`}
                                 data-photo-index={index}
-                                onPointerDown={(e) => startPointerDrag(e, index)}
-                                onPointerMove={handlePointerMove}
-                                onPointerUp={handlePointerUp}
-                                onPointerCancel={handlePointerCancel}
-                                style={{ touchAction: isDragging ? 'none' : 'pan-y' }}
+                                onPointerDown={(e) => onPointerDown(e, index)}
+                                onTouchStart={(e) => onTouchStart(e, index)}
+                                style={{ touchAction: 'pan-y', WebkitTouchCallout: 'none' }}
                                 className={`group relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 border transition-all select-none ${
                                     isDragging 
                                         ? 'opacity-20 scale-95 ring-4 ring-purple-600 ring-offset-2 border-dashed border-purple-500 z-10 cursor-grabbing' 
@@ -389,6 +245,7 @@ export function ProfilePhotosEditor({ photoUrl, onOrderChange }: Props) {
                                     type="button"
                                     disabled={busy}
                                     onPointerDown={(e) => e.stopPropagation()}
+                                    onTouchStart={(e) => e.stopPropagation()}
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         handleDeleteItem(item);
