@@ -1,14 +1,14 @@
 import React from 'react';
-import { NetflixStyleLanding } from '@/components/landing/NetflixStyleLanding';
+import { AdultExoclickLanding } from '@/components/landing/AdultExoclickLanding';
 
 export const metadata = {
-    title: 'MimoChat | Recarregue. Converse. Descubra.',
-    description: 'Converse com mulheres reais, troque fotos e vídeos exclusivos com total privacidade e recargas rápidas no PIX.',
+    title: 'MimoChat | Troque nudes com mulheres reais',
+    description: 'Converse sem censura com mulheres reais, troque fotos e vídeos exclusivos com total privacidade e bônus de boas-vindas liberado.',
 };
 
 export default function DescubraPage() {
     return (
-        <NetflixStyleLanding
+        <AdultExoclickLanding
             authRedirectUrl="/login"
             ctaTrackingAttr={true}
         />
