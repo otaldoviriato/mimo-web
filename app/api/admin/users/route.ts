@@ -7,6 +7,7 @@ import { Transaction } from '@/models/Transaction';
 import { MicroTransaction } from '@/models/MicroTransaction';
 import { Room } from '@/models/Room';
 import { Message } from '@/models/Message';
+import { getProfessionalsEarningsMap } from '@/lib/professionalEarnings';
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
@@ -139,19 +140,8 @@ export async function GET(request: NextRequest) {
         ]);
         const depositsByUser = new Map(depositsAgg.map(d => [d._id, Math.round(d.total)]));
 
-        // Total arrecadado (créditos recebidos) por usuário - relevante para perfis monetizados
-        const earningsAgg = await MicroTransaction.aggregate([
-            { $match: { userId: { $in: clerkIds }, type: 'credit' } },
-            { $group: { _id: '$userId', total: { $sum: '$amount' } } },
-        ]);
-        const earningsByUser = new Map(earningsAgg.map(e => [e._id, e.total]));
-
-        // Total de assinaturas recebidas (já salvas em centavos no banco)
-        const subscriptionEarningsAgg = await Transaction.aggregate([
-            { $match: { userId: { $in: clerkIds }, type: 'credit', source: 'subscription', status: 'COMPLETED' } },
-            { $group: { _id: '$userId', total: { $sum: '$amount' } } }
-        ]);
-        const subscriptionEarningsByUser = new Map(subscriptionEarningsAgg.map(s => [s._id, Math.round(s.total)]));
+        // Faturamento canônico das profissionais (créditos de microtransações + assinaturas, em centavos)
+        const earningsByUser = await getProfessionalsEarningsMap(clerkIds);
 
         // Quantidade de conversas (salas) por usuário
         // $setUnion remove duplicatas dentro do array de participantes antes do $unwind,
@@ -196,7 +186,7 @@ export async function GET(request: NextRequest) {
                 isOnline: u.isOnline || false,
                 onboardingStep: u.onboardingStep || null,
                 totalDeposited: depositsByUser.get(u.clerkId) || 0,
-                totalEarned: (earningsByUser.get(u.clerkId) || 0) + (subscriptionEarningsByUser.get(u.clerkId) || 0),
+                totalEarned: earningsByUser.get(u.clerkId) || 0,
                 accessCount: u.accessCount || 0,
                 lastAccessAt: u.lastAccessAt ? new Date(u.lastAccessAt).toISOString() : null,
                 roomsCount: roomsByUser.get(u.clerkId) || 0,

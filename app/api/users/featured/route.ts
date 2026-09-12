@@ -2,7 +2,8 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import { rankExploreUsers } from '@/lib/exploreRanking';
-import { AppSettings, GalleryItem, MicroTransaction, Room, Transaction, User } from '@/models';
+import { getProfessionalsEarningsMap } from '@/lib/professionalEarnings';
+import { AppSettings, GalleryItem, Room, User } from '@/models';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -65,22 +66,7 @@ export async function GET(request: NextRequest) {
 
         let earningsMap = new Map<string, number>();
         if (rankingMode === 'revenue') {
-            try {
-                const [microAgg, txAgg] = await Promise.all([
-                    MicroTransaction.aggregate([
-                        { $match: { userId: { $in: professionalIds }, type: 'credit' } },
-                        { $group: { _id: '$userId', total: { $sum: '$amount' } } }
-                    ]),
-                    Transaction.aggregate([
-                        { $match: { userId: { $in: professionalIds }, type: 'credit', status: { $in: ['PAID', 'COMPLETED'] } } },
-                        { $group: { _id: '$userId', total: { $sum: { $multiply: ['$amount', 100] } } } }
-                    ])
-                ]);
-                for (const item of microAgg) earningsMap.set(item._id, (earningsMap.get(item._id) || 0) + Number(item.total || 0));
-                for (const item of txAgg) earningsMap.set(item._id, (earningsMap.get(item._id) || 0) + Number(item.total || 0));
-            } catch (err) {
-                console.warn('Erro ao obter faturamento em featured:', err);
-            }
+            earningsMap = await getProfessionalsEarningsMap(professionalIds);
         }
 
         const ranked = rankExploreUsers(professionals.map(user => {
@@ -89,9 +75,7 @@ export async function GET(request: NextRequest) {
                 user.lastAccessAt ? new Date(user.lastAccessAt).getTime() : 0,
             );
             const publicPhotos = photosByOwner.get(user.clerkId) ?? [];
-            const recordedEarnings = earningsMap.get(user.clerkId) || 0;
-            const walletEarnings = ((user as any).professionalAvailableCents || 0) + ((user as any).professionalReservedForWithdrawalCents || 0);
-            const totalEarningsCents = Math.max(recordedEarnings, walletEarnings);
+            const totalEarningsCents = earningsMap.get(user.clerkId) || 0;
 
             return {
                 id: user._id,

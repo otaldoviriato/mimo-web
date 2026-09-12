@@ -2,7 +2,8 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import { rankExploreUsers, ExploreRankingMode } from '@/lib/exploreRanking';
-import { AppSettings, GalleryItem, MicroTransaction, Transaction, User } from '@/models';
+import { getProfessionalsEarningsMap } from '@/lib/professionalEarnings';
+import { AppSettings, GalleryItem, User } from '@/models';
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
@@ -51,29 +52,8 @@ export async function GET() {
         photoMap.set(photo.ownerId, [...(photoMap.get(photo.ownerId) ?? []), photo.imageUrl]);
     }
 
-    // Faturamento agregado de cada profissional
-    const earningsMap = new Map<string, number>();
-    try {
-        const [microAgg, txAgg] = await Promise.all([
-            MicroTransaction.aggregate([
-                { $match: { userId: { $in: ids }, type: 'credit' } },
-                { $group: { _id: '$userId', total: { $sum: '$amount' } } }
-            ]),
-            Transaction.aggregate([
-                { $match: { userId: { $in: ids }, type: 'credit', status: { $in: ['PAID', 'COMPLETED'] } } },
-                { $group: { _id: '$userId', total: { $sum: { $multiply: ['$amount', 100] } } } }
-            ])
-        ]);
-
-        for (const item of microAgg) {
-            earningsMap.set(item._id, (earningsMap.get(item._id) || 0) + Number(item.total || 0));
-        }
-        for (const item of txAgg) {
-            earningsMap.set(item._id, (earningsMap.get(item._id) || 0) + Number(item.total || 0));
-        }
-    } catch (err) {
-        console.warn('Erro ao agregar faturamento no explore-preview:', err);
-    }
+    // Faturamento canônico das profissionais (calculado em centavos sem multiplicação indevida)
+    const earningsMap = await getProfessionalsEarningsMap(ids);
 
     const mappedUsers = professionals.map(user => {
         const lastActiveTime = Math.max(
@@ -81,10 +61,8 @@ export async function GET() {
             user.lastAccessAt ? new Date(user.lastAccessAt).getTime() : 0,
         );
 
-        // Faturamento total (soma transações registradas ou saldo da carteira)
-        const recordedEarnings = earningsMap.get(user.clerkId) || 0;
-        const walletEarnings = ((user as any).professionalAvailableCents || 0) + ((user as any).professionalReservedForWithdrawalCents || 0);
-        const totalEarningsCents = Math.max(recordedEarnings, walletEarnings);
+        // Faturamento total canônico em centavos (MicroTransaction + Assinaturas)
+        const totalEarningsCents = earningsMap.get(user.clerkId) || 0;
 
         return {
             id: user._id,

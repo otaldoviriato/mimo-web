@@ -2,7 +2,12 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IMicroTransaction extends Document {
     userId: string;
-    amount: number; // em centavos
+    /**
+     * ATENÇÃO: `amount` é SEMPRE em centavos (ex: 1000 = R$ 10,00).
+     * NUNCA multiplique por 100 ao calcular ganhos ou saldos.
+     * Consulte `lib/professionalEarnings.ts` para cálculos padronizados.
+     */
+    amount: number; // SEMPRE em centavos
     type: 'credit' | 'debit' | 'platform_fee' | 'promotional_credit_grant' | 'promotional_credit_usage' | 'promotional_credit_expired';
     source: 'message' | 'image_unlock' | 'gift' | 'subscription' | 'campaign';
     messageId?: string;

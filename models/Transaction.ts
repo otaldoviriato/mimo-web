@@ -3,6 +3,13 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface ITransaction extends Document {
     userId: string;
     abacatePayId?: string;
+    /**
+     * ATENÇÃO SOBRE A UNIDADE DE MEDIDA DE `amount`:
+     * - Para `source: 'subscription'` (assinatura recebida por profissional): O VALOR JÁ ESTÁ EM CENTAVOS (ex: 2072 = R$ 20,72).
+     *   NUNCA multiplique por 100 ao calcular ganhos de criadoras!
+     * - Para `source: 'recharge'` (depósito/recarga de clientes): histórico legado pode conter valores em reais (ex: 50 = R$ 50,00).
+     *   Consulte `lib/professionalEarnings.ts` para cálculos padronizados de receita.
+     */
     amount: number;
     status: 'PAID' | 'PENDING' | 'CANCELLED' | 'COMPLETED' | 'debit';
     type: 'PIX' | 'CC' | 'credit' | 'debit' | 'platform_fee' | 'promotional_credit_grant' | 'promotional_credit_usage' | 'promotional_credit_expired';

@@ -3,9 +3,9 @@ import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { Room } from '@/models/Room';
-import { MicroTransaction } from '@/models/MicroTransaction';
 import { Transaction } from '@/models/Transaction';
 import { AppSettings } from '@/models/AppSettings';
+import { getProfessionalsEarningsMap } from '@/lib/professionalEarnings';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -63,15 +63,8 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ users: [] });
         }
 
-        const [earningsAgg, subEarningsAgg, depositsAgg, roomsAgg] = await Promise.all([
-            MicroTransaction.aggregate([
-                { $match: { userId: { $in: clerkIds }, type: 'credit' } },
-                { $group: { _id: '$userId', total: { $sum: '$amount' } } },
-            ]),
-            Transaction.aggregate([
-                { $match: { userId: { $in: clerkIds }, type: 'credit', source: 'subscription', status: 'COMPLETED' } },
-                { $group: { _id: '$userId', total: { $sum: '$amount' } } },
-            ]),
+        const [earningsByUser, depositsAgg, roomsAgg] = await Promise.all([
+            getProfessionalsEarningsMap(clerkIds),
             Transaction.aggregate([
                 { $match: { userId: { $in: clerkIds }, source: 'recharge', status: { $in: ['PAID', 'COMPLETED'] } } },
                 { $group: { _id: '$userId', total: { $sum: { $multiply: ['$amount', 100] } } } },
@@ -85,13 +78,11 @@ export async function GET(request: NextRequest) {
             ]),
         ]);
 
-        const earningsByUser = new Map(earningsAgg.map(e => [e._id, e.total]));
-        const subEarningsByUser = new Map(subEarningsAgg.map(s => [s._id, Math.round(s.total)]));
         const depositsByUser = new Map(depositsAgg.map(d => [d._id, Math.round(d.total)]));
         const roomsByUser = new Map(roomsAgg.map(r => [r._id, r.total]));
 
         const enriched = usersList.map(u => {
-            const earned = (earningsByUser.get(u.clerkId) || 0) + (subEarningsByUser.get(u.clerkId) || 0);
+            const earned = earningsByUser.get(u.clerkId) || 0;
             const deposited = depositsByUser.get(u.clerkId) || 0;
             const totalBilledCents = earned > 0 ? earned : deposited;
             const totalRooms = roomsByUser.get(u.clerkId) || 0;
