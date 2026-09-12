@@ -50,6 +50,8 @@ export interface IAppSettings extends Document {
     activeUnrechargedClientHoursThreshold: number;
     activeUserThresholdDays: number;
     exploreSortingCriteria: string[];
+    exploreRankingMode?: 'algorithm' | 'revenue' | 'recent_visits' | 'last_seen' | 'manual';
+    exploreManualOrder?: string[];
     creatorEngagementEmailsEnabled: boolean;
     creatorEngagementStep1Enabled: boolean;
     creatorEngagementStep1Hours: number;
@@ -368,6 +370,15 @@ const AppSettingsSchema = new Schema<IAppSettings>({
         type: [String],
         required: true,
         default: ['activeConversations', 'messagesLastWeek', 'online', 'recentAccess', 'completeness'],
+    },
+    exploreRankingMode: {
+        type: String,
+        enum: ['algorithm', 'revenue', 'recent_visits', 'last_seen', 'manual'],
+        default: 'algorithm',
+    },
+    exploreManualOrder: {
+        type: [String],
+        default: [],
     },
 }, {
     timestamps: true,

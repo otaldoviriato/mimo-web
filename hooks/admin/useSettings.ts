@@ -407,8 +407,6 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         comparisonPeriod !== savedSnapshot.comparisonPeriod
     );
     const isDirtyChat = savedSnapshot !== null && (
-        freeIntroReplyLimit !== savedSnapshot.freeIntroReplyLimit ||
-        freeIntroTimeoutMinutes !== savedSnapshot.freeIntroTimeoutMinutes ||
         chatSessionTimeoutMinutes !== savedSnapshot.chatSessionTimeoutMinutes ||
         earningsSessionInactivityMinutes !== savedSnapshot.earningsSessionInactivityMinutes ||
         earningsSessionMinimumCents !== savedSnapshot.earningsSessionMinimumCents ||
@@ -417,6 +415,9 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         offlineEmailDelayMinutes !== savedSnapshot.offlineEmailDelayMinutes ||
         offlineEmailCooldownMinutes !== savedSnapshot.offlineEmailCooldownMinutes ||
         activeUserThresholdDays !== savedSnapshot.activeUserThresholdDays
+    );
+    const isDirtyFreeIntro = savedSnapshot !== null && (
+        freeIntroReplyLimit !== savedSnapshot.freeIntroReplyLimit
     );
     const isDirtyPricing = savedSnapshot !== null && (
         maxPricePerChar !== savedSnapshot.maxPricePerChar ||
@@ -459,7 +460,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
 
     return {
         settings, loadingSettings, isAuthorized, saving, savedSnapshot,
-        isDirtyPlatform, isDirtyChat, isDirtyPricing, isDirtyProfiles,
+        isDirtyPlatform, isDirtyChat, isDirtyFreeIntro, isDirtyPricing, isDirtyProfiles,
         isDirtyPayments, isDirtyApp, isDirtyAdmins, isDirtyExplore,
         platformFee, setPlatformFee,
         uploadLimit, setUploadLimit,

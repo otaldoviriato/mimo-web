@@ -67,3 +67,6 @@ export type { ICampaignVisit } from './CampaignVisit';
 
 export { CampaignUserJourney } from './CampaignUserJourney';
 export type { ICampaignUserJourney, ITimelineEvent } from './CampaignUserJourney';
+
+export { MicroTransaction } from './MicroTransaction';
+export type { IMicroTransaction } from './MicroTransaction';
