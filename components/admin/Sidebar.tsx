@@ -86,7 +86,6 @@ const MENU_SECTIONS: MenuSection[] = [
             { href: '/admin/settings/platform', label: 'Plataforma & Operação', icon: Globe },
             { href: '/admin/settings/alerts', label: 'Alertas & Notificações', icon: Bell },
             { href: '/admin/settings/chat', label: 'Chat & Sessões', icon: Clock },
-            { href: '/admin/settings/free-intro', label: 'Conheça Grátis', icon: Gift },
             { href: '/admin/settings/promotions', label: 'Promoções & Bônus', icon: Tag },
             { href: '/admin/settings/explore', label: 'Explorar & Algoritmo', icon: Compass },
             { href: '/admin/settings/pricing', label: 'Precificação & Assinaturas', icon: Coins },

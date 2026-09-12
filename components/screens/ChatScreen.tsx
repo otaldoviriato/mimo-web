@@ -1,8 +1,5 @@
 'use client';
 import { readStackEntry, replaceStackUrl, stackOverlayState } from '@/lib/stackHistory';
-
-import { FreeIntroNotice } from '@/components/FreeIntroNotice';
-import { useFreeIntro } from '@/hooks/useFreeIntro';
 import React, { useState, useEffect, useRef, use } from 'react';
 import { usePathname } from 'next/navigation';
 import axios from 'axios';
@@ -848,26 +845,6 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     const isResolvingReceiver = isRouteClerkId ? loadingReceiverById : loadingReceiverByUsername;
     const receiver = fetchedReceiverById || fetchedReceiverByUsername || propInitialUser;
     const targetClerkId = receiver?.clerkId || (isRouteClerkId ? otherUserId : '');
-    const { data: freeIntro, isLoading: freeIntroQueryLoading } = useFreeIntro(targetClerkId);
-    const introAllowsText = !!freeIntro?.eligible || !!freeIntro?.grant;
-    const isIntroActive = !!freeIntro?.eligible || (!!freeIntro?.grant && !freeIntro.grant.convertedAt && (freeIntro.grant.used ?? 0) < (freeIntro.grant.limit ?? freeIntro.limit ?? 3));
-    const freeIntroExhaustedReportedRef = useRef<boolean>(false);
-
-    useEffect(() => {
-        if (!freeIntro?.grant || freeIntro.grant.convertedAt) return;
-        const used = freeIntro.grant.used ?? 0;
-        const limit = freeIntro.grant.limit ?? freeIntro.limit ?? 3;
-        if (used >= limit && !freeIntroExhaustedReportedRef.current) {
-            freeIntroExhaustedReportedRef.current = true;
-            const profId = receiver?.clerkId || otherUserId;
-            emitCampaignTelemetry({
-                eventType: 'free_intro_exhausted',
-                professionalId: profId,
-                username: receiver?.username,
-                totalFree: limit,
-            });
-        }
-    }, [freeIntro?.grant?.used, freeIntro?.grant?.limit, freeIntro?.limit, freeIntro?.grant?.convertedAt, receiver?.clerkId, receiver?.username, otherUserId]);
 
     useEffect(() => {
         if (propInitialUser && targetClerkId) {
@@ -2581,7 +2558,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
         const effectivePartnerId = partnerClerkId || otherUserId;
 
-        if (isClientToProfessional && !introAllowsText && !freeIntroQueryLoading && balance <= 0) {
+        if (isClientToProfessional && balance <= 0) {
             emitCampaignTelemetry({
                 eventType: 'paid_message_attempt',
                 professionalId: effectivePartnerId,
@@ -2595,22 +2572,13 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         }
 
         if (isClientToProfessional) {
-            if (introAllowsText) {
-                emitCampaignTelemetry({
-                    eventType: 'free_message_sent',
-                    professionalId: effectivePartnerId,
-                    username: receiver?.username,
-                    text: text.substring(0, 50),
-                });
-            } else {
-                emitCampaignTelemetry({
-                    eventType: 'paid_message_attempt',
-                    professionalId: effectivePartnerId,
-                    username: receiver?.username,
-                    hasBalance: true,
-                    balanceCents: balance,
-                });
-            }
+            emitCampaignTelemetry({
+                eventType: 'paid_message_attempt',
+                professionalId: effectivePartnerId,
+                username: receiver?.username,
+                hasBalance: true,
+                balanceCents: balance,
+            });
         }
 
         const charCount = text.length;
@@ -2702,7 +2670,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     const handleSendAudio = async (audioBlob: Blob, durationInSeconds: number) => {
         const isTeamMemberInvolved = userData?.isTeam || receiver?.isTeam;
         const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
-        if (isClientToProfessional && !introAllowsText && !freeIntroQueryLoading && balance <= 0) {
+        if (isClientToProfessional && balance <= 0) {
             reportMessageAttempt();
             openRechargeModal('ZERO_BALANCE_START');
             return;
@@ -2787,7 +2755,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         if (!e.target.files || e.target.files.length === 0) return;
 
         const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
-        if (isClientToProfessional && !introAllowsText && !freeIntroQueryLoading && balance <= 0) {
+        if (isClientToProfessional && balance <= 0) {
             e.target.value = '';
             reportMessageAttempt();
             openRechargeModal('ZERO_BALANCE_START');
@@ -3045,7 +3013,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     // Quantos segundos de áudio o saldo atual do cliente consegue pagar (undefined = sem limite, mensagem gratuita).
     const maxAudioDurationSeconds = (audioCostPerSecondInCents > 0 && !isTeamMemberInvolved)
         ? Math.floor(balance / audioCostPerSecondInCents)
-        : (isClientToProfessional && !introAllowsText && !freeIntroQueryLoading && balance <= 0 ? 0 : undefined);
+        : (isClientToProfessional && balance <= 0 ? 0 : undefined);
     // Se o saldo for > 0, exibe quando estiver abaixo do limite configurado.
     // Se o saldo for == 0, só exibe quando houver pelo menos uma mensagem da profissional recebida ou bloqueada (pois agora há motivo para recarregar).
     const partnerIdForFilter = partnerClerkId || otherUserId;
@@ -3057,7 +3025,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         ? balance <= lowBalanceThresholdInCents
         : hasProfessionalMessage;
 
-    const shouldShowLowBalanceAlert = !isIntroActive && !userData?.isProfessional &&
+    const shouldShowLowBalanceAlert = !userData?.isProfessional &&
         !userData?.isTeam &&
         !receiver?.isTeam &&
         receiver?.isProfessional &&
@@ -3327,7 +3295,6 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 </button>
             )}
 
-            <FreeIntroNotice state={freeIntro} />
             {/* Messages Container Wrapper */}
             <div className="flex-1 relative overflow-hidden flex flex-col">
                 {/* Messages */}
@@ -4207,7 +4174,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         <button
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
-                                if (isClientToProfessional && !introAllowsText && !freeIntroQueryLoading && balance <= 0) {
+                                if (isClientToProfessional && balance <= 0) {
                                     reportMessageAttempt();
                                     openRechargeModal('ZERO_BALANCE_START');
                                     return;
@@ -4251,11 +4218,11 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                             confirmBeforeSend={false}
                             costPerSecondInCents={audioCostPerSecondInCents}
                             onInsufficientBalance={() => {
-                                if (isClientToProfessional && !introAllowsText && !freeIntroQueryLoading && balance <= 0) {
+                                if (isClientToProfessional && balance <= 0) {
                                     reportMessageAttempt();
                                 }
                                 openRechargeModal(
-                                    isClientToProfessional && !introAllowsText && !freeIntroQueryLoading && balance <= 0
+                                    isClientToProfessional && balance <= 0
                                         ? 'ZERO_BALANCE_START'
                                         : (userData?.hasWelcomeCreditEnded
                                             ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'

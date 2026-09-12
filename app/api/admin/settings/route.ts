@@ -88,8 +88,6 @@ async function getOrCreateSettings() {
         if (settings.offlineEmailCooldownMinutes === undefined) { settings.offlineEmailCooldownMinutes = 15; updated = true; }
         if (settings.activeUserThresholdDays === undefined) { settings.activeUserThresholdDays = 7; updated = true; }
         if (settings.largeMessageWarningThresholdChars === undefined) { settings.largeMessageWarningThresholdChars = 100; updated = true; }
-        if (settings.freeIntroReplyLimit === undefined) { settings.freeIntroReplyLimit = 3; updated = true; }
-        if (settings.freeIntroTimeoutMinutes === undefined) { settings.freeIntroTimeoutMinutes = 10; updated = true; }
         if (settings.welcomeBonusEnabled === undefined) { settings.welcomeBonusEnabled = false; updated = true; }
         if (settings.welcomeBonusAmountCents === undefined) { settings.welcomeBonusAmountCents = 300; updated = true; }
         if (settings.welcomeBonusUrlParamKey === undefined) { settings.welcomeBonusUrlParamKey = 'promo'; updated = true; }
@@ -199,7 +197,6 @@ export async function PUT(request: NextRequest) {
             lowBalanceThresholdInCents,
             defaultPricePerCharSubscribers,
             defaultPricePerCharNonSubscribers,
-            freeIntroReplyLimit, freeIntroTimeoutMinutes,
             maxBillableMessageChars,
             maxOnlineCumulativeChars,
             offlineFollowUpIntervalHours,
@@ -413,19 +410,6 @@ export async function PUT(request: NextRequest) {
         if (largeMessageWarningThresholdChars !== undefined) {
             if (!Number.isSafeInteger(largeMessageWarningThresholdChars) || largeMessageWarningThresholdChars < 20 || largeMessageWarningThresholdChars > 10000) return NextResponse.json({ error: 'Limite de caracteres para confirmação de mensagem longa deve ser inteiro entre 20 e 10000.' }, { status: 400 });
             settings.largeMessageWarningThresholdChars = largeMessageWarningThresholdChars;
-        }
-        if (freeIntroReplyLimit !== undefined) {
-            if (!Number.isSafeInteger(freeIntroReplyLimit) || freeIntroReplyLimit < 1 || freeIntroReplyLimit > 100) return NextResponse.json({ error: 'Respostas gratuitas devem ser um inteiro entre 1 e 100.' }, { status: 400 });
-            settings.freeIntroReplyLimit = freeIntroReplyLimit;
-            // Sincroniza atomicamente no MongoDB todas as salas ativas de Conheça Grátis que ainda não foram convertidas
-            await Room.updateMany(
-                { 'freeIntro.convertedAt': null, 'freeIntro.limit': { $ne: freeIntroReplyLimit } },
-                { $set: { 'freeIntro.limit': freeIntroReplyLimit } }
-            );
-        }
-        if (freeIntroTimeoutMinutes !== undefined) {
-            if (!Number.isSafeInteger(freeIntroTimeoutMinutes) || freeIntroTimeoutMinutes < 1 || freeIntroTimeoutMinutes > 1440) return NextResponse.json({ error: 'Prazo sem resposta deve ser um inteiro entre 1 e 1440 minutos.' }, { status: 400 });
-            settings.freeIntroTimeoutMinutes = freeIntroTimeoutMinutes;
         }
         if (maxBillableMessageChars !== undefined) {
             if (!Number.isSafeInteger(maxBillableMessageChars) || maxBillableMessageChars < 1 || maxBillableMessageChars > 10000) return NextResponse.json({ error: 'Limite de caracteres deve ser inteiro entre 1 e 10000.' }, { status: 400 });

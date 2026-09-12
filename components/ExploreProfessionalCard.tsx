@@ -5,7 +5,6 @@ type Props = {
     name: string;
     photoUrl: string;
     online: boolean;
-    freeIntroEnabled: boolean;
     trackExposure?: boolean;
     onClick: () => void;
 };
@@ -21,7 +20,7 @@ function formatDisplayName(raw: string) {
     return namePart;
 }
 
-export function ExploreProfessionalCard({ professionalId, name, photoUrl, online, freeIntroEnabled, trackExposure, onClick }: Props) {
+export function ExploreProfessionalCard({ professionalId, name, photoUrl, online, trackExposure, onClick }: Props) {
     const formattedName = formatDisplayName(name);
 
     return (
@@ -40,14 +39,6 @@ export function ExploreProfessionalCard({ professionalId, name, photoUrl, online
             />
 
             <div className="absolute bottom-0 inset-x-0 h-[38%] bg-gradient-to-t from-black/85 via-black/35 to-transparent pointer-events-none" />
-
-            {freeIntroEnabled && (
-                <div className="absolute top-2.5 left-2.5 z-20 pointer-events-none">
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-md border border-white/15 text-white text-[10px] font-semibold tracking-wide shadow-xs pointer-events-auto">
-                        Conheça grátis
-                    </span>
-                </div>
-            )}
 
             <div className="absolute bottom-0 inset-x-0 p-3 text-white flex items-center gap-1.5 z-10 min-w-0">
                 <h3 className="text-sm sm:text-base font-black tracking-tight leading-tight truncate drop-shadow-sm">

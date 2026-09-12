@@ -2,7 +2,6 @@
 
 import { ExploreProfessionalCard } from '@/components/ExploreProfessionalCard';
 import { TeamExploreCard, TeamExploreUser } from '@/components/TeamExploreCard';
-import { useFreeIntro } from '@/hooks/useFreeIntro';
 import React, { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
@@ -32,7 +31,6 @@ const calculateAge = (birthDateString?: string | Date) => {
 };
 
 export default function SearchPage() {
-    const { socket: introSocket } = useFreeIntro();
     const router = useTransitionRouter();
     const queryClient = useQueryClient();
     const { data: userData, isLoading: loadingProfile } = useMyProfile();
@@ -43,15 +41,6 @@ export default function SearchPage() {
     const [username, setUsername] = useState('');
     const [loading, setLoading] = useState(false);
     const [foundUsers, setFoundUsers] = useState<any[]>([]);
-    useEffect(() => {
-        if (!introSocket) return;
-        const update = (event: { professionalId: string; enabled: boolean }) => {
-            setFoundUsers(current => current.map(profile => profile.clerkId === event.professionalId ? { ...profile, freeIntroEnabled: event.enabled } : profile));
-            void queryClient.invalidateQueries({ queryKey: ['users', 'featured'] });
-        };
-        introSocket.on('free_intro_offer_updated', update);
-        return () => { introSocket.off('free_intro_offer_updated', update); };
-    }, [introSocket, queryClient]);
     const {
         data: featuredUsers = [],
         isLoading: loadingFeatured,
@@ -301,7 +290,7 @@ export default function SearchPage() {
             : (firstName || user.name || `@${user.username}`);
         const mainPhoto = user.photoUrl || (user.publicPhotos && user.publicPhotos[0]) || '/Logo.svg';
 
-        return <ExploreProfessionalCard key={user.clerkId} professionalId={user.clerkId} name={displayName} photoUrl={mainPhoto} online={!!user.isOnline} freeIntroEnabled={!!user.freeIntroEnabled} trackExposure={!username.trim()} onClick={() => handleOpenProfile(user)} />;
+        return <ExploreProfessionalCard key={user.clerkId} professionalId={user.clerkId} name={displayName} photoUrl={mainPhoto} online={!!user.isOnline} trackExposure={!username.trim()} onClick={() => handleOpenProfile(user)} />;
     };
 
     const renderCard = (user: any) => {

@@ -1,6 +1,4 @@
 'use client';
-
-import { useFreeIntro } from '@/hooks/useFreeIntro';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
@@ -65,7 +63,6 @@ export default function UserProfilePage({ params, username: propUsername, initia
 
     const { data: fetchedUser, isLoading, isError } = useUserByUsername(decodedUsername);
     const user = fetchedUser || initialUser;
-    const { data: freeIntro } = useFreeIntro(user?.clerkId);
     const { data: me } = useMyProfile();
     const { data: galleryData, isLoading: loadingGallery } = usePublicGallery(user?.clerkId);
     const subscribeMutation = useSubscribe();
@@ -553,13 +550,12 @@ export default function UserProfilePage({ params, username: propUsername, initia
                 <div className={`fixed bottom-0 left-0 right-0 z-30 border-t border-slate-100 bg-white/95 px-5 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-sm ${user.isProfessional ? 'lg:left-1/2 lg:px-10 lg:py-5 xl:px-16' : ''}`}>
                     <div className="mx-auto w-full max-w-2xl">
                         <Button
-                            title={isBlockedByOtherTeamMember ? 'Em atendimento' : startingTeamChat ? 'Abrindo...' : freeIntro?.eligible ? 'Conhecer grátis' : 'Enviar mensagem'}
+                            title={isBlockedByOtherTeamMember ? 'Em atendimento' : startingTeamChat ? 'Abrindo...' : 'Enviar mensagem'}
                             onClick={handleMessageClick}
                             disabled={startingTeamChat || isBlockedByOtherTeamMember}
                             size="lg"
                             className="w-full"
                         />
-                        {freeIntro?.eligible && <p className="mt-2 text-center text-xs leading-relaxed text-slate-500">As primeiras {freeIntro.limit} respostas dela são grátis. Depois, você paga para ler.</p>}
                         {isBlockedByOtherTeamMember && <p className="mt-2 text-center text-xs text-slate-500">Em atendimento por {teamActivationContact?.assignedTeamMemberName || 'outro membro da equipe'}</p>}
                     </div>
                 </div>

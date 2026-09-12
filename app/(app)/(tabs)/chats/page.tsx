@@ -1,7 +1,5 @@
 'use client';
 
-import { FreeIntroConversationsControl } from '@/components/FreeIntroConversationsControl';
-import { useFreeIntro } from '@/hooks/useFreeIntro';
 import toast from 'react-hot-toast';
 import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
@@ -16,7 +14,6 @@ import { buildProfileShareUrl } from '@/lib/referral';
 import { recordLinkShared } from '@/lib/clientAcquisitionAnalytics';
 
 interface Room {
-    freeIntro?: { convertedAt?: string | null };
     _id: string;
     participants: string[];
     lastMessage?: string;
@@ -82,37 +79,6 @@ function ChatListSkeleton() {
 
 export default function ChatsPage() {
     const router = useTransitionRouter();
-    const [division, setDivision] = useState<'clients' | 'free'>('clients');
-    const { data: freeIntro, socket: introSocket } = useFreeIntro();
-    const [savingIntro, setSavingIntro] = useState(false);
-    const toggleIntro = async () => {
-        if (savingIntro || !freeIntro) return;
-        setSavingIntro(true);
-        const nextEnabled = !freeIntro.enabled;
-
-        if (introSocket?.connected) {
-            introSocket.emit('set_free_intro', { enabled: nextEnabled });
-        }
-
-        try {
-            const res = await fetch('/api/free-intro', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ enabled: nextEnabled }),
-            });
-            const data = await res.json();
-            if (!res.ok || !data.success) {
-                toast.error(data.error || 'Não foi possível atualizar. Tente novamente.');
-            } else {
-                toast.success(nextEnabled ? 'Conheça grátis ativado!' : 'Conheça grátis desativado.');
-                await queryClient.invalidateQueries({ queryKey: ['freeIntro'] });
-            }
-        } catch {
-            toast.error('Não foi possível atualizar. Tente novamente.');
-        } finally {
-            setSavingIntro(false);
-        }
-    };
     const { user } = useUser();
     const queryClient = useQueryClient();
     const { socket, connected, socketService, socketVersion } = useSocket(user?.id);
@@ -189,9 +155,7 @@ export default function ChatsPage() {
     const { data: cachedRooms = [], isLoading, isRefetching, refetch: refetchRooms } = useChatRooms();
     const visibleRooms = cachedRooms.filter((room: Room) => !hiddenRoomIds.some(id => room._id === id || (room.roomId ?? [...room.participants].sort().join('_')) === id));
     const { data: myProfile, refetch: refetchProfile } = useMyProfile();
-    const isFreeRoom = (room: Room) => !!room.freeIntro && !room.freeIntro.convertedAt;
-    const rooms = myProfile?.isProfessional ? visibleRooms.filter((room: Room) => isFreeRoom(room) === (division === 'free')) : visibleRooms;
-    const unreadFor = (free: boolean) => visibleRooms.filter((room: Room) => isFreeRoom(room) === free && (room.unreadCount?.[user?.id ?? ''] ?? 0) > 0).length;
+    const rooms = visibleRooms;
 
     useEffect(() => {
         if (myProfile && myProfile.isProfessional) {
@@ -764,7 +728,6 @@ export default function ChatsPage() {
                 </div>
             )}
 
-            {myProfile?.isProfessional && <FreeIntroConversationsControl division={division} onDivisionChange={setDivision} clientsUnread={unreadFor(false)} freeUnread={unreadFor(true)} state={freeIntro} saving={savingIntro} connected={true} onToggle={toggleIntro} />}
             {/* List */}
             <PullToRefresh onRefresh={onRefresh} className="pb-24 md:pb-0">
                 {isLoading ? (

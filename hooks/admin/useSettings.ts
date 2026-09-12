@@ -17,8 +17,6 @@ interface SettingsSnapshot {
     pixEnabled: boolean;
     creditCardEnabled: boolean;
     couponsEnabled: boolean;
-    freeIntroReplyLimit: number;
-    freeIntroTimeoutMinutes: number;
     chatSessionTimeoutMinutes: number;
     earningsSessionInactivityMinutes: number;
     earningsSessionMinimumCents: number;
@@ -78,8 +76,6 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     const [pixEnabled, setPixEnabled] = useState(true);
     const [creditCardEnabled, setCreditCardEnabled] = useState(true);
     const [couponsEnabled, setCouponsEnabled] = useState(true);
-    const [freeIntroReplyLimit, setFreeIntroReplyLimit] = useState(3);
-    const [freeIntroTimeoutMinutes, setFreeIntroTimeoutMinutes] = useState(10);
     const [chatSessionTimeoutMinutes, setChatSessionTimeoutMinutes] = useState(30);
     const [earningsSessionInactivityMinutes, setEarningsSessionInactivityMinutes] = useState(120);
     const [earningsSessionMinimumCents, setEarningsSessionMinimumCents] = useState(1000);
@@ -141,8 +137,6 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         pixEnabled: s.pixEnabled ?? true,
         creditCardEnabled: s.creditCardEnabled ?? true,
         couponsEnabled: s.couponsEnabled ?? true,
-        freeIntroReplyLimit: s.freeIntroReplyLimit ?? 3,
-        freeIntroTimeoutMinutes: s.freeIntroTimeoutMinutes ?? 10,
         chatSessionTimeoutMinutes: s.chatSessionTimeoutMinutes ?? 30,
         earningsSessionInactivityMinutes: s.earningsSessionInactivityMinutes ?? 120,
         earningsSessionMinimumCents: s.earningsSessionMinimumCents ?? 1000,
@@ -212,8 +206,6 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     setPixEnabled(s.pixEnabled ?? true);
                     setCreditCardEnabled(s.creditCardEnabled ?? true);
                     setCouponsEnabled(s.couponsEnabled ?? true);
-                    setFreeIntroReplyLimit(s.freeIntroReplyLimit ?? 3);
-                    setFreeIntroTimeoutMinutes(s.freeIntroTimeoutMinutes ?? 10);
                     setChatSessionTimeoutMinutes(s.chatSessionTimeoutMinutes ?? 30);
                     setEarningsSessionInactivityMinutes(s.earningsSessionInactivityMinutes ?? 120);
                     setEarningsSessionMinimumCents(s.earningsSessionMinimumCents ?? 1000);
@@ -325,7 +317,6 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     pixEnabled,
                     creditCardEnabled,
                     couponsEnabled,
-                    freeIntroReplyLimit, freeIntroTimeoutMinutes,
                     chatSessionTimeoutMinutes,
                     earningsSessionInactivityMinutes,
                     earningsSessionMinimumCents,
@@ -454,9 +445,6 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         offlineEmailCooldownMinutes !== savedSnapshot.offlineEmailCooldownMinutes ||
         activeUserThresholdDays !== savedSnapshot.activeUserThresholdDays
     );
-    const isDirtyFreeIntro = savedSnapshot !== null && (
-        freeIntroReplyLimit !== savedSnapshot.freeIntroReplyLimit
-    );
     const isDirtyPricing = savedSnapshot !== null && (
         maxPricePerChar !== savedSnapshot.maxPricePerChar ||
         maxSubscriptionPrice !== savedSnapshot.maxSubscriptionPrice ||
@@ -506,7 +494,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
 
     return {
         settings, loadingSettings, isAuthorized, saving, savedSnapshot,
-        isDirtyPlatform, isDirtyChat, isDirtyFreeIntro, isDirtyPricing, isDirtyProfiles,
+        isDirtyPlatform, isDirtyChat, isDirtyPricing, isDirtyProfiles,
         isDirtyPayments, isDirtyApp, isDirtyAdmins, isDirtyExplore, isDirtyPromotions,
         platformFee, setPlatformFee,
         uploadLimit, setUploadLimit,
@@ -522,7 +510,6 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         pixEnabled, setPixEnabled,
         creditCardEnabled, setCreditCardEnabled,
         couponsEnabled, setCouponsEnabled,
-        freeIntroReplyLimit, setFreeIntroReplyLimit, freeIntroTimeoutMinutes, setFreeIntroTimeoutMinutes,
         chatSessionTimeoutMinutes, setChatSessionTimeoutMinutes,
         earningsSessionInactivityMinutes, setEarningsSessionInactivityMinutes,
         earningsSessionMinimumCents, setEarningsSessionMinimumCents,
