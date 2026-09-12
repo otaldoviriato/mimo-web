@@ -1,6 +1,7 @@
 'use client';
 
 import { ExploreProfessionalCard } from '@/components/ExploreProfessionalCard';
+import { TeamExploreCard, TeamExploreUser } from '@/components/TeamExploreCard';
 import { useFreeIntro } from '@/hooks/useFreeIntro';
 import React, { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -34,6 +35,9 @@ export default function SearchPage() {
     const router = useTransitionRouter();
     const queryClient = useQueryClient();
     const { data: userData, isLoading: loadingProfile } = useMyProfile();
+    const isTeam = !!userData?.isTeam;
+    const [teamUsers, setTeamUsers] = useState<TeamExploreUser[]>([]);
+    const [loadingTeam, setLoadingTeam] = useState(false);
     const [username, setUsername] = useState('');
     const [loading, setLoading] = useState(false);
     const [foundUsers, setFoundUsers] = useState<any[]>([]);
@@ -187,8 +191,32 @@ export default function SearchPage() {
     };
 
     useEffect(() => {
+        if (!isTeam) return;
+        let cancelled = false;
+        setLoadingTeam(true);
+        fetch('/api/team/explore')
+            .then(res => res.ok ? res.json() : { users: [] })
+            .then(data => {
+                if (!cancelled) setTeamUsers(data.users || []);
+            })
+            .catch(err => {
+                console.error('Erro ao carregar explorador para equipe:', err);
+            })
+            .finally(() => {
+                if (!cancelled) setLoadingTeam(false);
+            });
+
+        return () => { cancelled = true; };
+    }, [isTeam]);
+
+    useEffect(() => {
         const searchQuery = username.trim();
-        if (!searchQuery) return;
+        if (!searchQuery) {
+            setFoundUsers([]);
+            setError('');
+            setLoading(false);
+            return;
+        }
 
         let cancelled = false;
         const timer = setTimeout(async () => {
@@ -197,8 +225,20 @@ export default function SearchPage() {
             setError('');
 
             try {
-                const data = await userApi.searchByUsername(searchQuery);
-                if (!cancelled) setFoundUsers(data.users || []);
+                if (isTeam) {
+                    const res = await fetch(`/api/team/explore?q=${encodeURIComponent(searchQuery)}`);
+                    if (!res.ok) throw new Error('Falha na busca');
+                    const data = await res.json();
+                    if (!cancelled) {
+                        setFoundUsers(data.users || []);
+                        if ((data.users || []).length === 0) {
+                            setError('Nenhum usuário encontrado com esse nome, @usuário ou e-mail.');
+                        }
+                    }
+                } else {
+                    const data = await userApi.searchByUsername(searchQuery);
+                    if (!cancelled) setFoundUsers(data.users || []);
+                }
             } catch (err: any) {
                 if (cancelled) return;
                 if (err.response?.status === 404) {
@@ -209,13 +249,13 @@ export default function SearchPage() {
             } finally {
                 if (!cancelled) setLoading(false);
             }
-        }, 600);
+        }, 400);
 
         return () => {
             cancelled = true;
             clearTimeout(timer);
         };
-    }, [username]);
+    }, [username, isTeam]);
 
     const renderCreatorCard = (user: any) => {
         const age = calculateAge(user.birthDate);
@@ -227,6 +267,19 @@ export default function SearchPage() {
         const mainPhoto = user.photoUrl || (user.publicPhotos && user.publicPhotos[0]) || '/Logo.svg';
 
         return <ExploreProfessionalCard key={user.clerkId} professionalId={user.clerkId} name={displayName} photoUrl={mainPhoto} online={!!user.isOnline} freeIntroEnabled={!!user.freeIntroEnabled} trackExposure={!username.trim()} onClick={() => handleOpenProfile(user)} />;
+    };
+
+    const renderCard = (user: any) => {
+        if (isTeam) {
+            return (
+                <TeamExploreCard 
+                    key={user.clerkId || user.id} 
+                    user={user} 
+                    onClick={() => handleOpenProfile(user)} 
+                />
+            );
+        }
+        return renderCreatorCard(user);
     };
 
     if (userData?.isProfessional) {
@@ -242,12 +295,13 @@ export default function SearchPage() {
         );
     }
 
-    const displayUsers = username.trim() ? foundUsers : featuredUsers;
+    const displayUsers = username.trim() ? foundUsers : (isTeam ? teamUsers : featuredUsers);
+    const isInitialLoading = isTeam ? loadingTeam : loadingFeatured;
 
     return (
         <div className="flex flex-col h-full bg-slate-50">
-            {/* Modern Search Bar - Expandível */}
-            {isSearchOpen && (
+            {/* Modern Search Bar - Sempre acessível para Equipe ou Expandível para Clientes */}
+            {(isSearchOpen || isTeam) && (
                 <div className="bg-white px-4 py-3 shrink-0 border-b border-slate-100 flex items-center gap-2 animate-in slide-in-from-top-2 duration-200 z-10 relative shadow-xs">
                     <div className="relative flex-1 group">
                         <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-purple-600">
@@ -255,7 +309,7 @@ export default function SearchPage() {
                         </div>
                         <input
                             className="w-full pl-10 pr-10 py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-600/10 transition-all font-medium"
-                            placeholder="Nome ou @usuário da criadora..."
+                            placeholder={isTeam ? "Buscar por nome, @usuário ou e-mail..." : "Nome ou @usuário da criadora..."}
                             value={username}
                             onChange={(e) => {
                                 const nextValue = e.target.value;
@@ -268,7 +322,7 @@ export default function SearchPage() {
                             }}
                             autoCapitalize="none"
                             autoCorrect="off"
-                            autoFocus
+                            autoFocus={isSearchOpen}
                         />
                         {username.length > 0 && !loading && (
                             <button 
@@ -287,15 +341,17 @@ export default function SearchPage() {
                             </div>
                         )}
                     </div>
-                    <button
-                        onClick={() => {
-                            setIsSearchOpen(false);
-                            clearSearch();
-                        }}
-                        className="text-xs font-bold text-slate-500 hover:text-purple-600 px-2 py-2 transition-colors cursor-pointer"
-                    >
-                        Fechar
-                    </button>
+                    {!isTeam && (
+                        <button
+                            onClick={() => {
+                                setIsSearchOpen(false);
+                                clearSearch();
+                            }}
+                            className="text-xs font-bold text-slate-500 hover:text-purple-600 px-2 py-2 transition-colors cursor-pointer"
+                        >
+                            Fechar
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -315,7 +371,7 @@ export default function SearchPage() {
                 {/* Seção Explorar / Vitrine */}
                 {!username.trim() && (
                     <div className="flex-1 flex flex-col gap-4 animate-in fade-in duration-500 pt-1">
-                        {loadingFeatured ? (
+                        {isInitialLoading ? (
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 animate-pulse">
                                 {[1, 2, 3, 4, 5, 6].map((n) => (
                                     <div key={n} className="aspect-[3/4] bg-slate-200 rounded-2xl" />
@@ -325,21 +381,23 @@ export default function SearchPage() {
                             <>
                                 {displayUsers.length > 0 ? (
                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                                        {displayUsers.map((user) => renderCreatorCard(user))}
+                                        {displayUsers.map((user) => renderCard(user))}
                                     </div>
                                 ) : (
                                     <div className="flex-1 min-h-[50vh] flex items-center justify-center text-center text-slate-400 text-xs sm:text-sm font-medium py-12 px-4 animate-in fade-in duration-300">
-                                        <p>Nenhuma criadora ativa no momento.</p>
+                                        <p>{isTeam ? 'Nenhum perfil disponível no momento.' : 'Nenhuma criadora ativa no momento.'}</p>
                                     </div>
                                 )}
-                                <div ref={loadMoreRef} className="flex min-h-12 items-center justify-center py-3" aria-live="polite">
-                                    {isFetchingNextPage ? (
-                                        <span className="flex items-center gap-2 text-xs font-semibold text-slate-400">
-                                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-purple-600" />
-                                            Carregando mais criadoras...
-                                        </span>
-                                    ) : null}
-                                </div>
+                                {!isTeam && (
+                                    <div ref={loadMoreRef} className="flex min-h-12 items-center justify-center py-3" aria-live="polite">
+                                        {isFetchingNextPage ? (
+                                            <span className="flex items-center gap-2 text-xs font-semibold text-slate-400">
+                                                <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-purple-600" />
+                                                Carregando mais criadoras...
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                )}
                             </>
                         )}
                     </div>
@@ -349,11 +407,11 @@ export default function SearchPage() {
                 {username.trim().length > 0 && (
                     <div className="flex flex-col gap-4 animate-in fade-in duration-300 pt-1">
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                            {foundUsers.map((user) => renderCreatorCard(user))}
+                            {foundUsers.map((user) => renderCard(user))}
                         </div>
                         {foundUsers.length === 0 && !loading && !error && (
                             <div className="text-center py-12 text-slate-400 text-xs">
-                                Nenhuma criadora encontrada para &quot;{username}&quot;.
+                                Nenhum resultado encontrado para &quot;{username}&quot;.
                             </div>
                         )}
                     </div>

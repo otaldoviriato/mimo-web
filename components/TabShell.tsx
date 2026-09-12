@@ -83,7 +83,19 @@ export default function TabShell({ children, activePath }: { children: React.Rea
                         )}
                     </span>
                 ),
-            }
+            },
+            {
+                href: '/search',
+                label: 'Explorar',
+                icon: (active: boolean) => (
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                        <rect x="3" y="3" width="7.5" height="7.5" rx="1.5" stroke="currentColor" strokeWidth={active ? 2.5 : 2} fill={active ? 'currentColor' : 'none'} />
+                        <rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" stroke="currentColor" strokeWidth={active ? 2.5 : 2} fill={active ? 'currentColor' : 'none'} />
+                        <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5" stroke="currentColor" strokeWidth={active ? 2.5 : 2} fill={active ? 'currentColor' : 'none'} />
+                        <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" stroke="currentColor" strokeWidth={active ? 2.5 : 2} fill={active ? 'currentColor' : 'none'} />
+                    </svg>
+                ),
+            },
         ] : isProfessional ? [
             {
                 href: '/wallet',
