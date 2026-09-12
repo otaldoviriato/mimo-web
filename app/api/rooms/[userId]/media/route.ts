@@ -71,6 +71,7 @@ export async function GET(
             thumbnailUrl: m.isVideo ? m.thumbnailUrl : m.originalImageUrl,
             isVideo: !!m.isVideo,
             messageId: m._id.toString(),
+            senderId: m.senderId,
             isTemporary: m.isTemporary,
             expiresAt: m.expiresAt
         }));

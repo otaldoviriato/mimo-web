@@ -6,7 +6,7 @@ import axios from 'axios';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useUser } from '@clerk/nextjs';
 import { Avatar } from '@/components/Avatar';
-import { useUserById, useUserByUsername } from '@/hooks/useQueries';
+import { useUserById, useUserByUsername, useMyProfile } from '@/hooks/useQueries';
 import {
     ShieldCheck,
     ArrowLeft,
@@ -20,7 +20,9 @@ import {
     ChevronRight,
     X,
     Play,
-    ChevronDown
+    ChevronDown,
+    Eye,
+    EyeOff
 } from 'lucide-react';
 
 function isClerkUserId(value: string) {
@@ -52,6 +54,7 @@ interface MediaItem {
     thumbnailUrl?: string;
     isVideo?: boolean;
     messageId?: string;
+    senderId?: string;
     isTemporary?: boolean;
     expiresAt?: string | Date;
 }
@@ -66,9 +69,11 @@ const BATCH_INCREMENT = 9;
 
 function LazyMediaThumbnail({
     item,
+    isBlurred,
     onClick
 }: {
     item: MediaItem;
+    isBlurred?: boolean;
     onClick: () => void;
 }) {
     const [loaded, setLoaded] = useState(false);
@@ -88,7 +93,7 @@ function LazyMediaThumbnail({
                 <video
                     src={item.url}
                     onLoadedData={() => setLoaded(true)}
-                    className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+                    className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'} ${isBlurred ? 'blur-xl scale-110' : ''}`}
                     muted
                     playsInline
                 />
@@ -98,17 +103,21 @@ function LazyMediaThumbnail({
                     alt="Mídia da conversa"
                     loading="lazy"
                     onLoad={() => setLoaded(true)}
-                    className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+                    className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'} ${isBlurred ? 'blur-xl scale-110' : ''}`}
                 />
             )}
 
-            {item.isVideo && (
+            {isBlurred ? (
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex flex-col items-center justify-center text-white p-1">
+                    <Eye size={16} strokeWidth={2.2} />
+                </div>
+            ) : item.isVideo ? (
                 <div className="absolute inset-0 bg-black/25 flex items-center justify-center text-white transition-opacity group-hover:bg-black/35">
                     <div className="w-8 h-8 rounded-full bg-black/40 backdrop-blur-xs flex items-center justify-center">
                         <Play className="w-4 h-4 text-white fill-white ml-0.5" />
                     </div>
                 </div>
-            )}
+            ) : null}
         </div>
     );
 }
@@ -119,12 +128,15 @@ export default function ChatInfoPage({ params, userId: propUserId }: ChatInfoPag
     const isRouteClerkId = isClerkUserId(otherUserId);
     const router = useTransitionRouter();
     const { user } = useUser();
+    const { data: profileData } = useMyProfile();
+    const isProfessional = Boolean(profileData?.user?.isProfessional);
     const { data: receiverById, isLoading: loadingReceiverById } = useUserById(isRouteClerkId ? otherUserId : undefined);
     const { data: receiverByUsername, isLoading: loadingReceiverByUsername } = useUserByUsername(isRouteClerkId ? undefined : otherUserId);
     const receiver = receiverById || receiverByUsername;
 
     const [messages, setMessages] = useState<Message[]>([]);
     const [historicalMedia, setHistoricalMedia] = useState<MediaItem[]>([]);
+    const [revealedClientMediaIds, setRevealedClientMediaIds] = useState<Set<string>>(new Set());
 
     const targetClerkId = receiver?.clerkId || (isClerkUserId(otherUserId) ? otherUserId : null);
     const isResolvingReceiver = isRouteClerkId ? loadingReceiverById : loadingReceiverByUsername;
@@ -206,6 +218,8 @@ export default function ChatInfoPage({ params, userId: propUserId }: ChatInfoPag
             })
             .map(m => ({
                 id: m._id,
+                messageId: m._id,
+                senderId: m.senderId,
                 url: m.isVideo ? m.videoUrl! : m.originalImageUrl!,
                 thumbnailUrl: m.isVideo ? m.thumbnailUrl : m.originalImageUrl,
                 isVideo: !!m.isVideo,
@@ -526,16 +540,22 @@ export default function ChatInfoPage({ params, userId: propUserId }: ChatInfoPag
                 ) : (
                     <div className="space-y-4">
                         <div className="grid grid-cols-3 gap-2">
-                            {visibleItems.map((item, idx) => (
-                                <LazyMediaThumbnail
-                                    key={item.id || item.url || idx}
-                                    item={item}
-                                    onClick={() => {
-                                        setShowControls(true);
-                                        setSelectedIndex(idx);
-                                    }}
-                                />
-                            ))}
+                            {visibleItems.map((item, idx) => {
+                                const isClientMediaToProf = isProfessional && item.senderId && item.senderId !== user?.id && !receiver?.isProfessional;
+                                const isBlurred = isClientMediaToProf && (item.id || item.messageId) && !revealedClientMediaIds.has(item.id || item.messageId || '');
+
+                                return (
+                                    <LazyMediaThumbnail
+                                        key={item.id || item.url || idx}
+                                        item={item}
+                                        isBlurred={Boolean(isBlurred)}
+                                        onClick={() => {
+                                            setShowControls(true);
+                                            setSelectedIndex(idx);
+                                        }}
+                                    />
+                                );
+                            })}
                         </div>
 
                         {/* Botão Ver Mais Mídias */}
@@ -628,29 +648,65 @@ export default function ChatInfoPage({ params, userId: propUserId }: ChatInfoPag
                     )}
 
                     {/* Exibição Central da Mídia */}
-                    <div
-                        className="w-full h-full flex items-center justify-center p-2 md:p-8"
-                        onClick={() => setShowControls(prev => !prev)}
-                    >
-                        {activeMedia.isVideo ? (
-                            <video
-                                key={activeMedia.url}
-                                src={activeMedia.url}
-                                controls
-                                autoPlay
-                                playsInline
-                                onClick={(e) => e.stopPropagation()}
-                                className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain"
-                            />
-                        ) : (
-                            <img
-                                key={activeMedia.url}
-                                src={activeMedia.url}
-                                alt="Mídia em tela cheia"
-                                className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl transition-transform duration-200"
-                            />
-                        )}
-                    </div>
+                    {(() => {
+                        const isClientMediaToProf = isProfessional && activeMedia.senderId && activeMedia.senderId !== user?.id && !receiver?.isProfessional;
+                        const isBlurred = isClientMediaToProf && (activeMedia.id || activeMedia.messageId) && !revealedClientMediaIds.has(activeMedia.id || activeMedia.messageId || '');
+
+                        return (
+                            <div
+                                className="w-full h-full flex items-center justify-center p-2 md:p-8 relative overflow-hidden"
+                                onClick={() => !isBlurred && setShowControls(prev => !prev)}
+                            >
+                                {activeMedia.isVideo ? (
+                                    <video
+                                        key={activeMedia.url}
+                                        src={activeMedia.url}
+                                        controls={!isBlurred}
+                                        autoPlay={!isBlurred}
+                                        playsInline
+                                        onClick={(e) => e.stopPropagation()}
+                                        className={`max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain ${isBlurred ? 'blur-3xl scale-110 pointer-events-none' : ''}`}
+                                    />
+                                ) : (
+                                    <img
+                                        key={activeMedia.url}
+                                        src={activeMedia.url}
+                                        alt="Mídia em tela cheia"
+                                        className={`max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl transition-transform duration-200 ${isBlurred ? 'blur-3xl scale-110' : ''}`}
+                                    />
+                                )}
+
+                                {isBlurred && (
+                                    <div
+                                        className="absolute inset-0 bg-black/60 backdrop-blur-md flex flex-col items-center justify-center gap-3 p-6 text-center z-30"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            const mediaKey = activeMedia.id || activeMedia.messageId;
+                                            if (mediaKey) {
+                                                setRevealedClientMediaIds(prev => {
+                                                    const next = new Set(prev);
+                                                    next.add(mediaKey);
+                                                    return next;
+                                                });
+                                            }
+                                        }}
+                                    >
+                                        <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white border border-white/30 shadow-lg group-hover:scale-105 transition-transform">
+                                            <Eye size={26} strokeWidth={2.2} />
+                                        </div>
+                                        <div className="flex flex-col items-center gap-1">
+                                            <span className="text-base font-bold text-white drop-shadow">
+                                                {activeMedia.isVideo ? 'Vídeo recebido' : 'Foto recebida'}
+                                            </span>
+                                            <span className="text-xs font-medium text-white/80 drop-shadow bg-black/40 px-3 py-1 rounded-full border border-white/10 mt-1">
+                                                Toque para visualizar
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
                 </div>
             )}
         </div>

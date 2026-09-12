@@ -25,7 +25,7 @@ import { trackAcquisitionEvent } from '@/lib/clientAcquisitionAnalytics';
 import { emitCampaignTelemetry } from '@/lib/campaignTelemetry';
 import { FirstMessageNotificationModal } from '@/components/FirstMessageNotificationModal';
 import { userApi } from '@/services/api';
-import { AlertTriangle, ShieldCheck, Wallet, Clock, MessageCircle, LockKeyhole } from 'lucide-react';
+import { AlertTriangle, ShieldCheck, Wallet, Clock, MessageCircle, LockKeyhole, Eye, EyeOff } from 'lucide-react';
 
 interface Message {
     _id: string;
@@ -611,6 +611,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     const [pendingLongMessageToConfirm, setPendingLongMessageToConfirm] = useState<Message | null>(null);
     const declinedLongMessageIdsRef = useRef<Set<string>>(new Set());
     const [showFirstMessageNotifModal, setShowFirstMessageNotifModal] = useState<boolean>(false);
+    const [revealedClientMediaIds, setRevealedClientMediaIds] = useState<Set<string>>(new Set());
 
     const triggerFirstMessageModalIfEligible = () => {
         const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
@@ -983,6 +984,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             })
             .map(m => ({
                 messageId: m._id,
+                senderId: m.senderId,
                 url: m.isVideo ? m.videoUrl! : m.originalImageUrl!,
                 thumbnailUrl: m.isVideo ? m.thumbnailUrl : m.originalImageUrl,
                 isVideo: !!m.isVideo,
@@ -990,12 +992,12 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 expiresAt: m.expiresAt,
             }));
 
-        // 3. Enriquecer itens da galeria histórica com propriedades locais se houver correspondência
         const enrichedHistorical = validHistorical.map(histItem => {
             const localMatch = localMedias.find(lm => lm.url === histItem.url);
             if (localMatch) {
                 return {
                     ...histItem,
+                    senderId: histItem.senderId || localMatch.senderId,
                     messageId: localMatch.messageId,
                     isTemporary: localMatch.isTemporary,
                     expiresAt: localMatch.expiresAt
@@ -3399,6 +3401,8 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     const isLocked = item.isLockedImage;
                     const isAudio = !!item.isAudio;
                     const isText = !item.isGift && !isLocked && !item.originalImageUrl && !item.isVideo && !item.isSystem && !isAudio;
+                    const isClientMediaToProfessional = Boolean(userData?.isProfessional) && !isMine && !receiver?.isProfessional && Boolean(item.originalImageUrl || item.isVideo);
+                    const isClientMediaBlurred = isClientMediaToProfessional && !revealedClientMediaIds.has(item._id);
                     
                     const nextItem = arr[index + 1];
                     let shouldShowSeparator = false;
@@ -3778,8 +3782,16 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                 </div>
                                             ) : (
                                                 <div 
-                                                    className="relative w-60 h-60 rounded-2xl overflow-hidden bg-gray-100 shadow-sm cursor-pointer group flex items-center justify-center"
+                                                    className="relative w-60 h-60 rounded-2xl overflow-hidden bg-gray-100 shadow-sm cursor-pointer group flex items-center justify-center select-none"
                                                     onClick={() => {
+                                                        if (isClientMediaBlurred) {
+                                                            setRevealedClientMediaIds(prev => {
+                                                                const next = new Set(prev);
+                                                                next.add(item._id);
+                                                                return next;
+                                                            });
+                                                            return;
+                                                        }
                                                         const url = item.isVideo ? item.videoUrl : item.originalImageUrl;
                                                         if (url) {
                                                             const idx = mediaItems.findIndex(m => m.url === url);
@@ -3787,7 +3799,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                         }
                                                     }}
                                                 >
-                                                    {item.isTemporary && item.expiresAt && (
+                                                    {item.isTemporary && item.expiresAt && !isClientMediaBlurred && (
                                                         <TemporaryMediaBadge 
                                                             expiresAt={item.expiresAt} 
                                                             onExpire={() => {
@@ -3798,17 +3810,56 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                     {(item.isVideo ? item.thumbnailUrl : item.originalImageUrl) ? (
                                                         <img 
                                                             src={(item.isVideo ? item.thumbnailUrl : item.originalImageUrl) || ''} 
-                                                            className="w-full h-full object-cover animate-in fade-in duration-300" 
+                                                            className={`w-full h-full object-cover animate-in fade-in duration-300 transition-all ${
+                                                                isClientMediaBlurred ? 'blur-3xl scale-125' : ''
+                                                            }`} 
                                                             alt="Media" 
                                                         />
                                                     ) : (
-                                                        <div className="w-full h-full bg-purple-950/20 flex flex-col items-center justify-center gap-2 text-purple-600">
+                                                        <div className={`w-full h-full bg-purple-950/20 flex flex-col items-center justify-center gap-2 text-purple-600 transition-all ${
+                                                            isClientMediaBlurred ? 'blur-3xl scale-125' : ''
+                                                        }`}>
                                                             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                                                 <path d="M23 7l-7 5 7 5V7z" />
                                                                 <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
                                                             </svg>
                                                             <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700/60">Vídeo</span>
                                                         </div>
+                                                    )}
+
+                                                    {isClientMediaBlurred && (
+                                                        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex flex-col items-center justify-center gap-2.5 p-4 text-center z-10 select-none transition-all">
+                                                            <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white border border-white/30 shadow-lg group-hover:scale-105 transition-transform">
+                                                                <Eye size={22} strokeWidth={2.2} />
+                                                            </div>
+                                                            <div className="flex flex-col items-center gap-0.5">
+                                                                <span className="text-xs font-bold text-white drop-shadow-md tracking-wide">
+                                                                    {item.isVideo ? 'Vídeo recebido' : 'Foto recebida'}
+                                                                </span>
+                                                                <span className="text-[11px] font-medium text-white/90 drop-shadow-md bg-black/35 px-2.5 py-0.5 rounded-full border border-white/10 mt-1">
+                                                                    Toque para visualizar
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {isClientMediaToProfessional && !isClientMediaBlurred && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setRevealedClientMediaIds(prev => {
+                                                                    const next = new Set(prev);
+                                                                    next.delete(item._id);
+                                                                    return next;
+                                                                });
+                                                            }}
+                                                            className="absolute top-2 right-2 z-20 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/15 flex items-center gap-1.5 shadow-md text-white/90 hover:text-white text-[10px] font-semibold active:scale-95 transition-all"
+                                                            title="Ocultar mídia"
+                                                        >
+                                                            <EyeOff size={12} strokeWidth={2.2} />
+                                                            <span>Ocultar</span>
+                                                        </button>
                                                     )}
 
                                                     {/* Progresso de upload circular para envio em background */}
@@ -3857,8 +3908,8 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                         </div>
                                                     )}
 
-                                                    {item.isVideo && (!item.tempId || !uploadTasks[item.tempId]) && (
-                                                        <div className="absolute inset-0 flex items-center justify-center">
+                                                    {item.isVideo && !isClientMediaBlurred && (!item.tempId || !uploadTasks[item.tempId]) && (
+                                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                                             <div className="w-12 h-12 rounded-full bg-black/45 backdrop-blur-sm flex items-center justify-center text-white border border-white/10 group-hover:scale-110 transition-transform">
                                                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                                                                     <path d="M8 5v14l11-7z" />
@@ -4463,30 +4514,65 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                     width: `${mediaItems.length * 100}vw`
                                 }}
                             >
-                                {mediaItems.map((item, idx) => (
-                                    <div 
-                                        key={idx} 
-                                        className="h-full flex-shrink-0 flex items-center justify-center"
-                                        style={{ width: '100vw' }}
-                                        onClick={handleSlideClick}
-                                    >
-                                        {item.isVideo ? (
-                                            <VideoPlayer
-                                                key={item.url}
-                                                src={item.url}
-                                                isActive={idx === fullscreenIndex}
-                                                controlsVisible={controlsVisible}
-                                            />
-                                        ) : (
-                                            <img
-                                                key={item.url}
-                                                src={item.url}
-                                                className="max-w-full max-h-full object-contain"
-                                                alt={`Mídia ${idx + 1}`}
-                                            />
-                                        )}
-                                    </div>
-                                ))}
+                                {mediaItems.map((item, idx) => {
+                                    const isClientMediaToProf = Boolean(userData?.isProfessional) && item.senderId && item.senderId !== user?.id && !receiver?.isProfessional;
+                                    const isBlurred = isClientMediaToProf && item.messageId && !revealedClientMediaIds.has(item.messageId);
+
+                                    return (
+                                        <div 
+                                            key={idx} 
+                                            className="h-full flex-shrink-0 flex items-center justify-center relative overflow-hidden"
+                                            style={{ width: '100vw' }}
+                                            onClick={isBlurred ? undefined : handleSlideClick}
+                                        >
+                                            {item.isVideo ? (
+                                                <div className={`relative max-w-full max-h-full flex items-center justify-center ${isBlurred ? 'blur-3xl scale-110 pointer-events-none' : ''}`}>
+                                                    <VideoPlayer
+                                                        key={item.url}
+                                                        src={item.url}
+                                                        isActive={idx === fullscreenIndex && !isBlurred}
+                                                        controlsVisible={controlsVisible}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <img
+                                                    key={item.url}
+                                                    src={item.url}
+                                                    className={`max-w-full max-h-full object-contain ${isBlurred ? 'blur-3xl scale-110' : ''}`}
+                                                    alt={`Mídia ${idx + 1}`}
+                                                />
+                                            )}
+
+                                            {isBlurred && (
+                                                <div 
+                                                    className="absolute inset-0 bg-black/60 backdrop-blur-md flex flex-col items-center justify-center gap-3 p-6 text-center z-30"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (item.messageId) {
+                                                            setRevealedClientMediaIds(prev => {
+                                                                const next = new Set(prev);
+                                                                next.add(item.messageId);
+                                                                return next;
+                                                            });
+                                                        }
+                                                    }}
+                                                >
+                                                    <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white border border-white/30 shadow-lg group-hover:scale-105 transition-transform">
+                                                        <Eye size={26} strokeWidth={2.2} />
+                                                    </div>
+                                                    <div className="flex flex-col items-center gap-1">
+                                                        <span className="text-base font-bold text-white drop-shadow">
+                                                            {item.isVideo ? 'Vídeo recebido' : 'Foto recebida'}
+                                                        </span>
+                                                        <span className="text-xs font-medium text-white/80 drop-shadow bg-black/40 px-3 py-1 rounded-full border border-white/10 mt-1">
+                                                            Toque para visualizar
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
 
@@ -4686,31 +4772,40 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-3 gap-1">
-                                    {mediaItems.map((item, idx) => (
-                                        <button
-                                            key={idx}
-                                            className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 active:opacity-70 transition-opacity"
-                                            onClick={() => {
-                                                setGalleryVisible(false);
-                                                setFullscreenIndex(idx);
-                                            }}
-                                        >
-                                            <img
-                                                src={item.thumbnailUrl || item.url}
-                                                alt={`Mídia ${idx + 1}`}
-                                                className="w-full h-full object-cover"
-                                            />
-                                            {item.isVideo && (
-                                                <div className="absolute inset-0 flex items-center justify-center">
-                                                    <div className="w-8 h-8 rounded-full bg-black/45 backdrop-blur-sm flex items-center justify-center">
-                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
-                                                            <path d="M8 5v14l11-7z"/>
-                                                        </svg>
+                                    {mediaItems.map((item, idx) => {
+                                        const isClientMediaToProf = Boolean(userData?.isProfessional) && item.senderId && item.senderId !== user?.id && !receiver?.isProfessional;
+                                        const isBlurred = isClientMediaToProf && item.messageId && !revealedClientMediaIds.has(item.messageId);
+
+                                        return (
+                                            <button
+                                                key={idx}
+                                                className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 active:opacity-70 transition-opacity"
+                                                onClick={() => {
+                                                    setGalleryVisible(false);
+                                                    setFullscreenIndex(idx);
+                                                }}
+                                            >
+                                                <img
+                                                    src={item.thumbnailUrl || item.url}
+                                                    alt={`Mídia ${idx + 1}`}
+                                                    className={`w-full h-full object-cover ${isBlurred ? 'blur-xl scale-110' : ''}`}
+                                                />
+                                                {isBlurred ? (
+                                                    <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex flex-col items-center justify-center text-white p-1">
+                                                        <Eye size={16} strokeWidth={2.2} />
                                                     </div>
-                                                </div>
-                                            )}
-                                        </button>
-                                    ))}
+                                                ) : item.isVideo && (
+                                                    <div className="absolute inset-0 flex items-center justify-center">
+                                                        <div className="w-8 h-8 rounded-full bg-black/45 backdrop-blur-sm flex items-center justify-center">
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
+                                                                <path d="M8 5v14l11-7z"/>
+                                                            </svg>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
