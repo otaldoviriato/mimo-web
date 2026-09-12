@@ -1,5 +1,7 @@
 'use client';
 
+import { isStaffSession } from '@/lib/staffSessionClient';
+
 const VISITOR_KEY = 'mimo_visitor_id';
 
 type PublicEvent = {
@@ -17,7 +19,7 @@ function getVisitorId() {
 }
 
 export function trackAcquisitionEvent(event: PublicEvent) {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || isStaffSession()) return;
 
     const body = JSON.stringify({
         ...event,

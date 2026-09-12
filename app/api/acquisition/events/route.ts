@@ -5,6 +5,7 @@ import { recordAcquisitionEvent } from '@/lib/acquisitionAnalytics';
 import { sanitizeReferralValue } from '@/lib/referral';
 import { User } from '@/models/User';
 import { CampaignVisit } from '@/models/CampaignVisit';
+import { isStaffOrAdmin } from '@/lib/internalStaff';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -35,6 +36,10 @@ export async function POST(request: NextRequest) {
         }
 
         const { userId } = await auth();
+        if (userId && (await isStaffOrAdmin(userId))) {
+            return new NextResponse(null, { status: 204 });
+        }
+
         if (eventType.startsWith('explore_') && !userId) {
             return NextResponse.json({ error: 'Nao autorizado.' }, { status: 401 });
         }

@@ -13,6 +13,7 @@ import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tansta
 import { useUser } from '@clerk/nextjs';
 import { userApi } from '@/services/api';
 import { REFERRAL_STORAGE_KEY } from '@/lib/referral';
+import { setStaffSession } from '@/lib/staffSessionClient';
 
 const CHAT_SERVER_URL = process.env.NEXT_PUBLIC_CHAT_SERVER_URL || 'http://localhost:3001';
 
@@ -75,6 +76,7 @@ export function useMyProfile() {
             const user = response?.user ?? null;
             if (typeof window !== 'undefined' && user) {
                 localStorage.setItem('mimo_profile', JSON.stringify(user));
+                setStaffSession(Boolean(user.isAdmin || user.isTeam));
                 if (user.acquiredByProfessionalId) {
                     localStorage.removeItem(REFERRAL_STORAGE_KEY);
                 }
@@ -90,8 +92,10 @@ export function useMyProfile() {
                         // Ignora o cache se for de outro usuário logado no Clerk para evitar flashes visuais
                         if (clerkUser?.id && parsed.clerkId !== clerkUser.id) {
                             localStorage.removeItem('mimo_profile');
+                            setStaffSession(false);
                             return undefined;
                         }
+                        setStaffSession(Boolean(parsed?.isAdmin || parsed?.isTeam));
                         return parsed;
                     } catch {
                         return undefined;

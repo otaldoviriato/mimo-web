@@ -1,11 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
+import { isStaffOrAdmin } from '@/lib/internalStaff';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
     try {
+        const { userId } = await auth();
+        if (userId && (await isStaffOrAdmin(userId))) {
+            return NextResponse.json({
+                success: true,
+                ignored: true,
+                reason: 'Administradores e membros da equipe não impactam métricas de atratividade.',
+            });
+        }
+
         const body = await request.json().catch(() => ({}));
         const impressions = Array.isArray(body.impressions)
             ? (body.impressions as unknown[]).filter((id): id is string => typeof id === 'string' && id.trim().length > 0)

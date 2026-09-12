@@ -13,6 +13,7 @@ import { UserX, Lock, Eye, X, ChevronLeft, ChevronRight, ShieldCheck, Gift } fro
 import toast from 'react-hot-toast';
 import { trackAcquisitionEvent } from '@/lib/clientAcquisitionAnalytics';
 import { emitCampaignTelemetry } from '@/lib/campaignTelemetry';
+import { isStaffSession } from '@/lib/staffSessionClient';
 
 interface UserProfilePageProps {
     params?: Promise<{ username: string }>;
@@ -84,9 +85,10 @@ export default function UserProfilePage({ params, username: propUsername, initia
         !teamActivationContact?.isAssignedToCurrentTeamMember
     );
     const showSubscribeButton = user?.isProfessional && user?.isSubscriptionEnabled && !isSubscriber && !isOwner;
+    const isStaff = Boolean(me?.isAdmin || me?.isTeam || isStaffSession());
 
     useEffect(() => {
-        if (!user?.clerkId || typeof window === 'undefined') return;
+        if (!user?.clerkId || typeof window === 'undefined' || isStaff) return;
         const search = new URLSearchParams(window.location.search);
         if (search.get('ref') !== user.clerkId) return;
 
@@ -107,12 +109,12 @@ export default function UserProfilePage({ params, username: propUsername, initia
                 name: user.name,
             });
         }
-    }, [user?.clerkId, user?.username, user?.name]);
+    }, [isStaff, user?.clerkId, user?.username, user?.name]);
 
     const handleMessageClick = async () => {
         if (!user || isBlockedByOtherTeamMember) return;
 
-        if (user.clerkId) {
+        if (user.clerkId && !isStaff) {
             emitCampaignTelemetry({
                 eventType: 'message_click',
                 professionalId: user.clerkId,
@@ -182,7 +184,7 @@ export default function UserProfilePage({ params, username: propUsername, initia
         setViewerItems(items);
         setActiveViewerIndex(index);
 
-        if (user?.clerkId) {
+        if (user?.clerkId && !isStaff) {
             emitCampaignTelemetry({
                 eventType: 'photo_view',
                 professionalId: user.clerkId,
@@ -191,7 +193,7 @@ export default function UserProfilePage({ params, username: propUsername, initia
                 totalPhotos: items.length,
             });
         }
-    }, [user?.clerkId, user?.username]);
+    }, [isStaff, user?.clerkId, user?.username]);
 
     const closeViewer = useCallback(() => {
         setActiveViewerIndex(null);
@@ -214,7 +216,7 @@ export default function UserProfilePage({ params, username: propUsername, initia
         setViewerIsAnimating(true);
         setViewerDragOffset(directionOffset);
 
-        if (user?.clerkId) {
+        if (user?.clerkId && !isStaff) {
             emitCampaignTelemetry({
                 eventType: 'photo_view',
                 professionalId: user.clerkId,
@@ -230,7 +232,7 @@ export default function UserProfilePage({ params, username: propUsername, initia
             setViewerDragOffset(0);
             viewerTransitionTimeoutRef.current = null;
         }, viewerTransitionMs);
-    }, [activeViewerIndex, currentGalleryItems.length, user?.clerkId, user?.username]);
+    }, [activeViewerIndex, currentGalleryItems.length, isStaff, user?.clerkId, user?.username]);
 
     const showPreviousViewerItem = useCallback(() => {
         if (activeViewerIndex !== null && activeViewerIndex > 0) {

@@ -5,13 +5,14 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { CAMPAIGN_ATTRIBUTION_STORAGE_KEY } from './CampaignVisitTracker';
 import { emitCampaignTelemetry } from '@/lib/campaignTelemetry';
+import { isStaffSession } from '@/lib/staffSessionClient';
 
 export function PublicTrafficTracker() {
     const pathname = usePathname();
     const trackedInThisRender = useRef<Set<string>>(new Set());
 
     useEffect(() => {
-        if (typeof window === 'undefined') return;
+        if (typeof window === 'undefined' || isStaffSession()) return;
 
         // 1. Garante visitorId estável
         let visitorId = localStorage.getItem('mimo_visitor_id');
@@ -72,6 +73,7 @@ export function PublicTrafficTracker() {
 
         // 3. Listener global de CTA clicks (Etapa 2 do Funil)
         const recordCta = (event: MouseEvent) => {
+            if (isStaffSession()) return;
             const element = event.target instanceof Element ? event.target.closest('[data-campaign-cta]') : null;
             if (!element) return;
 
@@ -108,7 +110,7 @@ export function AuthenticatedTrafficSync() {
     const syncedUserRef = useRef<string | null>(null);
 
     useEffect(() => {
-        if (!isSignedIn || !userId || typeof window === 'undefined') return;
+        if (!isSignedIn || !userId || typeof window === 'undefined' || isStaffSession()) return;
         if (syncedUserRef.current === userId) return;
 
         const visitorId = localStorage.getItem('mimo_visitor_id');
@@ -125,7 +127,7 @@ export function AuthenticatedTrafficSync() {
 
     // Rastreamento de presença em tempo real (online / saiu da página)
     useEffect(() => {
-        if (!isSignedIn || !userId || typeof window === 'undefined') return;
+        if (!isSignedIn || !userId || typeof window === 'undefined' || isStaffSession()) return;
 
         // Heartbeat inicial
         emitCampaignTelemetry({ eventType: 'heartbeat' });

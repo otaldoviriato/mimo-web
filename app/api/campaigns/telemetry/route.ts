@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { CampaignUserJourney } from '@/models/CampaignUserJourney';
 import { Campaign } from '@/models/Campaign';
+import { isStaffOrAdmin } from '@/lib/internalStaff';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,14 @@ export async function POST(request: NextRequest) {
 
         if (!effectiveUserId) {
             return NextResponse.json({ error: 'Identificador do usuário ausente' }, { status: 400 });
+        }
+
+        if (await isStaffOrAdmin(effectiveUserId)) {
+            return NextResponse.json({
+                success: true,
+                ignored: true,
+                reason: 'Administradores e membros da equipe não geram métricas de telemetria.',
+            });
         }
 
         const eventType = String(body.eventType || '').trim();

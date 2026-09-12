@@ -12,6 +12,7 @@ import { Search, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { trackAcquisitionEvent } from '@/lib/clientAcquisitionAnalytics';
 import { emitCampaignTelemetry } from '@/lib/campaignTelemetry';
+import { isStaffSession } from '@/lib/staffSessionClient';
 
 const calculateAge = (birthDateString?: string | Date) => {
     if (!birthDateString) return null;
@@ -36,6 +37,7 @@ export default function SearchPage() {
     const queryClient = useQueryClient();
     const { data: userData, isLoading: loadingProfile } = useMyProfile();
     const isTeam = !!userData?.isTeam;
+    const isStaff = Boolean(userData?.isAdmin || isTeam || isStaffSession());
     const [teamUsers, setTeamUsers] = useState<TeamExploreUser[]>([]);
     const [loadingTeam, setLoadingTeam] = useState(false);
     const [username, setUsername] = useState('');
@@ -91,7 +93,7 @@ export default function SearchPage() {
     }, []);
 
     useEffect(() => {
-        if (userData?.isProfessional || username.trim() || loadingFeatured) return;
+        if (userData?.isProfessional || isStaff || username.trim() || loadingFeatured) return;
 
         const flushImpressions = () => {
             const batch = Array.from(pendingImpressionsBatch.current);
@@ -137,10 +139,10 @@ export default function SearchPage() {
             observer.disconnect();
             flushImpressions();
         };
-    }, [featuredUsers, loadingFeatured, userData?.isProfessional, username]);
+    }, [featuredUsers, isStaff, loadingFeatured, userData?.isProfessional, username]);
 
     useEffect(() => {
-        if (userData?.isProfessional) return;
+        if (userData?.isProfessional || isStaff) return;
 
         let ticking = false;
         const handleScroll = () => {
@@ -164,7 +166,7 @@ export default function SearchPage() {
 
         window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
-    }, [userData?.isProfessional]);
+    }, [isStaff, userData?.isProfessional]);
 
     useEffect(() => {
         const target = loadMoreRef.current;
@@ -182,7 +184,7 @@ export default function SearchPage() {
 
     const handleOpenProfile = (user: { clerkId: string; username: string; [key: string]: any }) => {
         const isDirectSearch = Boolean(username.trim());
-        if (!isDirectSearch && user.clerkId) {
+        if (!isDirectSearch && user.clerkId && !isStaff) {
             trackAcquisitionEvent({
                 eventType: 'explore_profile_viewed',
                 professionalId: user.clerkId,
@@ -194,8 +196,8 @@ export default function SearchPage() {
             }).catch(() => {});
         }
 
-        // Emite telemetria de campanha para visualização de perfil no Explorar
-        if (user.clerkId || user.username) {
+        // Emite telemetria de campanha para visualização de perfil no Explorar (apenas usuários comuns)
+        if ((user.clerkId || user.username) && !isStaff) {
             emitCampaignTelemetry({
                 eventType: 'profile_view',
                 professionalId: user.clerkId,

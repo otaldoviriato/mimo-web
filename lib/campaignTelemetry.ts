@@ -15,10 +15,12 @@ type TelemetryEvent =
     | { eventType: 'page_leave' }
     | { eventType: 'custom'; actionText: string };
 
+import { isStaffSession } from '@/lib/staffSessionClient';
+
 let lastExploreScrollTime = 0;
 
 export function emitCampaignTelemetry(event: TelemetryEvent) {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || isStaffSession()) return;
 
     // Throttling para eventos frequentes como scroll
     if (event.eventType === 'explore_scroll') {

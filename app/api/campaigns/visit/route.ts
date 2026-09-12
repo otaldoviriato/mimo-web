@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { Campaign } from '@/models/Campaign';
 import { CampaignVisit } from '@/models/CampaignVisit';
 import { User } from '@/models/User';
+import { isStaffOrAdmin } from '@/lib/internalStaff';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +19,15 @@ function sanitizeSlug(text: string): string {
 
 export async function POST(request: NextRequest) {
     try {
+        const { userId } = await auth();
+        if (userId && (await isStaffOrAdmin(userId))) {
+            return NextResponse.json({
+                success: true,
+                ignored: true,
+                reason: 'Administradores e membros da equipe não são rastreados em visitas de campanhas.',
+            });
+        }
+
         const body = await request.json();
         const {
             visitorId,

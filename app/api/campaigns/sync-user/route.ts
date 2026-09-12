@@ -6,10 +6,9 @@ import { Campaign } from '@/models/Campaign';
 import { CampaignVisit } from '@/models/CampaignVisit';
 import { CampaignUserJourney } from '@/models/CampaignUserJourney';
 import { User } from '@/models/User';
+import { isStaffOrAdmin } from '@/lib/internalStaff';
 
 export const dynamic = 'force-dynamic';
-
-const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
 export async function POST(request: NextRequest) {
     try {
@@ -27,14 +26,12 @@ export async function POST(request: NextRequest) {
 
         await connectToDatabase();
 
-        // 1. Administrador não entra no funil de campanhas
-        const settings = await AppSettings.findOne({ key: 'global' }).select('adminClerkIds').lean();
-        const isAdmin = userId === FALLBACK_ADMIN || settings?.adminClerkIds?.includes(userId);
-        if (isAdmin) {
+        // 1. Administrador e membros da equipe não entram no funil de campanhas
+        if (await isStaffOrAdmin(userId)) {
             return NextResponse.json({
                 success: true,
                 ignored: true,
-                reason: 'Administrador não entra no funil de leads',
+                reason: 'Administrador ou membro da equipe não entra no funil de leads',
             });
         }
 
