@@ -260,3 +260,29 @@ export function NetflixStyleLanding({
         </div>
     );
 }
+
+export function DiscoverProfileBackground() {
+    const columns = [COL_1, COL_2, COL_3, COL_4, COL_5, COL_6];
+    return (
+        <div className="discover-profile-background" aria-hidden="true">
+            <div className="discover-profile-wall">
+                {columns.map((profiles, column) => (
+                    <div key={column} className="discover-profile-column" style={{ animationDuration: `${65 + column * 7}s`, animationDirection: column % 2 ? 'reverse' : 'normal' }}>
+                        {[...profiles, ...profiles].map((profile, index) => <ProfileCard key={index} profile={profile} />)}
+                    </div>
+                ))}
+            </div>
+            <div className="discover-profile-veil" />
+            <style>{`
+                .discover-profile-background { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+                .discover-profile-wall { display: flex; justify-content: center; gap: 14px; width: 180vw; min-width: 1150px; position: absolute; top: -180px; left: 50%; transform: translateX(-50%) rotate(-6deg); }
+                .discover-profile-column { display: flex; flex-direction: column; gap: 14px; width: clamp(180px, 20vw, 300px); flex-shrink: 0; animation: discover-profile-drift linear infinite; }
+                .discover-profile-column > div { flex-shrink: 0; }
+                .discover-profile-veil { position: absolute; inset: 0; background: rgba(250,248,253,.88); backdrop-filter: blur(1px); }
+                @keyframes discover-profile-drift { to { transform: translateY(calc(-50% - 7px)); } }
+                @media (prefers-reduced-motion: reduce) { .discover-profile-column { animation: none; } }
+            `}</style>
+        </div>
+    );
+}
+
