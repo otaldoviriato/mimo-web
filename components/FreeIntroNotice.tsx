@@ -10,9 +10,9 @@ export function FreeIntroNotice({ state }: { state?: FreeIntroState }) {
     return (
         <div role="status" className="shrink-0 border-b border-purple-100 bg-purple-50 px-4 py-2 text-center text-xs leading-relaxed text-purple-800">
             {state.eligible
-                ? `Conhecer grátis · As primeiras ${limit} ${limit === 1 ? 'resposta dela é gratuita' : 'respostas dela são gratuitas'}. Depois, você paga para ler. Somente texto nesta etapa.`
+                ? `Conhecer grátis · As primeiras ${limit} ${limit === 1 ? 'resposta dela é gratuita' : 'respostas dela são gratuitas'}. Depois, você paga para ler.`
                 : remaining > 0
-                    ? `Conheça grátis · ${remaining} de ${limit} ${limit === 1 ? 'resposta gratuita restante' : 'respostas gratuitas restantes'}. Somente texto. Depois, as próximas mensagens exigem saldo para leitura.`
+                    ? `Conheça grátis · ${remaining} de ${limit} ${limit === 1 ? 'resposta gratuita restante' : 'respostas gratuitas restantes'}. Depois, as próximas mensagens exigem saldo para leitura.`
                     : 'Respostas gratuitas concluídas. As próximas mensagens dela exigem saldo para leitura.'}
         </div>
     );

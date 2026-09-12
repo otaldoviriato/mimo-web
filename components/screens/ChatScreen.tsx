@@ -849,7 +849,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     const targetClerkId = receiver?.clerkId || (isRouteClerkId ? otherUserId : '');
     const { data: freeIntro, isLoading: freeIntroQueryLoading } = useFreeIntro(targetClerkId);
     const introAllowsText = !!freeIntro?.eligible || !!freeIntro?.grant;
-    const introTextOnly = !!freeIntro?.textOnly;
+    const isIntroActive = !!freeIntro?.eligible || (!!freeIntro?.grant && !freeIntro.grant.convertedAt && (freeIntro.grant.used ?? 0) < (freeIntro.grant.limit ?? freeIntro.limit ?? 3));
     const freeIntroExhaustedReportedRef = useRef<boolean>(false);
 
     useEffect(() => {
@@ -2698,7 +2698,6 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     };
 
     const handleSendAudio = async (audioBlob: Blob, durationInSeconds: number) => {
-        if (introTextOnly) { toast.error('Durante as respostas gratuitas, envie somente texto.'); return; }
         const isTeamMemberInvolved = userData?.isTeam || receiver?.isTeam;
         const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
         if (isClientToProfessional && !introAllowsText && !freeIntroQueryLoading && balance <= 0) {
@@ -2783,7 +2782,6 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     };
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
-        if (introTextOnly) { e.target.value = ''; toast.error('Durante as respostas gratuitas, envie somente texto.'); return; }
         if (!e.target.files || e.target.files.length === 0) return;
 
         const isClientToProfessional = !userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved;
@@ -2852,7 +2850,6 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     // Usado pelo MediaComposerSheet (profissional configurou preço/duração) e pelo
     // fallback no compose bar (envio durante a janela em que userData ainda está carregando).
     const sendSelectedMedia = async (priceInCents: number, isTemporaryMedia: boolean, expiryMinutes: number, coverFrameDataUrl?: string) => {
-        if (introTextOnly) { toast.error('Durante as respostas gratuitas, envie somente texto.'); return; }
         if (!selectedFile) return;
 
         const file = selectedFile;
@@ -2968,7 +2965,6 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     };
 
     const handleSendGift = async () => {
-        if (introTextOnly) { toast.error('Durante as respostas gratuitas, envie somente texto.'); return; }
         if (!giftAmountStr || parseFloat(giftAmountStr) <= 0) return;
         
         const giftAmountInCents = parseFloat(giftAmountStr) * 100;
@@ -3059,7 +3055,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         ? balance <= lowBalanceThresholdInCents
         : hasProfessionalMessage;
 
-    const shouldShowLowBalanceAlert = !introTextOnly && !userData?.isProfessional &&
+    const shouldShowLowBalanceAlert = !isIntroActive && !userData?.isProfessional &&
         !userData?.isTeam &&
         !receiver?.isTeam &&
         receiver?.isProfessional &&
@@ -4051,7 +4047,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         <div className="relative shrink-0">
                             <button
                                 onClick={() => setAttachMenuVisible(!attachMenuVisible)}
-                                disabled={introTextOnly || !connected || !!selectedFile}
+                                disabled={!connected || !!selectedFile}
                                 className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shrink-0 ${
                                     attachMenuVisible ? 'bg-purple-600 text-white rotate-45' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                                 }`}
@@ -4197,7 +4193,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         </button>
                     ) : (
                         <AudioRecorder
-                            connected={!introTextOnly && connected && userData !== undefined}
+                            connected={connected && userData !== undefined}
                             onSendAudio={handleSendAudio}
                             onStatusChange={setAudioRecordingStatus}
                             maxDurationSeconds={maxAudioDurationSeconds}

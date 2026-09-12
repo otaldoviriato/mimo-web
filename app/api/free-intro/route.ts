@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
         const effectiveLimit = !intro.convertedAt ? limit : intro.limit;
         const used = intro.used ?? 0;
         const remaining = Math.max(0, effectiveLimit - used);
-        const textOnly = !intro.convertedAt && used < effectiveLimit;
+        const textOnly = false;
 
         if (!intro.convertedAt && intro.limit !== limit && room?._id) {
             await Room.updateOne(
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     const other = await User.findOne({ clerkId: otherId }).select('isProfessional professionalStatus freeIntroEnabled isTeam isSuspended').lean();
     const hasConversation = !!room?.lastMessageTime || !!room?.lastMessage || !!await Message.exists({ roomId: participants.join('_') });
     const eligible = !hasConversation && !me.isProfessional && !me.isTeam && !!other?.isProfessional && other.professionalStatus === 'approved' && !other.isSuspended && !other.isTeam && other.freeIntroEnabled === true;
-    return NextResponse.json({ ...base, eligible, hasConversation, remaining: eligible ? limit : 0, textOnly: eligible });
+    return NextResponse.json({ ...base, eligible, hasConversation, remaining: eligible ? limit : 0, textOnly: false });
 }
 
 export async function PATCH(request: NextRequest) {
