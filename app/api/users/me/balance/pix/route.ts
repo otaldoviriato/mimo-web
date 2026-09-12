@@ -14,8 +14,8 @@ export async function POST(req: NextRequest) {
 
     const { amount } = await req.json();
 
-    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount < 1 || !Number.isSafeInteger(Math.round(amount * 100))) {
-      return NextResponse.json({ error: 'Valor mínimo de R$ 1,00' }, { status: 400 });
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount < 2 || !Number.isSafeInteger(Math.round(amount * 100))) {
+      return NextResponse.json({ error: 'Valor mínimo de R$ 2,00' }, { status: 400 });
     }
 
     await connectToDatabase();

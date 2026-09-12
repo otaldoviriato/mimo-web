@@ -107,10 +107,10 @@ interface DepositHistoryCache {
 }
 
 const FIXED_OPTIONS = [
+    { label: 'R$ 2', value: 2 },
     { label: 'R$ 10', value: 10 },
     { label: 'R$ 25', value: 25 },
     { label: 'R$ 50', value: 50 },
-    { label: 'R$ 100', value: 100 },
 ];
 
 function getLastRechargeAmount(): number | null {
@@ -194,7 +194,7 @@ export function RechargeModal({
 }: RechargeModalProps) {
     const queryClient = useQueryClient();
     const { user } = useUser();
-    const initialAmount = getLastRechargeAmount() ?? 10;
+    const initialAmount = getLastRechargeAmount() ?? 2;
     const isInitialCustom = !FIXED_OPTIONS.some((o) => o.value === initialAmount);
 
     const [step, setStep] = useState<Step>('amount_and_method');
@@ -314,7 +314,7 @@ export function RechargeModal({
                     } else {
                         const localSaved = getLastRechargeAmount();
                         if (!localSaved) {
-                            setSelectedAmount(10);
+                            setSelectedAmount(2);
                             setIsCustomAmount(false);
                             setCustomAmountText('');
                         }
@@ -362,7 +362,7 @@ export function RechargeModal({
                                 setSelectedMethod('pix');
                             }
                             if (!getLastRechargeAmount()) {
-                                setSelectedAmount(10);
+                                setSelectedAmount(2);
                             }
                         });
                 }
@@ -380,7 +380,7 @@ export function RechargeModal({
     const resetState = () => {
         setStep('amount_and_method');
         const last = getLastRechargeAmount();
-        const initialAmount = last ?? 10;
+        const initialAmount = last ?? 2;
         if (FIXED_OPTIONS.some((o) => o.value === initialAmount)) {
             setSelectedAmount(initialAmount);
             setIsCustomAmount(false);
@@ -470,7 +470,7 @@ export function RechargeModal({
 
     const handleConfirm = async () => {
         const amount = getFinalAmount();
-        if (amount <= 0) return;
+        if (amount < 2) return;
         localStorage.setItem('mimo_last_recharge_amount', String(amount));
         if (selectedMethod === 'pix' && onGeneratePix) {
             setLoading(true);
@@ -618,7 +618,7 @@ export function RechargeModal({
         ? hasCompletePixData
         : true;
     const isCardValid = isCardSelected ? hasValidCardData : true;
-    const canConfirm = finalAmount > 0 && selectedMethod !== '' && isPixValid && isCardValid;
+    const canConfirm = finalAmount >= 2 && selectedMethod !== '' && isPixValid && isCardValid;
     const formattedFinalAmount = finalAmount > 0 ? finalAmount.toFixed(2).replace('.', ',') : '0,00';
     const displayedBalanceInCents = rechargeContext?.currentBalanceInCents ?? currentBalanceInCents ?? 0;
     const requiredAmountInCents = rechargeContext?.requiredAmountInCents;
@@ -1042,7 +1042,7 @@ export function RechargeModal({
                                                                 type="text"
                                                                 inputMode="decimal"
                                                                 className="w-20 bg-transparent text-right text-sm font-semibold text-gray-900 outline-none"
-                                                                placeholder="0,00"
+                                                                placeholder="2,00"
                                                                 value={customAmountText}
                                                                 onChange={(e) => setCustomAmountText(e.target.value.replace(/[^0-9.,]/g, ''))}
                                                                 autoFocus
@@ -1058,6 +1058,11 @@ export function RechargeModal({
                                                         <span className="text-xs text-gray-400">Inserir manualmente</span>
                                                     )}
                                                 </button>
+                                                {isCustomAmount && finalAmount > 0 && finalAmount < 2 && (
+                                                    <p className="mt-1.5 text-xs font-medium text-amber-600">
+                                                        Valor mínimo de recarga: R$ 2,00
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
                                     )}

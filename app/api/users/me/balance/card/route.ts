@@ -84,8 +84,8 @@ export async function POST(request: NextRequest) {
         const saveCard = body.saveCard !== false;
         const savedCardId = typeof body.savedCardId === 'string' ? body.savedCardId.trim() : '';
 
-        if (!Number.isFinite(amount) || amount < 1) {
-            return NextResponse.json({ error: 'Valor minimo de R$ 1,00' }, { status: 400 });
+        if (!Number.isFinite(amount) || amount < 2) {
+            return NextResponse.json({ error: 'Valor mínimo de R$ 2,00' }, { status: 400 });
         }
 
         await connectToDatabase();
