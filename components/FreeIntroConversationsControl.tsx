@@ -31,7 +31,7 @@ export function FreeIntroConversationsControl({ division, onDivisionChange, clie
                             isSelected ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'
                         }`}
                     >
-                        <span>{value === 'clients' ? 'Clientes' : 'Grátis'}</span>
+                        <span>{value === 'clients' ? 'Clientes' : 'Novos'}</span>
                         {!isSelected && unread > 0 && (
                             <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-purple-600 text-white text-[11px] font-black leading-none shadow-xs">
                                 {displayUnread}

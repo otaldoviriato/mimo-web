@@ -191,7 +191,7 @@ export default function ChatsPage() {
     const { data: myProfile, refetch: refetchProfile } = useMyProfile();
     const isFreeRoom = (room: Room) => !!room.freeIntro && !room.freeIntro.convertedAt;
     const rooms = myProfile?.isProfessional ? visibleRooms.filter((room: Room) => isFreeRoom(room) === (division === 'free')) : visibleRooms;
-    const unreadFor = (free: boolean) => visibleRooms.reduce((sum: number, room: Room) => sum + (isFreeRoom(room) === free ? (room.unreadCount?.[user?.id ?? ''] ?? 0) : 0), 0);
+    const unreadFor = (free: boolean) => visibleRooms.filter((room: Room) => isFreeRoom(room) === free && (room.unreadCount?.[user?.id ?? ''] ?? 0) > 0).length;
 
     useEffect(() => {
         if (myProfile && myProfile.isProfessional) {
