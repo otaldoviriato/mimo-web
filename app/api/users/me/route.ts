@@ -9,6 +9,7 @@ import { CreditGrant } from '@/models/CreditGrant';
 import { Transaction } from '@/models/Transaction';
 import { MicroTransaction } from '@/models/MicroTransaction';
 import { Subscription } from '@/models/Subscription';
+import { CampaignVisit } from '@/models/CampaignVisit';
 import { grantWelcomeCredit } from '@/lib/creditCampaign';
 import { Resend } from 'resend';
 import { subscriptionPriceBRLToCents } from '@/lib/subscriptionBilling';
@@ -262,7 +263,29 @@ export async function GET(request: NextRequest) {
         if (user.isProfessional === false) {
             try {
                 const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() || undefined;
-                const welcomeResult = await grantWelcomeCredit(user.clerkId, user.email, ip, user.phone, user.taxId);
+
+                // Extrai parâmetros promocionais da URL a partir do cookie salvo pelo GlobalTrafficTracker
+                let campaignParams: Record<string, string> = {};
+                try {
+                    const promoCookie = request.cookies.get('mimo_promo_params')?.value;
+                    if (promoCookie) {
+                        campaignParams = JSON.parse(decodeURIComponent(promoCookie));
+                    }
+                } catch {}
+
+                // Fallback: se não estiver no cookie, busca parâmetros na última visita registrada de campanha
+                if (Object.keys(campaignParams).length === 0) {
+                    try {
+                        const visit = await CampaignVisit.findOne({
+                            $or: [{ userId: user.clerkId }]
+                        }).sort({ createdAt: -1 }).lean() as any;
+                        if (visit?.utm && typeof visit.utm === 'object') {
+                            campaignParams = { ...visit.utm };
+                        }
+                    } catch {}
+                }
+
+                const welcomeResult = await grantWelcomeCredit(user.clerkId, user.email, ip, user.phone, user.taxId, campaignParams);
                 if (welcomeResult.success) {
                     const updatedUser = await User.findOne({ clerkId: userId });
                     if (updatedUser) {

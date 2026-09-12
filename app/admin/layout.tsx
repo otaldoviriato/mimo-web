@@ -23,6 +23,7 @@ const PATH_TITLES: Record<string, string> = {
     '/admin/settings/alerts': 'Configurações — Alertas do Admin',
     '/admin/settings/chat': 'Configurações — Chat & Sessões',
     '/admin/settings/free-intro': 'Configurações — Conheça Grátis',
+    '/admin/settings/promotions': 'Configurações — Promoções & Bônus',
     '/admin/settings/explore': 'Configurações — Explorar & Algoritmo',
     '/admin/settings/pricing': 'Configurações — Precificação & Assinaturas',
     '/admin/settings/profiles': 'Configurações — Perfis & Galeria',

@@ -48,6 +48,12 @@ interface SettingsSnapshot {
     creatorEngagementStep1Hours: number;
     creatorEngagementStep2Enabled: boolean;
     creatorEngagementStep2Hours: number;
+    welcomeBonusEnabled: boolean;
+    welcomeBonusAmountCents: number;
+    welcomeBonusUrlParamKey: string;
+    welcomeBonusUrlParamValue: string;
+    welcomeBonusLimitByIp: boolean;
+    welcomeBonusBlockSameIpChat: boolean;
 }
 
 export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, userId: string | null | undefined) {
@@ -105,6 +111,14 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     const [creatorEngagementStep2Enabled, setCreatorEngagementStep2Enabled] = useState(false);
     const [creatorEngagementStep2Hours, setCreatorEngagementStep2Hours] = useState(72);
 
+    // Promoções & Bônus de Boas-Vindas
+    const [welcomeBonusEnabled, setWelcomeBonusEnabled] = useState(false);
+    const [welcomeBonusAmountCents, setWelcomeBonusAmountCents] = useState(300);
+    const [welcomeBonusUrlParamKey, setWelcomeBonusUrlParamKey] = useState('promo');
+    const [welcomeBonusUrlParamValue, setWelcomeBonusUrlParamValue] = useState('exoclick');
+    const [welcomeBonusLimitByIp, setWelcomeBonusLimitByIp] = useState(true);
+    const [welcomeBonusBlockSameIpChat, setWelcomeBonusBlockSameIpChat] = useState(true);
+
     // Gerenciamento de administradores
     const [adminListRich, setAdminListRich] = useState<RichAdmin[]>([]);
     const [adminSearch, setAdminSearch] = useState('');
@@ -158,6 +172,12 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         creatorEngagementStep1Hours: s.creatorEngagementStep1Hours ?? 24,
         creatorEngagementStep2Enabled: s.creatorEngagementStep2Enabled ?? true,
         creatorEngagementStep2Hours: s.creatorEngagementStep2Hours ?? 72,
+        welcomeBonusEnabled: s.welcomeBonusEnabled ?? false,
+        welcomeBonusAmountCents: s.welcomeBonusAmountCents ?? 300,
+        welcomeBonusUrlParamKey: s.welcomeBonusUrlParamKey ?? 'promo',
+        welcomeBonusUrlParamValue: s.welcomeBonusUrlParamValue ?? 'exoclick',
+        welcomeBonusLimitByIp: s.welcomeBonusLimitByIp ?? true,
+        welcomeBonusBlockSameIpChat: s.welcomeBonusBlockSameIpChat ?? true,
     });
 
     useEffect(() => {
@@ -222,6 +242,12 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     setCreatorEngagementStep1Hours(s.creatorEngagementStep1Hours ?? 24);
                     setCreatorEngagementStep2Enabled(s.creatorEngagementStep2Enabled ?? true);
                     setCreatorEngagementStep2Hours(s.creatorEngagementStep2Hours ?? 72);
+                    setWelcomeBonusEnabled(s.welcomeBonusEnabled ?? false);
+                    setWelcomeBonusAmountCents(s.welcomeBonusAmountCents ?? 300);
+                    setWelcomeBonusUrlParamKey(s.welcomeBonusUrlParamKey ?? 'promo');
+                    setWelcomeBonusUrlParamValue(s.welcomeBonusUrlParamValue ?? 'exoclick');
+                    setWelcomeBonusLimitByIp(s.welcomeBonusLimitByIp ?? true);
+                    setWelcomeBonusBlockSameIpChat(s.welcomeBonusBlockSameIpChat ?? true);
                     setSavedSnapshot(buildSnapshot(s, richAdmins));
                     setIsAuthorized(true);
                 } else if (response.status === 403) {
@@ -322,6 +348,12 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     newClientHoursThreshold,
                     activeRechargedClientDaysThreshold,
                     activeUnrechargedClientHoursThreshold,
+                    welcomeBonusEnabled,
+                    welcomeBonusAmountCents,
+                    welcomeBonusUrlParamKey,
+                    welcomeBonusUrlParamValue,
+                    welcomeBonusLimitByIp,
+                    welcomeBonusBlockSameIpChat,
                 }),
             });
             if (response.ok) {
@@ -369,6 +401,12 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                 setCreatorEngagementStep1Hours(s.creatorEngagementStep1Hours ?? 24);
                 setCreatorEngagementStep2Enabled(s.creatorEngagementStep2Enabled ?? true);
                 setCreatorEngagementStep2Hours(s.creatorEngagementStep2Hours ?? 72);
+                setWelcomeBonusEnabled(s.welcomeBonusEnabled ?? false);
+                setWelcomeBonusAmountCents(s.welcomeBonusAmountCents ?? 300);
+                setWelcomeBonusUrlParamKey(s.welcomeBonusUrlParamKey ?? 'promo');
+                setWelcomeBonusUrlParamValue(s.welcomeBonusUrlParamValue ?? 'exoclick');
+                setWelcomeBonusLimitByIp(s.welcomeBonusLimitByIp ?? true);
+                setWelcomeBonusBlockSameIpChat(s.welcomeBonusBlockSameIpChat ?? true);
             } else {
                 const errData = await response.json();
                 toast.error(errData.error || 'Erro ao salvar configurações.');
@@ -456,12 +494,20 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         adminListRich.length !== savedSnapshot.adminClerkIds.length ||
         adminListRich.some(a => !savedSnapshot.adminClerkIds.includes(a.clerkId))
     );
+    const isDirtyPromotions = savedSnapshot !== null && (
+        welcomeBonusEnabled !== savedSnapshot.welcomeBonusEnabled ||
+        welcomeBonusAmountCents !== savedSnapshot.welcomeBonusAmountCents ||
+        welcomeBonusUrlParamKey !== savedSnapshot.welcomeBonusUrlParamKey ||
+        welcomeBonusUrlParamValue !== savedSnapshot.welcomeBonusUrlParamValue ||
+        welcomeBonusLimitByIp !== savedSnapshot.welcomeBonusLimitByIp ||
+        welcomeBonusBlockSameIpChat !== savedSnapshot.welcomeBonusBlockSameIpChat
+    );
     const isDirtyExplore = false;
 
     return {
         settings, loadingSettings, isAuthorized, saving, savedSnapshot,
         isDirtyPlatform, isDirtyChat, isDirtyFreeIntro, isDirtyPricing, isDirtyProfiles,
-        isDirtyPayments, isDirtyApp, isDirtyAdmins, isDirtyExplore,
+        isDirtyPayments, isDirtyApp, isDirtyAdmins, isDirtyExplore, isDirtyPromotions,
         platformFee, setPlatformFee,
         uploadLimit, setUploadLimit,
         comparisonPeriod, setComparisonPeriod,
@@ -510,6 +556,12 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         adminSearchResults,
         showAdminDropdown, setShowAdminDropdown,
         searchingAdmin,
+        welcomeBonusEnabled, setWelcomeBonusEnabled,
+        welcomeBonusAmountCents, setWelcomeBonusAmountCents,
+        welcomeBonusUrlParamKey, setWelcomeBonusUrlParamKey,
+        welcomeBonusUrlParamValue, setWelcomeBonusUrlParamValue,
+        welcomeBonusLimitByIp, setWelcomeBonusLimitByIp,
+        welcomeBonusBlockSameIpChat, setWelcomeBonusBlockSameIpChat,
         saveSettings,
         handleSelectAdmin,
         handleRemoveAdmin,

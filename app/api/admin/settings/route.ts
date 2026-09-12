@@ -43,6 +43,12 @@ async function getOrCreateSettings() {
             offlineEmailCooldownMinutes: 15,
             activeUserThresholdDays: 7,
             largeMessageWarningThresholdChars: 100,
+            welcomeBonusEnabled: false,
+            welcomeBonusAmountCents: 300,
+            welcomeBonusUrlParamKey: 'promo',
+            welcomeBonusUrlParamValue: 'exoclick',
+            welcomeBonusLimitByIp: true,
+            welcomeBonusBlockSameIpChat: true,
         });
     } else {
         // Garantir que novos campos sejam populados se não existirem
@@ -84,6 +90,12 @@ async function getOrCreateSettings() {
         if (settings.largeMessageWarningThresholdChars === undefined) { settings.largeMessageWarningThresholdChars = 100; updated = true; }
         if (settings.freeIntroReplyLimit === undefined) { settings.freeIntroReplyLimit = 3; updated = true; }
         if (settings.freeIntroTimeoutMinutes === undefined) { settings.freeIntroTimeoutMinutes = 10; updated = true; }
+        if (settings.welcomeBonusEnabled === undefined) { settings.welcomeBonusEnabled = false; updated = true; }
+        if (settings.welcomeBonusAmountCents === undefined) { settings.welcomeBonusAmountCents = 300; updated = true; }
+        if (settings.welcomeBonusUrlParamKey === undefined) { settings.welcomeBonusUrlParamKey = 'promo'; updated = true; }
+        if (settings.welcomeBonusUrlParamValue === undefined) { settings.welcomeBonusUrlParamValue = 'exoclick'; updated = true; }
+        if (settings.welcomeBonusLimitByIp === undefined) { settings.welcomeBonusLimitByIp = true; updated = true; }
+        if (settings.welcomeBonusBlockSameIpChat === undefined) { settings.welcomeBonusBlockSameIpChat = true; updated = true; }
         if (updated) {
             await settings.save();
         }
@@ -204,6 +216,12 @@ export async function PUT(request: NextRequest) {
             offlineEmailCooldownMinutes,
             activeUserThresholdDays,
             largeMessageWarningThresholdChars,
+            welcomeBonusEnabled,
+            welcomeBonusAmountCents,
+            welcomeBonusUrlParamKey,
+            welcomeBonusUrlParamValue,
+            welcomeBonusLimitByIp,
+            welcomeBonusBlockSameIpChat,
         } = body;
 
         // Validações básicas
@@ -480,6 +498,35 @@ export async function PUT(request: NextRequest) {
                 return NextResponse.json({ error: 'Limite de horas de inatividade para cliente sem recarga inválido' }, { status: 400 });
             }
             settings.activeUnrechargedClientHoursThreshold = val;
+        }
+
+        if (welcomeBonusEnabled !== undefined) {
+            settings.welcomeBonusEnabled = Boolean(welcomeBonusEnabled);
+        }
+
+        if (welcomeBonusAmountCents !== undefined) {
+            const val = Number(welcomeBonusAmountCents);
+            if (isNaN(val) || val < 0 || val > 10000) {
+                return NextResponse.json({ error: 'Valor do bônus deve ser entre R$ 0,00 e R$ 100,00' }, { status: 400 });
+            }
+            settings.welcomeBonusAmountCents = Math.round(val);
+        }
+
+        if (welcomeBonusUrlParamKey !== undefined) {
+            const key = String(welcomeBonusUrlParamKey).trim().toLowerCase();
+            settings.welcomeBonusUrlParamKey = key || 'promo';
+        }
+
+        if (welcomeBonusUrlParamValue !== undefined) {
+            settings.welcomeBonusUrlParamValue = String(welcomeBonusUrlParamValue).trim().toLowerCase();
+        }
+
+        if (welcomeBonusLimitByIp !== undefined) {
+            settings.welcomeBonusLimitByIp = Boolean(welcomeBonusLimitByIp);
+        }
+
+        if (welcomeBonusBlockSameIpChat !== undefined) {
+            settings.welcomeBonusBlockSameIpChat = Boolean(welcomeBonusBlockSameIpChat);
         }
 
         // Validação de consistência

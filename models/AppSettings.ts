@@ -61,6 +61,12 @@ export interface IAppSettings extends Document {
     offlineFollowUpMaxAttempts: number;
     maxOnlineCumulativeChars: number;
     largeMessageWarningThresholdChars?: number;
+    welcomeBonusEnabled?: boolean;
+    welcomeBonusAmountCents?: number;
+    welcomeBonusUrlParamKey?: string;
+    welcomeBonusUrlParamValue?: string;
+    welcomeBonusLimitByIp?: boolean;
+    welcomeBonusBlockSameIpChat?: boolean;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -379,6 +385,33 @@ const AppSettingsSchema = new Schema<IAppSettings>({
     exploreManualOrder: {
         type: [String],
         default: [],
+    },
+    welcomeBonusEnabled: {
+        type: Boolean,
+        default: false,
+    },
+    welcomeBonusAmountCents: {
+        type: Number,
+        default: 300,
+        min: 0,
+    },
+    welcomeBonusUrlParamKey: {
+        type: String,
+        default: 'promo',
+        trim: true,
+    },
+    welcomeBonusUrlParamValue: {
+        type: String,
+        default: 'exoclick',
+        trim: true,
+    },
+    welcomeBonusLimitByIp: {
+        type: Boolean,
+        default: true,
+    },
+    welcomeBonusBlockSameIpChat: {
+        type: Boolean,
+        default: true,
     },
 }, {
     timestamps: true,

@@ -49,6 +49,12 @@ export interface SettingsData {
     creatorEngagementStep1Hours?: number;
     creatorEngagementStep2Enabled?: boolean;
     creatorEngagementStep2Hours?: number;
+    welcomeBonusEnabled?: boolean;
+    welcomeBonusAmountCents?: number;
+    welcomeBonusUrlParamKey?: string;
+    welcomeBonusUrlParamValue?: string;
+    welcomeBonusLimitByIp?: boolean;
+    welcomeBonusBlockSameIpChat?: boolean;
 }
 
 export interface ChatMessage {

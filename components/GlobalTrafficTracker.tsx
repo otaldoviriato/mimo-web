@@ -29,14 +29,29 @@ export function PublicTrafficTracker() {
         }
         trackedInThisRender.current.add(currentLanding);
 
-        // 2. Extrai parâmetros de rastreamento da URL
+        // 2. Extrai parâmetros de rastreamento e promoção da URL
         const urlParams = new URLSearchParams(window.location.search);
         const utm: Record<string, string> = {};
+        const promoParams: Record<string, string> = {};
+
         urlParams.forEach((val, key) => {
-            if (key.toLowerCase().startsWith('utm_') && val) {
-                utm[key.toLowerCase()] = val;
+            const cleanKey = key.toLowerCase().trim();
+            const cleanVal = val.trim();
+            if (cleanVal) {
+                promoParams[cleanKey] = cleanVal;
+                if (cleanKey.startsWith('utm_')) {
+                    utm[cleanKey] = cleanVal;
+                }
             }
         });
+
+        // Persiste parâmetros promocionais em localStorage e cookie para sobreviver ao login/cadastro
+        if (Object.keys(promoParams).length > 0) {
+            try {
+                localStorage.setItem('mimo_promo_params', JSON.stringify(promoParams));
+                document.cookie = `mimo_promo_params=${encodeURIComponent(JSON.stringify(promoParams))}; path=/; max-age=2592000; SameSite=Lax`;
+            } catch {}
+        }
 
         const clickId = urlParams.get('click_id') || urlParams.get('clickId') || undefined;
         const site = urlParams.get('site') || undefined;
@@ -44,7 +59,7 @@ export function PublicTrafficTracker() {
         const creative = urlParams.get('creative') || undefined;
         const variation = urlParams.get('variation_id') || urlParams.get('variation') || utm.utm_content || undefined;
 
-        const hasUtm = Object.keys(utm).length > 0 || Boolean(clickId) || Boolean(zone);
+        const hasUtm = Object.keys(utm).length > 0 || Boolean(clickId) || Boolean(zone) || Object.keys(promoParams).length > 0;
 
         const attribution = {
             visitorId,
@@ -53,9 +68,9 @@ export function PublicTrafficTracker() {
             zone,
             creative,
             variation,
-            utm,
+            utm: { ...promoParams, ...utm },
             landingPage: currentLanding,
-            slug: hasUtm ? (utm.utm_campaign || utm.utm_source || 'utm-traffic') : 'organico',
+            slug: hasUtm ? (utm.utm_campaign || utm.utm_source || promoParams.promo || 'campaign-traffic') : 'organico',
             capturedAt: new Date().toISOString(),
         };
 

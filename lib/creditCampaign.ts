@@ -4,6 +4,7 @@ import { CreditGrant } from '@/models/CreditGrant';
 import { User } from '@/models/User';
 import { Transaction } from '@/models/Transaction';
 import { MicroTransaction } from '@/models/MicroTransaction';
+import { AppSettings } from '@/models/AppSettings';
 import { isOnboardingCompleted } from '@/lib/onboarding';
 
 export async function grantWelcomeCredit(
@@ -11,27 +12,66 @@ export async function grantWelcomeCredit(
     email: string,
     ip?: string,
     phone?: string,
-    cpf?: string
+    cpf?: string,
+    campaignParams?: Record<string, string> | null
 ): Promise<{ success: boolean; amount?: number; grantId?: string; reason?: string; error?: string }> {
     await connectToDatabase();
 
-    // 1. Busca a campanha ativa do tipo welcome_credit
-    const campaign = await CreditCampaign.findOne({
+    // 1. Busca configurações ativas de boas-vindas no AppSettings
+    const settings = await AppSettings.findOne({ key: 'global' }).lean();
+    const isPromoEnabled = settings?.welcomeBonusEnabled ?? false;
+
+    let campaign = await CreditCampaign.findOne({
         type: 'welcome_credit',
-        enabled: true,
-        startsAt: { $lte: new Date() },
         $or: [
             { endsAt: null },
             { endsAt: { $gte: new Date() } }
         ]
     });
 
-    if (!campaign) {
+    // Se nem o AppSettings nem o CreditCampaign estiverem ativados, encerra
+    if (!isPromoEnabled && (!campaign || !campaign.enabled)) {
         console.log(`[Campaign] Nenhuma campanha de boas-vindas ativa encontrada.`);
         return { success: false, reason: 'no_active_campaign' };
     }
 
-    // 2. Valida o tipo do usuário (somente cliente pode receber)
+    const bonusAmountCents = isPromoEnabled
+        ? (settings?.welcomeBonusAmountCents ?? 300)
+        : (campaign?.amount ?? 300);
+
+    // 2. Validação do Parâmetro Obrigatório de URL (quando a promoção está ativa no AppSettings)
+    if (isPromoEnabled) {
+        const requiredKey = (settings?.welcomeBonusUrlParamKey || 'promo').toLowerCase().trim();
+        const requiredVal = (settings?.welcomeBonusUrlParamValue || '').toLowerCase().trim();
+
+        if (requiredKey) {
+            if (!campaignParams || typeof campaignParams !== 'object') {
+                console.log(`[Campaign] Bônus rejeitado: parâmetros de campanha ausentes para o usuário ${userId}.`);
+                return { success: false, reason: 'missing_campaign_param' };
+            }
+
+            // Normaliza as chaves do objeto para comparação insensível a maiúsculas
+            const normalizedParams: Record<string, string> = {};
+            for (const [k, v] of Object.entries(campaignParams)) {
+                if (typeof v === 'string') {
+                    normalizedParams[k.toLowerCase().trim()] = v.toLowerCase().trim();
+                }
+            }
+
+            const actualVal = normalizedParams[requiredKey];
+            if (actualVal === undefined) {
+                console.log(`[Campaign] Bônus rejeitado: parâmetro obrigatório '${requiredKey}' não encontrado nos parâmetros recebidos.`, campaignParams);
+                return { success: false, reason: 'missing_campaign_param' };
+            }
+
+            if (requiredVal && actualVal !== requiredVal) {
+                console.log(`[Campaign] Bônus rejeitado: valor do parâmetro '${requiredKey}' é '${actualVal}', esperado '${requiredVal}'.`);
+                return { success: false, reason: 'invalid_campaign_param_value' };
+            }
+        }
+    }
+
+    // 3. Validação do tipo do usuário (somente cliente pode receber)
     const user = await User.findOne({ clerkId: userId }).select('isProfessional onboardingStep email phone taxId birthDate name username photoUrl balance promotionalBalance');
     if (!user) {
         return { success: false, reason: 'user_not_found' };
@@ -63,29 +103,55 @@ export async function grantWelcomeCredit(
         return { success: false, reason: 'has_prior_recharges' };
     }
 
-    // 3. Valida se já atingiu o limite maxTotalUsers da campanha
-    if (campaign.maxTotalUsers !== null && campaign.maxTotalUsers !== undefined) {
-        const totalGrants = await CreditGrant.countDocuments({ campaignId: campaign._id });
-        if (totalGrants >= campaign.maxTotalUsers) {
-            console.log(`[Campaign] Campanha ${campaign.name} atingiu o limite de usos (${campaign.maxTotalUsers}).`);
-            return { success: false, reason: 'campaign_exhausted' };
-        }
+    // Sincroniza ou cria registro de CreditCampaign
+    if (!campaign) {
+        campaign = await CreditCampaign.create({
+            name: 'Bônus de Boas-Vindas Campanha',
+            type: 'welcome_credit',
+            enabled: isPromoEnabled,
+            amount: bonusAmountCents,
+            limitByIp: settings?.welcomeBonusLimitByIp ?? true,
+            limitByEmail: true,
+            limitByCpf: false,
+            limitByPhone: false,
+            appMessageTitle: 'Bônus de Boas-Vindas',
+            appMessageDescription: `Você recebeu R$ ${(bonusAmountCents / 100).toFixed(2)} de saldo de boas-vindas!`,
+            balanceLabel: 'Bônus de Boas-Vindas',
+            startsAt: new Date(),
+        });
+    } else if (isPromoEnabled && (campaign.amount !== bonusAmountCents || !campaign.enabled)) {
+        await CreditCampaign.updateOne(
+            { _id: campaign._id },
+            { $set: { amount: bonusAmountCents, enabled: true } }
+        );
+        campaign.amount = bonusAmountCents;
+        campaign.enabled = true;
     }
 
-    // 4. Valida se o usuário já recebeu (idempotência a nível lógico)
-    const existingGrant = await CreditGrant.findOne({ campaignId: campaign._id, userId });
+    // 4. Validação de idempotência por usuário (apenas 1 concessão por usuário)
+    const existingGrant = await CreditGrant.findOne({ userId });
     if (existingGrant) {
         return { success: false, reason: 'already_granted' };
     }
 
-    // 5. Validações Antifraude (CPF, E-mail, Telefone, IP)
+    // 5. Validações Antifraude (IP, Email, Telefone, CPF)
+    const shouldLimitByIp = isPromoEnabled ? (settings?.welcomeBonusLimitByIp !== false) : campaign.limitByIp;
+    if (shouldLimitByIp && ip) {
+        const ipExists = await CreditGrant.findOne({
+            firstIp: ip
+        });
+        if (ipExists) {
+            console.log(`[Campaign] Bônus rejeitado: IP ${ip} já utilizado para concessão.`);
+            return { success: false, reason: 'limit_by_ip' };
+        }
+    }
+
     const metadataEmail = email || user.email;
     const metadataPhone = phone || user.phone;
     const metadataCpf = cpf || user.taxId;
 
     if (campaign.limitByEmail && metadataEmail) {
         const emailExists = await CreditGrant.findOne({
-            campaignId: campaign._id,
             'metadata.email': metadataEmail.toLowerCase().trim()
         });
         if (emailExists) return { success: false, reason: 'limit_by_email' };
@@ -93,7 +159,6 @@ export async function grantWelcomeCredit(
 
     if (campaign.limitByPhone && metadataPhone) {
         const phoneExists = await CreditGrant.findOne({
-            campaignId: campaign._id,
             'metadata.phone': metadataPhone
         });
         if (phoneExists) return { success: false, reason: 'limit_by_phone' };
@@ -101,22 +166,13 @@ export async function grantWelcomeCredit(
 
     if (campaign.limitByCpf && metadataCpf) {
         const cpfExists = await CreditGrant.findOne({
-            campaignId: campaign._id,
             'metadata.cpf': metadataCpf
         });
         if (cpfExists) return { success: false, reason: 'limit_by_cpf' };
     }
 
-    if (campaign.limitByIp && ip) {
-        const ipExists = await CreditGrant.findOne({
-            campaignId: campaign._id,
-            firstIp: ip
-        });
-        if (ipExists) return { success: false, reason: 'limit_by_ip' };
-    }
-
     // 6. Concede o crédito
-    const amount = campaign.amount;
+    const amount = bonusAmountCents;
     let expiresAt: Date | null = null;
     if (campaign.validityHours) {
         expiresAt = new Date(Date.now() + campaign.validityHours * 60 * 60 * 1000);
