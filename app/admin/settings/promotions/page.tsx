@@ -13,10 +13,6 @@ export default function AdminSettingsPromotionsPage() {
             setWelcomeBonusEnabled={settings.setWelcomeBonusEnabled}
             welcomeBonusAmountCents={settings.welcomeBonusAmountCents}
             setWelcomeBonusAmountCents={settings.setWelcomeBonusAmountCents}
-            welcomeBonusUrlParamKey={settings.welcomeBonusUrlParamKey}
-            setWelcomeBonusUrlParamKey={settings.setWelcomeBonusUrlParamKey}
-            welcomeBonusUrlParamValue={settings.welcomeBonusUrlParamValue}
-            setWelcomeBonusUrlParamValue={settings.setWelcomeBonusUrlParamValue}
             welcomeBonusLimitByIp={settings.welcomeBonusLimitByIp}
             setWelcomeBonusLimitByIp={settings.setWelcomeBonusLimitByIp}
             welcomeBonusBlockSameIpChat={settings.welcomeBonusBlockSameIpChat}

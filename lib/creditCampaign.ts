@@ -39,39 +39,7 @@ export async function grantWelcomeCredit(
         ? (settings?.welcomeBonusAmountCents ?? 300)
         : (campaign?.amount ?? 300);
 
-    // 2. Validação do Parâmetro Obrigatório de URL (quando a promoção está ativa no AppSettings)
-    if (isPromoEnabled) {
-        const requiredKey = (settings?.welcomeBonusUrlParamKey || 'promo').toLowerCase().trim();
-        const requiredVal = (settings?.welcomeBonusUrlParamValue || '').toLowerCase().trim();
-
-        if (requiredKey) {
-            if (!campaignParams || typeof campaignParams !== 'object') {
-                console.log(`[Campaign] Bônus rejeitado: parâmetros de campanha ausentes para o usuário ${userId}.`);
-                return { success: false, reason: 'missing_campaign_param' };
-            }
-
-            // Normaliza as chaves do objeto para comparação insensível a maiúsculas
-            const normalizedParams: Record<string, string> = {};
-            for (const [k, v] of Object.entries(campaignParams)) {
-                if (typeof v === 'string') {
-                    normalizedParams[k.toLowerCase().trim()] = v.toLowerCase().trim();
-                }
-            }
-
-            const actualVal = normalizedParams[requiredKey];
-            if (actualVal === undefined) {
-                console.log(`[Campaign] Bônus rejeitado: parâmetro obrigatório '${requiredKey}' não encontrado nos parâmetros recebidos.`, campaignParams);
-                return { success: false, reason: 'missing_campaign_param' };
-            }
-
-            if (requiredVal && actualVal !== requiredVal) {
-                console.log(`[Campaign] Bônus rejeitado: valor do parâmetro '${requiredKey}' é '${actualVal}', esperado '${requiredVal}'.`);
-                return { success: false, reason: 'invalid_campaign_param_value' };
-            }
-        }
-    }
-
-    // 3. Validação do tipo do usuário (somente cliente pode receber)
+    // 2. Validação do tipo do usuário (somente cliente pode receber)
     const user = await User.findOne({ clerkId: userId }).select('isProfessional onboardingStep email phone taxId birthDate name username photoUrl balance promotionalBalance');
     if (!user) {
         return { success: false, reason: 'user_not_found' };
