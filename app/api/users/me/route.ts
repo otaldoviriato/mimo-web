@@ -308,12 +308,11 @@ export async function GET(request: NextRequest) {
                 }).populate('campaignId');
 
                 if (activeUnshownGrant) {
-                    const campaign = activeUnshownGrant.campaignId as any;
                     welcomeCreditNotice = {
                         grantId: activeUnshownGrant._id.toString(),
                         amount: activeUnshownGrant.amountGranted,
-                        title: campaign?.appMessageTitle || 'Você recebeu créditos de boas-vindas!',
-                        description: campaign?.appMessageDescription || `Você recebeu R$ ${(activeUnshownGrant.amountGranted / 100).toFixed(2)} em créditos para começar suas conversas.`
+                        title: 'Você ganhou créditos de presente!',
+                        description: 'Liberamos créditos na sua carteira para você conversar e conhecer as criadoras agora mesmo.'
                     };
                 }
             } catch (noticeErr: any) {
