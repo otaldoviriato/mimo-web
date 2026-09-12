@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
                 isSuspended: { $ne: true },
                 hideFromExplore: { $ne: true },
             })
-                .select('clerkId username name email photoUrl coverUrl identityStatus subscriptionPrice bio createdAt avgResponseTimeMinutes freeIntroEnabled isOnline lastSeen lastAccessAt birthDate city state accessCount professionalAvailableCents professionalReservedForWithdrawalCents')
+                .select('clerkId username name email photoUrl coverUrl identityStatus subscriptionPrice bio createdAt avgResponseTimeMinutes freeIntroEnabled isOnline lastSeen lastAccessAt birthDate city state accessCount impressionsCount clicksCount professionalAvailableCents professionalReservedForWithdrawalCents')
                 .sort({ isOnline: -1, lastSeen: -1, lastAccessAt: -1, createdAt: -1, accessCount: -1 })
                 .limit(100)
                 .lean(),
@@ -100,6 +100,8 @@ export async function GET(request: NextRequest) {
                 lastAccessAt: user.lastAccessAt ?? null,
                 lastActiveTime,
                 accessCount: user.accessCount ?? 0,
+                impressionsCount: (user as any).impressionsCount ?? 0,
+                clicksCount: (user as any).clicksCount ?? 0,
                 totalEarningsCents,
                 birthDate: user.birthDate ?? null,
                 city: user.city ?? '',

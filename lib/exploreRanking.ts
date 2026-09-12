@@ -1,12 +1,15 @@
 export const EXPLORE_RESULT_LIMIT = 30;
 
-export type ExploreRankingMode = 'algorithm' | 'revenue' | 'recent_visits' | 'last_seen' | 'manual';
+export type ExploreRankingMode = 'algorithm' | 'revenue' | 'recent_visits' | 'last_seen' | 'attractiveness' | 'manual';
 
 export type ExploreRankable = {
     clerkId: string;
     isOnline: boolean;
     lastActiveTime: number;
     accessCount?: number;
+    impressionsCount?: number;
+    clicksCount?: number;
+    attractivenessRate?: number;
     totalEarningsCents?: number;
     lastAccessAt?: number | string | Date | null;
     lastSeen?: number | string | Date | null;
@@ -63,7 +66,40 @@ export function compareByLastSeen(a: ExploreRankable, b: ExploreRankable) {
         || a.clerkId.localeCompare(b.clerkId);
 }
 
-/** Ordena as profissionais de acordo com o modo selecionado (manual, faturamento, acessos recentes, último acesso ou algoritmo) */
+export function calculateAttractivenessRate(clicks?: number, impressions?: number): number {
+    const c = clicks ?? 0;
+    const i = impressions ?? 0;
+    if (i <= 0) return 0;
+    return Number(((c / i) * 100).toFixed(1));
+}
+
+export function compareByAttractiveness(a: ExploreRankable, b: ExploreRankable) {
+    const rateA = a.attractivenessRate ?? calculateAttractivenessRate(a.clicksCount, a.impressionsCount);
+    const rateB = b.attractivenessRate ?? calculateAttractivenessRate(b.clicksCount, b.impressionsCount);
+    const clicksA = a.clicksCount ?? 0;
+    const clicksB = b.clicksCount ?? 0;
+    const impA = a.impressionsCount ?? 0;
+    const impB = b.impressionsCount ?? 0;
+
+    // 1. Taxa percentual de atratividade (maior primeiro)
+    if (rateB !== rateA) {
+        return rateB - rateA;
+    }
+    // 2. Desempate por maior volume absoluto de cliques
+    if (clicksB !== clicksA) {
+        return clicksB - clicksA;
+    }
+    // 3. Desempate por maior volume de exibições
+    if (impB !== impA) {
+        return impB - impA;
+    }
+    // 4. Desempate por disponibilidade online e atividade
+    return Number(b.isOnline) - Number(a.isOnline)
+        || b.lastActiveTime - a.lastActiveTime
+        || a.clerkId.localeCompare(b.clerkId);
+}
+
+/** Ordena as profissionais de acordo com o modo selecionado (manual, faturamento, acessos recentes, último acesso, atratividade ou algoritmo) */
 export function rankExploreUsers<T extends ExploreRankable>(
     users: T[],
     optionsOrLimit: RankExploreOptions | number = EXPLORE_RESULT_LIMIT,
@@ -107,6 +143,8 @@ export function rankExploreUsers<T extends ExploreRankable>(
         sorted = [...users].sort(compareByRecentVisits);
     } else if (mode === 'last_seen') {
         sorted = [...users].sort(compareByLastSeen);
+    } else if (mode === 'attractiveness') {
+        sorted = [...users].sort(compareByAttractiveness);
     } else {
         sorted = [...users].sort(compareByAlgorithm);
     }

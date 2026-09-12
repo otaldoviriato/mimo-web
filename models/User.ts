@@ -60,6 +60,8 @@ export interface IUser extends Document {
     isAvailable?: boolean;
     lastSeen?: Date;
     accessCount?: number;
+    impressionsCount?: number;
+    clicksCount?: number;
     lastAccessAt?: Date;
     emailNotificationsEnabled?: boolean;
     newUserNotificationsEnabled?: boolean;
@@ -278,6 +280,16 @@ const UserSchema = new Schema<IUser>({
         type: Date,
     },
     accessCount: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    impressionsCount: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    clicksCount: {
         type: Number,
         default: 0,
         min: 0,

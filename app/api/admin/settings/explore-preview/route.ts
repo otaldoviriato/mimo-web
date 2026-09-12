@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
-import { rankExploreUsers, ExploreRankingMode } from '@/lib/exploreRanking';
+import { rankExploreUsers, ExploreRankingMode, calculateAttractivenessRate } from '@/lib/exploreRanking';
 import { getProfessionalsEarningsMap } from '@/lib/professionalEarnings';
 import { AppSettings, GalleryItem, User } from '@/models';
 
@@ -33,7 +33,7 @@ export async function GET() {
         isSuspended: { $ne: true },
         hideFromExplore: { $ne: true },
     })
-        .select('clerkId username name photoUrl coverUrl bio isOnline lastSeen lastAccessAt createdAt accessCount professionalAvailableCents professionalReservedForWithdrawalCents')
+        .select('clerkId username name photoUrl coverUrl bio isOnline lastSeen lastAccessAt createdAt accessCount impressionsCount clicksCount professionalAvailableCents professionalReservedForWithdrawalCents')
         .sort({ isOnline: -1, lastSeen: -1, lastAccessAt: -1, createdAt: -1, accessCount: -1 })
         .lean();
 
@@ -63,6 +63,9 @@ export async function GET() {
 
         // Faturamento total canônico em centavos (MicroTransaction + Assinaturas)
         const totalEarningsCents = earningsMap.get(user.clerkId) || 0;
+        const impressions = Number((user as any).impressionsCount || 0);
+        const clicks = Number((user as any).clicksCount || 0);
+        const attractivenessRate = calculateAttractivenessRate(clicks, impressions);
 
         return {
             id: user._id,
@@ -77,6 +80,9 @@ export async function GET() {
             lastAccessAt: user.lastAccessAt ?? null,
             lastActiveTime,
             accessCount: (user as any).accessCount ?? 0,
+            impressionsCount: impressions,
+            clicksCount: clicks,
+            attractivenessRate,
             totalEarningsCents,
             publicPhotos: (photoMap.get(user.clerkId) ?? []).slice(0, 4),
         };
@@ -103,7 +109,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const { rankingMode, manualOrder } = body;
 
-    const allowedModes: ExploreRankingMode[] = ['algorithm', 'revenue', 'recent_visits', 'last_seen', 'manual'];
+    const allowedModes: ExploreRankingMode[] = ['algorithm', 'revenue', 'recent_visits', 'last_seen', 'attractiveness', 'manual'];
 
     const updateSet: Record<string, any> = {};
 

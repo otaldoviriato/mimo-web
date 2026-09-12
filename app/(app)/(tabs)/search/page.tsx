@@ -59,6 +59,8 @@ export default function SearchPage() {
     } = useFeaturedUsers();
     const [error, setError] = useState('');
     const exposedProfiles = useRef(new Set<string>());
+    const pendingImpressionsBatch = useRef<Set<string>>(new Set());
+    const impressionsTimer = useRef<NodeJS.Timeout | null>(null);
     const loadMoreRef = useRef<HTMLDivElement>(null);
 
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -91,6 +93,21 @@ export default function SearchPage() {
     useEffect(() => {
         if (userData?.isProfessional || username.trim() || loadingFeatured) return;
 
+        const flushImpressions = () => {
+            const batch = Array.from(pendingImpressionsBatch.current);
+            if (batch.length === 0) return;
+            pendingImpressionsBatch.current.clear();
+            if (impressionsTimer.current) {
+                clearTimeout(impressionsTimer.current);
+                impressionsTimer.current = null;
+            }
+            void fetch('/api/telemetry/explore-metrics', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ impressions: batch }),
+            }).catch(() => {});
+        };
+
         const observer = new IntersectionObserver((entries) => {
             for (const entry of entries) {
                 if (!entry.isIntersecting || entry.intersectionRatio < 0.5) continue;
@@ -98,17 +115,28 @@ export default function SearchPage() {
                 if (!professionalId || exposedProfiles.current.has(professionalId)) continue;
 
                 exposedProfiles.current.add(professionalId);
+                pendingImpressionsBatch.current.add(professionalId);
+
                 trackAcquisitionEvent({
                     eventType: 'explore_profile_impression',
                     professionalId,
                 });
                 observer.unobserve(entry.target);
             }
+
+            if (pendingImpressionsBatch.current.size > 0 && !impressionsTimer.current) {
+                impressionsTimer.current = setTimeout(() => {
+                    flushImpressions();
+                }, 1200);
+            }
         }, { threshold: 0.5 });
 
         const cards = document.querySelectorAll<HTMLElement>('[data-explore-professional-id]');
         cards.forEach((card) => observer.observe(card));
-        return () => observer.disconnect();
+        return () => {
+            observer.disconnect();
+            flushImpressions();
+        };
     }, [featuredUsers, loadingFeatured, userData?.isProfessional, username]);
 
     useEffect(() => {
@@ -159,6 +187,11 @@ export default function SearchPage() {
                 eventType: 'explore_profile_viewed',
                 professionalId: user.clerkId,
             });
+            void fetch('/api/telemetry/explore-metrics', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ click: user.clerkId }),
+            }).catch(() => {});
         }
 
         // Emite telemetria de campanha para visualização de perfil no Explorar

@@ -50,7 +50,7 @@ export interface IAppSettings extends Document {
     activeUnrechargedClientHoursThreshold: number;
     activeUserThresholdDays: number;
     exploreSortingCriteria: string[];
-    exploreRankingMode?: 'algorithm' | 'revenue' | 'recent_visits' | 'last_seen' | 'manual';
+    exploreRankingMode?: 'algorithm' | 'revenue' | 'recent_visits' | 'last_seen' | 'attractiveness' | 'manual';
     exploreManualOrder?: string[];
     creatorEngagementEmailsEnabled: boolean;
     creatorEngagementStep1Enabled: boolean;
@@ -373,7 +373,7 @@ const AppSettingsSchema = new Schema<IAppSettings>({
     },
     exploreRankingMode: {
         type: String,
-        enum: ['algorithm', 'revenue', 'recent_visits', 'last_seen', 'manual'],
+        enum: ['algorithm', 'revenue', 'recent_visits', 'last_seen', 'attractiveness', 'manual'],
         default: 'algorithm',
     },
     exploreManualOrder: {

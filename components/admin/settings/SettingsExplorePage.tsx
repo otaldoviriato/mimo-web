@@ -15,10 +15,11 @@ import {
     RefreshCw,
     RotateCcw,
     Sliders,
+    TrendingUp,
     Wifi,
 } from 'lucide-react';
 
-type RankingMode = 'algorithm' | 'revenue' | 'recent_visits' | 'last_seen' | 'manual';
+type RankingMode = 'algorithm' | 'revenue' | 'recent_visits' | 'last_seen' | 'attractiveness' | 'manual';
 
 interface PreviewUser {
     id: string;
@@ -31,6 +32,9 @@ interface PreviewUser {
     lastAccessAt?: string | null;
     totalEarningsCents?: number;
     accessCount?: number;
+    impressionsCount?: number;
+    clicksCount?: number;
+    attractivenessRate?: number;
 }
 
 export function SettingsExplorePage() {
@@ -218,7 +222,7 @@ export function SettingsExplorePage() {
                     </span>
                 </div>
 
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                     <button
                         type="button"
                         onClick={() => handleSelectMode('algorithm')}
@@ -240,6 +244,30 @@ export function SettingsExplorePage() {
                         </div>
                         <p className="mt-1 text-[11px] font-medium text-slate-500">
                             Regra padrão: primeiro quem está online, depois quem acessou mais recentemente.
+                        </p>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => handleSelectMode('attractiveness')}
+                        disabled={isSaving}
+                        className={`flex flex-col items-start rounded-xl border p-3.5 text-left transition ${
+                            rankingMode === 'attractiveness'
+                                ? 'border-pink-600 bg-pink-50/50 shadow-sm'
+                                : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                    >
+                        <div className="flex w-full items-center justify-between">
+                            <span className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                                <TrendingUp size={14} className="text-pink-600" />
+                                Mais atraentes
+                            </span>
+                            {rankingMode === 'attractiveness' && (
+                                <CheckCircle2 size={15} className="text-pink-600" />
+                            )}
+                        </div>
+                        <p className="mt-1 text-[11px] font-medium text-slate-500">
+                            Maior taxa de conversão: proporção de cliques recebidos sobre exibições na vitrine.
                         </p>
                     </button>
 
@@ -434,11 +462,9 @@ export function SettingsExplorePage() {
                                             >
                                                 {formatLastSeen(user)}
                                             </span>
-                                            <div className="flex items-center gap-2 text-[10px] text-slate-400">
-                                                <span>Faturamento: <strong className="text-slate-600">{formatCurrency(user.totalEarningsCents)}</strong></span>
-                                                {user.accessCount !== undefined && user.accessCount > 0 && (
-                                                    <span>• {user.accessCount} visitas</span>
-                                                )}
+                                            <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-0.5 text-[10px] text-slate-400">
+                                                <span>Atratividade: <strong className="font-bold text-pink-600">{user.attractivenessRate ?? 0}%</strong> ({user.clicksCount ?? 0} cliques / {user.impressionsCount ?? 0} exibições)</span>
+                                                <span>• Faturamento: <strong className="text-slate-600">{formatCurrency(user.totalEarningsCents)}</strong></span>
                                             </div>
                                         </div>
 
