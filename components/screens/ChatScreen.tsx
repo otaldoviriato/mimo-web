@@ -855,7 +855,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     useEffect(() => {
         if (!freeIntro?.grant || freeIntro.grant.convertedAt) return;
         const used = freeIntro.grant.used ?? 0;
-        const limit = freeIntro.grant.limit ?? 3;
+        const limit = freeIntro.grant.limit ?? freeIntro.limit ?? 3;
         if (used >= limit && !freeIntroExhaustedReportedRef.current) {
             freeIntroExhaustedReportedRef.current = true;
             const profId = receiver?.clerkId || otherUserId;
@@ -866,7 +866,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 totalFree: limit,
             });
         }
-    }, [freeIntro?.grant?.used, freeIntro?.grant?.limit, freeIntro?.grant?.convertedAt, receiver?.clerkId, receiver?.username, otherUserId]);
+    }, [freeIntro?.grant?.used, freeIntro?.grant?.limit, freeIntro?.limit, freeIntro?.grant?.convertedAt, receiver?.clerkId, receiver?.username, otherUserId]);
 
     useEffect(() => {
         if (propInitialUser && targetClerkId) {

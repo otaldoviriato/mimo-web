@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { AppSettings } from '@/models/AppSettings';
 import { User } from '@/models/User';
+import { Room } from '@/models/Room';
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
 
@@ -398,6 +399,11 @@ export async function PUT(request: NextRequest) {
         if (freeIntroReplyLimit !== undefined) {
             if (!Number.isSafeInteger(freeIntroReplyLimit) || freeIntroReplyLimit < 1 || freeIntroReplyLimit > 100) return NextResponse.json({ error: 'Respostas gratuitas devem ser um inteiro entre 1 e 100.' }, { status: 400 });
             settings.freeIntroReplyLimit = freeIntroReplyLimit;
+            // Sincroniza atomicamente no MongoDB todas as salas ativas de Conheça Grátis que ainda não foram convertidas
+            await Room.updateMany(
+                { 'freeIntro.convertedAt': null, 'freeIntro.limit': { $ne: freeIntroReplyLimit } },
+                { $set: { 'freeIntro.limit': freeIntroReplyLimit } }
+            );
         }
         if (freeIntroTimeoutMinutes !== undefined) {
             if (!Number.isSafeInteger(freeIntroTimeoutMinutes) || freeIntroTimeoutMinutes < 1 || freeIntroTimeoutMinutes > 1440) return NextResponse.json({ error: 'Prazo sem resposta deve ser um inteiro entre 1 e 1440 minutos.' }, { status: 400 });

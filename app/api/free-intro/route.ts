@@ -20,7 +20,32 @@ export async function GET(request: NextRequest) {
     const participants = [userId, otherId].sort();
     const room = await Room.findOne({ participants }).select('freeIntro lastMessageTime lastMessage').lean();
     const intro = room?.freeIntro;
-    if (intro) return NextResponse.json({ ...base, eligible: false, hasConversation: true, grant: intro, remaining: Math.max(0, intro.limit - intro.used), textOnly: !intro.convertedAt && intro.used < intro.limit });
+    if (intro) {
+        const effectiveLimit = !intro.convertedAt ? limit : intro.limit;
+        const used = intro.used ?? 0;
+        const remaining = Math.max(0, effectiveLimit - used);
+        const textOnly = !intro.convertedAt && used < effectiveLimit;
+
+        if (!intro.convertedAt && intro.limit !== limit && room?._id) {
+            await Room.updateOne(
+                { _id: room._id, 'freeIntro.convertedAt': null },
+                { $set: { 'freeIntro.limit': limit } }
+            );
+        }
+
+        return NextResponse.json({
+            ...base,
+            limit: effectiveLimit,
+            eligible: false,
+            hasConversation: true,
+            grant: {
+                ...intro,
+                limit: effectiveLimit,
+            },
+            remaining,
+            textOnly,
+        });
+    }
     const other = await User.findOne({ clerkId: otherId }).select('isProfessional professionalStatus freeIntroEnabled isTeam isSuspended').lean();
     const hasConversation = !!room?.lastMessageTime || !!room?.lastMessage || !!await Message.exists({ roomId: participants.join('_') });
     const eligible = !hasConversation && !me.isProfessional && !me.isTeam && !!other?.isProfessional && other.professionalStatus === 'approved' && !other.isSuspended && !other.isTeam && other.freeIntroEnabled === true;
