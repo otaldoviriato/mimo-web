@@ -74,6 +74,15 @@ export default function UserProfilePage({ params, username: propUsername, initia
     // Profissionais só podem conversar com clientes se a conversa já tiver sido iniciada pelo cliente.
     const sameUserType = !!me && !!user && !me.isTeam && !user.isTeam && !!me.isProfessional === !!user.isProfessional;
     const canMessage = !isOwner && !sameUserType && (!me?.isProfessional || hasChat || me?.isTeam);
+    // Clientes comuns não podem iniciar uma nova conversa com profissional offline; conversas existentes são permitidas.
+    const professionalOfflineNewChat = Boolean(
+        canMessage &&
+        user?.isProfessional &&
+        !user?.isOnline &&
+        !hasChat &&
+        !me?.isTeam &&
+        !me?.isProfessional
+    );
     const teamActivationContact = user?.teamActivationContact;
     const isBlockedByOtherTeamMember = Boolean(
         me?.isTeam &&
@@ -550,13 +559,14 @@ export default function UserProfilePage({ params, username: propUsername, initia
                 <div className={`fixed bottom-0 left-0 right-0 z-30 border-t border-slate-100 bg-white/95 px-5 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-sm ${user.isProfessional ? 'lg:left-1/2 lg:px-10 lg:py-5 xl:px-16' : ''}`}>
                     <div className="mx-auto w-full max-w-2xl">
                         <Button
-                            title={isBlockedByOtherTeamMember ? 'Em atendimento' : startingTeamChat ? 'Abrindo...' : 'Enviar mensagem'}
+                            title={isBlockedByOtherTeamMember ? 'Em atendimento' : startingTeamChat ? 'Abrindo...' : professionalOfflineNewChat ? 'Criadora offline' : 'Enviar mensagem'}
                             onClick={handleMessageClick}
-                            disabled={startingTeamChat || isBlockedByOtherTeamMember}
+                            disabled={startingTeamChat || isBlockedByOtherTeamMember || professionalOfflineNewChat}
                             size="lg"
                             className="w-full"
                         />
                         {isBlockedByOtherTeamMember && <p className="mt-2 text-center text-xs text-slate-500">Em atendimento por {teamActivationContact?.assignedTeamMemberName || 'outro membro da equipe'}</p>}
+                        {professionalOfflineNewChat && <p className="mt-2 text-center text-xs text-slate-500">Novas conversas só podem ser iniciadas quando a criadora estiver online.</p>}
                     </div>
                 </div>
             )}

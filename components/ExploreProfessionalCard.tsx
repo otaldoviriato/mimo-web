@@ -35,7 +35,7 @@ export function ExploreProfessionalCard({ professionalId, name, photoUrl, online
                 src={photoUrl}
                 alt={formattedName}
                 loading="lazy"
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${online ? '' : 'grayscale brightness-90'}`}
             />
 
             <div className="absolute bottom-0 inset-x-0 h-[38%] bg-gradient-to-t from-black/85 via-black/35 to-transparent pointer-events-none" />
@@ -44,10 +44,14 @@ export function ExploreProfessionalCard({ professionalId, name, photoUrl, online
                 <h3 className="text-sm sm:text-base font-black tracking-tight leading-tight truncate drop-shadow-sm">
                     {formattedName}
                 </h3>
-                {online && (
+                {online ? (
                     <span className="relative flex h-2 w-2 shrink-0 ml-0.5" title="Online">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 ring-1 ring-black/40 shadow-xs" />
+                    </span>
+                ) : (
+                    <span className="relative flex h-2 w-2 shrink-0 ml-0.5" title="Offline">
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-slate-400 ring-1 ring-black/40 shadow-xs" />
                     </span>
                 )}
             </div>
