@@ -1,7 +1,5 @@
 'use client';
 
-import { MessageCircle, MessageCircleOff } from 'lucide-react';
-
 type Props = {
     professionalId: string;
     name: string;
@@ -25,7 +23,6 @@ function formatDisplayName(raw: string) {
 export function ExploreProfessionalCard({ professionalId, name, photoUrl, online, trackExposure, onClick }: Props) {
     const formattedName = formatDisplayName(name);
     const chatAvailability = online ? 'Chat disponível' : 'Chat indisponível';
-    const ChatIcon = online ? MessageCircle : MessageCircleOff;
 
     return (
         <button
@@ -42,28 +39,29 @@ export function ExploreProfessionalCard({ professionalId, name, photoUrl, online
                 className="w-full h-full object-cover motion-safe:transition-transform motion-safe:duration-500 motion-safe:group-hover:scale-105"
             />
 
-            <div className="absolute bottom-0 inset-x-0 z-10">
-                <div className="px-2.5 sm:px-3 pb-2 pt-8 bg-gradient-to-t from-black/85 via-black/40 to-transparent">
-                    <h3 className="text-sm sm:text-base text-white font-black tracking-tight leading-tight truncate drop-shadow-sm">
-                        {formattedName}
-                    </h3>
-                </div>
+            {!online && (
                 <div
                     aria-hidden="true"
-                    className={`flex min-h-12 items-center justify-between gap-1.5 px-2.5 sm:px-3 py-2 ${
-                        online ? 'bg-emerald-300 text-emerald-950' : 'bg-slate-900 text-slate-200'
-                    }`}
-                >
-                    <div className="min-w-0">
-                        <span className="block text-xs sm:text-sm font-bold leading-tight">
-                            {online ? 'Online agora' : 'Offline'}
-                        </span>
-                        <span className={`block mt-0.5 text-[10px] sm:text-xs leading-tight ${online ? 'text-emerald-950' : 'text-slate-300'}`}>
-                            {chatAvailability}
-                        </span>
-                    </div>
-                    <ChatIcon className={`h-4 w-4 sm:h-5 sm:w-5 shrink-0 ${online ? 'text-emerald-950' : 'text-slate-400'}`} />
-                </div>
+                    className="absolute inset-0 bg-black/40 pointer-events-none"
+                />
+            )}
+
+            <div aria-hidden="true" className="absolute bottom-0 inset-x-0 h-[38%] bg-gradient-to-t from-black/85 via-black/35 to-transparent pointer-events-none" />
+
+            <span
+                aria-hidden="true"
+                className={`absolute top-2.5 right-2.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[10px] sm:text-xs font-bold leading-none backdrop-blur-md ${
+                    online ? 'bg-emerald-400/90 text-emerald-950 shadow-sm' : 'bg-black/25 text-white/90'
+                }`}
+            >
+                {online && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-950" />}
+                {online ? 'Online' : 'Offline'}
+            </span>
+
+            <div className="absolute bottom-0 inset-x-0 p-3 min-w-0">
+                <h3 className="text-sm sm:text-base text-white font-black tracking-tight leading-tight truncate drop-shadow-sm">
+                    {formattedName}
+                </h3>
             </div>
         </button>
     );
