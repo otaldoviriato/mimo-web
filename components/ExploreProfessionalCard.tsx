@@ -35,23 +35,27 @@ export function ExploreProfessionalCard({ professionalId, name, photoUrl, online
                 src={photoUrl}
                 alt={formattedName}
                 loading="lazy"
-                className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${online ? '' : 'grayscale brightness-90'}`}
+                className={`w-full h-full object-cover transition-all duration-500 group-hover:scale-105 ${
+                    online 
+                        ? 'brightness-100' 
+                        : 'opacity-90 saturate-[0.75] contrast-[0.95]'
+                }`}
             />
 
             <div className="absolute bottom-0 inset-x-0 h-[38%] bg-gradient-to-t from-black/85 via-black/35 to-transparent pointer-events-none" />
 
-            <div className="absolute bottom-0 inset-x-0 p-3 text-white flex items-center gap-1.5 z-10 min-w-0">
-                <h3 className="text-sm sm:text-base font-black tracking-tight leading-tight truncate drop-shadow-sm">
+            <div className="absolute bottom-0 inset-x-0 p-3 text-white flex items-center justify-between gap-1.5 z-10 min-w-0">
+                <h3 className={`text-sm sm:text-base font-black tracking-tight leading-tight truncate drop-shadow-sm ${online ? 'text-white' : 'text-white/90'}`}>
                     {formattedName}
                 </h3>
                 {online ? (
-                    <span className="relative flex h-2 w-2 shrink-0 ml-0.5" title="Online">
+                    <span className="relative flex h-2 w-2 shrink-0" title="Online">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 ring-1 ring-black/40 shadow-xs" />
                     </span>
                 ) : (
-                    <span className="relative flex h-2 w-2 shrink-0 ml-0.5" title="Offline">
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-slate-400 ring-1 ring-black/40 shadow-xs" />
+                    <span className="relative flex items-center justify-center shrink-0" title="Offline">
+                        <span className="inline-flex rounded-full h-2 w-2 bg-slate-400/80 ring-1 ring-black/30 shadow-xs" />
                     </span>
                 )}
             </div>
