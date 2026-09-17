@@ -604,6 +604,16 @@ export default function UserProfilePage({ params, username: propUsername, initia
                                 >
                                     {isGalleryItemLocked(item) ? (
                                         <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-gradient-to-br from-purple-950 via-slate-950 to-fuchsia-950 px-6 text-center">
+                                            {item?.imageUrl && (
+                                                <div className="absolute inset-0 overflow-hidden">
+                                                    <img
+                                                        src={item.imageUrl}
+                                                        alt=""
+                                                        aria-hidden="true"
+                                                        className="h-full w-full object-cover blur-3xl scale-125 brightness-[0.4] saturate-150"
+                                                    />
+                                                </div>
+                                            )}
                                             <div
                                                 className="absolute inset-0 opacity-[0.16]"
                                                 style={{

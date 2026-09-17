@@ -256,8 +256,24 @@ export function ProfessionalProfilePresentation({ user, publicItems, exclusiveIt
                                 const hidden = !canAccess || (isOwner && item.visibility === 'subscribers' && !revealed[item._id]);
                                 return (
                                     <div key={item._id} className="relative aspect-[3/4] overflow-hidden rounded-xl bg-slate-100">
-                                        <button type="button" aria-label={hidden ? 'Conteúdo exclusivo para assinantes' : `Abrir conteúdo exclusivo ${index + 1}`} disabled={!canAccess && !user.isSubscriptionEnabled} onClick={() => canAccess ? onOpen(exclusiveItems, index) : onSubscribe?.()} className="absolute inset-0 h-full w-full">
-                                            {hidden ? <div className="flex h-full flex-col items-center justify-center gap-2 bg-purple-50 text-purple-600"><Lock size={22} /><span className="text-xs font-medium">Exclusivo</span></div> : item.mediaType === 'video' ? <video src={item.imageUrl} preload="metadata" className="h-full w-full object-cover" /> : <ProfilePhoto src={item.imageUrl} alt={`Foto exclusiva ${index + 1}`} />}
+                                        <button type="button" aria-label={hidden ? 'Conteúdo exclusivo para assinantes' : `Abrir conteúdo exclusivo ${index + 1}`} disabled={!canAccess && !user.isSubscriptionEnabled} onClick={() => canAccess ? onOpen(exclusiveItems, index) : onSubscribe?.()} className="group absolute inset-0 h-full w-full overflow-hidden">
+                                            {item.mediaType === 'video' ? (
+                                                <video src={item.imageUrl} preload="metadata" className={`h-full w-full object-cover transition duration-300 ${hidden ? 'blur-2xl scale-110 brightness-[0.75]' : ''}`} />
+                                            ) : (
+                                                <div className={`h-full w-full ${hidden ? 'blur-2xl scale-110 brightness-[0.75]' : ''}`}>
+                                                    <ProfilePhoto src={item.imageUrl} alt={`Foto exclusiva ${index + 1}`} />
+                                                </div>
+                                            )}
+                                            {hidden && (
+                                                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/25 text-white backdrop-blur-[2px] p-2 transition group-hover:bg-black/35">
+                                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white shadow-sm backdrop-blur-md">
+                                                        <Lock size={18} />
+                                                    </div>
+                                                    <span className="rounded-full bg-black/40 px-2.5 py-0.5 text-[11px] font-semibold tracking-wide text-white/95 backdrop-blur-sm">
+                                                        Exclusivo
+                                                    </span>
+                                                </div>
+                                            )}
                                         </button>
                                         {isOwner && item.visibility === 'subscribers' && <button type="button" aria-label={hidden ? 'Revelar foto na galeria' : 'Ocultar foto na galeria'} onClick={() => setRevealed(previous => ({ ...previous, [item._id]: !previous[item._id] }))} className="absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-purple-700">{hidden ? <Eye size={18} /> : <EyeOff size={18} />}</button>}
                                     </div>

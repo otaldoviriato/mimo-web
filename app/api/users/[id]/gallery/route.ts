@@ -55,12 +55,12 @@ export async function GET(
         const publicItems = allItems.filter(item => !item.galleryType || item.galleryType === 'public');
         const privateItems = allItems.filter(item => item.galleryType === 'private');
 
-        // Sanitizar a URL das fotos públicas exclusivas de assinante para evitar vazamento
+        // Marcar fotos públicas exclusivas de assinante com isLocked
         const sanitizedPublicItems = publicItems.map(item => {
             const isLocked = item.visibility === 'subscribers' && !isSubscriber && !isOwner;
             if (isLocked) {
-                const itemObj = item.toObject();
-                itemObj.imageUrl = ''; // Remove a URL real da imagem exclusiva para não-assinantes
+                const itemObj: Record<string, any> = item.toObject();
+                itemObj.isLocked = true;
                 return itemObj;
             }
             return item;
