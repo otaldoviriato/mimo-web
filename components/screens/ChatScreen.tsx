@@ -600,9 +600,16 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     const { socket, connected, socketService, socketVersion } = useSocket(user?.id);
 
     const [messages, setMessages] = useState<Message[]>([]);
-    const [loadingMessages, setLoadingMessages] = useState(true);
+    const [loadingMessages, setLoadingMessages] = useState(() => !isSignedIn ? false : true);
 
-    // Pré-preencher mensagem digitada antes do login (funil anúncio ? chat ? login)
+    // Se não estiver logado, não exibir esqueleto de carregamento de mensagens
+    React.useEffect(() => {
+        if (!isSignedIn) {
+            setLoadingMessages(false);
+        }
+    }, [isSignedIn]);
+
+    // Pré-preencher mensagem digitada antes do login (funil anúncio → chat → login)
     React.useEffect(() => {
         if (isSignedIn && typeof window !== 'undefined') {
             const pending = sessionStorage.getItem(PENDING_CHAT_MESSAGE_KEY);
@@ -1128,7 +1135,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 const isInteractive = 
                     target.tagName === 'TEXTAREA' || 
                     target.tagName === 'INPUT' || 
-                    target.closest('input, textarea, select');
+                    Boolean(target.closest('input, textarea, select, button, [contenteditable="true"]'));
                 
                 if (!isInteractive) {
                     e.preventDefault();
@@ -4159,7 +4166,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     )}
 
                     {audioRecordingStatus === 'idle' && (
-                        <div className="flex-1 min-w-0 flex flex-col justify-center rounded-2xl px-3.5 py-2 min-h-[44px] max-h-[140px] transition-all bg-gray-100">
+                        <div onClick={() => inputRef.current?.focus()} className="flex-1 min-w-0 flex flex-col justify-center rounded-2xl px-3.5 py-2 min-h-[44px] max-h-[140px] transition-all bg-gray-100 cursor-text">
                             <textarea
                                 ref={inputRef}
                                 value={selectedFile ? "MÃ­dia selecionada para envio..." : messageText}
@@ -4170,7 +4177,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                 onBlur={() => setIsInputFocused(false)}
                                 placeholder="Digite sua mensagem..."
                                 rows={1}
-                                className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none leading-5 py-0.5 disabled:text-gray-400 disabled:cursor-not-allowed"
+                                className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none leading-5 py-0.5 disabled:text-gray-400 disabled:cursor-not-allowed select-text"
                                 style={{ maxHeight: '96px' }}
                                 onInput={(e) => {
                                     const el = e.currentTarget;
@@ -4219,10 +4226,10 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                     handleSend();
                                 }
                             }}
-                            disabled={(!messageText.trim() && !selectedFile) || !connected}
+                            disabled={(!messageText.trim() && !selectedFile) || (isSignedIn && !connected)}
                             className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shrink-0 select-none ${
-                                (messageText.trim() || selectedFile) && connected
-                                    ? 'bg-purple-600 hover:bg-purple-700 shadow-sm text-white'
+                                (messageText.trim() || selectedFile) && (!isSignedIn || connected)
+                                    ? 'bg-purple-600 hover:bg-purple-700 shadow-sm text-white cursor-pointer'
                                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                             }`}
                         >
