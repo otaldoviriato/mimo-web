@@ -1,6 +1,7 @@
 'use client';
 import { readStackEntry, replaceStackUrl, stackOverlayState } from '@/lib/stackHistory';
 import React, { useState, useEffect, useRef, use } from 'react';
+import { createPortal } from 'react-dom';
 import { usePathname } from 'next/navigation';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -4209,6 +4210,12 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         <button
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
+                                // Se não estiver logado, NUNCA abrir modal de recarga: chamar handleSend() para solicitar login
+                                if (!isSignedIn) {
+                                    handleSend();
+                                    return;
+                                }
+
                                 if (isClientToProfessional && balance <= 0) {
                                     reportMessageAttempt();
                                     openRechargeModal('ZERO_BALANCE_START');
@@ -4920,13 +4927,14 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             />
 
             {/* Modal de Login para não-autenticados que tentam enviar mensagem */}
-            {showLoginModal && (
+            {showLoginModal && typeof document !== 'undefined' && createPortal(
                 <LoginPromptModal
                     returnTo={typeof window !== 'undefined' ? window.location.pathname + window.location.search : '/'}
                     recipientUsername={receiver?.username}
                     pendingMessage={messageText}
                     onClose={() => setShowLoginModal(false)}
-                />
+                />,
+                document.body
             )}
         </div>
     );
