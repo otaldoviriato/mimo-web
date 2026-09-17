@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { ChevronLeft, ChevronRight, Eye, EyeOff, Lock, Pause, Play, ShieldCheck, Pencil } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Eye, EyeOff, Images, Lock, Pause, Play, ShieldCheck, Pencil } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 
@@ -57,7 +57,7 @@ export function ProfilePhoto({ src, alt, priority = false, ambient = false }: { 
     );
 }
 
-export function ProfessionalProfilePresentation({ user, publicItems, exclusiveItems, privateCount, isSubscriber, isOwner, loadingGallery, subscribing, onBack, onSubscribe, onEditSubscription, onOpen, headerActions, privatePreviewUrl }: Props) {
+export function ProfessionalProfilePresentation({ user, publicItems, exclusiveItems, privateCount, isSubscriber, isOwner, loadingGallery, subscribing, onBack, onSubscribe, onEditSubscription, onOpen, headerActions }: Props) {
     const router = useRouter();
     const [photoIndex, setPhotoIndex] = useState(0);
     const [expanded, setExpanded] = useState(false);
@@ -251,26 +251,24 @@ export function ProfessionalProfilePresentation({ user, publicItems, exclusiveIt
 
                 {hasExclusive && (
                     <section aria-label="Conteúdo para assinantes" className="border-t border-slate-100 pt-6">
-                        <div className="mb-4 flex items-center gap-2"><Lock size={16} className="text-purple-600" /><h2 className="text-lg font-semibold text-slate-900">Fotos para assinantes</h2></div>
+                        <div className="mb-4 flex items-center gap-2"><Lock size={16} className="shrink-0 text-purple-600" /><h2 className="text-lg font-semibold text-slate-900">Conteúdos para assinantes</h2></div>
                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                             {exclusiveItems.map((item, index) => {
                                 const hidden = !canAccess || (isOwner && item.visibility === 'subscribers' && !revealed[item._id]);
                                 return (
                                     <div key={item._id} className="relative aspect-[3/4] overflow-hidden rounded-xl bg-slate-100">
-                                        <button type="button" aria-label={hidden ? 'Conteúdo exclusivo para assinantes' : `Abrir conteúdo exclusivo ${index + 1}`} disabled={!canAccess && !user.isSubscriptionEnabled} onClick={() => canAccess ? onOpen(exclusiveItems, index) : onSubscribe?.()} className="group absolute inset-0 h-full w-full overflow-hidden">
+                                        <button type="button" aria-label={hidden ? `Conteúdo exclusivo ${index + 1}, para assinantes` : `Abrir conteúdo exclusivo ${index + 1}`} disabled={!canAccess && !user.isSubscriptionEnabled} onClick={() => canAccess ? onOpen(exclusiveItems, index) : onSubscribe?.()} className="group absolute inset-0 h-full w-full overflow-hidden focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-purple-600">
                                             {item.mediaType === 'video' ? (
-                                                <video src={item.imageUrl} preload="metadata" className={`h-full w-full object-cover transition duration-300 ${hidden ? 'blur-lg scale-105 brightness-[0.85]' : ''}`} />
+                                                <video src={item.imageUrl} preload="metadata" className={`h-full w-full object-cover ${hidden ? 'blur-[6px] scale-110' : ''}`} />
                                             ) : (
-                                                <div className={`h-full w-full ${hidden ? 'blur-lg scale-105 brightness-[0.85]' : ''}`}>
+                                                <div className={`h-full w-full ${hidden ? 'blur-[6px] scale-110' : ''}`}>
                                                     <ProfilePhoto src={item.imageUrl} alt={`Foto exclusiva ${index + 1}`} />
                                                 </div>
                                             )}
                                             {hidden && (
-                                                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/25 text-white backdrop-blur-[1px] p-2 transition group-hover:bg-black/35">
-                                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white shadow-sm backdrop-blur-md">
-                                                        <Lock size={18} />
-                                                    </div>
-                                                    <span className="rounded-full bg-black/40 px-2.5 py-0.5 text-[11px] font-semibold tracking-wide text-white/95 backdrop-blur-sm">
+                                                <div aria-hidden="true" className="absolute inset-0 z-10 flex items-end bg-gradient-to-t from-black/35 via-black/10 to-transparent p-2.5">
+                                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-black/45 px-2 py-1 text-[10px] sm:text-[11px] font-medium leading-none text-white backdrop-blur-md">
+                                                        <Lock size={12} className="shrink-0" />
                                                         Exclusivo
                                                     </span>
                                                 </div>
@@ -281,42 +279,28 @@ export function ProfessionalProfilePresentation({ user, publicItems, exclusiveIt
                                 );
                             })}
                         </div>
-                        {!canAccess && privateCount > 0 && (() => {
-                            const enumerationPreview = privatePreviewUrl || exclusiveItems.find(i => i.imageUrl)?.imageUrl || publicItems.find(i => i.imageUrl)?.imageUrl;
-                            return (
+                        {!canAccess && privateCount > 0 && (
                                 <button
                                     type="button"
                                     onClick={() => onSubscribe?.()}
                                     disabled={!user.isSubscriptionEnabled}
-                                    className="group relative mt-3 flex min-h-28 w-full flex-col items-center justify-center overflow-hidden rounded-2xl p-5 text-white shadow-sm transition active:scale-[0.99]"
+                                    aria-label={`Ver assinatura: ${privateCount} ${privateCount === 1 ? 'conteúdo exclusivo' : 'conteúdos exclusivos'}`}
+                                    className="group mt-3 flex w-full items-center gap-3 rounded-2xl border border-purple-100 bg-gradient-to-br from-purple-50 to-white p-4 text-left transition-colors enabled:hover:border-purple-200 enabled:hover:bg-purple-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600 disabled:cursor-default"
                                 >
-                                    {enumerationPreview ? (
-                                        <>
-                                            <img
-                                                src={enumerationPreview}
-                                                alt=""
-                                                aria-hidden="true"
-                                                className="absolute inset-0 h-full w-full object-cover blur-lg scale-110 brightness-[0.45] transition duration-300 group-hover:scale-115 group-hover:brightness-[0.5]"
-                                            />
-                                            <div className="absolute inset-0 bg-purple-900/40 mix-blend-multiply" />
-                                        </>
-                                    ) : (
-                                        <div className="absolute inset-0 bg-purple-50" />
-                                    )}
-                                    <div className={`relative z-10 flex flex-col items-center justify-center gap-1.5 ${enumerationPreview ? 'text-white' : 'text-purple-700'}`}>
-                                        <div className={`flex h-9 w-9 items-center justify-center rounded-full shadow-sm backdrop-blur-md ${enumerationPreview ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-700'}`}>
-                                            <Lock size={18} />
-                                        </div>
-                                        <span className="text-sm font-semibold tracking-wide">
-                                            {privateCount} {privateCount === 1 ? 'conteúdo exclusivo' : 'conteúdos exclusivos'}
+                                    <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-100/80 text-purple-600">
+                                        <Images size={21} strokeWidth={1.5} />
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                        <span className="block text-sm font-semibold leading-snug tracking-tight text-slate-900">
+                                            {privateCount.toLocaleString('pt-BR')} {privateCount === 1 ? 'conteúdo exclusivo' : 'conteúdos exclusivos'}
                                         </span>
-                                        <span className={`text-xs ${enumerationPreview ? 'text-white/80' : 'text-slate-500'}`}>
-                                            Disponível para assinantes
+                                        <span className="mt-1 block text-xs leading-relaxed text-slate-500">
+                                            {user.isSubscriptionEnabled ? 'Assine para acessar a coleção' : 'Coleção para assinantes'}
                                         </span>
                                     </div>
+                                    {user.isSubscriptionEnabled && <ChevronRight aria-hidden="true" size={16} className="shrink-0 text-purple-400" />}
                                 </button>
-                            );
-                        })()}
+                        )}
                     </section>
                 )}
             </div>
