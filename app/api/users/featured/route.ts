@@ -10,31 +10,33 @@ export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
     try {
+        // userId Ã© opcional â€” a rota Ã© pÃºblica para permitir o Explorar sem login
         const { userId } = await auth();
-        if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
         await connectToDatabase();
-        const currentUser = await User.findOne({ clerkId: userId }).select('isProfessional').lean();
-        if (currentUser?.isProfessional) return NextResponse.json({ users: [], hasMore: false });
+
+        // Profissionais logadas nÃ£o veem o Explorar
+        if (userId) {
+            const currentUser = await User.findOne({ clerkId: userId }).select('isProfessional').lean();
+            if (currentUser?.isProfessional) return NextResponse.json({ users: [], hasMore: false });
+        }
 
         const excludedIds = request.nextUrl.searchParams.get('exclude')
             ?.split(',')
             .filter(value => /^user_[A-Za-z0-9]+$/.test(value))
             .slice(0, 500) ?? [];
 
+        const clerkIdFilter = userId
+            ? { clerkId: { $ne: userId, $nin: excludedIds }, isProfessional: true, professionalStatus: 'approved', isSuspended: { $ne: true }, hideFromExplore: { $ne: true } }
+            : { clerkId: { $nin: excludedIds }, isProfessional: true, professionalStatus: 'approved', isSuspended: { $ne: true }, hideFromExplore: { $ne: true } };
+
         const [professionals, rooms, settings] = await Promise.all([
-            User.find({
-                clerkId: { $ne: userId, $nin: excludedIds },
-                isProfessional: true,
-                professionalStatus: 'approved',
-                isSuspended: { $ne: true },
-                hideFromExplore: { $ne: true },
-            })
+            User.find(clerkIdFilter)
                 .select('clerkId username name email photoUrl coverUrl identityStatus subscriptionPrice bio createdAt avgResponseTimeMinutes freeIntroEnabled isOnline lastSeen lastAccessAt birthDate city state accessCount impressionsCount clicksCount professionalAvailableCents professionalReservedForWithdrawalCents')
                 .sort({ isOnline: -1, lastSeen: -1, lastAccessAt: -1, createdAt: -1, accessCount: -1 })
                 .limit(100)
                 .lean(),
-            Room.find({ participants: userId }).select('participants').lean(),
+            userId ? Room.find({ participants: userId }).select('participants').lean() : Promise.resolve([]),
             AppSettings.findOne({ key: 'global' })
                 .select('conversationPricePerEquivalentCharCents subscriberDiscountPercentage exploreRankingMode exploreManualOrder')
                 .lean(),

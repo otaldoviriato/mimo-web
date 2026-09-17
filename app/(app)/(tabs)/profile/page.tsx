@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useUser } from '@clerk/nextjs';
+import { useUser, useAuth } from '@clerk/nextjs';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { Avatar } from '@/components/Avatar';
 import { useMyProfile, useUploadPhoto, useMyGallery, useUploadToGallery, useDeleteFromGallery, useDepositHistory, useChatRooms, useUpdateGalleryItemVisibility, useMySubscriptions, useCancelSubscription, useResumeSubscription, type MySubscription } from '@/hooks/useQueries';
@@ -10,13 +10,14 @@ import { ImageCropper } from '@/components/ImageCropper';
 import { usePayment } from '@/context/PaymentContext';
 import { PullToRefresh } from '@/components';
 import { ProfessionalProfilePresentation, type ProfileGalleryItem } from '@/components/ProfessionalProfilePresentation';
-import { Share2, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, ShieldAlert, Heart, Globe, Crown, Camera, Gift, CreditCard, QrCode, Star, X, MoreVertical, ChevronLeft, ChevronRight, ExternalLink, CalendarClock, AlertCircle, Pencil, MessageCircle, RotateCcw } from 'lucide-react';
+import { UserX, Share2, Image as ImageIcon, Lock, Trash2, Plus, AlertTriangle, ShieldCheck, ShieldAlert, Heart, Globe, Crown, Camera, Gift, CreditCard, QrCode, Star, X, MoreVertical, ChevronLeft, ChevronRight, ExternalLink, CalendarClock, AlertCircle, Pencil, MessageCircle, RotateCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { buildProfileShareUrl } from '@/lib/referral';
 import { recordLinkShared } from '@/lib/clientAcquisitionAnalytics';
 
 export default function ProfilePage() {
     const { user } = useUser();
+    const { isSignedIn } = useAuth();
     const router = useTransitionRouter();
     const { openRechargeModal } = usePayment();
 
@@ -153,9 +154,9 @@ export default function ProfilePage() {
 
         const profileUrl = buildProfileShareUrl(window.location.origin, userData.username, user?.id || userData.clerkId);
         const name       = userData.name || `@${userData.username}`;
-        const shareText  = `Ei! Esse é meu perfil no MimoChat — ${name}. Me manda uma mensagem, adoro conversar! 💬`;
+        const shareText  = `Ei! Esse Ã© meu perfil no MimoChat â€” ${name}. Me manda uma mensagem, adoro conversar! ðŸ’¬`;
 
-        // Web Share API: abre o sheet nativo do Android/iOS (requer HTTPS em produção)
+        // Web Share API: abre o sheet nativo do Android/iOS (requer HTTPS em produÃ§Ã£o)
         if (typeof navigator !== 'undefined' && navigator.share) {
             try {
                 await navigator.share({
@@ -166,19 +167,19 @@ export default function ProfilePage() {
                 recordLinkShared('native_share');
                 return;
             } catch (err: any) {
-                // AbortError = usuário fechou o sheet sem compartilhar — comportamento normal
+                // AbortError = usuÃ¡rio fechou o sheet sem compartilhar â€” comportamento normal
                 if (err?.name === 'AbortError') return;
                 // Qualquer outro erro cai no fallback abaixo
             }
         }
 
-        // Fallback: copia o link para a área de transferência e mostra feedback
+        // Fallback: copia o link para a Ã¡rea de transferÃªncia e mostra feedback
         try {
             await navigator.clipboard.writeText(`${shareText}\n\n${profileUrl}`);
             recordLinkShared('clipboard');
             toast.success('Link copiado! Cole no WhatsApp, e-mail ou onde preferir.');
         } catch {
-            // sem permissão de clipboard — ignora silenciosamente
+            // sem permissÃ£o de clipboard â€” ignora silenciosamente
         }
     };
 
@@ -224,7 +225,7 @@ export default function ProfilePage() {
 
         const maxSizeBytes = 8 * 1024 * 1024;
         if (file.size > maxSizeBytes) {
-            alert('Esta imagem é muito grande. Escolha uma foto de no máximo 8MB.');
+            alert('Esta imagem Ã© muito grande. Escolha uma foto de no mÃ¡ximo 8MB.');
             if (galleryInputRef.current) galleryInputRef.current.value = '';
             return;
         }
@@ -239,12 +240,12 @@ export default function ProfilePage() {
 
         const maxSizeBytes = 8 * 1024 * 1024;
         if (file.size > maxSizeBytes) {
-            alert('Este arquivo é muito grande. Escolha um arquivo de no máximo 8MB.');
+            alert('Este arquivo Ã© muito grande. Escolha um arquivo de no mÃ¡ximo 8MB.');
             if (privateGalleryInputRef.current) privateGalleryInputRef.current.value = '';
             return;
         }
 
-        if (confirm(`Deseja adicionar este arquivo (${file.type.startsWith('video/') ? 'vídeo' : 'foto'}) à sua Galeria Privada?`)) {
+        if (confirm(`Deseja adicionar este arquivo (${file.type.startsWith('video/') ? 'vÃ­deo' : 'foto'}) Ã  sua Galeria Privada?`)) {
             setUploadingGallery(true);
             const originalName = file.name || 'file.jpg';
             const extension = originalName.split('.').pop() || 'jpg';
@@ -325,7 +326,7 @@ export default function ProfilePage() {
         publicExclusiveCount >= minExclusivePhotos && 
         publicExclusiveCount <= maxExclusivePhotos;
 
-    // ─── LAYOUT CREATOR (PROFISSIONAL ESTILO TINDER) ─────────────────────────
+    // â”€â”€â”€ LAYOUT CREATOR (PROFISSIONAL ESTILO TINDER) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const publicGalleryItems = React.useMemo<ProfileGalleryItem[]>(() => {
         const rawItems: ProfileGalleryItem[] = Array.isArray(galleryData?.publicItems) 
             ? galleryData.publicItems 
@@ -400,7 +401,7 @@ export default function ProfilePage() {
                     />
                 </PullToRefresh>
 
-                {/* Modal fullscreen de visualização de foto */}
+                {/* Modal fullscreen de visualizaÃ§Ã£o de foto */}
                 {mounted && selectedItem && createPortal(
                     <div className="fixed inset-0 z-[9999] flex flex-col justify-between bg-black animate-in fade-in duration-200 select-none">
                         <div className="h-16 px-5 flex items-center justify-between border-b border-white/10 bg-black/60 backdrop-blur-md z-10 shrink-0">
@@ -410,14 +411,14 @@ export default function ProfilePage() {
                             >
                                 <ChevronLeft className="w-6 h-6" />
                             </button>
-                            <span className="text-white text-sm font-semibold">Visualizar Mídia</span>
+                            <span className="text-white text-sm font-semibold">Visualizar MÃ­dia</span>
                             <div className="w-10" />
                         </div>
                         <div className="flex-1 relative flex items-center justify-center bg-black w-full h-full p-4">
                             {selectedItem.mediaType === 'video' ? (
                                 <video src={selectedItem.imageUrl} controls autoPlay className="w-full h-full max-h-[80vh] object-contain bg-black" />
                             ) : (
-                                <img src={selectedItem.imageUrl} alt="Mídia" className="w-full h-full max-h-[80vh] object-contain" />
+                                <img src={selectedItem.imageUrl} alt="MÃ­dia" className="w-full h-full max-h-[80vh] object-contain" />
                             )}
                         </div>
                     </div>,
@@ -427,7 +428,7 @@ export default function ProfilePage() {
         );
     }
 
-    // ─── LAYOUT CLIENTE (COMUM COM SALDO E RECARGAS) ─────────────────────────
+    // â”€â”€â”€ LAYOUT CLIENTE (COMUM COM SALDO E RECARGAS) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const depositHistoryItems = (depositHistory?.transactions ?? []).map((tx) => ({
         id: tx.id,
         amount: tx.source === 'gift' ? tx.amount / 100 : tx.amount,
@@ -435,7 +436,7 @@ export default function ProfilePage() {
         label: tx.source === 'gift'
             ? `Cupom${typeof tx.metadata?.giftCode === 'string' ? ` ${tx.metadata.giftCode}` : ''}`
             : tx.type === 'CC'
-                ? 'Cartão de Crédito'
+                ? 'CartÃ£o de CrÃ©dito'
                 : 'Pix',
         type: tx.source === 'gift' ? 'gift' : tx.type === 'CC' ? 'card' : 'pix'
     }));
@@ -443,6 +444,36 @@ export default function ProfilePage() {
     const teamMemberSince = userData?.createdAt
         ? new Date(userData.createdAt).toLocaleDateString('pt-BR')
         : 'Nao informado';
+    // Estado para não-logados: tela de perfil com indicação de que não está logado
+    if (!isSignedIn) {
+        return (
+            <div className="flex flex-col h-full bg-slate-50 relative overflow-hidden max-w-lg mx-auto w-full items-center justify-center p-6 text-center select-none">
+                <div className="w-20 h-20 rounded-full bg-slate-200 border-2 border-slate-300 flex items-center justify-center text-slate-400 mb-4 shadow-inner">
+                    <UserX className="w-10 h-10" />
+                </div>
+                <h1 className="text-xl font-bold text-slate-900 mb-1">Você não está logado</h1>
+                <p className="text-sm text-slate-500 mb-6 max-w-xs leading-relaxed">
+                    Acesse sua conta para visualizar seu perfil, recarregar saldo, gerenciar assinaturas e mais.
+                </p>
+                <div className="flex flex-col gap-3 w-full max-w-xs">
+                    <button
+                        type="button"
+                        onClick={() => { window.location.href = "/login"; }}
+                        className="w-full h-12 rounded-2xl bg-purple-600 hover:bg-purple-700 active:scale-[0.98] text-white font-bold text-sm shadow-md shadow-purple-600/25 transition-all flex items-center justify-center cursor-pointer"
+                    >
+                        Entrar ou cadastrar
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => { router.push("/search"); }}
+                        className="w-full h-12 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-[0.98] text-slate-700 font-semibold text-sm transition-all shadow-sm flex items-center justify-center cursor-pointer"
+                    >
+                        Explorar profissionais
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col h-full bg-slate-50 relative overflow-hidden max-w-full">
@@ -451,7 +482,7 @@ export default function ProfilePage() {
             <div className="absolute top-[35%] right-[-15%] w-[300px] h-[300px] rounded-full bg-pink-400/12 blur-[90px] pointer-events-none select-none z-0" />
             <div className="absolute bottom-[15%] left-[-15%] w-[280px] h-[280px] rounded-full bg-indigo-400/10 blur-[100px] pointer-events-none select-none z-0" />
 
-            {/* Textura Geométrica Discreta (Bolinhas Lavanda) */}
+            {/* Textura GeomÃ©trica Discreta (Bolinhas Lavanda) */}
             <div
                 className="absolute inset-0 pointer-events-none select-none z-0"
                 style={{
@@ -464,17 +495,17 @@ export default function ProfilePage() {
 
 
             <PullToRefresh onRefresh={isTeam ? onRefreshTeam : onRefreshClient} className="px-4 pt-5 pb-24 max-w-md w-full mx-auto relative z-10" contentClassName="flex flex-col gap-4">
-                {/* Informações Básicas / Perfil */}
+                {/* InformaÃ§Ãµes BÃ¡sicas / Perfil */}
                 <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 flex items-center justify-between gap-3 shadow-xs">
                     <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                        {/* Avatar com Indicadores de Câmera e Online Posicionados sem Sobreposição */}
+                        {/* Avatar com Indicadores de CÃ¢mera e Online Posicionados sem SobreposiÃ§Ã£o */}
                         <div className="relative shrink-0">
                             <div 
                                 onClick={() => fileInputRef.current?.click()}
                                 className="cursor-pointer group relative rounded-full"
                             >
                                 <Avatar uri={localPhotoUrl} size={60} />
-                                {/* Botão Câmera (Top Right) */}
+                                {/* BotÃ£o CÃ¢mera (Top Right) */}
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -489,16 +520,16 @@ export default function ProfilePage() {
                             </div>
                             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
                             
-                            {/* Ponto Verde Online (Bottom Right) sem sobreposição */}
+                            {/* Ponto Verde Online (Bottom Right) sem sobreposiÃ§Ã£o */}
                             <span 
                                 className="w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white absolute bottom-0 right-0 shadow-2xs z-10 flex items-center justify-center" 
-                                title="Você está online"
+                                title="VocÃª estÃ¡ online"
                             >
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                             </span>
                         </div>
                         
-                        {/* Informações do Usuário */}
+                        {/* InformaÃ§Ãµes do UsuÃ¡rio */}
                         <div className="min-w-0 flex-1">
                             <h2 className="text-base font-bold text-slate-900 truncate leading-tight">
                                 {userData?.name || userData?.username || user?.username || ''}
@@ -512,7 +543,7 @@ export default function ProfilePage() {
                         </div>
                     </div>
 
-                    {/* Botão Editar Perfil */}
+                    {/* BotÃ£o Editar Perfil */}
                     <button
                         onClick={() => router.push('/profile/edit')}
                         className="shrink-0 bg-slate-100 hover:bg-slate-200/80 active:scale-95 text-slate-700 font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all border border-slate-200/80 cursor-pointer shadow-2xs"
@@ -560,7 +591,7 @@ export default function ProfilePage() {
                             </span>
                             {userData?.promotionalBalance > 0 && (
                                 <span className="text-[10px] text-purple-600 font-semibold mt-1 block">
-                                    Sendo {((userData.promotionalBalance) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} de {userData.promotionalBalanceLabel || 'Crédito de boas-vindas'}
+                                    Sendo {((userData.promotionalBalance) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} de {userData.promotionalBalanceLabel || 'CrÃ©dito de boas-vindas'}
                                 </span>
                             )}
                         </div>
@@ -575,9 +606,9 @@ export default function ProfilePage() {
                     </div>
                 </div>
 
-                {/* Histórico de Recargas */}
+                {/* HistÃ³rico de Recargas */}
                 <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs flex flex-col gap-3">
-                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5">Histórico de Recargas</h3>
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5">HistÃ³rico de Recargas</h3>
                     
                     {loadingHistory ? (
                         <div className="flex flex-col gap-3">
@@ -607,7 +638,7 @@ export default function ProfilePage() {
                                         <div>
                                             <p className="font-bold text-slate-700">{tx.label}</p>
                                             <p className="text-[10px] text-slate-400 font-medium">
-                                                {new Date(tx.createdAt).toLocaleDateString('pt-BR')} às {new Date(tx.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                {new Date(tx.createdAt).toLocaleDateString('pt-BR')} Ã s {new Date(tx.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                             </p>
                                         </div>
                                     </div>
@@ -622,7 +653,7 @@ export default function ProfilePage() {
                     </>
                 )}
 
-                {/* Card de Minhas Assinaturas (Sempre visível para o cliente) */}
+                {/* Card de Minhas Assinaturas (Sempre visÃ­vel para o cliente) */}
                 {!isTeam && (() => {
                     const mySubscriptions = subscriptionsData?.subscriptions ?? [];
                     return (
@@ -697,7 +728,7 @@ export default function ProfilePage() {
                                                         {isPastDue ? (
                                                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700">
                                                                 <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
-                                                                Saldo insuficiente • {sub.daysLeftInGrace ?? 3}d restantes
+                                                                Saldo insuficiente â€¢ {sub.daysLeftInGrace ?? 3}d restantes
                                                             </span>
                                                         ) : isExpired ? (
                                                             <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500">
@@ -707,7 +738,7 @@ export default function ProfilePage() {
                                                         ) : renewalCanceled ? (
                                                             <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600">
                                                                 <AlertCircle className="w-3 h-3 shrink-0" />
-                                                                Expira em {daysLeft} dia{daysLeft !== 1 ? 's' : ''} (sem renovação)
+                                                                Expira em {daysLeft} dia{daysLeft !== 1 ? 's' : ''} (sem renovaÃ§Ã£o)
                                                             </span>
                                                         ) : (
                                                             <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500">
@@ -718,7 +749,7 @@ export default function ProfilePage() {
                                                     </div>
                                                 </div>
 
-                                                {/* Preço e Ação Rápida */}
+                                                {/* PreÃ§o e AÃ§Ã£o RÃ¡pida */}
                                                 <div className="shrink-0 text-right flex flex-col items-end gap-1">
                                                     <span className="text-xs font-black text-purple-700">
                                                         {(sub.priceInCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
@@ -735,7 +766,7 @@ export default function ProfilePage() {
                                                             Recarregar
                                                         </button>
                                                     ) : (
-                                                        <p className="text-[9px] text-slate-400">/mês</p>
+                                                        <p className="text-[9px] text-slate-400">/mÃªs</p>
                                                     )}
                                                 </div>
                                             </button>
@@ -800,10 +831,10 @@ export default function ProfilePage() {
                                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3.5 flex flex-col gap-2 text-xs">
                                     <div className="flex items-center gap-1.5 font-bold text-amber-800">
                                         <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                                        <span>Renovação pendente por saldo insuficiente</span>
+                                        <span>RenovaÃ§Ã£o pendente por saldo insuficiente</span>
                                     </div>
                                     <p className="text-amber-700 leading-relaxed text-[11px]">
-                                        Você tem até <strong>{managingSubscription.daysLeftInGrace ?? 3} dias</strong> de tolerância para recarregar. Assim que o saldo for creditado, a renovação será efetuada automaticamente!
+                                        VocÃª tem atÃ© <strong>{managingSubscription.daysLeftInGrace ?? 3} dias</strong> de tolerÃ¢ncia para recarregar. Assim que o saldo for creditado, a renovaÃ§Ã£o serÃ¡ efetuada automaticamente!
                                     </p>
                                     <button
                                         type="button"
@@ -831,8 +862,8 @@ export default function ProfilePage() {
                                         {managingSubscription.status === 'PAST_DUE'
                                             ? 'Venceu em'
                                             : managingSubscription.cancelAtPeriodEnd
-                                            ? 'Acesso até'
-                                            : 'Próxima renovação'}
+                                            ? 'Acesso atÃ©'
+                                            : 'PrÃ³xima renovaÃ§Ã£o'}
                                     </p>
                                     <p className="text-sm font-bold text-gray-800 mt-0.5">
                                         {new Date(managingSubscription.expiresAt).toLocaleDateString('pt-BR')}
@@ -840,7 +871,7 @@ export default function ProfilePage() {
                                 </div>
                             </div>
 
-                            {/* Ações: Ir para chat / Visitar perfil */}
+                            {/* AÃ§Ãµes: Ir para chat / Visitar perfil */}
                             <div className="grid grid-cols-2 gap-2">
                                 <button
                                     type="button"
@@ -871,38 +902,38 @@ export default function ProfilePage() {
                                 )}
                             </div>
 
-                            {/* Reativação de renovação automática quando cancelamento está agendado */}
+                            {/* ReativaÃ§Ã£o de renovaÃ§Ã£o automÃ¡tica quando cancelamento estÃ¡ agendado */}
                             {managingSubscription.cancelAtPeriodEnd && managingSubscription.status !== 'EXPIRED' && (
                                 <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5 flex flex-col gap-2.5">
                                     <p className="text-xs font-bold text-amber-800 text-center">
-                                        Renovação cancelada. Acesso liberado até {new Date(managingSubscription.expiresAt).toLocaleDateString('pt-BR')}.
+                                        RenovaÃ§Ã£o cancelada. Acesso liberado atÃ© {new Date(managingSubscription.expiresAt).toLocaleDateString('pt-BR')}.
                                     </p>
                                     <button
                                         type="button"
                                         onClick={async () => {
                                             try {
                                                 await resumeSubscriptionMutation.mutateAsync(managingSubscription._id);
-                                                toast.success('Renovação automática reativada com sucesso!');
+                                                toast.success('RenovaÃ§Ã£o automÃ¡tica reativada com sucesso!');
                                                 setManagingSubscription(null);
                                             } catch (err: any) {
-                                                toast.error(err.message || 'Erro ao reativar renovação');
+                                                toast.error(err.message || 'Erro ao reativar renovaÃ§Ã£o');
                                             }
                                         }}
                                         disabled={resumeSubscriptionMutation.isPending}
                                         className="w-full h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer disabled:opacity-60"
                                     >
                                         <RotateCcw className="w-3.5 h-3.5" />
-                                        {resumeSubscriptionMutation.isPending ? 'Reativando...' : 'Reativar renovação automática'}
+                                        {resumeSubscriptionMutation.isPending ? 'Reativando...' : 'Reativar renovaÃ§Ã£o automÃ¡tica'}
                                     </button>
                                 </div>
                             )}
 
-                            {/* Confirmação de cancelamento inline */}
+                            {/* ConfirmaÃ§Ã£o de cancelamento inline */}
                             {!managingSubscription.cancelAtPeriodEnd && managingSubscription.status !== 'EXPIRED' && (
                                 cancellingSubscriptionId === managingSubscription._id ? (
                                     <div className="border border-red-100 bg-red-50/60 rounded-2xl p-4 flex flex-col gap-3">
                                         <p className="text-xs font-bold text-red-700 text-center leading-relaxed">
-                                            Tem certeza? A renovação automática será cancelada, mas seu acesso de assinante continua normalmente até {new Date(managingSubscription.expiresAt).toLocaleDateString('pt-BR')}.
+                                            Tem certeza? A renovaÃ§Ã£o automÃ¡tica serÃ¡ cancelada, mas seu acesso de assinante continua normalmente atÃ© {new Date(managingSubscription.expiresAt).toLocaleDateString('pt-BR')}.
                                         </p>
                                         <div className="flex gap-2">
                                             <button
@@ -917,7 +948,7 @@ export default function ProfilePage() {
                                                 onClick={async () => {
                                                     try {
                                                         await cancelSubscriptionMutation.mutateAsync(managingSubscription._id);
-                                                        toast.success('Renovação cancelada. Seu acesso segue ativo até o fim do ciclo.');
+                                                        toast.success('RenovaÃ§Ã£o cancelada. Seu acesso segue ativo atÃ© o fim do ciclo.');
                                                         setManagingSubscription(null);
                                                         setCancellingSubscriptionId(null);
                                                     } catch (err: any) {
@@ -937,7 +968,7 @@ export default function ProfilePage() {
                                         onClick={() => setCancellingSubscriptionId(managingSubscription._id)}
                                         className="w-full flex items-center justify-center gap-2 h-10 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 font-bold text-xs transition-all duration-75 active:scale-95 cursor-pointer"
                                     >
-                                        Cancelar renovação automática
+                                        Cancelar renovaÃ§Ã£o automÃ¡tica
                                     </button>
                                 )
                             )}
