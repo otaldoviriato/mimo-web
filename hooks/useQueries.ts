@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo } from 'react';
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useUser } from '@clerk/nextjs';
+import { useUser, useAuth } from '@clerk/nextjs';
 import { userApi } from '@/services/api';
 import { REFERRAL_STORAGE_KEY } from '@/lib/referral';
 import { setStaffSession } from '@/lib/staffSessionClient';
@@ -67,6 +67,7 @@ export function useChatPricing(professionalId?: string) {
 
 export function useMyProfile() {
     const { user: clerkUser } = useUser();
+    const { isSignedIn } = useAuth();
     const queryClient = useQueryClient();
 
     const query = useQuery({
@@ -85,12 +86,16 @@ export function useMyProfile() {
         },
         initialData: () => {
             if (typeof window !== 'undefined') {
+                // Se o usuário não estiver autenticado no Clerk, nunca carregar perfil residual do cache
+                if (isSignedIn === false || !clerkUser?.id) {
+                    setStaffSession(false);
+                    return undefined;
+                }
                 const cached = localStorage.getItem('mimo_profile');
                 if (cached) {
                     try {
                         const parsed = JSON.parse(cached);
-                        // Ignora o cache se for de outro usuário logado no Clerk para evitar flashes visuais
-                        if (clerkUser?.id && parsed.clerkId !== clerkUser.id) {
+                        if (parsed.clerkId !== clerkUser.id) {
                             localStorage.removeItem('mimo_profile');
                             setStaffSession(false);
                             return undefined;
@@ -143,9 +148,10 @@ export function useMyProfile() {
         }
     }, [query.data, isDifferentClerkUser]);
 
+    const isLoggedOut = isSignedIn === false || !clerkUser?.id;
     return {
         ...query,
-        data: isDifferentClerkUser ? undefined : query.data,
+        data: (isDifferentClerkUser || isLoggedOut) ? undefined : query.data,
     };
 }
 

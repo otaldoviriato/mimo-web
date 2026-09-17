@@ -883,7 +883,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
     const targetProfessionalId = userData?.isProfessional ? (userData.clerkId || user?.id) : (receiver?.isProfessional ? receiver.clerkId : undefined);
     const { data: chatPricing } = useChatPricing(targetProfessionalId);
-    const balance = userData?.balance ?? 0;
+    const balance = isSignedIn ? (userData?.balance ?? 0) : 0;
     const formattedBalance = (balance / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     const cachedRoom = user?.id && targetClerkId
         ? queryClient.getQueryData<CachedRoom[]>(QueryKeys.rooms(user.id))?.find((room) => room.participants.includes(targetClerkId) || (otherUserId && room.participants.includes(otherUserId)))
@@ -3179,7 +3179,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                     )}
                                 </div>
                                 <div className="flex items-center gap-1.5 mt-0.5">
-                                    {!connected ? (
+                                    {(!connected && isSignedIn) ? (
                                         <span className="text-[10px] text-white/50 font-bold uppercase tracking-widest">Conectando...</span>
                                     ) : isTyping ? (
                                         <span className="text-[11px] text-emerald-300 font-bold animate-pulse tracking-wide lowercase">digitando...</span>
@@ -3197,7 +3197,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         </button>
 
                         <div className="flex items-center gap-2">
-                            {!connected && (
+                            {(!connected && isSignedIn) && (
                                 <svg className="animate-spin h-4 w-4 text-white/60" viewBox="0 0 24 24" fill="none">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />

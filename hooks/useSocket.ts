@@ -24,7 +24,10 @@ export function useSocket(userId: string | undefined) {
     }, []);
 
     useEffect(() => {
-        if (!userId) return;
+        if (!userId) {
+            socketService.disconnect();
+            return;
+        }
         socketService.connect(userId, () => getTokenRef.current());
     }, [userId]);
 

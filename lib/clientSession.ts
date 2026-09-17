@@ -4,6 +4,7 @@ import type { QueryClient } from '@tanstack/react-query';
 
 const LOCAL_STORAGE_EXACT_KEYS = [
     'mimo_profile',
+    'mimo_staff_session',
     'mimo_redirect_after_login',
     'mimo_onboarding_step',
     'mimo_professional_released',

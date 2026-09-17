@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useMyProfile } from '@/hooks/useQueries';
-import { useUser } from '@clerk/nextjs';
+import { useUser, useAuth } from '@clerk/nextjs';
 import { PWAPromoModal } from '@/components/PWAPromoModal';
 import { NotifPromoModal } from '@/components/NotifPromoModal';
 import { Settings, ShieldAlert, Search, Pencil, UserCheck, ShieldCheck, Menu } from 'lucide-react';
@@ -16,6 +16,7 @@ export default function TabShell({ children, activePath }: { children: React.Rea
     const router = useTransitionRouter();
     const { data: userData } = useMyProfile();
     const { user } = useUser();
+    const { isSignedIn } = useAuth();
 
     const isProfessional = !!userData?.isProfessional;
     const isTeam = !!userData?.isTeam;
@@ -180,7 +181,7 @@ export default function TabShell({ children, activePath }: { children: React.Rea
                         })}
                     </nav>
 
-                    {userData?.isAdmin && (
+                    {(isSignedIn && userData?.isAdmin) && (
                         <div className="px-4 pb-5 border-t border-gray-100 pt-4">
                             <button
                                 onClick={() => router.push('/admin')}
@@ -262,7 +263,7 @@ export default function TabShell({ children, activePath }: { children: React.Rea
                                 <Pencil className="w-4.5 h-4.5" />
                             </button>
                         )}
-                        {userData?.isAdmin && (
+                        {(isSignedIn && userData?.isAdmin) && (
                             <button
                                 onClick={() => router.push('/admin')}
                                 className="p-2 md:px-3 md:py-1.5 hover:bg-white/10 active:bg-white/20 md:bg-white/15 md:hover:bg-white/25 md:border md:border-white/25 rounded-full transition-all text-white flex items-center justify-center gap-2 cursor-pointer"
