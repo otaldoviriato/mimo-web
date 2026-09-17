@@ -71,6 +71,7 @@ export async function GET(
 
         // Se for assinante ou o dono, retornamos as fotos/vídeos privados, caso contrário retornamos vazio
         const visiblePrivateItems = (isSubscriber || isOwner) ? privateItems : [];
+        const privatePreviewUrl = privateItems.find(item => item.imageUrl)?.imageUrl || sanitizedPublicItems.find((item: any) => item.isLocked)?.imageUrl || '';
 
         return NextResponse.json({ 
             items: sanitizedPublicItems,
@@ -78,6 +79,7 @@ export async function GET(
             privateItems: visiblePrivateItems,
             privatePhotosCount,
             privateVideosCount,
+            privatePreviewUrl,
             isSubscriber: !!isSubscriber,
             isOwner: !!isOwner
         });

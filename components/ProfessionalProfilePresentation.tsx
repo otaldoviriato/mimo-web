@@ -41,6 +41,7 @@ interface Props {
     onEditSubscription?: () => void;
     onOpen: (items: ProfileGalleryItem[], index: number) => void;
     headerActions?: React.ReactNode;
+    privatePreviewUrl?: string;
 }
 
 export function ProfilePhoto({ src, alt, priority = false, ambient = false }: { src: string; alt: string; priority?: boolean; ambient?: boolean }) {
@@ -56,7 +57,7 @@ export function ProfilePhoto({ src, alt, priority = false, ambient = false }: { 
     );
 }
 
-export function ProfessionalProfilePresentation({ user, publicItems, exclusiveItems, privateCount, isSubscriber, isOwner, loadingGallery, subscribing, onBack, onSubscribe, onEditSubscription, onOpen, headerActions }: Props) {
+export function ProfessionalProfilePresentation({ user, publicItems, exclusiveItems, privateCount, isSubscriber, isOwner, loadingGallery, subscribing, onBack, onSubscribe, onEditSubscription, onOpen, headerActions, privatePreviewUrl }: Props) {
     const router = useRouter();
     const [photoIndex, setPhotoIndex] = useState(0);
     const [expanded, setExpanded] = useState(false);
@@ -258,14 +259,14 @@ export function ProfessionalProfilePresentation({ user, publicItems, exclusiveIt
                                     <div key={item._id} className="relative aspect-[3/4] overflow-hidden rounded-xl bg-slate-100">
                                         <button type="button" aria-label={hidden ? 'Conteúdo exclusivo para assinantes' : `Abrir conteúdo exclusivo ${index + 1}`} disabled={!canAccess && !user.isSubscriptionEnabled} onClick={() => canAccess ? onOpen(exclusiveItems, index) : onSubscribe?.()} className="group absolute inset-0 h-full w-full overflow-hidden">
                                             {item.mediaType === 'video' ? (
-                                                <video src={item.imageUrl} preload="metadata" className={`h-full w-full object-cover transition duration-300 ${hidden ? 'blur-2xl scale-110 brightness-[0.75]' : ''}`} />
+                                                <video src={item.imageUrl} preload="metadata" className={`h-full w-full object-cover transition duration-300 ${hidden ? 'blur-lg scale-105 brightness-[0.85]' : ''}`} />
                                             ) : (
-                                                <div className={`h-full w-full ${hidden ? 'blur-2xl scale-110 brightness-[0.75]' : ''}`}>
+                                                <div className={`h-full w-full ${hidden ? 'blur-lg scale-105 brightness-[0.85]' : ''}`}>
                                                     <ProfilePhoto src={item.imageUrl} alt={`Foto exclusiva ${index + 1}`} />
                                                 </div>
                                             )}
                                             {hidden && (
-                                                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/25 text-white backdrop-blur-[2px] p-2 transition group-hover:bg-black/35">
+                                                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/25 text-white backdrop-blur-[1px] p-2 transition group-hover:bg-black/35">
                                                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white shadow-sm backdrop-blur-md">
                                                         <Lock size={18} />
                                                     </div>
@@ -280,7 +281,42 @@ export function ProfessionalProfilePresentation({ user, publicItems, exclusiveIt
                                 );
                             })}
                         </div>
-                        {!canAccess && privateCount > 0 && <button type="button" onClick={() => onSubscribe?.()} disabled={!user.isSubscriptionEnabled} className="mt-3 flex min-h-28 w-full flex-col items-center justify-center gap-2 rounded-xl bg-purple-50 px-4 py-5 text-purple-700"><Lock size={22} /><span className="text-sm">{privateCount} {privateCount === 1 ? 'conteúdo exclusivo' : 'conteúdos exclusivos'}</span><span className="text-xs text-slate-500">Disponível para assinantes</span></button>}
+                        {!canAccess && privateCount > 0 && (() => {
+                            const enumerationPreview = privatePreviewUrl || exclusiveItems.find(i => i.imageUrl)?.imageUrl || publicItems.find(i => i.imageUrl)?.imageUrl;
+                            return (
+                                <button
+                                    type="button"
+                                    onClick={() => onSubscribe?.()}
+                                    disabled={!user.isSubscriptionEnabled}
+                                    className="group relative mt-3 flex min-h-28 w-full flex-col items-center justify-center overflow-hidden rounded-2xl p-5 text-white shadow-sm transition active:scale-[0.99]"
+                                >
+                                    {enumerationPreview ? (
+                                        <>
+                                            <img
+                                                src={enumerationPreview}
+                                                alt=""
+                                                aria-hidden="true"
+                                                className="absolute inset-0 h-full w-full object-cover blur-lg scale-110 brightness-[0.45] transition duration-300 group-hover:scale-115 group-hover:brightness-[0.5]"
+                                            />
+                                            <div className="absolute inset-0 bg-purple-900/40 mix-blend-multiply" />
+                                        </>
+                                    ) : (
+                                        <div className="absolute inset-0 bg-purple-50" />
+                                    )}
+                                    <div className={`relative z-10 flex flex-col items-center justify-center gap-1.5 ${enumerationPreview ? 'text-white' : 'text-purple-700'}`}>
+                                        <div className={`flex h-9 w-9 items-center justify-center rounded-full shadow-sm backdrop-blur-md ${enumerationPreview ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-700'}`}>
+                                            <Lock size={18} />
+                                        </div>
+                                        <span className="text-sm font-semibold tracking-wide">
+                                            {privateCount} {privateCount === 1 ? 'conteúdo exclusivo' : 'conteúdos exclusivos'}
+                                        </span>
+                                        <span className={`text-xs ${enumerationPreview ? 'text-white/80' : 'text-slate-500'}`}>
+                                            Disponível para assinantes
+                                        </span>
+                                    </div>
+                                </button>
+                            );
+                        })()}
                     </section>
                 )}
             </div>

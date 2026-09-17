@@ -409,6 +409,7 @@ export default function UserProfilePage({ params, username: propUsername, initia
                     onBack={handleBack}
                     onSubscribe={handleSubscribe}
                     onOpen={openViewer}
+                    privatePreviewUrl={galleryData?.privatePreviewUrl}
                 />
             ) : <>
             {/* Cover and Header */}
@@ -610,7 +611,7 @@ export default function UserProfilePage({ params, username: propUsername, initia
                                                         src={item.imageUrl}
                                                         alt=""
                                                         aria-hidden="true"
-                                                        className="h-full w-full object-cover blur-3xl scale-125 brightness-[0.4] saturate-150"
+                                                        className="h-full w-full object-cover blur-xl scale-110 brightness-[0.55] saturate-125"
                                                     />
                                                 </div>
                                             )}
