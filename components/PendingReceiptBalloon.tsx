@@ -51,19 +51,21 @@ export const PendingReceiptBalloon: React.FC<PendingReceiptBalloonProps> = ({
         }
     };
 
+    const hasBalanceOrAutoSettling = isAutoSettling || (currentBalanceInCents >= requiredCents);
+
     return (
         <button
             type="button"
             onClick={handleClick}
             className={`group relative block w-fit min-w-[190px] max-w-[78%] cursor-pointer text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600 rounded-2xl rounded-bl-sm bg-white border border-slate-200/90 shadow-xs overflow-hidden transition-all active:scale-[0.99] hover:border-purple-300 px-3 pt-2 pb-1.5 ${
-                isAutoSettling ? 'opacity-90' : ''
+                hasBalanceOrAutoSettling ? 'opacity-90' : ''
             }`}
             aria-label={`Mensagem recebida aguardando saldo. Valor: ${formattedPrice}. Toque para liberar.`}
         >
             {/* Cabeçalho sutil no mesmo padrão da profissional: status e valor */}
             <div className="flex items-center justify-between gap-2 pb-1 mb-1 border-b border-slate-100 text-[10.5px] select-none">
                 <div className="flex items-center gap-1.5 shrink-0">
-                    {isAutoSettling ? (
+                    {hasBalanceOrAutoSettling ? (
                         <>
                             <span className="relative flex h-1.5 w-1.5 shrink-0">
                                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-purple-500 animate-pulse" />

@@ -24,6 +24,7 @@ export function useTransitionRouter() {
             const initialUser = meta?.initialUser ?? (meta && !meta.giftCode ? meta : undefined);
             stackNav.pushVirtual(target.type, {
                 ...target.params,
+                userId: meta?.userId || initialUser?.clerkId || target.params.userId,
                 username: meta?.username || initialUser?.username || target.params.username,
                 initialUser,
                 giftCode: meta?.giftCode || target.params.giftCode,

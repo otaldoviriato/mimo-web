@@ -1198,7 +1198,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
     const partnerClerkId = targetClerkId || (isRouteClerkId ? otherUserId : '');
     const roomId = (user?.id && partnerClerkId) ? [user.id, partnerClerkId].sort().join('_') : '';
-    const activeChat = !isClosing && !isLeaving && !isRechargeOpen && !!currentPathname?.includes('/chat/');
+    const activeChat = !isClosing && !isLeaving && !isRechargeOpen && (isSubPage || !!currentPathname?.includes('/chat/'));
     useEffect(() => {
         if (!socket || !roomId) return;
         const updateVisibility = () => {
@@ -1714,6 +1714,10 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 setMessages((prev) => prev.map((msg) => {
                     // Se a mensagem já está destrancada na tela, não marca como aguardando saldo
                     if (msg.billingStatus === 'paid' || msg.isContentLocked === false) {
+                        return msg;
+                    }
+                    // Se for o cliente e tiver saldo suficiente para esta mensagem, não marca como aguardando saldo
+                    if (!userData?.isProfessional && balance >= (msg.receiptChargeCents || 0)) {
                         return msg;
                     }
                     if (msg.billingStatus === 'pending' && (!data.messageIds || data.messageIds.includes(msg._id))) {
@@ -3581,7 +3585,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                         <PendingReceiptBalloon
                                             item={item}
                                             currentBalanceInCents={balance}
-                                            isAutoSettling={!hasRoomJoinedRef.current && balance >= (item.receiptChargeCents || 0)}
+                                            isAutoSettling={balance >= (item.receiptChargeCents || 0)}
                                             onOpenRecharge={(requiredCents) =>
                                                 openRechargeModal({
                                                     currentBalanceInCents: balance,

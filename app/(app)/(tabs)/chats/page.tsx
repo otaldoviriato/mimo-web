@@ -436,7 +436,7 @@ export default function ChatsPage() {
             }
         }
         const friendlySlug = initialUser?.username || otherUserId;
-        router.push(`/chat/${friendlySlug}`, { initialUser });
+        router.push(`/chat/${friendlySlug}`, { initialUser, userId: otherUserId });
     };
 
     const handleDeleteRoom = async (roomId: string) => {
