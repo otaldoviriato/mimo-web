@@ -50,11 +50,15 @@ export function ExploreProfessionalCard({ professionalId, name, photoUrl, online
 
             <span
                 aria-hidden="true"
-                className={`absolute top-2.5 right-2.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[10px] sm:text-xs font-bold leading-none backdrop-blur-md ${
-                    online ? 'bg-emerald-400/90 text-emerald-950 shadow-sm' : 'bg-black/25 text-white/90'
+                className={`absolute top-2.5 right-2.5 inline-flex items-center gap-1.5 rounded-full text-[10px] sm:text-xs leading-none backdrop-blur-md ${
+                    online
+                        ? 'bg-black/45 px-2 py-1 font-medium text-white'
+                        : 'bg-black/25 px-2.5 py-1.5 font-bold text-white/90'
                 }`}
             >
-                {online && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-950" />}
+                {online && (
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)] motion-safe:animate-pulse motion-safe:[animation-duration:3s]" />
+                )}
                 {online ? 'Online' : 'Offline'}
             </span>
 
