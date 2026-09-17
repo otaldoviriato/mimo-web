@@ -416,7 +416,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (pathname === '/onboarding') return;
 
-        if (isProfileResolved && !isFullyCompleted && !needsReceiptConsent) {
+        if (isProfileResolved && !isFullyCompleted && !needsReceiptConsent && !isPublicRoute(pathname)) {
             router.replace('/onboarding');
             return;
         }
@@ -466,7 +466,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         return <div className="min-h-screen bg-slate-50" role="status" aria-label="Carregando tela" />;
     }
 
-    if (shouldBlockAppRender) {
+    if (shouldBlockAppRender && !isPublicRoute(pathname)) {
         return (
             <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gradient-to-br from-[#4C1D95] via-[#6D28D9] to-[#8B5CF6] select-none">
                 <div className="relative w-24 h-24 rounded-3xl overflow-hidden shadow-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 animate-pulse">

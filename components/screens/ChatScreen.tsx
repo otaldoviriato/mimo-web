@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { readStackEntry, replaceStackUrl, stackOverlayState } from '@/lib/stackHistory';
 import React, { useState, useEffect, useRef, use } from 'react';
 import { createPortal } from 'react-dom';
@@ -4933,6 +4933,20 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     recipientUsername={receiver?.username}
                     pendingMessage={messageText}
                     onClose={() => setShowLoginModal(false)}
+                    onLoginSuccess={() => {
+                        refetchMyProfile();
+                        const partner = partnerClerkId || otherUserId;
+                        if (user?.id && partner) {
+                            const currentRoomId = roomId || [user.id, partner].sort().join('_');
+                            axios.get(`/api/rooms/${user.id}/messages`, {
+                                params: { roomId: currentRoomId, limit: 50 }
+                            }).then((res) => {
+                                if (Array.isArray(res.data) && res.data.length > 0) {
+                                    setMessages(res.data);
+                                }
+                            }).catch(() => {});
+                        }
+                    }}
                 />,
                 document.body
             )}

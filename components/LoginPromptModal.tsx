@@ -18,6 +18,7 @@ interface LoginPromptModalProps {
     recipientUsername?: string;
     pendingMessage?: string;
     onClose: () => void;
+    onLoginSuccess?: () => void;
 }
 
 export default function LoginPromptModal({
@@ -26,17 +27,20 @@ export default function LoginPromptModal({
     recipientUsername,
     pendingMessage,
     onClose,
+    onLoginSuccess,
 }: LoginPromptModalProps) {
     const { signOut } = useAuth();
     const { isLoaded: signInLoaded, signIn, setActive: setSignInActive } = useSignIn();
     const { isLoaded: signUpLoaded, signUp, setActive: setSignUpActive } = useSignUp();
 
     const [step, setStep] = useState<'initial' | 'email_input' | 'code_input'>('initial');
+    const [slideDirection, setSlideDirection] = useState<'forward' | 'backward'>('forward');
     const [email, setEmail] = useState('');
     const [code, setCode] = useState('');
     const [flowType, setFlowType] = useState<'signIn' | 'signUp' | null>(null);
     const [googleLoading, setGoogleLoading] = useState(false);
     const [emailLoading, setEmailLoading] = useState(false);
+    const [isVerifyingSuccess, setIsVerifyingSuccess] = useState(false);
     const [error, setError] = useState('');
 
     const isAlreadySignedInError = (err: unknown): boolean => {
@@ -90,7 +94,7 @@ export default function LoginPromptModal({
         }
     };
 
-    const prepareLoginState = () => {
+    const prepareLoginState = (isFullRedirect = false) => {
         storePostAuthRedirect(returnTo);
         if (pendingMessage && typeof window !== 'undefined') {
             sessionStorage.setItem(PENDING_CHAT_MESSAGE_KEY, pendingMessage);
@@ -98,7 +102,7 @@ export default function LoginPromptModal({
         if (recipientUsername && typeof window !== 'undefined') {
             sessionStorage.setItem(PENDING_CHAT_RECIPIENT_KEY, recipientUsername);
         }
-        if (typeof window !== 'undefined') {
+        if (typeof window !== 'undefined' && isFullRedirect) {
             localStorage.setItem('mimo_post_login_check_rooms', 'true');
             sessionStorage.removeItem('mimo_has_navigated_chats');
         }
@@ -117,7 +121,7 @@ export default function LoginPromptModal({
             const pendingReferral = getPendingReferral();
             const pendingCampaign = getPendingCampaign();
 
-            prepareLoginState();
+            prepareLoginState(true);
 
             if (pendingReferral && typeof window !== 'undefined') {
                 localStorage.setItem(REFERRAL_STORAGE_KEY, JSON.stringify(pendingReferral));
@@ -175,7 +179,7 @@ export default function LoginPromptModal({
         setEmailLoading(true);
         setError('');
 
-        prepareLoginState();
+        prepareLoginState(false);
 
         try {
             await signIn.create({ identifier: cleanEmail });
@@ -195,6 +199,7 @@ export default function LoginPromptModal({
             });
 
             setFlowType('signIn');
+            setSlideDirection('forward');
             setStep('code_input');
         } catch (err: unknown) {
             if (isAlreadySignedInError(err)) {
@@ -222,6 +227,7 @@ export default function LoginPromptModal({
                     await signUp.create(signUpParams);
                     await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
                     setFlowType('signUp');
+                    setSlideDirection('forward');
                     setStep('code_input');
                 } catch (signUpErr: unknown) {
                     if (isAlreadySignedInError(signUpErr)) {
@@ -255,8 +261,16 @@ export default function LoginPromptModal({
             if (flowType === 'signUp') {
                 await signUp.attemptEmailAddressVerification({ code: cleanCode });
                 if (signUp.status === 'complete') {
+                    setIsVerifyingSuccess(true);
                     if (setSignUpActive) {
                         await setSignUpActive({ session: signUp.createdSessionId });
+                    }
+                    // Sincroniza sessão no backend sem redirecionar
+                    try {
+                        await fetch('/api/users/me', { credentials: 'same-origin' });
+                    } catch {}
+                    if (onLoginSuccess) {
+                        onLoginSuccess();
                     }
                     onClose();
                 } else {
@@ -265,8 +279,16 @@ export default function LoginPromptModal({
             } else {
                 await signIn.attemptFirstFactor({ strategy: 'email_code', code: cleanCode });
                 if (signIn.status === 'complete') {
+                    setIsVerifyingSuccess(true);
                     if (setSignInActive) {
                         await setSignInActive({ session: signIn.createdSessionId });
+                    }
+                    // Sincroniza sessão no backend sem redirecionar
+                    try {
+                        await fetch('/api/users/me', { credentials: 'same-origin' });
+                    } catch {}
+                    if (onLoginSuccess) {
+                        onLoginSuccess();
                     }
                     onClose();
                 } else {
@@ -278,6 +300,7 @@ export default function LoginPromptModal({
                 try { await signOut(); } catch {}
             }
             setError(clerkError(err, 'Código inválido ou expirado'));
+            setIsVerifyingSuccess(false);
         } finally {
             setEmailLoading(false);
         }
@@ -291,64 +314,66 @@ export default function LoginPromptModal({
             shouldScaleBackground={false}
         >
             <Drawer.Portal>
-                <Drawer.Overlay className="fixed inset-0 z-[200] bg-gray-950/55 backdrop-blur-[2px]" />
+                <Drawer.Overlay className="fixed inset-0 z-[200] bg-slate-900/50 backdrop-blur-sm" />
                 <Drawer.Content
-                    className="fixed inset-x-0 !bottom-0 z-[201] mx-auto flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[24px] bg-white shadow-[0_-20px_60px_rgba(15,23,42,0.18)] outline-none"
+                    className="fixed inset-x-0 !bottom-0 z-[201] mx-auto flex max-h-[90vh] w-full max-w-md flex-col rounded-t-3xl bg-white shadow-2xl outline-none"
                     style={{ bottom: 0 }}
                 >
                     {/* Barra de puxar / Handle */}
-                    <div className="border-b border-gray-100 px-5 pb-3 pt-3 shrink-0 bg-white">
-                        <div className="mx-auto mb-3 h-1.5 w-12 shrink-0 rounded-full bg-gray-200" />
-                        <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2.5">
-                                {step !== 'initial' ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setError('');
-                                            setStep(step === 'code_input' ? 'email_input' : 'initial');
-                                        }}
-                                        className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 transition-colors"
-                                        aria-label="Voltar"
-                                    >
-                                        <ArrowLeft className="w-4 h-4" />
-                                    </button>
-                                ) : (
-                                    <div className="w-7 h-7 rounded-lg bg-purple-600 flex items-center justify-center shadow-sm">
-                                        <img src="/Logo.svg" alt="MimoChat" className="w-4 h-4 object-contain" />
-                                    </div>
-                                )}
-                                <Drawer.Title className="text-base font-bold tracking-tight text-slate-900">
-                                    {step === 'initial' && 'Crie sua conta para enviar'}
-                                    {step === 'email_input' && 'Entrar com Email'}
-                                    {step === 'code_input' && 'Código de Verificação'}
-                                </Drawer.Title>
-                            </div>
-
-                            <button
-                                type="button"
-                                aria-label="Fechar"
-                                onClick={onClose}
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-800"
-                            >
-                                <X className="w-4 h-4" strokeWidth={2.2} />
-                            </button>
-                        </div>
+                    <div className="flex justify-center pt-3 pb-1">
+                        <div className="w-10 h-1 bg-slate-200 rounded-full" />
                     </div>
 
-                    {/* Conteúdo do BottomSheet */}
-                    <div className="flex w-full flex-1 flex-col overflow-y-auto px-5 py-5">
+                    {/* Botão de Fechar */}
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="absolute right-4 top-4 p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors z-10"
+                        aria-label="Fechar"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+
+                    {/* Botão de Voltar (se em sub-etapas) */}
+                    {step !== 'initial' && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setError('');
+                                setSlideDirection('backward');
+                                setStep(step === 'code_input' ? 'email_input' : 'initial');
+                            }}
+                            className="absolute left-4 top-4 p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors z-10"
+                            aria-label="Voltar"
+                        >
+                            <ArrowLeft className="w-5 h-5" />
+                        </button>
+                    )}
+
+                    {/* Conteúdo com transição animada */}
+                    <div className="overflow-x-hidden p-6 pb-8 pt-2">
                         {step === 'initial' && (
-                            <div className="flex flex-col gap-4">
-                                <div className="text-center pb-1">
-                                    <p className="text-sm text-slate-500 leading-snug">
+                            <div
+                                key="initial"
+                                className={`flex flex-col transition-all duration-300 ease-out animate-in ${
+                                    slideDirection === 'backward' ? 'slide-in-from-left-4 fade-in-0' : 'fade-in-0'
+                                }`}
+                            >
+                                <div className="flex flex-col items-center mb-5">
+                                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-600 to-purple-700 flex items-center justify-center shadow-md mb-3">
+                                        <img src="/Logo.svg" alt="MimoChat" className="w-8 h-8 object-contain" />
+                                    </div>
+                                    <Drawer.Title className="text-xl font-bold text-slate-900 text-center">
+                                        Crie sua conta para enviar
+                                    </Drawer.Title>
+                                    <p className="text-sm text-slate-500 text-center mt-1 leading-snug">
                                         {recipientUsername
                                             ? `Para falar com @${recipientUsername}, entre ou crie sua conta gratuitamente.`
                                             : 'Entre ou crie sua conta gratuitamente para continuar.'}
                                     </p>
                                 </div>
 
-                                <div className="flex flex-col gap-3 pt-1">
+                                <div className="flex flex-col gap-3">
                                     <button
                                         type="button"
                                         onClick={handleGoogleLogin}
@@ -365,87 +390,119 @@ export default function LoginPromptModal({
                                                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                                             </svg>
                                         )}
-                                        {googleLoading ? 'Conectando...' : 'Continuar com Google'}
+                                        {googleLoading ? 'Aguarde...' : 'Continuar com Google'}
                                     </button>
 
                                     <button
                                         type="button"
                                         onClick={() => {
                                             setError('');
+                                            setSlideDirection('forward');
                                             setStep('email_input');
                                         }}
                                         className="flex items-center justify-center gap-2 w-full h-12 rounded-2xl bg-purple-600 hover:bg-purple-700 active:scale-[0.98] text-white font-semibold text-sm transition-all shadow-md shadow-purple-600/25 cursor-pointer"
                                     >
-                                        <Mail className="w-4 h-4" />
                                         Continuar com Email
                                     </button>
+
+                                    {error && (
+                                        <p className="text-center text-xs text-red-500">{error}</p>
+                                    )}
                                 </div>
+
+                                <p className="text-center text-[10px] text-slate-400 mt-4 leading-relaxed">
+                                    Ao continuar, você confirma ser maior de 18 anos e concorda com os{' '}
+                                    <a href="/termos-de-uso" target="_blank" className="text-purple-500 underline">Termos de Uso</a>
+                                    {' '}e a{' '}
+                                    <a href="/politica-de-privacidade" target="_blank" className="text-purple-500 underline">Política de Privacidade</a>.
+                                </p>
                             </div>
                         )}
 
                         {step === 'email_input' && (
-                            <form
-                                onSubmit={(e) => {
-                                    e.preventDefault();
-                                    onSendCode();
-                                }}
-                                className="flex flex-col gap-4"
+                            <div
+                                key="email_input"
+                                className={`flex flex-col transition-all duration-300 ease-out animate-in ${
+                                    slideDirection === 'forward'
+                                        ? 'slide-in-from-right-4 fade-in-0'
+                                        : 'slide-in-from-left-4 fade-in-0'
+                                }`}
                             >
-                                <div>
-                                    <label htmlFor="email-input" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
-                                        Seu endereço de email
-                                    </label>
+                                <div className="flex flex-col items-center mb-5">
+                                    <div className="w-14 h-14 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shadow-sm mb-3">
+                                        <Mail className="w-7 h-7" />
+                                    </div>
+                                    <Drawer.Title className="text-xl font-bold text-slate-900 text-center">
+                                        Qual seu email?
+                                    </Drawer.Title>
+                                    <p className="text-sm text-slate-500 text-center mt-1 leading-snug">
+                                        Enviaremos um código de verificação para você entrar ou criar sua conta.
+                                    </p>
+                                </div>
+
+                                <form
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        onSendCode();
+                                    }}
+                                    className="flex flex-col gap-3"
+                                >
                                     <input
-                                        id="email-input"
                                         type="email"
                                         value={email}
                                         onChange={(e) => {
                                             setEmail(e.target.value);
                                             setError('');
                                         }}
-                                        placeholder="exemplo@email.com"
+                                        placeholder="seu@email.com"
                                         autoFocus
-                                        className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-purple-600 focus:ring-2 focus:ring-purple-600/10 text-slate-900 placeholder:text-slate-400 text-sm outline-none transition-all"
+                                        className="w-full h-12 px-4 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-purple-600 focus:ring-2 focus:ring-purple-600/10 text-slate-900 placeholder:text-slate-400 text-sm outline-none transition-all text-center font-medium"
                                     />
-                                </div>
 
-                                <button
-                                    type="submit"
-                                    disabled={emailLoading || !email.trim()}
-                                    className="flex items-center justify-center gap-2 w-full h-12 rounded-2xl bg-purple-600 hover:bg-purple-700 active:scale-[0.98] text-white font-semibold text-sm transition-all shadow-md shadow-purple-600/25 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {emailLoading ? (
-                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    ) : (
-                                        'Enviar código de acesso'
+                                    <button
+                                        type="submit"
+                                        disabled={emailLoading || !email.trim()}
+                                        className="flex items-center justify-center gap-2 w-full h-12 rounded-2xl bg-purple-600 hover:bg-purple-700 active:scale-[0.98] text-white font-semibold text-sm transition-all shadow-md shadow-purple-600/25 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {emailLoading ? (
+                                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        ) : (
+                                            'Continuar'
+                                        )}
+                                    </button>
+
+                                    {error && (
+                                        <p className="text-center text-xs text-red-500">{error}</p>
                                     )}
-                                </button>
-                            </form>
+                                </form>
+                            </div>
                         )}
 
                         {step === 'code_input' && (
-                            <form
-                                onSubmit={(e) => {
-                                    e.preventDefault();
-                                    onVerifyCode();
-                                }}
-                                className="flex flex-col gap-4"
+                            <div
+                                key="code_input"
+                                className="flex flex-col transition-all duration-300 ease-out animate-in slide-in-from-right-4 fade-in-0"
                             >
-                                <div className="text-center pb-1">
-                                    <p className="text-sm text-slate-600">
-                                        Enviamos um código de verificação para:
-                                    </p>
-                                    <p className="text-sm font-semibold text-slate-900 mt-0.5">
-                                        {email}
+                                <div className="flex flex-col items-center mb-5">
+                                    <div className="w-14 h-14 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shadow-sm mb-3">
+                                        <CheckCircle2 className="w-7 h-7" />
+                                    </div>
+                                    <Drawer.Title className="text-xl font-bold text-slate-900 text-center">
+                                        Digite o código
+                                    </Drawer.Title>
+                                    <p className="text-sm text-slate-500 text-center mt-1 leading-snug">
+                                        Código enviado para <span className="font-semibold text-slate-800">{email}</span>
                                     </p>
                                 </div>
 
-                                <div>
-                                    <label htmlFor="otp-code-input" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2 text-center">
-                                        Digite o código de 6 dígitos
-                                    </label>
+                                <form
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        onVerifyCode();
+                                    }}
+                                    className="flex flex-col gap-3"
+                                >
                                     <input
-                                        id="otp-code-input"
                                         type="text"
                                         inputMode="numeric"
                                         pattern="[0-9]*"
@@ -457,50 +514,42 @@ export default function LoginPromptModal({
                                         }}
                                         placeholder="000000"
                                         autoFocus
-                                        className="w-full h-13 text-center text-2xl font-bold tracking-[0.35em] rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-purple-600 focus:ring-2 focus:ring-purple-600/10 text-slate-900 placeholder:text-slate-300 outline-none transition-all"
+                                        disabled={isVerifyingSuccess}
+                                        className="w-full h-13 text-center text-2xl font-bold tracking-[0.35em] rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-purple-600 focus:ring-2 focus:ring-purple-600/10 text-slate-900 placeholder:text-slate-300 outline-none transition-all"
                                     />
-                                </div>
 
-                                <button
-                                    type="submit"
-                                    disabled={emailLoading || code.trim().length < 6}
-                                    className="flex items-center justify-center gap-2 w-full h-12 rounded-2xl bg-purple-600 hover:bg-purple-700 active:scale-[0.98] text-white font-semibold text-sm transition-all shadow-md shadow-purple-600/25 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {emailLoading ? (
-                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    ) : (
-                                        <>
-                                            <CheckCircle2 className="w-4 h-4" />
-                                            Confirmar e Entrar
-                                        </>
-                                    )}
-                                </button>
-
-                                <div className="text-center mt-1">
                                     <button
-                                        type="button"
-                                        onClick={onSendCode}
-                                        disabled={emailLoading}
-                                        className="text-xs text-purple-600 hover:text-purple-700 font-medium hover:underline disabled:opacity-50"
+                                        type="submit"
+                                        disabled={emailLoading || code.trim().length < 6 || isVerifyingSuccess}
+                                        className="flex items-center justify-center gap-2 w-full h-12 rounded-2xl bg-purple-600 hover:bg-purple-700 active:scale-[0.98] text-white font-semibold text-sm transition-all shadow-md shadow-purple-600/25 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        Reenviar código
+                                        {emailLoading || isVerifyingSuccess ? (
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                <span>{isVerifyingSuccess ? 'Entrando...' : 'Verificando...'}</span>
+                                            </div>
+                                        ) : (
+                                            'Confirmar e Entrar'
+                                        )}
                                     </button>
-                                </div>
-                            </form>
-                        )}
 
-                        {error && (
-                            <div className="mt-3 p-3 rounded-xl bg-red-50 border border-red-100 text-center">
-                                <p className="text-xs font-medium text-red-600">{error}</p>
+                                    <div className="text-center mt-1">
+                                        <button
+                                            type="button"
+                                            onClick={onSendCode}
+                                            disabled={emailLoading || isVerifyingSuccess}
+                                            className="text-xs text-purple-600 hover:text-purple-700 font-medium hover:underline disabled:opacity-50"
+                                        >
+                                            Não recebeu? Reenviar código
+                                        </button>
+                                    </div>
+
+                                    {error && (
+                                        <p className="text-center text-xs text-red-500">{error}</p>
+                                    )}
+                                </form>
                             </div>
                         )}
-
-                        <p className="text-center text-[10px] text-slate-400 mt-5 leading-relaxed">
-                            Ao continuar, você confirma ter mais de 18 anos e concorda com nossos{' '}
-                            <a href="/termos-de-uso" target="_blank" className="text-purple-600 underline">Termos de Uso</a>
-                            {' '}e{' '}
-                            <a href="/politica-de-privacidade" target="_blank" className="text-purple-600 underline">Privacidade</a>.
-                        </p>
                     </div>
                 </Drawer.Content>
             </Drawer.Portal>
