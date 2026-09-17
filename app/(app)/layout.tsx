@@ -261,7 +261,18 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
     // Build ancestry and browser entries together before exposing the destination.
     useEffect(() => {
-        if (!isLoaded || !isSignedIn || !isFullyCompleted || pathname === '/onboarding') return;
+        if (!isLoaded) return;
+        if (!isSignedIn) {
+            if (isPublicRoute(pathname)) {
+                queueMicrotask(() => {
+                    const href = window.location.pathname + window.location.search + window.location.hash;
+                    initialize(href);
+                    setIsNavInitialized(true);
+                });
+            }
+            return;
+        }
+        if (!isFullyCompleted || pathname === '/onboarding') return;
         let cancelled = false;
         // Run after Next's parent effects install the public History API adapter.
         queueMicrotask(() => {
@@ -451,7 +462,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     // (flash visual). A leitura de localStorage Ã© segura aqui porque este componente
     // Ã© 'use client' e nunca executa no servidor.
     //
-    if (!shouldBlockAppRender && !isNavInitialized) {
+    if (!shouldBlockAppRender && !isNavInitialized && (!isPublicRoute(pathname) || !isLoaded)) {
         return <div className="min-h-screen bg-slate-50" role="status" aria-label="Carregando tela" />;
     }
 

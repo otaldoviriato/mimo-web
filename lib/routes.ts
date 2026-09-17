@@ -11,6 +11,7 @@ export const CLERK_PUBLIC_ROUTES = [
     ...PUBLIC_CONTENT_ROUTES,
     '/login',
     '/sso-callback',
+    '/search',
 ] as const;
 
 export const RESERVED_BASE_ROUTES = [

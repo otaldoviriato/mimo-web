@@ -1,4 +1,5 @@
 'use client';
+export const dynamic = 'force-dynamic';
 
 import { ExploreProfessionalCard } from '@/components/ExploreProfessionalCard';
 import { TeamExploreCard, TeamExploreUser } from '@/components/TeamExploreCard';

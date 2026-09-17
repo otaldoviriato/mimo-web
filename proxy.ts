@@ -8,13 +8,21 @@ import { CLERK_PUBLIC_ROUTES } from '@/lib/routes';
 const isPublicRoute = createRouteMatcher([
     ...CLERK_PUBLIC_ROUTES.map(route => `${route}(.*)`),
     '/api/webhooks(.*)',
-    '/api/notifications/send(.*)', // Permitir notificações disparadas pelo servidor de chat
-    '/api/auth/asaas-bypass(.*)',  // Permitir chamada de bypass de autenticação do Asaas
+    '/api/notifications/send(.*)',
+    '/api/auth/asaas-bypass(.*)',
     '/manifest.json',
     '/firebase-messaging-sw.js',
     '/.well-known/(.*)',
     '/api/creator-applications(.*)',
     '/api/campaigns/visit(.*)',
+    '/api/users/featured(.*)',
+    '/api/users/username/(.*)',
+    '/api/users/(.*)/gallery',
+    '/search(.*)',
+    '/chat/(.*)',
+    '/:username',
+    '/:username/chat',
+    '/:username/chat/(.*)',
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
