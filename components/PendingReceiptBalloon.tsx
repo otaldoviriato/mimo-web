@@ -15,6 +15,7 @@ interface PendingReceiptBalloonProps {
         audioDuration?: number;
     };
     currentBalanceInCents: number;
+    isAutoSettling?: boolean;
     onOpenRecharge: (requiredAmountInCents: number) => void;
     onClickUnlock?: (item: any) => void;
 }
@@ -22,6 +23,7 @@ interface PendingReceiptBalloonProps {
 export const PendingReceiptBalloon: React.FC<PendingReceiptBalloonProps> = ({
     item,
     currentBalanceInCents,
+    isAutoSettling = false,
     onOpenRecharge,
     onClickUnlock,
 }) => {
@@ -53,19 +55,34 @@ export const PendingReceiptBalloon: React.FC<PendingReceiptBalloonProps> = ({
         <button
             type="button"
             onClick={handleClick}
-            className="group relative block w-fit min-w-[190px] max-w-[78%] cursor-pointer text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600 rounded-2xl rounded-bl-sm bg-white border border-slate-200/90 shadow-xs overflow-hidden transition-all active:scale-[0.99] hover:border-purple-300 px-3 pt-2 pb-1.5"
+            className={`group relative block w-fit min-w-[190px] max-w-[78%] cursor-pointer text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600 rounded-2xl rounded-bl-sm bg-white border border-slate-200/90 shadow-xs overflow-hidden transition-all active:scale-[0.99] hover:border-purple-300 px-3 pt-2 pb-1.5 ${
+                isAutoSettling ? 'opacity-90' : ''
+            }`}
             aria-label={`Mensagem recebida aguardando saldo. Valor: ${formattedPrice}. Toque para liberar.`}
         >
-            {/* Cabeçalho sutil no mesmo padrão da profissional: status com bolinha âmbar e valor */}
+            {/* Cabeçalho sutil no mesmo padrão da profissional: status e valor */}
             <div className="flex items-center justify-between gap-2 pb-1 mb-1 border-b border-slate-100 text-[10.5px] select-none">
                 <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="relative flex h-1.5 w-1.5 shrink-0">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500" />
-                    </span>
-                    <span className="font-medium text-slate-500 tracking-tight whitespace-nowrap">
-                        Aguardando saldo
-                    </span>
+                    {isAutoSettling ? (
+                        <>
+                            <span className="relative flex h-1.5 w-1.5 shrink-0">
+                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-purple-500 animate-pulse" />
+                            </span>
+                            <span className="font-medium text-slate-500 tracking-tight whitespace-nowrap">
+                                Carregando...
+                            </span>
+                        </>
+                    ) : (
+                        <>
+                            <span className="relative flex h-1.5 w-1.5 shrink-0">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500" />
+                            </span>
+                            <span className="font-medium text-slate-500 tracking-tight whitespace-nowrap">
+                                Aguardando saldo
+                            </span>
+                        </>
+                    )}
                 </div>
                 <span className="font-semibold text-purple-700 shrink-0 whitespace-nowrap">
                     {formattedPrice}

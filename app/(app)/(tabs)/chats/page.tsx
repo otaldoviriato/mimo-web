@@ -423,8 +423,19 @@ export default function ChatsPage() {
     }, [user?.id, queryClient]);
 
     // Abre a tela de conversa física usando o roteador de transição com dados pré-carregados
-    const handleOpenChat = (userId: string, initialUser?: any) => {
-        const friendlySlug = initialUser?.username || userId;
+    const handleOpenChat = (otherUserId: string, initialUser?: any) => {
+        if (user?.id && otherUserId && socketService) {
+            // Se o usuário logado for cliente, adianta o joinRoom imediatamente no evento de interação
+            // para que a autoliquidação das mensagens pendentes seja processada no backend durante a animação de rota
+            if (!myProfile?.isProfessional) {
+                try {
+                    socketService.joinRoom(user.id, otherUserId);
+                } catch (e) {
+                    console.error('[ChatsPage] Falha ao pré-conectar sala:', e);
+                }
+            }
+        }
+        const friendlySlug = initialUser?.username || otherUserId;
         router.push(`/chat/${friendlySlug}`, { initialUser });
     };
 
@@ -821,11 +832,22 @@ export default function ChatsPage() {
                                 }
                             };
 
+                            const preheatRoom = () => {
+                                if (otherUserId && user?.id && socketService && !myProfile?.isProfessional) {
+                                    try {
+                                        socketService.joinRoom(user.id, otherUserId);
+                                    } catch (e) {}
+                                }
+                            };
+
                             return (
                                 <li key={room._id}>
                                     <TouchableRipple
                                         onClick={handleItemClick}
-                                        onMouseDown={(e) => startPress(room._id, e.clientX, e.clientY)}
+                                        onMouseDown={(e) => {
+                                            preheatRoom();
+                                            startPress(room._id, e.clientX, e.clientY);
+                                        }}
                                         onMouseMove={(e) => movePress(e.clientX, e.clientY)}
                                         onMouseUp={endPress}
                                         onMouseLeave={() => {
@@ -836,6 +858,7 @@ export default function ChatsPage() {
                                             touchStartPos.current = null;
                                         }}
                                         onTouchStart={(e) => {
+                                            preheatRoom();
                                             const touch = e.touches[0];
                                             if (touch) {
                                                 startPress(room._id, touch.clientX, touch.clientY);

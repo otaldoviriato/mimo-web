@@ -607,6 +607,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     const [largeMessageThreshold, setLargeMessageThreshold] = useState(100);
     const [pendingLongMessageToConfirm, setPendingLongMessageToConfirm] = useState<Message | null>(null);
     const declinedLongMessageIdsRef = useRef<Set<string>>(new Set());
+    const hasRoomJoinedRef = useRef(false);
     const [showFirstMessageNotifModal, setShowFirstMessageNotifModal] = useState<boolean>(false);
     const [revealedClientMediaIds, setRevealedClientMediaIds] = useState<Set<string>>(new Set());
 
@@ -1456,6 +1457,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 }
             }
 
+            hasRoomJoinedRef.current = true;
             setLoadingMessages(false);
             if (data.monetizationDisabled !== undefined) {
                 setMonetizationDisabled(data.monetizationDisabled);
@@ -1774,6 +1776,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         });
 
         return () => {
+            hasRoomJoinedRef.current = false;
             socketService.leaveRoom(roomId);
             socket.off('room_joined');
             socket.off('user_presence');
@@ -3578,6 +3581,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                         <PendingReceiptBalloon
                                             item={item}
                                             currentBalanceInCents={balance}
+                                            isAutoSettling={!hasRoomJoinedRef.current && balance >= (item.receiptChargeCents || 0)}
                                             onOpenRecharge={(requiredCents) =>
                                                 openRechargeModal({
                                                     currentBalanceInCents: balance,
