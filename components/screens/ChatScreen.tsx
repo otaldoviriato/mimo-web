@@ -4388,32 +4388,25 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
                 {/* Gaveta / Grid de Mídias Recentes para Profissionais */}
                 {recentMediaDrawer && userData?.isProfessional && (
-                    <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-2.5 animate-in slide-in-from-bottom-2 duration-200">
-                        <div className="flex items-center justify-between px-1">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-slate-800">
-                                    {recentMediaDrawer === 'video' ? 'Vídeos recentes' : 'Fotos recentes'}
-                                </span>
-                                <span className="text-[11px] font-medium text-slate-400">
-                                    Toque para reenviar ou adicione novo
-                                </span>
-                            </div>
+                    <div className="mt-2.5 pt-2.5 border-t border-slate-100 flex flex-col gap-1.5 animate-in slide-in-from-bottom-2 duration-200">
+                        <div className="flex items-center justify-end px-1">
                             <button
                                 type="button"
                                 onClick={() => setRecentMediaDrawer(null)}
-                                className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                                className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                                aria-label="Fechar"
                             >
                                 <XIcon size={16} />
                             </button>
                         </div>
 
                         {loadingRecentMedia ? (
-                            <div className="flex items-center justify-center py-10">
-                                <div className="w-7 h-7 rounded-full border-2 border-purple-600 border-t-transparent animate-spin" />
+                            <div className="flex items-center justify-center py-8">
+                                <div className="w-6 h-6 rounded-full border-2 border-purple-600 border-t-transparent animate-spin" />
                             </div>
                         ) : (
-                            <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 max-h-56 overflow-y-auto pb-1 select-none pr-0.5">
-                                {/* Item 0: Card para Adicionar Novo do Dispositivo */}
+                            <div className="grid grid-cols-4 sm:grid-cols-5 gap-1 max-h-56 overflow-y-auto select-none">
+                                {/* Item 0: Botão de Adicionar da Galeria/Dispositivo */}
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -4424,14 +4417,10 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                             fileInputRef.current?.click();
                                         }
                                     }}
-                                    className="aspect-square rounded-2xl border-2 border-dashed border-purple-300 hover:border-purple-500 bg-purple-50/50 hover:bg-purple-50 flex flex-col items-center justify-center gap-1.5 text-purple-700 transition-all active:scale-95 group shadow-sm"
+                                    className="aspect-square bg-purple-600/10 hover:bg-purple-600/15 border border-purple-600/20 text-purple-700 flex items-center justify-center transition-colors active:scale-95 group"
+                                    aria-label="Adicionar mídia do aparelho"
                                 >
-                                    <div className="w-9 h-9 rounded-full bg-purple-600 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
-                                        <Plus size={20} strokeWidth={2.5} />
-                                    </div>
-                                    <span className="text-[11px] font-bold text-center leading-tight px-1 text-purple-900">
-                                        Do aparelho
-                                    </span>
+                                    <Plus size={28} strokeWidth={2.2} className="group-hover:scale-110 transition-transform text-purple-700" />
                                 </button>
 
                                 {/* Lista de mídias recentes */}
@@ -4452,24 +4441,29 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                 setPreviewUrl(displayThumb);
                                                 setRecentMediaDrawer(null);
                                             }}
-                                            className="relative aspect-square rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 cursor-pointer group shadow-sm hover:border-purple-500 transition-all active:scale-95"
+                                            className="relative aspect-square overflow-hidden bg-slate-100 cursor-pointer group hover:opacity-90 transition-opacity"
                                         >
                                             <img
                                                 src={displayThumb}
-                                                alt="Mídia recente"
-                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                                alt=""
+                                                className="w-full h-full object-cover"
                                             />
 
-                                            {/* Badge de Vídeo */}
+                                            {/* Gradiente sutil inferior caso tenha preço ou vídeo */}
+                                            {(isPaid || item.isVideo) && (
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none" />
+                                            )}
+
+                                            {/* Ícone de Vídeo discreto integrado */}
                                             {item.isVideo && (
-                                                <div className="absolute top-1.5 left-1.5 bg-black/60 backdrop-blur-xs text-white p-1 rounded-lg">
-                                                    <VideoIcon size={12} strokeWidth={2.5} />
+                                                <div className="absolute top-1 left-1 text-white drop-shadow-sm">
+                                                    <VideoIcon size={13} strokeWidth={2.5} />
                                                 </div>
                                             )}
 
-                                            {/* Badge de Preço anterior */}
+                                            {/* Preço integrado diretamente no canto inferior da imagem */}
                                             {isPaid && formattedPrice && (
-                                                <div className="absolute bottom-1.5 right-1.5 flex items-center gap-0.5 bg-black/70 backdrop-blur-xs text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-md border border-white/10 shadow-xs">
+                                                <div className="absolute bottom-1 right-1 flex items-center gap-0.5 text-white text-[10px] font-bold tracking-tight drop-shadow">
                                                     <LockIcon size={9} strokeWidth={2.5} />
                                                     <span>{formattedPrice}</span>
                                                 </div>
