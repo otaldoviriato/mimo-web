@@ -113,12 +113,12 @@ function formatMediaDuration(durationInSeconds?: number) {
 
 function getReplyPreviewContent(msg: Message | null | undefined): string {
     if (!msg) return '';
-    if (msg.isContentLocked) return 'ðŸ”’ Mensagem bloqueada';
-    if (msg.isGift) return 'ðŸŽ Presente';
-    if (msg.isLockedImage) return 'ðŸ“¸ Imagem bloqueada';
-    if (msg.originalImageUrl) return 'ðŸ“¸ Imagem';
-    if (msg.isVideo) return 'ðŸŽ¥ VÃ­deo';
-    if (msg.audioUrl) return 'ðŸŽµ Mensagem de voz';
+    if (msg.isContentLocked) return '🔒 Mensagem bloqueada';
+    if (msg.isGift) return '🎁 Presente';
+    if (msg.isLockedImage) return '📸 Imagem bloqueada';
+    if (msg.originalImageUrl) return '📸 Imagem';
+    if (msg.isVideo) return '🎥 Vídeo';
+    if (msg.audioUrl) return '🎵 Mensagem de voz';
     return msg.content || '';
 }
 
@@ -133,8 +133,8 @@ function mergeMessagePreservingUnlocked(current: Message, incoming: Message): Me
 
     let merged = { ...incoming };
 
-    // Regra de ouro da monotonicidade: se a mensagem jÃ¡ foi destrancada na tela localmente,
-    // NENHUM snapshot de rede desatualizado ou em trÃ¢nsito pode re-bloqueÃ¡-la ou apagar o conteÃºdo descriptografado.
+    // Regra de ouro da monotonicidade: se a mensagem já foi destrancada na tela localmente,
+    // NENHUM snapshot de rede desatualizado ou em trânsito pode re-bloqueá-la ou apagar o conteúdo descriptografado.
     if (isCurrentlyUnlocked && isIncomingPending) {
         merged.isContentLocked = false;
         merged.billingStatus = 'paid';
@@ -192,7 +192,7 @@ function LockedMediaTypeBadge({ isVideo, duration }: { isVideo?: boolean; durati
                 </svg>
             )}
             <span className="text-[9px] font-bold uppercase leading-none tracking-wider">
-                {isVideo ? 'VÃ­deo' : 'Foto'}
+                {isVideo ? 'Vídeo' : 'Foto'}
             </span>
             {formattedDuration && (
                 <span className="text-[9px] font-semibold leading-none text-white/80">
@@ -245,12 +245,12 @@ function formatLastSeen(
         const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
         if (isToday) {
-            return `visto por Ãºltimo hoje Ã s ${timeStr}`;
+            return `visto por último hoje às ${timeStr}`;
         } else if (isYesterday) {
-            return `visto por Ãºltimo ontem Ã s ${timeStr}`;
+            return `visto por último ontem às ${timeStr}`;
         } else {
             const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            return `visto por Ãºltimo em ${dateStr} Ã s ${timeStr}`;
+            return `visto por último em ${dateStr} às ${timeStr}`;
         }
     } catch (e) {
         return '';
@@ -291,7 +291,7 @@ function formatSeparatorDate(timestamp: string | Date) {
             return 'Ontem';
         }
         
-        // Se for do mesmo ano, exibe apenas dia e mÃªs por extenso. Caso contrÃ¡rio, exibe o ano tambÃ©m.
+        // Se for do mesmo ano, exibe apenas dia e mês por extenso. Caso contrário, exibe o ano também.
         if (date.getFullYear() === today.getFullYear()) {
             return date.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' });
         }
@@ -325,13 +325,13 @@ function EarningsIndicator({
 }: EarningsIndicatorProps) {
     const [shown, setShown] = useState(false);
 
-    // Se o valor de ganhos da profissional nÃ£o estiver explÃ­cito, deriva a partir do custo (ex: 80% do valor cobrado)
+    // Se o valor de ganhos da profissional não estiver explícito, deriva a partir do custo (ex: 80% do valor cobrado)
     const effectiveEarnings = (receiverEarnings && receiverEarnings > 0)
         ? receiverEarnings
         : (cost && cost > 0 ? Math.round(cost * 0.8) : 0);
 
     useEffect(() => {
-        // Dispara a animaÃ§Ã£o se a mensagem acabou de ser cobrada/liquidada (isSettled),
+        // Dispara a animação se a mensagem acabou de ser cobrada/liquidada (isSettled),
         // se o settledAt for recente (< 25s), se for nova mensagem (isNew) ou se o envio for recente (< 25s)
         const isRecent = timestamp ? (Date.now() - new Date(timestamp).getTime() < 25000) : false;
         const isSettledRecent = settledAt ? (Date.now() - new Date(settledAt).getTime() < 25000) : false;
@@ -341,7 +341,7 @@ function EarningsIndicator({
                 setShown(true);
             }, 60);
 
-            // Fica alguns segundos visÃ­vel e volta deslizando suavemente para trÃ¡s do balÃ£o
+            // Fica alguns segundos visível e volta deslizando suavemente para trás do balão
             const exitTimer = setTimeout(() => {
                 setShown(false);
             }, 3800);
@@ -385,7 +385,7 @@ interface MediaEarningsIndicatorProps {
 }
 
 function MediaEarningsIndicator({ messageId, receiverEarnings, cost, isSelected, isNew }: MediaEarningsIndicatorProps) {
-    // No marketplace-first, ganhos nÃ£o sÃ£o por mÃ­dia avulsa; popup "+ R$" desativado
+    // No marketplace-first, ganhos não são por mídia avulsa; popup "+ R$" desativado
     return null;
 }
 
@@ -591,7 +591,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 eventType: 'recharge_trigger',
                 professionalId: profId,
                 username: receiver?.username,
-                reason: 'Tentativa de mensagem sem crÃ©ditos (abriu modal de recarga)',
+                reason: 'Tentativa de mensagem sem créditos (abriu modal de recarga)',
             });
         }
     };
@@ -765,8 +765,8 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         return () => {
             window.removeEventListener('popstate', handlePopState);
             
-            // Se o fechamento foi disparado manualmente (ex: botÃ£o X) e o histÃ³rico 
-            // ainda estiver no estado da galeria, voltamos no histÃ³rico para limpÃ¡-lo.
+            // Se o fechamento foi disparado manualmente (ex: botão X) e o histórico
+            // ainda estiver no estado da galeria, voltamos no histórico para limpá-lo.
             if (!closedByHistory && window.history.state?.mimoViewerOpen &&
                 readStackEntry(window.history.state)?.screens.at(-1)?.key === ownerKey) {
                 window.history.back();
@@ -795,8 +795,8 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         return () => {
             window.removeEventListener('popstate', handlePopState);
             
-            // Se a seleÃ§Ã£o foi limpa manualmente (ex: clicando em "X" ou limpando os IDs) 
-            // e o histÃ³rico ainda estiver no estado de seleÃ§Ã£o, voltamos no histÃ³rico para limpÃ¡-lo.
+            // Se a seleção foi limpa manualmente (ex: clicando em "X" ou limpando os IDs)
+            // e o histórico ainda estiver no estado de seleção, voltamos no histórico para limpá-lo.
             if (!closedByHistory && window.history.state?.mimoMessageSelectionOpen &&
                 readStackEntry(window.history.state)?.screens.at(-1)?.key === ownerKey) {
                 window.history.back();
@@ -878,7 +878,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         }
     }, [propInitialUser, targetClerkId, queryClient]);
 
-    // Se a rota acessada tiver o Clerk ID (ex: /chat/user_123), substitui na barra do navegador pela rota amigÃ¡vel (/chat/username)
+    // Se a rota acessada tiver o Clerk ID (ex: /chat/user_123), substitui na barra do navegador pela rota amigável (/chat/username)
     useEffect(() => {
         if (typeof window !== 'undefined' && receiver?.username && isRouteClerkId) {
             const currentPath = window.location.pathname;
@@ -954,11 +954,11 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         };
     }, []);
 
-    // Lista derivada das mÃ­dias histÃ³ricas carregadas combinadas com as mÃ­dias das mensagens locais
+    // Lista derivada das mídias históricas carregadas combinadas com as mídias das mensagens locais
     const mediaItems = React.useMemo(() => {
         const now = new Date();
 
-        // 1. Filtrar mÃ­dias histÃ³ricas que por ventura jÃ¡ expiraram
+        // 1. Filtrar mídias históricas que por ventura já expiraram
         const validHistorical = allMediaItemsLoaded.filter(item => {
             if (item.isTemporary && item.expiresAt) {
                 const expiresTime = new Date(item.expiresAt).getTime();
@@ -969,10 +969,10 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             return true;
         });
 
-        // 2. Extrair mÃ­dias locais vÃ¡lidas (nÃ£o expiradas e nÃ£o bloqueadas)
+        // 2. Extrair mídias locais válidas (não expiradas e não bloqueadas)
         const localMedias = messages
             .filter(m => {
-                if (m.isLockedImage) return false; // locked nÃ£o entra
+                if (m.isLockedImage) return false; // locked não entra
                 if (m.isExpired) return false;
                 if (m.isTemporary && m.expiresAt) {
                     const expiresTime = new Date(m.expiresAt).getTime();
@@ -1012,10 +1012,10 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         return [...enrichedHistorical, ...newLocalMedias];
     }, [allMediaItemsLoaded, messages]);
 
-    // Efeito para fechar o visualizador de tela cheia se a mÃ­dia ativa expirar ou for removida da lista
+    // Efeito para fechar o visualizador de tela cheia se a mídia ativa expirar ou for removida da lista
     useEffect(() => {
         if (fullscreenIndex !== null) {
-            // Se o index ficou fora dos limites ou se a mÃ­dia sumiu do array (por expiraÃ§Ã£o)
+            // Se o index ficou fora dos limites ou se a mídia sumiu do array (por expiração)
             if (!mediaItems[fullscreenIndex]) {
                 setFullscreenIndex(null);
                 return;
@@ -1083,7 +1083,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     const typingTimeoutRef = useRef<any>(null);
     const partnerTypingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Fila serial de envio para garantir ordem cronolÃ³gica rigorosa e evitar que mensagens sumam
+    // Fila serial de envio para garantir ordem cronológica rigorosa e evitar que mensagens sumam
     const lastSentTimestampRef = useRef<number>(0);
     const sendQueueRef = useRef<Array<{
         content: string;
@@ -1105,7 +1105,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         if (!root) return;
 
         const handleTouchMove = (e: TouchEvent) => {
-            // Se algum modal ou visualizador de imagem interno estiver aberto, nÃ£o impedimos o toque
+            // Se algum modal ou visualizador de imagem interno estiver aberto, não impedimos o toque
             const isAnyModalOrViewerOpen = 
                 (fullscreenIndex !== null || fullscreenLockedMessage !== null) || 
                 giftModalVisible || 
@@ -1123,14 +1123,14 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             const isTouchInsideMessages = container.contains(e.target as Node);
 
             if (isTouchInsideMessages) {
-                // Se estÃ¡ dentro das mensagens, permitimos a rolagem apenas se houver overflow vertical
+                // Se está dentro das mensagens, permitimos a rolagem apenas se houver overflow vertical
                 const hasOverflow = container.scrollHeight > container.clientHeight;
                 if (!hasOverflow) {
-                    // Sem overflow (poucas mensagens), previne o scroll elÃ¡stico do viewport/body
+                    // Sem overflow (poucas mensagens), previne o scroll elástico do viewport/body
                     e.preventDefault();
                 }
             } else {
-                // Se o toque estÃ¡ fora (header, fundo vazio da sala, input area)
+                // Se o toque está fora (header, fundo vazio da sala, input area)
                 // Permitimos touchmove apenas se o target for um input, textarea ou elementos interativos
                 const target = e.target as HTMLElement;
                 const isInteractive = 
@@ -1164,11 +1164,11 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     useEffect(() => {
         if (!user?.id || couponClaimedRef.current) return;
 
-        // Ordem de prioridade para encontrar o cÃ³digo do cupom:
-        // 1. Prop direta (passada pelo layout virtual via pushVirtual params) â€” mais confiÃ¡vel
+        // Ordem de prioridade para encontrar o código do cupom:
+        // 1. Prop direta (passada pelo layout virtual via pushVirtual params) — mais confiável
         // 2. localStorage (sobrevive a redirects OAuth no PWA)
         // 3. sessionStorage (fallback legado)
-        // 4. URL query param (usuÃ¡rio jÃ¡ logado acessando o link diretamente)
+        // 4. URL query param (usuário já logado acessando o link diretamente)
         const fromProp = propGiftCode;
         const fromLocalStorage = localStorage.getItem('mimo_pending_gift');
         const fromSessionStorage = sessionStorage.getItem('mimo_pending_gift');
@@ -1176,7 +1176,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         const code = fromProp || fromLocalStorage || fromSessionStorage || fromUrl;
         if (!code) return;
 
-        // Trava global de sessÃ£o do front-end para evitar requisiÃ§Ãµes concorrentes duplicadas
+        // Trava global de sessão do front-end para evitar requisições concorrentes duplicadas
         if (typeof window !== 'undefined') {
             const claims = (window as any).__claimingGiftCodes = (window as any).__claimingGiftCodes || {};
             if (claims[code]) return;
@@ -1239,7 +1239,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     }, [socket, roomId, activeChat, balance, userData?.isProfessional]);
 
 
-    // Carrega mensagens do cache local APENAS no primeiro render da sala e preserva se jÃ¡ houver mensagens
+    // Carrega mensagens do cache local APENAS no primeiro render da sala e preserva se já houver mensagens
     useEffect(() => {
         if (typeof window !== 'undefined' && user?.id && (partnerClerkId || otherUserId)) {
             const currentRoomId = roomId || [user.id, partnerClerkId || otherUserId].sort().join('_');
@@ -1257,7 +1257,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     const parsed = JSON.parse(cached);
                     if (Array.isArray(parsed) && parsed.length > 0) {
                         setMessages((prev) => {
-                            // Se jÃ¡ houver mensagens em memÃ³ria (inclusive otimistas), NÃƒO sobrescreve
+                            // Se já houver mensagens em memória (inclusive otimistas), NÃO sobrescreve
                             if (prev.length > 0) return prev;
                             const normalized = parsed.map((m: any) =>
                                 unlockMessageIfEligible(m, user.id, balance, largeMessageThreshold, currentRoomId, declinedLongMessageIdsRef.current)
@@ -1295,7 +1295,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         return unlocked;
                     });
 
-                    // PRESERVAR mensagens locais/otimistas que estÃ£o sendo enviadas
+                    // PRESERVAR mensagens locais/otimistas que estão sendo enviadas
                     const pendingOptimistic = prev.filter(m => m.status === 'sending' || (m.tempId && !rawList.some(r => r.tempId === m.tempId || r._id === m.tempId)));
 
                     if (prev.length === 0) {
@@ -1318,7 +1318,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         });
     }, [roomId, user?.id, otherUserId, partnerClerkId]);
 
-    // Atualiza apenas o destrancamento em memÃ³ria quando o saldo ou o limite de caracteres muda (SEM resetar cache ou estado)
+    // Atualiza apenas o destrancamento em memória quando o saldo ou o limite de caracteres muda (SEM resetar cache ou estado)
     useEffect(() => {
         if (!user?.id) return;
         setMessages((prev) => {
@@ -1340,7 +1340,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         }
     }, [balance, largeMessageThreshold, user?.id, roomId, userData?.isProfessional, socket]);
 
-    // Salva apenas as Ãºltimas 50 mensagens confirmadas no cache local para nÃ£o sobrecarregar o armazenamento
+    // Salva apenas as últimas 50 mensagens confirmadas no cache local para não sobrecarregar o armazenamento
     useEffect(() => {
         const partner = partnerClerkId || otherUserId;
         if (typeof window !== 'undefined' && user?.id && partner && !loadingMessages) {
@@ -1353,7 +1353,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         }
     }, [messages, user?.id, otherUserId, partnerClerkId, loadingMessages, roomId]);
 
-    // Busca mÃ­dias histÃ³ricas do backend quando a galeria for aberta
+    // Busca mídias históricas do backend quando a galeria for aberta
     useEffect(() => {
         if (galleryVisible && roomId && user?.id) {
             const fetchMedia = async () => {
@@ -1363,14 +1363,14 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     });
                     setAllMediaItemsLoaded(response.data);
                 } catch (error) {
-                    console.error('Erro ao carregar mÃ­dias da galeria:', error);
+                    console.error('Erro ao carregar mídias da galeria:', error);
                 }
             };
             fetchMedia();
         }
     }, [galleryVisible, roomId, user?.id]);
 
-    // Notifica que o DOM estÃ¡ pronto imediatamente na montagem para iniciar a transiÃ§Ã£o sem delay (estilo nativo)
+    // Notifica que o DOM está pronto imediatamente na montagem para iniciar a transição sem delay (estilo nativo)
     useEffect(() => {
         if (typeof window !== 'undefined' && (window as any).__resolveTransition) {
             (window as any).__resolveTransition();
@@ -1378,7 +1378,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         }
     }, []);
 
-    // Prefetch da tela de perfil pÃºblico para navegaÃ§Ã£o instantÃ¢nea (resposta tÃ¡til imediata)
+    // Prefetch da tela de perfil público para navegação instantânea (resposta tátil imediata)
     useEffect(() => {
         if (receiver?.username) {
             router.prefetch(`/${receiver.username}`);
@@ -1390,7 +1390,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             const container = messagesContainerRef.current;
             if (container) {
                 if (behavior === 'auto') {
-                    container.scrollTop = 0; // No flex-col-reverse, 0 Ã© o final das mensagens (bottom)
+                    container.scrollTop = 0; // No flex-col-reverse, 0 é o final das mensagens (bottom)
                 } else {
                     container.scrollTo({ top: 0, behavior: 'smooth' });
                 }
@@ -1450,7 +1450,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     return unlocked;
                 });
 
-                // PRESERVA mensagens otimistas que ainda nÃ£o foram confirmadas pelo servidor
+                // PRESERVA mensagens otimistas que ainda não foram confirmadas pelo servidor
                 const pendingOptimistic = prev.filter(
                     m => m.status === 'sending' || 
                     (m.tempId && !data.messages.some(dbM => dbM.tempId === m.tempId || dbM._id === m.tempId))
@@ -1466,7 +1466,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 return sortMessagesStable([...unlockedMessages, ...uniquePending]);
             });
 
-            // Se o usuÃ¡rio logado for o cliente e houver mensagens pendentes longas que nÃ£o foram recusadas:
+            // Se o usuário logado for o cliente e houver mensagens pendentes longas que não foram recusadas:
             if (!userData?.isProfessional) {
                 const pendingLong = data.messages.find(m =>
                     m.receiverId === user?.id &&
@@ -1561,7 +1561,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
             const processedMsg = unlockMessageIfEligible(data.message, user.id, balance, largeMessageThreshold, roomId, declinedLongMessageIdsRef.current);
 
-            // Se for recebida para o usuÃ¡rio atual e ainda estiver pendente (ex: mensagem longa):
+            // Se for recebida para o usuário atual e ainda estiver pendente (ex: mensagem longa):
             if (processedMsg.receiverId === user?.id && processedMsg.billingStatus === 'pending') {
                 const charTotal = processedMsg.equivalentCharCount ?? processedMsg.charCount ?? 0;
                 if (charTotal > largeMessageThreshold && !declinedLongMessageIdsRef.current.has(processedMsg._id)) {
@@ -1570,13 +1570,13 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             }
 
             setMessages((prev) => {
-                // Se for uma mensagem que nÃ³s enviamos (tem tempId), atualiza a mensagem otimista
+                // Se for uma mensagem que nós enviamos (tem tempId), atualiza a mensagem otimista
                 if (data.tempId) {
                     const index = prev.findIndex(m => m.tempId === data.tempId || m._id === data.tempId);
                     if (index !== -1) {
                         const existing = prev[index];
                         const newMessages = [...prev];
-                        // Preservar monotonicidade: estado mais avanÃ§ado sempre prevalece
+                        // Preservar monotonicidade: estado mais avançado sempre prevalece
                         const isRead = !!(existing.isRead || processedMsg.isRead);
                         const isDelivered = !!(isRead || existing.isDelivered || processedMsg.isDelivered);
                         const awaitingBalance = !!(existing.awaitingBalance || processedMsg.awaitingBalance);
@@ -1598,7 +1598,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     }
                 }
 
-                // Se a mensagem jÃ¡ existe (evitar duplicatas), atualiza preservando estado destrancado
+                // Se a mensagem já existe (evitar duplicatas), atualiza preservando estado destrancado
                 const existingIndex = prev.findIndex(m => m._id === processedMsg._id);
                 if (existingIndex !== -1) {
                     const existing = prev[existingIndex];
@@ -1619,7 +1619,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 return newMessages;
             });
 
-            // Atualiza cache local de rooms para refletir a Ãºltima mensagem recebida/enviada em tempo real
+            // Atualiza cache local de rooms para refletir a última mensagem recebida/enviada em tempo real
             queryClient.setQueryData(QueryKeys.rooms(user?.id ?? ''), (old: any) => {
                 if (!old) return old;
                 return old.map((r: any) => {
@@ -1629,7 +1629,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         const isMe = data.message?.senderId === user?.id;
                         let safeText = data.message.content.substring(0, 100);
                         if (isPending) {
-                            safeText = isMe ? 'Aguardando saldo do cliente' : (data.message.isAudio ? 'ðŸŽ™ï¸ Nova mensagem de Ã¡udio' : 'Nova mensagem');
+                            safeText = isMe ? 'Aguardando saldo do cliente' : (data.message.isAudio ? '🎙ï¸ Nova mensagem de áudio' : 'Nova mensagem');
                         }
                         return {
                             ...r,
@@ -1664,7 +1664,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 // Notifica o servidor para liquidar mensagens curtas pendentes:
                 socket.emit('confirm_view_messages', { roomId });
 
-                // E se houver mensagem longa pendente nÃ£o recusada, abre a modal de confirmaÃ§Ã£o:
+                // E se houver mensagem longa pendente não recusada, abre a modal de confirmação:
                 setMessages((currentMsgs) => {
                     const pendingLong = currentMsgs.find(m =>
                         m.receiverId === user?.id &&
@@ -1694,14 +1694,14 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
             if (data.isTyping) {
                 setIsTyping(true);
-                // Fallback automÃ¡tico de 5s caso o evento isTyping: false nunca chegue
+                // Fallback automático de 5s caso o evento isTyping: false nunca chegue
                 partnerTypingTimeoutRef.current = setTimeout(() => {
                     setIsTyping(false);
                     partnerTypingTimeoutRef.current = null;
                 }, 5000);
             } else {
                 // Ao parar de digitar, adicionamos um atraso de 2s para ocultar
-                // Isso previne que a tela pisque se o usuÃ¡rio parar e recomeÃ§ar logo em seguida
+                // Isso previne que a tela pisque se o usuário parar e recomeçar logo em seguida
                 partnerTypingTimeoutRef.current = setTimeout(() => {
                     setIsTyping(false);
                     partnerTypingTimeoutRef.current = null;
@@ -1734,11 +1734,11 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         socket.on('messages_awaiting_balance', (data: { roomId: string; clientId: string; messageIds?: string[] }) => {
             if (data.roomId === roomId) {
                 setMessages((prev) => prev.map((msg) => {
-                    // Se a mensagem jÃ¡ estÃ¡ destrancada na tela, nÃ£o marca como aguardando saldo
+                    // Se a mensagem já está destrancada na tela, não marca como aguardando saldo
                     if (msg.billingStatus === 'paid' || msg.isContentLocked === false) {
                         return msg;
                     }
-                    // Se for o cliente e tiver saldo suficiente para esta mensagem, nÃ£o marca como aguardando saldo
+                    // Se for o cliente e tiver saldo suficiente para esta mensagem, não marca como aguardando saldo
                     if (!userData?.isProfessional && balance >= (msg.receiptChargeCents || 0)) {
                         return msg;
                     }
@@ -1827,7 +1827,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
     // Handles the edge case where the user selects a file before userData finishes
     // loading. Once userData is available we decide: auto-send (non-professional)
-    // or let the price modal appear (professional â€” selectedFile is already set).
+    // or let the price modal appear (professional — selectedFile is already set).
     useEffect(() => {
         const pending = pendingMediaRef.current;
         if (!pending || userData === undefined) return;
@@ -1853,7 +1853,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     tempId: tempId,
                     senderId: user?.id ?? '',
                     receiverId: partnerClerkId || otherUserId,
-                    content: isVideoFile ? 'VÃ­deo' : 'Foto',
+                    content: isVideoFile ? 'Vídeo' : 'Foto',
                     charCount: 0,
                     cost: 0,
                     timestamp: new Date().toISOString(),
@@ -2052,7 +2052,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 
                 if (!signedRes.ok) {
                     const errJson = await signedRes.json().catch(() => ({}));
-                    throw new Error(errJson.error || 'Falha ao obter URL assinada para o vÃ­deo');
+                    throw new Error(errJson.error || 'Falha ao obter URL assinada para o vídeo');
                 }
                 const signedData = await signedRes.json();
                 
@@ -2144,7 +2144,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
             const data = res.data;
             if (!data.success) {
-                throw new Error(data.error || 'Erro ao processar mÃ­dia');
+                throw new Error(data.error || 'Erro ao processar mídia');
             }
             triggerFirstMessageModalIfEligible();
 
@@ -2171,13 +2171,13 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     errMsg = JSON.stringify(data);
                 }
             } else if (e.message?.includes('Network Error')) {
-                errMsg = 'Erro de rede. Verifique sua conexÃ£o.';
+                errMsg = 'Erro de rede. Verifique sua conexão.';
             } else {
                 errMsg = e.message || 'Erro desconhecido';
             }
             
             // Exibir alerta explicativo do erro
-            toast.error(`Falha no envio de mÃ­dia: ${errMsg}`);
+            toast.error(`Falha no envio de mídia: ${errMsg}`);
 
             setUploadTasks(prev => {
                 if (!prev[tempId]) return prev;
@@ -2193,7 +2193,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     const handleStartPress = (msg: Message, e: React.TouchEvent | React.MouseEvent) => {
         longPressActivated.current = false;
 
-        // Mensagens bloqueadas (aguardando saldo) nÃ£o podem ser respondidas
+        // Mensagens bloqueadas (aguardando saldo) não podem ser respondidas
         if (msg.isContentLocked) {
             swipingMessage.current = null;
             swipingElement.current = null;
@@ -2346,9 +2346,9 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         }, 50);
     };
 
-    // Click em modo de seleÃ§Ã£o: toggle da mensagem no set
+    // Click em modo de seleção: toggle da mensagem no set
     const handleMessageClick = (msgId: string) => {
-        // Se foi um long press, ignora o click disparado logo apÃ³s soltar
+        // Se foi um long press, ignora o click disparado logo após soltar
         if (longPressActivated.current) {
             longPressActivated.current = false;
             return;
@@ -2532,7 +2532,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 );
 
                 // Aguarda o ACK do servidor garantindo que a mensagem foi processada e transmitida
-                // antes de despachar a prÃ³xima mensagem da fila (elimina inversÃ£o no wire)
+                // antes de despachar a próxima mensagem da fila (elimina inversão no wire)
                 if (item.tempId) {
                     const ack = await socketService.waitForAck(item.tempId, 2500);
                     if (ack.success) {
@@ -2549,7 +2549,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     }
                 }
 
-                // Pequeno espaÃ§amento adicional de 20ms entre envios seriais
+                // Pequeno espaçamento adicional de 20ms entre envios seriais
                 if (sendQueueRef.current.length > 0) {
                     await new Promise(resolve => setTimeout(resolve, 20));
                 }
@@ -2619,7 +2619,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         const charCount = text.length;
         const costInCents = 0;
 
-        // Timestamp estritamente crescente para ordem cronolÃ³gica consistente
+        // Timestamp estritamente crescente para ordem cronológica consistente
         const safeTimestampMs = Math.max(Date.now(), (lastSentTimestampRef.current || 0) + 1);
         lastSentTimestampRef.current = safeTimestampMs;
         const timestampIso = new Date(safeTimestampMs).toISOString();
@@ -2722,7 +2722,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             tempId: tempId,
             senderId: user?.id ?? '',
             receiverId: effectivePartnerId,
-            content: 'ðŸŽ™ï¸ Mensagem de Ã¡udio',
+            content: '🎙ï¸ Mensagem de áudio',
             charCount: 0,
             cost: estimatedAudioCostInCents,
             timestamp: new Date().toISOString(),
@@ -2747,21 +2747,21 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             });
 
             if (!res.data.success) {
-                throw new Error(res.data.error || 'Erro ao enviar Ã¡udio');
+                throw new Error(res.data.error || 'Erro ao enviar áudio');
             }
             triggerFirstMessageModalIfEligible();
         } catch (e: any) {
-            console.error('Erro ao enviar Ã¡udio:', e);
+            console.error('Erro ao enviar áudio:', e);
             const serverError: string | undefined = e.response?.data?.error;
             setMessages(prev => prev.map(m => m.tempId === tempId ? { ...m, status: 'error' } : m));
             if (serverError?.toLowerCase().includes('saldo insuficiente')) {
                 openRechargeModal(
                     userData?.hasWelcomeCreditEnded
-                        ? 'Seus crÃ©ditos de boas-vindas acabaram. Recarregue para continuar conversando.'
-                        : 'VocÃª nÃ£o tem saldo suficiente para enviar esta mensagem de Ã¡udio. Por favor, recarregue sua carteira.'
+                        ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
+                        : 'Você não tem saldo suficiente para enviar esta mensagem de áudio. Por favor, recarregue sua carteira.'
                 );
             } else {
-                toast.error(`Falha ao enviar mensagem de Ã¡udio: ${serverError || e.message || 'Erro de rede'}`);
+                toast.error(`Falha ao enviar mensagem de áudio: ${serverError || e.message || 'Erro de rede'}`);
             }
         }
     };
@@ -2813,7 +2813,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         }
 
         if (userData === undefined) {
-            // userData hasn't loaded yet â€” defer the routing decision to the
+            // userData hasn't loaded yet — defer the routing decision to the
             // useEffect above so we never auto-send for a professional by mistake.
             pendingMediaRef.current = { file, isVideoFile };
             return;
@@ -2833,7 +2833,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 tempId: tempId,
                 senderId: user?.id ?? '',
                 receiverId: effectivePartnerId,
-                content: isVideoFile ? 'VÃ­deo' : 'Foto',
+                content: isVideoFile ? 'Vídeo' : 'Foto',
                 charCount: 0,
                 cost: 0,
                 timestamp: new Date().toISOString(),
@@ -2851,9 +2851,9 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         // isProfessional === true: the price modal renders because selectedFile is set.
     };
 
-    // Envia a mÃ­dia selecionada (selectedFile) com o preÃ§o/duraÃ§Ã£o jÃ¡ definidos.
-    // Usado pelo MediaComposerSheet (profissional configurou preÃ§o/duraÃ§Ã£o) e pelo
-    // fallback no compose bar (envio durante a janela em que userData ainda estÃ¡ carregando).
+    // Envia a mídia selecionada (selectedFile) com o preço/duração já definidos.
+    // Usado pelo MediaComposerSheet (profissional configurou preço/duração) e pelo
+    // fallback no compose bar (envio durante a janela em que userData ainda está carregando).
     const sendSelectedMedia = async (priceInCents: number, isTemporaryMedia: boolean, expiryMinutes: number, coverFrameDataUrl?: string) => {
         if (!selectedFile) return;
 
@@ -2871,7 +2871,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             tempId: tempId,
             senderId: user?.id ?? '',
             receiverId: effectivePartnerId,
-            content: isVideoFile ? 'VÃ­deo' : 'Foto',
+            content: isVideoFile ? 'Vídeo' : 'Foto',
             charCount: 0,
             cost: 0,
             timestamp: new Date().toISOString(),
@@ -2903,11 +2903,11 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 setMessages(prev => prev.map(m => m._id === messageId ? data.message : m));
                 return true;
             } else {
-                toast.error(data.error || 'Erro ao desbloquear conteÃºdo');
+                toast.error(data.error || 'Erro ao desbloquear conteúdo');
                 return false;
             }
         } catch (e) {
-            toast.error('Erro na requisiÃ§Ã£o');
+            toast.error('Erro na requisição');
             return false;
         } finally {
             setUnlocking(false);
@@ -2916,7 +2916,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
     const handleUnlockImage = async (messageId: string, priceInCents: number, isVideoMessage: boolean = false) => {
         if (priceInCents === 0) {
-            // Desbloqueia mÃ­dias grÃ¡tis temporÃ¡rias instantaneamente
+            // Desbloqueia mídias grátis temporárias instantaneamente
             await executeUnlock(messageId);
             return;
         }
@@ -2932,8 +2932,8 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             });
             openRechargeModal(
                 userData?.hasWelcomeCreditEnded
-                    ? 'Seus crÃ©ditos de boas-vindas acabaram. Recarregue para continuar conversando.'
-                    : 'VocÃª nÃ£o tem saldo suficiente para desbloquear este conteÃºdo. Por favor, recarregue sua carteira.'
+                    ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
+                    : 'Você não tem saldo suficiente para desbloquear este conteúdo. Por favor, recarregue sua carteira.'
             );
             return;
         }
@@ -2956,8 +2956,8 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             setUnlockModalVisible(false);
             openRechargeModal(
                 userData?.hasWelcomeCreditEnded
-                    ? 'Seus crÃ©ditos de boas-vindas acabaram. Recarregue para continuar conversando.'
-                    : 'VocÃª nÃ£o tem saldo suficiente para desbloquear este conteÃºdo. Por favor, recarregue sua carteira.'
+                    ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
+                    : 'Você não tem saldo suficiente para desbloquear este conteúdo. Por favor, recarregue sua carteira.'
             );
             return;
         }
@@ -2977,8 +2977,8 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             setGiftModalVisible(false);
             openRechargeModal(
                 userData?.hasWelcomeCreditEnded
-                    ? 'Seus crÃ©ditos de boas-vindas acabaram. Recarregue para continuar conversando.'
-                    : 'VocÃª nÃ£o tem saldo suficiente para enviar este presente. Por favor, recarregue sua carteira.'
+                    ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
+                    : 'Você não tem saldo suficiente para enviar este presente. Por favor, recarregue sua carteira.'
             );
             return;
         }
@@ -3005,15 +3005,15 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     setGiftModalVisible(false);
                     openRechargeModal(
                         userData?.hasWelcomeCreditEnded
-                            ? 'Seus crÃ©ditos de boas-vindas acabaram. Recarregue para continuar conversando.'
-                            : 'VocÃª nÃ£o tem saldo suficiente para enviar este presente. Por favor, recarregue sua carteira.'
+                            ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
+                            : 'Você não tem saldo suficiente para enviar este presente. Por favor, recarregue sua carteira.'
                     );
                 } else {
                     toast.error(data.error || 'Erro ao enviar presente');
                 }
             }
         } catch (e) {
-            toast.error('Erro de conexÃ£o');
+            toast.error('Erro de conexão');
         } finally {
             setSendingGift(false);
         }
@@ -3042,15 +3042,15 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         estimatedCostInCents = Math.max(1, Math.ceil(charCount * currentRate * 100));
     }
 
-    // PreÃ§o do Ã¡udio: preÃ§o por caractere x multiplicador configurÃ¡vel, por segundo.
+    // Preço do áudio: preço por caractere x multiplicador configurável, por segundo.
     const audioPriceMultiplier = chatPricing?.audioPriceMultiplier ?? 5;
     const audioCostPerSecondInCents = currentRate > 0 ? (currentRate * 100 * audioPriceMultiplier) : 0;
-    // Quantos segundos de Ã¡udio o saldo atual do cliente consegue pagar (undefined = sem limite, mensagem gratuita).
+    // Quantos segundos de áudio o saldo atual do cliente consegue pagar (undefined = sem limite, mensagem gratuita).
     const maxAudioDurationSeconds = (audioCostPerSecondInCents > 0 && !isTeamMemberInvolved)
         ? Math.floor(balance / audioCostPerSecondInCents)
         : (isClientToProfessional && balance <= 0 ? 0 : undefined);
     // Se o saldo for > 0, exibe quando estiver abaixo do limite configurado.
-    // Se o saldo for == 0, sÃ³ exibe quando houver pelo menos uma mensagem da profissional recebida ou bloqueada (pois agora hÃ¡ motivo para recarregar).
+    // Se o saldo for == 0, só exibe quando houver pelo menos uma mensagem da profissional recebida ou bloqueada (pois agora há motivo para recarregar).
     const partnerIdForFilter = partnerClerkId || otherUserId;
     const hasProfessionalMessage = messages.some(
         (m) => (!m.isSystem && (m.senderId === partnerIdForFilter || (partnerClerkId && m.senderId === otherUserId))) || m.isContentLocked
@@ -3075,12 +3075,12 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         : 'w-full h-full';
 
     const animationClass = isSubPage
-        ? '' // A div externa do layout jÃ¡ gerencia as animaÃ§Ãµes de slide-in/out da subpÃ¡gina
+        ? '' // A div externa do layout já gerencia as animações de slide-in/out da subpágina
         : (useNativeTransition ? '' : (isClosingOrLeaving ? 'animate-android-slide-out' : 'animate-android-slide-in'));
 
-    // Um usuÃ¡rio nunca pode conversar consigo mesmo, nem com outro usuÃ¡rio do mesmo tipo
-    // (profissional com profissional, cliente com cliente). O servidor tambÃ©m bloqueia isso,
-    // mas escondemos a UI de chat aqui para nÃ£o exibir uma conversa invÃ¡lida.
+    // Um usuário nunca pode conversar consigo mesmo, nem com outro usuário do mesmo tipo
+    // (profissional com profissional, cliente com cliente). O servidor também bloqueia isso,
+    // mas escondemos a UI de chat aqui para não exibir uma conversa inválida.
     const isSelfChat = !!user?.id && (user.id === partnerClerkId || user.id === otherUserId);
     const isSameUserType = !!userData && !!receiver && !userData.isTeam && !receiver.isTeam && !!userData.isProfessional === !!receiver.isProfessional;
     if (isSelfChat || isSameUserType) {
@@ -3091,8 +3091,8 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             >
                 <p className="text-gray-700 font-medium">
             {isSelfChat
-                        ? 'VocÃª nÃ£o pode conversar com vocÃª mesmo.'
-                        : 'Esta conversa nÃ£o estÃ¡ disponÃ­vel.'}
+                        ? 'Você não pode conversar com você mesmo.'
+                        : 'Esta conversa não está disponível.'}
                 </p>
                 <button
                     onClick={handleBack}
@@ -3174,12 +3174,12 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                             <div className={`flex-1 min-w-0 ${!receiver ? 'animate-pulse' : ''}`}>
                                 <div className="flex items-center gap-1.5 min-w-0">
                                     <p className="text-base font-bold text-white truncate tracking-tight">
-                                        {receiver?.isDeleted ? 'UsuÃ¡rio ExcluÃ­do' : (receiver?.name || receiver?.username || (isResolvingReceiver ? 'Carregando...' : (otherUserId ? 'UsuÃ¡rio' : 'Conversa')))}
+                                        {receiver?.isDeleted ? 'Usuário Excluído' : (receiver?.name || receiver?.username || (isResolvingReceiver ? 'Carregando...' : (otherUserId ? 'Usuário' : 'Conversa')))}
                                     </p>
                                     {!receiver?.isDeleted && receiver?.isTeam && (
                                         <span className="text-[10px] bg-emerald-500/90 text-white font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider shrink-0 flex items-center gap-1 border border-white/20">
                                             <ShieldCheck className="w-3 h-3 text-white" />
-                                            Equipe Mimo âœ“
+                                            Equipe Mimo ✓
                                         </span>
                                     )}
                                     {!receiver?.isDeleted && receiver?.isProfessional && receiver?.identityStatus === 'approved' && (
@@ -3197,7 +3197,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                         </span>
                                     ) : (
                                         <span className="text-[10px] text-white/65 font-medium truncate tracking-tight normal-case">
-                                            {receiver ? formatLastSeen(receiver.isOnline, receiver.lastSeen, latestPartnerMessage?.timestamp) : (receiver?.username ? `@${receiver.username}` : 'Ver informaÃ§Ãµes')}
+                                            {receiver ? formatLastSeen(receiver.isOnline, receiver.lastSeen, latestPartnerMessage?.timestamp) : (receiver?.username ? `@${receiver.username}` : 'Ver informações')}
                                         </span>
                                     )}
                                 </div>
@@ -3288,7 +3288,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                                 </>
                                                             )}
                                                         </svg>
-                                                        {monetizationDisabled ? 'Habilitar MonetizaÃ§Ã£o' : 'Desabilitar MonetizaÃ§Ã£o'}
+                                                        {monetizationDisabled ? 'Habilitar Monetização' : 'Desabilitar Monetização'}
                                                     </button>
                                                 </>
                                             )}
@@ -3304,7 +3304,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             {(receiver?.isTeam || userData?.isTeam) && (
                 <div className="shrink-0 z-10 flex items-center justify-center gap-2 border-b border-emerald-200/80 bg-emerald-50 px-4 py-2 text-center text-xs font-bold text-emerald-800">
                     <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Conversa Oficial com a Equipe Mimo â€” Atendimento e suporte de ativaÃ§Ã£o gratuito</span>
+                    <span>Conversa Oficial com a Equipe Mimo — Atendimento e suporte de ativação gratuito</span>
                 </div>
             )}
 
@@ -3445,7 +3445,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                 onClick={() => handleMessageClick(item._id)}
                                 onDoubleClick={(e) => handleMessageDoubleClick(item, e)}
                             >
-                                {/* Ãcone de resposta revelado pelo swipe */}
+                                {/* Ícone de resposta revelado pelo swipe */}
                                 {!item.isContentLocked && (
                                     <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center justify-center opacity-0 scale-75 transition-all duration-150 reply-icon-indicator pointer-events-none z-0">
                                         <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 shadow-sm border border-gray-200">
@@ -3465,7 +3465,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                 : 'bg-white border-purple-50 border-2 rounded-bl-none'
                                         }`}
                                     >
-                                        {/* BalÃ£o de mensagem respondida em Presente */}
+                                        {/* Balão de mensagem respondida em Presente */}
                                         {item.replyToId && (
                                             <div 
                                                 onClick={(e) => {
@@ -3486,7 +3486,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                 } flex flex-col gap-0.5 max-w-full`}
                                             >
                                                 <span className={`font-black ${isMine ? 'text-white' : 'text-purple-700'}`}>
-                                                    {item.replyToSenderId === user?.id ? 'VocÃª' : (receiver?.name || receiver?.username || 'UsuÃ¡rio')}
+                                                    {item.replyToSenderId === user?.id ? 'Você' : (receiver?.name || receiver?.username || 'Usuário')}
                                                 </span>
                                                 <span className="truncate max-w-full">
                                                     {item.replyToContent}
@@ -3506,7 +3506,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                             
                                             <div className="text-center">
                                                 <p className={`text-[11px] font-black uppercase tracking-[0.2em] mb-2 ${isMine ? 'text-purple-200' : 'text-purple-500'}`}>
-                                                    {isMine ? 'Mimo Enviado' : 'VocÃª recebeu um presente'}
+                                                    {isMine ? 'Mimo Enviado' : 'Você recebeu um presente'}
                                                 </p>
                                                 <p className={`text-4xl font-black tracking-tight ${isMine ? 'text-white' : 'text-gray-900'}`}>
                                                     R$ {(item.cost / 100).toFixed(2)}
@@ -3581,7 +3581,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                 : (isMine ? 'rounded-br-sm' : 'rounded-bl-sm')
                                             }`}
                                         >
-                                            {/* BalÃ£o de mensagem respondida em Mensagem Comum */}
+                                            {/* Balão de mensagem respondida em Mensagem Comum */}
                                             {item.replyToId && (
                                                 <div 
                                                     onClick={(e) => {
@@ -3602,7 +3602,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                     } flex flex-col gap-0.5 max-w-full`}
                                                 >
                                                     <span className={`font-black ${isMine ? 'text-white' : 'text-purple-700'}`}>
-                                                        {item.replyToSenderId === user?.id ? 'VocÃª' : (receiver?.name || receiver?.username || 'UsuÃ¡rio')}
+                                                        {item.replyToSenderId === user?.id ? 'Você' : (receiver?.name || receiver?.username || 'Usuário')}
                                                     </span>
                                                     <span className="truncate max-w-full">
                                                         {item.replyToContent}
@@ -3630,8 +3630,8 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                         <circle cx="12" cy="12" r="10" />
                                                         <polyline points="12 6 12 12 16 14" />
                                                     </svg>
-                                                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">MÃ­dia Expirada</span>
-                                                    <span className="text-[9px] text-slate-400 text-center px-4 leading-tight">Esta mÃ­dia temporÃ¡ria nÃ£o estÃ¡ mais disponÃ­vel.</span>
+                                                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Mídia Expirada</span>
+                                                    <span className="text-[9px] text-slate-400 text-center px-4 leading-tight">Esta mídia temporária não está mais disponível.</span>
                                                 </div>
                                             ) : isAudio ? (
                                                 <div>
@@ -3682,7 +3682,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                                 <path d="M23 7l-7 5 7 5V7z" />
                                                                 <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
                                                             </svg>
-                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700/60">VÃ­deo</span>
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700/60">Vídeo</span>
                                                         </div>
                                                     )}
 
@@ -3744,7 +3744,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                                                             </svg>
                                                             <span className="text-[10px] font-medium uppercase tracking-widest text-white/90 drop-shadow">
-                                                                {item.lockedImagePrice && item.lockedImagePrice > 0 ? 'Desbloquear' : 'Revelar mÃ­dia'}
+                                                                {item.lockedImagePrice && item.lockedImagePrice > 0 ? 'Desbloquear' : 'Revelar mídia'}
                                                             </span>
                                                             {item.lockedImagePrice && item.lockedImagePrice > 0 ? (
                                                                 <span className="text-xs font-semibold text-purple-200 drop-shadow">
@@ -3752,7 +3752,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                                 </span>
                                                             ) : (
                                                                 <span className="text-xs font-semibold text-amber-200 drop-shadow">
-                                                                    GrÃ¡tis
+                                                                    Grátis
                                                                 </span>
                                                             )}
                                                             {item.isTemporary && item.expiryMinutes && (
@@ -3761,7 +3761,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                                         <circle cx="12" cy="12" r="10" />
                                                                         <polyline points="12 6 12 12 16 14" />
                                                                     </svg>
-                                                                    Expira apÃ³s {item.expiryMinutes < 1 ? `${Math.round(item.expiryMinutes * 60)}s` : `${item.expiryMinutes}min`}
+                                                                    Expira após {item.expiryMinutes < 1 ? `${Math.round(item.expiryMinutes * 60)}s` : `${item.expiryMinutes}min`}
                                                                 </span>
                                                             )}
                                                         </div>
@@ -3772,9 +3772,9 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                                     <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                                                                     <span className="text-[8px] font-bold text-white uppercase tracking-wider">
                                                                         {item.lockedImagePrice && item.lockedImagePrice > 0 
-                                                                            ? `Aguardando â€¢ R$ ${((item.lockedImagePrice || 0) / 100).toFixed(2)}` 
+                                                                            ? `Aguardando • R$ ${((item.lockedImagePrice || 0) / 100).toFixed(2)}`
                                                                             : item.isTemporary && item.expiryMinutes
-                                                                            ? `Aguardando â€¢ ${item.expiryMinutes < 1 ? `${Math.round(item.expiryMinutes * 60)}s` : `${item.expiryMinutes}min`}`
+                                                                            ? `Aguardando • ${item.expiryMinutes < 1 ? `${Math.round(item.expiryMinutes * 60)}s` : `${item.expiryMinutes}min`}`
                                                                             : 'Aguardando'
                                                                         }
                                                                     </span>
@@ -3826,7 +3826,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                                 <path d="M23 7l-7 5 7 5V7z" />
                                                                 <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
                                                             </svg>
-                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700/60">VÃ­deo</span>
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700/60">Vídeo</span>
                                                         </div>
                                                     )}
 
@@ -3837,7 +3837,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                             </div>
                                                             <div className="flex flex-col items-center gap-0.5">
                                                                 <span className="text-xs font-bold text-white drop-shadow-md tracking-wide">
-                                                                    {item.isVideo ? 'VÃ­deo recebido' : 'Foto recebida'}
+                                                                    {item.isVideo ? 'Vídeo recebido' : 'Foto recebida'}
                                                                 </span>
                                                                 <span className="text-[11px] font-medium text-white/90 drop-shadow-md bg-black/35 px-2.5 py-0.5 rounded-full border border-white/10 mt-1">
                                                                     Toque para visualizar
@@ -3858,7 +3858,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                                 });
                                                             }}
                                                             className="absolute top-2 right-2 z-20 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/15 flex items-center gap-1.5 shadow-md text-white/90 hover:text-white text-[10px] font-semibold active:scale-95 transition-all"
-                                                            title="Ocultar mÃ­dia"
+                                                            title="Ocultar mídia"
                                                         >
                                                             <EyeOff size={12} strokeWidth={2.2} />
                                                             <span>Ocultar</span>
@@ -3921,7 +3921,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                         </div>
                                                     )}
 
-                                                    {/* Badges de informaÃ§Ãµes para a profissional apÃ³s o desbloqueio */}
+                                                    {/* Badges de informações para a profissional após o desbloqueio */}
                                                     {isMine && (
                                                         <LockedMediaTypeBadge
                                                             isVideo={item.isVideo}
@@ -3934,7 +3934,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                             <div className="bg-emerald-500/80 backdrop-blur-md px-2 py-1.5 rounded-lg border border-emerald-400/20 flex items-center gap-1.5 shadow-md animate-in fade-in duration-200">
                                                                 <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                                                                 <span className="text-[8px] font-black text-white uppercase tracking-wider">
-                                                                    Desbloqueado â€¢ R$ {((item.lockedImagePrice || 0) / 100).toFixed(2)}
+                                                                    Desbloqueado • R$ {((item.lockedImagePrice || 0) / 100).toFixed(2)}
                                                                 </span>
                                                             </div>
                                                         </div>
@@ -4060,7 +4060,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     <div className="flex items-center justify-between bg-purple-50 border-l-4 border-purple-600 rounded-r-xl p-3 mb-3 animate-in slide-in-from-bottom-2 duration-150">
                         <div className="flex-1 min-w-0 pr-4">
                             <p className="text-[11px] font-black text-purple-700 uppercase tracking-wider mb-0.5">
-                                Respondendo a {replyingTo.senderId === user?.id ? 'VocÃª' : (receiver?.name || receiver?.username || 'UsuÃ¡rio')}
+                                Respondendo a {replyingTo.senderId === user?.id ? 'Você' : (receiver?.name || receiver?.username || 'Usuário')}
                             </p>
                             <p className="text-xs text-gray-600 truncate">
                                 {getReplyPreviewContent(replyingTo)}
@@ -4080,7 +4080,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
 
 
-                {/* Sheet de Preview e ConfiguraÃ§Ã£o da MÃ­dia */}
+                {/* Sheet de Preview e Configuração da Mídia */}
                 {selectedFile && userData?.isProfessional && (
                     <MediaComposerSheet
                         file={selectedFile}
@@ -4147,7 +4147,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                     <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
                                                 </svg>
                                             </div>
-                                            <span className="font-semibold text-xs">Enviar VÃ­deo</span>
+                                            <span className="font-semibold text-xs">Enviar Vídeo</span>
                                         </button>
                                     </div>
                                 </>
@@ -4170,7 +4170,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         <div onClick={() => inputRef.current?.focus()} className="flex-1 min-w-0 flex flex-col justify-center rounded-2xl px-3.5 py-2 min-h-[44px] max-h-[140px] transition-all bg-gray-100 cursor-text">
                             <textarea
                                 ref={inputRef}
-                                value={selectedFile ? "MÃ­dia selecionada para envio..." : messageText}
+                                value={selectedFile ? "Mídia selecionada para envio..." : messageText}
                                 disabled={!!selectedFile}
                                 onChange={(e) => handleTyping(e.target.value)}
                                 onKeyDown={handleKeyDown}
@@ -4267,8 +4267,8 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                     isClientToProfessional && balance <= 0
                                         ? 'ZERO_BALANCE_START'
                                         : (userData?.hasWelcomeCreditEnded
-                                            ? 'Seus crÃ©ditos de boas-vindas acabaram. Recarregue para continuar conversando.'
-                                            : 'VocÃª nÃ£o tem saldo suficiente para enviar uma mensagem de Ã¡udio. Por favor, recarregue sua carteira.')
+                                            ? 'Seus créditos de boas-vindas acabaram. Recarregue para continuar conversando.'
+                                            : 'Você não tem saldo suficiente para enviar uma mensagem de áudio. Por favor, recarregue sua carteira.')
                                 );
                             }}
                         />
@@ -4282,7 +4282,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
                     <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm flex flex-col items-center shadow-2xl relative overflow-hidden">
                         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-purple-500 to-pink-500" />
-                        <h3 className="font-bold text-xl text-gray-900 mb-4 tracking-tight">Enviar Presente ðŸŽ</h3>
+                        <h3 className="font-bold text-xl text-gray-900 mb-4 tracking-tight">Enviar Presente 🎁</h3>
                         <div className="w-full relative rounded-2xl overflow-hidden mb-6 aspect-square bg-purple-50 flex items-center justify-center">
                             <img src="/assets/gift.png" className="w-40 h-40 object-contain animate-bounce" style={{ animationDuration: '3s' }} />
                         </div>
@@ -4291,7 +4291,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                             <input type="number" step="0.01" className="bg-gray-50 border border-gray-100 rounded-2xl p-4 pl-10 w-full text-center text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all" placeholder="Valor" value={giftAmountStr} onChange={e => setGiftAmountStr(e.target.value)} />
                         </div>
                         <div className="flex gap-3 w-full">
-                            <button className="flex-1 h-12 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-semibold transition-colors" onClick={() => setGiftModalVisible(false)}>Agora nÃ£o</button>
+                            <button className="flex-1 h-12 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-semibold transition-colors" onClick={() => setGiftModalVisible(false)}>Agora não</button>
                             <button disabled={sendingGift || !giftAmountStr} className="flex-1 h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-semibold flex justify-center items-center transition-colors shadow-lg shadow-purple-600/30 disabled:opacity-50" onClick={handleSendGift}>
                                 {sendingGift ? (
                                     <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
@@ -4315,10 +4315,10 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                             </svg>
                         </div>
                         <h3 className="font-bold text-xl text-gray-900 mb-2 tracking-tight text-center">
-                            Desbloquear {unlockData.isVideo ? 'VÃ­deo' : 'Foto'}?
+                            Desbloquear {unlockData.isVideo ? 'Vídeo' : 'Foto'}?
                         </h3>
                         <p className="text-gray-500 text-sm text-center mb-6">
-                            VocÃª usarÃ¡ seu saldo para liberar este conteÃºdo exclusivo permanentemente.
+                            Você usará seu saldo para liberar este conteúdo exclusivo permanentemente.
                         </p>
                         
                         <div className="w-full bg-gray-50 rounded-2xl p-4 flex flex-col items-center mb-6 border border-gray-100">
@@ -4375,7 +4375,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                             <p className="font-bold text-gray-900">{date.toLocaleDateString('pt-BR')}</p>
                                         </div>
                                         <div className="bg-gray-50 p-4 rounded-2xl">
-                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">HorÃ¡rio</p>
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Horário</p>
                                             <p className="font-bold text-gray-900">{date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</p>
                                         </div>
                                     </div>
@@ -4394,14 +4394,14 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                         {showAsDebit ? 'Seu Investimento' : 'Seu Ganho'}
                                                     </p>
                                                     <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${showAsDebit ? 'bg-purple-200 text-purple-700' : 'bg-green-200 text-green-700'}`}>
-                                                        {showAsDebit ? 'DÃ©bito' : 'CrÃ©dito'}
+                                                        {showAsDebit ? 'Débito' : 'Crédito'}
                                                     </div>
                                                 </div>
                                                 <p className="text-4xl font-black text-gray-900 tracking-tight">
                                                     R$ {(displayAmount / 100).toFixed(2)}
                                                 </p>
                                                 <p className="text-[10px] text-gray-500 mt-2 font-medium">
-                                                    {isMediaUnlock ? 'MÃ­dia desbloqueada' : `${msg.charCount} caracteres enviados`}
+                                                    {isMediaUnlock ? 'Mídia desbloqueada' : `${msg.charCount} caracteres enviados`}
                                                 </p>
                                             </div>
                                         );
@@ -4453,12 +4453,12 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     const deltaX = e.touches[0].clientX - swipeTouchStartX.current;
                     const deltaY = e.touches[0].clientY - swipeTouchStartY.current;
                     
-                    // Determina a direÃ§Ã£o bloqueada na primeira movimentaÃ§Ã£o significativa
+                    // Determina a direção bloqueada na primeira movimentação significativa
                     if (swipeLockedRef.current === null && (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5)) {
                         swipeLockedRef.current = Math.abs(deltaX) >= Math.abs(deltaY) ? 'horizontal' : 'vertical';
                     }
                     
-                    // SÃ³ processa movimento horizontal bloqueado
+                    // Só processa movimento horizontal bloqueado
                     if (swipeLockedRef.current !== 'horizontal') return;
                     
                     let offset = deltaX;
@@ -4548,7 +4548,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                     key={item.url}
                                                     src={item.url}
                                                     className={`max-w-full max-h-full object-contain ${isBlurred ? 'blur-3xl scale-110' : ''}`}
-                                                    alt={`MÃ­dia ${idx + 1}`}
+                                                    alt={`Mídia ${idx + 1}`}
                                                 />
                                             )}
 
@@ -4571,7 +4571,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                     </div>
                                                     <div className="flex flex-col items-center gap-1">
                                                         <span className="text-base font-bold text-white drop-shadow">
-                                                            {item.isVideo ? 'VÃ­deo recebido' : 'Foto recebida'}
+                                                            {item.isVideo ? 'Vídeo recebido' : 'Foto recebida'}
                                                         </span>
                                                         <span className="text-xs font-medium text-white/80 drop-shadow bg-black/40 px-3 py-1 rounded-full border border-white/10 mt-1">
                                                             Toque para visualizar
@@ -4585,7 +4585,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                             </div>
                         </div>
 
-                        {/* Controles flutuantes â€” somem apÃ³s 1s de inatividade */}
+                        {/* Controles flutuantes — somem após 1s de inatividade */}
                         <div
                             className="absolute inset-0 z-20 pointer-events-none"
                             style={{
@@ -4656,7 +4656,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                 </button>
                             )}
 
-                            {/* Dots de paginaÃ§Ã£o */}
+                            {/* Dots de paginação */}
                             {mediaItems.length > 1 && mediaItems.length <= 20 && (
                                 <div className="absolute bottom-6 left-0 right-0 flex items-center justify-center gap-1.5 py-2">
                                     {mediaItems.map((_, i) => (
@@ -4677,14 +4677,14 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 );
             })()}
 
-            {/* ===== VIEWER FULLSCREEN DEDICADO PARA MÃDIA BLOQUEADA (PROFISSIONAL) ===== */}
+            {/* ===== VIEWER FULLSCREEN DEDICADO PARA MÍDIA BLOQUEADA (PROFISSIONAL) ===== */}
             {fullscreenLockedMessage !== null && (() => {
                 const isVideo = !!fullscreenLockedMessage.isVideo;
                 const mediaUrl = isVideo ? fullscreenLockedMessage.videoUrl : fullscreenLockedMessage.originalImageUrl;
                 
                 return (
                     <div className="fixed inset-0 z-[100] bg-black flex flex-col select-none overflow-hidden animate-in fade-in duration-200">
-                        {/* Container da mÃ­dia */}
+                        {/* Container da mídia */}
                         <div className="absolute inset-0 z-0 flex items-center justify-center" onClick={() => setControlsVisible(v => !v)}>
                             {isVideo ? (
                                 <VideoPlayer
@@ -4698,7 +4698,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                     key={mediaUrl}
                                     src={mediaUrl!}
                                     className="max-w-full max-h-full object-contain"
-                                    alt="MÃ­dia Bloqueada"
+                                    alt="Mídia Bloqueada"
                                 />
                             )}
                         </div>
@@ -4729,7 +4729,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                 <div className="pointer-events-auto flex items-center gap-1.5 bg-black/55 border border-white/10 px-3 py-1.5 rounded-full backdrop-blur-md shadow-md animate-in fade-in duration-300">
                                     <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                                     <span className="text-[10px] font-bold text-white uppercase tracking-wider">
-                                        Aguardando Abertura â€¢ R$ {((fullscreenLockedMessage.lockedImagePrice || 0) / 100).toFixed(2)}
+                                        Aguardando Abertura • R$ {((fullscreenLockedMessage.lockedImagePrice || 0) / 100).toFixed(2)}
                                     </span>
                                 </div>
                                 <div className="w-10" />
@@ -4739,7 +4739,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 );
             })()}
 
-            {/* ===== GALERIA DE MÃDIA (Vaul Drawer) ===== */}
+            {/* ===== GALERIA DE MÍDIA (Vaul Drawer) ===== */}
             <Drawer.Root open={galleryVisible} onOpenChange={setGalleryVisible}>
                 <Drawer.Portal>
                     <Drawer.Overlay className="fixed inset-0 z-[100] bg-black/60" />
@@ -4751,7 +4751,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
                             {/* Header */}
                             <div className="flex items-center justify-between">
-                                <Drawer.Title className="text-xl font-bold text-gray-900">MÃ­dia Compartilhada</Drawer.Title>
+                                <Drawer.Title className="text-xl font-bold text-gray-900">Mídia Compartilhada</Drawer.Title>
                                 <span className="text-sm text-gray-400 font-medium">
                                     {mediaItems.length === 0
                                         ? 'Nenhum item'
@@ -4761,7 +4761,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                             </div>
                         </div>
 
-                        {/* ConteÃºdo RolÃ¡vel */}
+                        {/* Conteúdo Rolável */}
                         <div className="w-full flex-1 overflow-y-auto flex flex-col px-6 pb-8 min-h-0">
 
                             {/* Grid de thumbnails */}
@@ -4776,7 +4776,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                         </svg>
                                     </div>
                                     <p className="text-gray-400 text-sm font-medium text-center">
-                                        Nenhuma imagem ou vÃ­deo enviado ainda
+                                        Nenhuma imagem ou vídeo enviado ainda
                                     </p>
                                 </div>
                             ) : (
@@ -4796,7 +4796,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                             >
                                                 <img
                                                     src={item.thumbnailUrl || item.url}
-                                                    alt={`MÃ­dia ${idx + 1}`}
+                                                    alt={`Mídia ${idx + 1}`}
                                                     className={`w-full h-full object-cover ${isBlurred ? 'blur-xl scale-110' : ''}`}
                                                 />
                                                 {isBlurred ? (
@@ -4822,7 +4822,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 </Drawer.Portal>
             </Drawer.Root>
 
-            {/* Modal de crÃ©dito promocional (cupom) resgatado */}
+            {/* Modal de crédito promocional (cupom) resgatado */}
             {couponClaimModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-5 select-none no-select">
                     <div
@@ -4855,7 +4855,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                     </div>
                                     <div className="min-w-0 pr-7">
                                         <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-purple-500">Saldo promocional</p>
-                                        <h2 className="text-[22px] font-semibold leading-tight tracking-normal text-gray-900">CrÃ©dito liberado para vocÃª</h2>
+                                        <h2 className="text-[22px] font-semibold leading-tight tracking-normal text-gray-900">Crédito liberado para você</h2>
                                     </div>
                                 </div>
 
@@ -4878,7 +4878,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                     </div>
                                     <div className="mt-4 h-px bg-purple-100" />
                                     <p className="mt-4 text-sm leading-relaxed text-gray-600">
-                                        O valor jÃ¡ entrou no seu saldo e pode ser usado nas conversas e conteÃºdos do app.
+                                        O valor já entrou no seu saldo e pode ser usado nas conversas e conteúdos do app.
                                     </p>
                                 </div>
 

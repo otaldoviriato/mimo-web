@@ -152,10 +152,10 @@ export function SettingsChatPage({
                         <div className="md:w-1/2 space-y-1">
                             <h4 className="text-sm font-bold text-slate-800">Alerta de Saldo Baixo (R$)</h4>
                             <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                                Define o saldo mÃ­nimo para exibir uma faixa de alerta dentro da sala de chat do cliente. Ao tocar na faixa, o BottomSheet de recarga Ã© aberto.
+                                Define o saldo mínimo para exibir uma faixa de alerta dentro da sala de chat do cliente. Ao tocar na faixa, o BottomSheet de recarga é aberto.
                             </p>
                             <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2">
-                                O valor padrÃ£o recomendado Ã© de <strong className="text-slate-600">R$ 10,00</strong>. Use 0 para desativar o alerta.
+                                O valor padrão recomendado é de <strong className="text-slate-600">R$ 10,00</strong>. Use 0 para desativar o alerta.
                             </p>
                         </div>
                         <div className="md:w-1/2 space-y-4">
@@ -172,7 +172,7 @@ export function SettingsChatPage({
                             </div>
                             <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
                                 <p className="text-[11px] text-blue-700 font-semibold">
-                                    ConfiguraÃ§Ã£o atual: clientes com saldo atÃ© <strong>{(lowBalanceThresholdInCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong> verÃ£o o alerta na sala.
+                                    Configuração atual: clientes com saldo até <strong>{(lowBalanceThresholdInCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong> verão o alerta na sala.
                                 </p>
                             </div>
                         </div>

@@ -10,12 +10,12 @@ export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
     try {
-        // userId Ã© opcional â€” a rota Ã© pÃºblica para permitir o Explorar sem login
+        // userId é opcional — a rota é pública para permitir o Explorar sem login
         const { userId } = await auth();
 
         await connectToDatabase();
 
-        // Profissionais logadas nÃ£o veem o Explorar
+        // Profissionais logadas não veem o Explorar
         if (userId) {
             const currentUser = await User.findOne({ clerkId: userId }).select('isProfessional').lean();
             if (currentUser?.isProfessional) return NextResponse.json({ users: [], hasMore: false });

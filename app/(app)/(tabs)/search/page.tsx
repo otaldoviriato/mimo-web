@@ -71,7 +71,7 @@ export default function SearchPage() {
         setLoading(false);
     };
 
-    // Resolve a transiÃ§Ã£o de visualizaÃ§Ã£o imediatamente para nÃ£o travar a animaÃ§Ã£o de volta
+    // Resolve a transição de visualização imediatamente para não travar a animação de volta
     useEffect(() => {
         if (typeof window !== 'undefined' && (window as any).__resolveTransition) {
             (window as any).__resolveTransition();
@@ -187,7 +187,7 @@ export default function SearchPage() {
             }).catch(() => {});
         }
 
-        // Emite telemetria de campanha para visualizaÃ§Ã£o de perfil no Explorar (apenas usuÃ¡rios comuns)
+        // Emite telemetria de campanha para visualização de perfil no Explorar (apenas usuários comuns)
         if ((user.clerkId || user.username) && !isStaff) {
             emitCampaignTelemetry({
                 eventType: 'profile_view',
@@ -258,7 +258,7 @@ export default function SearchPage() {
                     if (!cancelled) {
                         setFoundUsers(data.users || []);
                         if ((data.users || []).length === 0) {
-                            setError('Nenhum usuÃ¡rio encontrado com esse nome, @usuÃ¡rio ou e-mail.');
+                            setError('Nenhum usuário encontrado com esse nome, @usuário ou e-mail.');
                         }
                     }
                 } else {
@@ -270,7 +270,7 @@ export default function SearchPage() {
                 if (err.response?.status === 404) {
                     setError('Nenhum perfil encontrado');
                 } else {
-                    setError('NÃ£o foi possÃ­vel buscar agora');
+                    setError('Não foi possível buscar agora');
                 }
             } finally {
                 if (!cancelled) setLoading(false);
@@ -314,7 +314,7 @@ export default function SearchPage() {
                 <div className="max-w-md bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
                     <h2 className="text-base font-bold text-slate-800 mb-1">Vitrine do Marketplace</h2>
                     <p className="text-xs text-slate-500">
-                        O Explorar Ã© a Ã¡rea onde novos clientes descobrem o seu perfil para iniciar conversas.
+                        O Explorar é a área onde novos clientes descobrem o seu perfil para iniciar conversas.
                     </p>
                 </div>
             </div>
@@ -326,7 +326,7 @@ export default function SearchPage() {
 
     return (
         <div className="flex flex-col h-full bg-slate-50">
-            {/* Modern Search Bar - Sempre acessÃ­vel para Equipe ou ExpandÃ­vel para Clientes */}
+            {/* Modern Search Bar - Sempre acessível para Equipe ou Expandível para Clientes */}
             {(isSearchOpen || isTeam) && (
                 <div className="bg-white px-4 py-3 shrink-0 border-b border-slate-100 flex items-center gap-2 animate-in slide-in-from-top-2 duration-200 z-10 relative shadow-xs">
                     <div className="relative flex-1 group">
@@ -335,7 +335,7 @@ export default function SearchPage() {
                         </div>
                         <input
                             className="w-full pl-10 pr-10 py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-600/10 transition-all font-medium"
-                            placeholder={isTeam ? "Buscar por nome, @usuÃ¡rio ou e-mail..." : "Nome ou @usuÃ¡rio da criadora..."}
+                            placeholder={isTeam ? "Buscar por nome, @usuário ou e-mail..." : "Nome ou @usuário da criadora..."}
                             value={username}
                             onChange={(e) => {
                                 const nextValue = e.target.value;
@@ -394,7 +394,7 @@ export default function SearchPage() {
                     </div>
                 )}
 
-                {/* SeÃ§Ã£o Explorar / Vitrine */}
+                {/* Seção Explorar / Vitrine */}
                 {!username.trim() && (
                     <div className="flex-1 flex flex-col gap-4 animate-in fade-in duration-500 pt-1">
                         {isInitialLoading ? (
@@ -411,7 +411,7 @@ export default function SearchPage() {
                                     </div>
                                 ) : (
                                     <div className="flex-1 min-h-[50vh] flex items-center justify-center text-center text-slate-400 text-xs sm:text-sm font-medium py-12 px-4 animate-in fade-in duration-300">
-                                        <p>{isTeam ? 'Nenhum perfil disponÃ­vel no momento.' : 'Nenhuma criadora ativa no momento.'}</p>
+                                        <p>{isTeam ? 'Nenhum perfil disponível no momento.' : 'Nenhuma criadora ativa no momento.'}</p>
                                     </div>
                                 )}
                                 {!isTeam && (
@@ -429,7 +429,7 @@ export default function SearchPage() {
                     </div>
                 )}
 
-                {/* ExibiÃ§Ã£o de Resultados da Busca EspecÃ­fica */}
+                {/* Exibição de Resultados da Busca Específica */}
                 {username.trim().length > 0 && (
                     <div className="flex flex-col gap-4 animate-in fade-in duration-300 pt-1">
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">

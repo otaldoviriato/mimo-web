@@ -40,7 +40,9 @@ export async function grantWelcomeCredit(
         : (campaign?.amount ?? 300);
 
     // 2. Validação do tipo do usuário (somente cliente pode receber)
-    const user = await User.findOne({ clerkId: userId }).select('isProfessional onboardingStep email phone taxId birthDate name username photoUrl balance promotionalBalance');
+    const user = await User.findOne({ clerkId: userId }).select(
+        'isProfessional onboardingStep email phone taxId birthDate name username photoUrl balance promotionalBalance marketplaceWalletMigratedAt customerCashAvailableCents customerPromoAvailableCents'
+    );
     if (!user) {
         return { success: false, reason: 'user_not_found' };
     }
@@ -99,6 +101,18 @@ export async function grantWelcomeCredit(
     // 4. Validação de idempotência por usuário (apenas 1 concessão por usuário)
     const existingGrant = await CreditGrant.findOne({ userId });
     if (existingGrant) {
+        // Contingência para concessões criadas antes da correção da carteira migrada:
+        // o registro de campanha existia, mas customerPromoAvailableCents permanecia em zero.
+        if (existingGrant.status === 'active' && user.marketplaceWalletMigratedAt) {
+            await User.updateOne(
+                { clerkId: userId },
+                {
+                    $max: {
+                        customerPromoAvailableCents: existingGrant.amountRemaining,
+                    },
+                }
+            );
+        }
         return { success: false, reason: 'already_granted' };
     }
 

@@ -46,7 +46,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const { user } = useUser();
     const { data: userData, isLoading: isProfileLoading, refetch: refetchProfile } = useMyProfile();
     
-    // Garante que o perfil carregado no cache/Query pertence ao usuÃ¡rio atualmente logado no Clerk
+    // Garante que o perfil carregado no cache/Query pertence ao usuário atualmente logado no Clerk
     const isProfileValid = !!(userData && user && userData.clerkId === user.id);
     
     const onboardingStep = isProfileValid ? calculateOnboardingStep(userData) : null;
@@ -89,7 +89,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         const grantId = welcomeNotice.grantId;
         setWelcomeNotice(null);
         
-        // Remove do cache local para nÃ£o reabrir em outras navegaÃ§Ãµes rÃ¡pidas
+        // Remove do cache local para não reabrir em outras navegações rápidas
         queryClient.setQueryData(QueryKeys.me, (old: any) =>
             old ? { ...old, welcomeCreditNotice: null } : old
         );
@@ -106,7 +106,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         }
     };
 
-    // â”€â”€â”€ Socket Listeners Globais para SincronizaÃ§Ã£o de Estado â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // â”€â”€─ Socket Listeners Globais para Sincronização de Estado â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     useEffect(() => {
         if (!socket || !user?.id) return;
 
@@ -194,7 +194,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             );
         };
 
-        // 4. Invalida salas quando uma sala Ã© excluÃ­da
+        // 4. Invalida salas quando uma sala é excluída
         const handleRoomDeletedOnSocket = (data: { roomId: string }) => {
             queryClient.invalidateQueries({ queryKey: QueryKeys.rooms(user.id!) });
         };
@@ -212,10 +212,10 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         };
     }, [socket, socketVersion, user?.id, queryClient]);
 
-    // â”€â”€â”€ TÃ­tulo de NotificaÃ§Ã£o no Navegador â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // â”€â”€─ Título de Notificação no Navegador â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const totalUnreads = React.useMemo(() => {
         if (!user?.id) return 0;
-        // Filtra e conta a quantidade de salas (conversas) que possuem mensagens nÃ£o lidas
+        // Filtra e conta a quantidade de salas (conversas) que possuem mensagens não lidas
         return rooms.filter((room: any) => (room.unreadCount?.[user.id!] ?? 0) > 0).length;
     }, [rooms, user?.id]);
 
@@ -234,7 +234,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         if (isProfessionalReleased === false) {
-            // Inicia o timer da animaÃ§Ã£o de liberaÃ§Ã£o flutuante
+            // Inicia o timer da animação de liberação flutuante
             const fadeTimer = setTimeout(() => {
                 setFadeOutRelease(true);
             }, 2500);
@@ -299,9 +299,9 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     }, [isLoaded, isSignedIn, isFullyCompleted, pathname, searchParams, initialize, router]);
 
     useEffect(() => {
-        // Se a rota for o chat, deixamos a prÃ³pria pÃ¡gina de chat gerenciar a resoluÃ§Ã£o
+        // Se a rota for o chat, deixamos a própria página de chat gerenciar a resolução
         // para aguardar o carregamento das mensagens do cache.
-        // Para outras rotas, resolvemos a transiÃ§Ã£o pendente imediatamente.
+        // Para outras rotas, resolvemos a transição pendente imediatamente.
         if (pathname && !pathname.includes('/chat/')) {
             if (typeof window !== 'undefined' && (window as any).__resolveTransition) {
                 (window as any).__resolveTransition();
@@ -318,7 +318,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                 return;
             }
 
-            // Ignora a animaÃ§Ã£o View Transition de slide se estivermos navegando (voltando) entre abas principais do rodapÃ©
+            // Ignora a animação View Transition de slide se estivermos navegando (voltando) entre abas principais do rodapé
             const destination = window.location.pathname;
             if (isTabRoute(pathname) && isTabRoute(destination)) {
                 return;
@@ -371,7 +371,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                 const searchParams = new URLSearchParams(window.location.search);
                 const gift = searchParams.get('gift');
                 if (gift) {
-                    // localStorage persiste em redirects OAuth no PWA (sessionStorage pode ser destruÃ­do)
+                    // localStorage persiste em redirects OAuth no PWA (sessionStorage pode ser destruído)
                     localStorage.setItem('mimo_pending_gift', gift);
                 }
                 const referral = getReferralFromSearchParams(searchParams);
@@ -395,8 +395,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (isSignedIn && user) {
             setupAxiosInterceptors(getToken);
-            // Apenas renova/atualiza o token se a permissÃ£o jÃ¡ foi dada
-            // Evita disparar prompt automÃ¡tico no carregamento (bloqueado no iOS)
+            // Apenas renova/atualiza o token se a permissão já foi dada
+            // Evita disparar prompt automático no carregamento (bloqueado no iOS)
             if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
                 handleRequestPermission();
             }
@@ -421,7 +421,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        // Se o cliente (homem) logar ou criar conta e nÃ£o houver chats, redireciona para o Explorar (/search)
+        // Se o cliente (homem) logar ou criar conta e não houver chats, redireciona para o Explorar (/search)
         if (
             isFullyCompleted &&
             roomsLoaded &&
@@ -449,18 +449,18 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     if (!isSignedIn && !isPublicRoute(pathname)) return null;
     if (needsReceiptConsent) return <ReceiptConsentModal onAccepted={refetchProfile} />;
 
-    // Permite que /onboarding renderize seus prÃ³prios filhos â€” ele gerencia todo o fluxo de cadastro.
+    // Permite que /onboarding renderize seus próprios filhos — ele gerencia todo o fluxo de cadastro.
     if (pathname === '/onboarding') {
         return <>{children}</>;
     }
 
-    // â”€â”€ Guard de onboarding sÃ­ncrono â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // â”€â”€ Guard de onboarding síncrono â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     //
-    // Verifica NO CORPO DO RENDER (nÃ£o em useEffect) se o onboarding precisa
-    // ser concluÃ­do. O useEffect de redirect abaixo vai disparar logo em seguida,
-    // mas sem este guard sÃ­ncrono o app renderizaria brevemente antes do redirect
-    // (flash visual). A leitura de localStorage Ã© segura aqui porque este componente
-    // Ã© 'use client' e nunca executa no servidor.
+    // Verifica NO CORPO DO RENDER (não em useEffect) se o onboarding precisa
+    // ser concluído. O useEffect de redirect abaixo vai disparar logo em seguida,
+    // mas sem este guard síncrono o app renderizaria brevemente antes do redirect
+    // (flash visual). A leitura de localStorage é segura aqui porque este componente
+    // é 'use client' e nunca executa no servidor.
     //
     if (!shouldBlockAppRender && !isNavInitialized && (!isPublicRoute(pathname) || !isLoaded)) {
         return <div className="min-h-screen bg-slate-50" role="status" aria-label="Carregando tela" />;
@@ -486,12 +486,12 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                 {basePath || isStackBasePath(pathname) ? <StackBase path={basePath || pathname} active={screens.every(screen => screen.isClosing)} /> : children}
             </div>
 
-            {/* AnimaÃ§Ã£o Premium de Acesso Liberado */}
+            {/* Animação Premium de Acesso Liberado */}
             {isProfessionalReleased === false && (
                 <div className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-50 text-slate-900 overflow-hidden transition-all duration-[1000ms] ease-in-out ${
                     fadeOutRelease ? 'opacity-0 blur-md scale-95 pointer-events-none' : 'opacity-100 blur-none scale-100'
                 }`}>
-                    {/* Efeito de flash e liberaÃ§Ã£o */}
+                    {/* Efeito de flash e liberação */}
                     <div className="absolute inset-0 bg-gradient-to-br from-purple-100/60 via-fuchsia-100/60 to-slate-50 animate-pulse"></div>
                     <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-50"></div>
                     
@@ -509,7 +509,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                                 Acesso Liberado!
                             </h1>
                             <p className="text-sm font-bold text-purple-700">
-                                Sua conta foi aprovada! Prepare-se para a experiÃªncia.
+                                Sua conta foi aprovada! Prepare-se para a experiência.
                             </p>
                         </div>
                         <div className="flex space-x-1.5 justify-center items-center pt-2">
@@ -570,7 +570,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
             <NotificationPromptModal />
 
-            {/* Modal de CrÃ©dito de Boas-vindas */}
+            {/* Modal de Crédito de Boas-vindas */}
             {welcomeNotice && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-5 select-none no-select">
                     <div
@@ -579,7 +579,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                     />
                     <div className="relative w-full max-w-[340px] animate-in fade-in slide-in-from-bottom-5 zoom-in-95 duration-250">
                         <div className="relative overflow-hidden rounded-[28px] border border-slate-100 bg-white p-6 text-slate-900 shadow-2xl shadow-purple-950/15">
-                            {/* BotÃ£o Fechar discreto */}
+                            {/* Botão Fechar discreto */}
                             <button
                                 type="button"
                                 aria-label="Fechar"
@@ -589,39 +589,39 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                                 <X className="w-4 h-4" />
                             </button>
 
-                            {/* Ãcone de Presente Harmonioso */}
+                            {/* Ícone de Presente Harmonioso */}
                             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 ring-8 ring-purple-50/50">
                                 <Gift className="h-7 w-7" />
                             </div>
 
-                            {/* TÃ­tulo & Mensagem Enxuta */}
+                            {/* Título & Mensagem Enxuta */}
                             <div className="text-center space-y-1.5">
                                 <h2 className="text-xl font-black text-slate-900 tracking-tight">
-                                    {welcomeNotice.title || 'VocÃª ganhou crÃ©ditos de presente!'}
+                                    {welcomeNotice.title || 'Você ganhou créditos de presente!'}
                                 </h2>
                                 <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                                    Adicionamos crÃ©ditos na sua conta para vocÃª conversar e trocar mensagens com as criadoras agora mesmo.
+                                    Adicionamos créditos na sua conta para você conversar e trocar mensagens com as criadoras agora mesmo.
                                 </p>
                             </div>
 
-                            {/* Linha Discreta de Saldo DisponÃ­vel (Sem nÃºmero gigante) */}
+                            {/* Linha Discreta de Saldo Disponível (Sem número gigante) */}
                             <div className="my-5 flex items-center justify-between rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3">
                                 <div className="flex items-center gap-2">
                                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                    <span className="text-xs font-semibold text-slate-600">Saldo disponÃ­vel</span>
+                                    <span className="text-xs font-semibold text-slate-600">Saldo disponível</span>
                                 </div>
                                 <span className="text-xs font-bold text-purple-700 bg-purple-50 border border-purple-100/80 px-2.5 py-1 rounded-full">
                                     {((welcomeNotice.amount) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                 </span>
                             </div>
 
-                            {/* BotÃ£o de AÃ§Ã£o */}
+                            {/* Botão de Ação */}
                             <button
                                 type="button"
                                 onClick={handleCloseWelcomeNotice}
                                 className="w-full h-12 rounded-2xl bg-purple-600 hover:bg-purple-700 active:scale-[0.98] text-white font-bold text-sm shadow-md shadow-purple-600/25 transition-all flex items-center justify-center cursor-pointer"
                             >
-                                ComeÃ§ar a conversar
+                                Começar a conversar
                             </button>
                         </div>
                     </div>

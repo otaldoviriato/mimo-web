@@ -84,25 +84,25 @@ export default function ChatsPage() {
     const queryClient = useQueryClient();
     const { socket, connected, socketService, socketVersion } = useSocket(user?.id);
     
-    // Controle do banner de incentivo Ã  verificaÃ§Ã£o de identidade
+    // Controle do banner de incentivo à verificação de identidade
     const [hideIdentityPrompt, setHideIdentityPrompt] = useState(true);
 
     // Estado de "digitando" por sala: { [roomId]: boolean }
     const [typingRooms, setTypingRooms] = useState<Record<string, boolean>>({});
-    // Rastreia os timeouts ativos de digitaÃ§Ã£o por sala para evitar conflitos concorrentes
+    // Rastreia os timeouts ativos de digitação por sala para evitar conflitos concorrentes
     const typingTimeouts = useRef<Record<string, NodeJS.Timeout>>({});
 
-    // Modal de crÃ©dito promocional (gift code)
+    // Modal de crédito promocional (gift code)
     const [giftModal, setGiftModal] = useState(false);
     const [giftAmount, setGiftAmount] = useState<number | null>(null);
     const giftClaimedRef = useRef(false);
 
-    // Modal de confirmaÃ§Ã£o de exclusÃ£o
+    // Modal de confirmação de exclusão
     const [deleteConfirmRoomId, setDeleteConfirmRoomId] = useState<string | null>(null);
     const deletingRoomIds = useRef(new Set<string>());
     const [hiddenRoomIds, setHiddenRoomIds] = useState<string[]>([]);
 
-    // Estado para o menu de opÃ§Ãµes da conversa (Drawer / Bottom Sheet)
+    // Estado para o menu de opções da conversa (Drawer / Bottom Sheet)
     const [selectedRoomIdForMenu, setSelectedRoomIdForMenu] = useState<string | null>(null);
 
     // Refs para controle de Long Press e Scroll
@@ -111,7 +111,7 @@ export default function ChatsPage() {
     const touchStartPos = useRef<{ x: number; y: number } | null>(null);
     const hasMoved = useRef(false);
 
-    // Estado e controle para verificaÃ§Ã£o de identidade
+    // Estado e controle para verificação de identidade
     const prevStatusRef = useRef<string | null | undefined>(undefined);
     const [showSuccessToast, setShowSuccessToast] = useState(false);
     const [copiedProfileLink, setCopiedProfileLink] = useState(false);
@@ -121,7 +121,7 @@ export default function ChatsPage() {
 
         const profileUrl = buildProfileShareUrl(window.location.origin, myProfile.username, user?.id || myProfile.clerkId);
         const name = myProfile.name || `@${myProfile.username}`;
-        const shareText = `Ei! Esse Ã© meu perfil no MimoChat - ${name}. Me manda uma mensagem, adoro conversar!`;
+        const shareText = `Ei! Esse é meu perfil no MimoChat - ${name}. Me manda uma mensagem, adoro conversar!`;
 
         if (typeof navigator !== 'undefined' && navigator.share) {
             try {
@@ -145,7 +145,7 @@ export default function ChatsPage() {
         } catch {}
     };
 
-    // Resolve a transiÃ§Ã£o pendente assim que a lista de chats Ã© montada
+    // Resolve a transição pendente assim que a lista de chats é montada
     useEffect(() => {
         if (typeof window !== 'undefined' && (window as any).__resolveTransition) {
             (window as any).__resolveTransition();
@@ -207,7 +207,7 @@ export default function ChatsPage() {
     const renderVerificationBanner = () => {
         if (!myProfile) return null;
         if (!myProfile.isProfessional) return null;
-        // O card de verificaÃ§Ã£o de identidade sÃ³ deve aparecer para criadoras que JÃ tenham ao menos 1 conversa iniciada
+        // O card de verificação de identidade só deve aparecer para criadoras que JÁ tenham ao menos 1 conversa iniciada
         if ((rooms?.length ?? 0) === 0) return null;
 
         // Se estiver pendente
@@ -219,9 +219,9 @@ export default function ChatsPage() {
                             <Clock className="w-4.5 h-4.5" />
                         </div>
                         <div className="min-w-0">
-                            <h3 className="font-bold text-amber-900 text-xs md:text-sm">VerificaÃ§Ã£o em anÃ¡lise â³</h3>
+                            <h3 className="font-bold text-amber-900 text-xs md:text-sm">Verificação em análise ⏳</h3>
                             <p className="text-[11px] md:text-xs text-amber-700 mt-1 leading-snug max-w-xl">
-                                Seus documentos foram enviados para anÃ¡lise. A concessÃ£o do seu selo de verificado ocorrerÃ¡ em atÃ© 48 horas.
+                                Seus documentos foram enviados para análise. A concessão do seu selo de verificado ocorrerá em até 48 horas.
                             </p>
                         </div>
                     </div>
@@ -239,9 +239,9 @@ export default function ChatsPage() {
                                 <AlertCircle className="w-4.5 h-4.5" />
                             </div>
                             <div className="min-w-0">
-                                <h3 className="font-bold text-red-950 text-xs md:text-sm">VerificaÃ§Ã£o recusada âŒ</h3>
+                                <h3 className="font-bold text-red-950 text-xs md:text-sm">Verificação recusada ❌</h3>
                                 <p className="text-[11px] md:text-xs text-red-700 mt-1 leading-snug max-w-xl">
-                                    {myProfile.notes || 'Infelizmente sua verificaÃ§Ã£o de identidade nÃ£o foi aprovada. Verifique suas fotos enviadas nos Ajustes.'}
+                                    {myProfile.notes || 'Infelizmente sua verificação de identidade não foi aprovada. Verifique suas fotos enviadas nos Ajustes.'}
                                 </p>
                             </div>
                         </div>
@@ -259,7 +259,7 @@ export default function ChatsPage() {
             );
         }
 
-        // Se nÃ£o for aprovado e nem pendente, e nÃ£o estiver ocultado temporariamente
+        // Se não for aprovado e nem pendente, e não estiver ocultado temporariamente
         if (myProfile.identityStatus !== 'approved' && !hideIdentityPrompt) {
             return (
                 <div className="mx-4 mt-2 sm:mt-3 bg-white/95 backdrop-blur-md border border-purple-200/90 rounded-2xl p-4 shadow-lg shadow-purple-500/10 animate-in fade-in slide-in-from-top-2 duration-300 relative pointer-events-auto">
@@ -278,9 +278,9 @@ export default function ChatsPage() {
                             <ShieldCheck className="w-5 h-5" />
                         </div>
                         <div className="min-w-0 flex-1 pr-4">
-                            <h3 className="font-bold text-purple-900 text-xs md:text-sm">Ganhe mais credibilidade com o Selo Verificado! ðŸ’œ</h3>
+                            <h3 className="font-bold text-purple-900 text-xs md:text-sm">Ganhe mais credibilidade com o Selo Verificado! 💜</h3>
                             <p className="text-[10px] md:text-xs text-purple-700 mt-1 leading-snug">
-                                Perfis verificados por documentos recebem o selo oficial ao lado do nome, gerando muito mais confianÃ§a e seguranÃ§a na nossa comunidade.
+                                Perfis verificados por documentos recebem o selo oficial ao lado do nome, gerando muito mais confiança e segurança na nossa comunidade.
                             </p>
                             <div className="mt-3.5 flex justify-end">
                                 <button
@@ -304,7 +304,7 @@ export default function ChatsPage() {
         return null;
     };
 
-    // â”€â”€â”€ Listeners de WebSocket em tempo real â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // â”€â”€─ Listeners de WebSocket em tempo real â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€─
     useEffect(() => {
         if (!socket || !user?.id) return;
 
@@ -317,9 +317,9 @@ export default function ChatsPage() {
         };
 
         // 2. Exibe "digitando..." por sala na lista
-        // O servidor emite global_typing para user:${receiverId} sempre que alguÃ©m digita
+        // O servidor emite global_typing para user:${receiverId} sempre que alguém digita
         const handleGlobalTyping = (data: { roomId: string; userId: string; isTyping: boolean }) => {
-            // Limpa qualquer timeout ativo anterior para esta sala (de exibiÃ§Ã£o ou ocultaÃ§Ã£o)
+            // Limpa qualquer timeout ativo anterior para esta sala (de exibição ou ocultação)
             if (typingTimeouts.current[data.roomId]) {
                 clearTimeout(typingTimeouts.current[data.roomId]);
                 delete typingTimeouts.current[data.roomId];
@@ -329,14 +329,14 @@ export default function ChatsPage() {
                 // Mostra "digitando" imediatamente
                 setTypingRooms((prev) => ({ ...prev, [data.roomId]: true }));
 
-                // Auto-limpa apÃ³s 5s como fallback (caso o evento isTyping=false nÃ£o chegue)
+                // Auto-limpa após 5s como fallback (caso o evento isTyping=false não chegue)
                 typingTimeouts.current[data.roomId] = setTimeout(() => {
                     setTypingRooms((prev) => ({ ...prev, [data.roomId]: false }));
                     delete typingTimeouts.current[data.roomId];
                 }, 5000);
             } else {
                 // Ao parar de digitar, adicionamos um atraso de 2s para ocultar
-                // Isso previne que a tela pisque se o usuÃ¡rio parar e recomeÃ§ar logo em seguida
+                // Isso previne que a tela pisque se o usuário parar e recomeçar logo em seguida
                 typingTimeouts.current[data.roomId] = setTimeout(() => {
                     setTypingRooms((prev) => ({ ...prev, [data.roomId]: false }));
                     delete typingTimeouts.current[data.roomId];
@@ -370,10 +370,10 @@ export default function ChatsPage() {
         };
     }, [socket, socketVersion, user?.id, queryClient]);
 
-    // â”€â”€â”€ Resgate de gift code â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // Funciona em dois cenÃ¡rios:
-    // 1. UsuÃ¡rio nÃ£o logado acessa /login?gift=X â†’ GiftCapture salva no sessionStorage â†’ redireciona para /chats
-    // 2. UsuÃ¡rio jÃ¡ logado acessa /chats?gift=X diretamente â†’ lemos window.location.search aqui
+    // â”€â”€─ Resgate de gift code â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Funciona em dois cenários:
+    // 1. Usuário não logado acessa /login?gift=X → GiftCapture salva no sessionStorage → redireciona para /chats
+    // 2. Usuário já logado acessa /chats?gift=X diretamente → lemos window.location.search aqui
     useEffect(() => {
         if (!user?.id || giftClaimedRef.current) return;
 
@@ -381,14 +381,14 @@ export default function ChatsPage() {
         const fromUrl = new URLSearchParams(window.location.search).get('gift');
         const openChat = new URLSearchParams(window.location.search).get('openChat');
 
-        // Se formos abrir um chat virtual por cima, nÃ£o resgatamos o cupom aqui na lista de conversas.
-        // O chat virtual cuidarÃ¡ do resgate.
+        // Se formos abrir um chat virtual por cima, não resgatamos o cupom aqui na lista de conversas.
+        // O chat virtual cuidará do resgate.
         if (openChat) return;
 
         const code = stored || fromUrl;
         if (!code) return;
 
-        // Trava global de sessÃ£o do front-end para evitar requisiÃ§Ãµes concorrentes duplicadas
+        // Trava global de sessão do front-end para evitar requisições concorrentes duplicadas
         if (typeof window !== 'undefined') {
             const claims = (window as any).__claimingGiftCodes = (window as any).__claimingGiftCodes || {};
             if (claims[code]) return;
@@ -423,16 +423,16 @@ export default function ChatsPage() {
         });
     }, [user?.id, queryClient]);
 
-    // Abre a tela de conversa fÃ­sica usando o roteador de transiÃ§Ã£o com dados prÃ©-carregados
+    // Abre a tela de conversa física usando o roteador de transição com dados pré-carregados
     const handleOpenChat = (otherUserId: string, initialUser?: any) => {
         if (user?.id && otherUserId && socketService) {
-            // Se o usuÃ¡rio logado for cliente, adianta o joinRoom imediatamente no evento de interaÃ§Ã£o
-            // para que a autoliquidaÃ§Ã£o das mensagens pendentes seja processada no backend durante a animaÃ§Ã£o de rota
+            // Se o usuário logado for cliente, adianta o joinRoom imediatamente no evento de interação
+            // para que a autoliquidação das mensagens pendentes seja processada no backend durante a animação de rota
             if (!myProfile?.isProfessional) {
                 try {
                     socketService.joinRoom(user.id, otherUserId);
                 } catch (e) {
-                    console.error('[ChatsPage] Falha ao prÃ©-conectar sala:', e);
+                    console.error('[ChatsPage] Falha ao pré-conectar sala:', e);
                 }
             }
         }
@@ -491,7 +491,7 @@ export default function ChatsPage() {
             deletingRoomIds.current.delete(roomId);
             setHiddenRoomIds(ids => ids.filter(id => id !== roomId));
             console.error('Erro ao excluir sala:', error);
-            alert('NÃ£o foi possÃ­vel excluir a conversa. Ela foi restaurada. Tente novamente.');
+            alert('Não foi possível excluir a conversa. Ela foi restaurada. Tente novamente.');
             return;
         }
 
@@ -594,12 +594,12 @@ export default function ChatsPage() {
     return (
         <div className="relative flex flex-col h-full">
 
-            {/* Banner de verificaÃ§Ã£o flutuando sobre a lista */}
+            {/* Banner de verificação flutuando sobre a lista */}
             <div className="absolute top-0 inset-x-0 z-20 pointer-events-none">
                 {renderVerificationBanner()}
             </div>
 
-            {/* Modal de crÃ©dito promocional */}
+            {/* Modal de crédito promocional */}
             {giftModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-5">
                     <div
@@ -626,7 +626,7 @@ export default function ChatsPage() {
                                     </div>
                                     <div className="min-w-0 pr-7">
                                         <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-purple-500">Saldo promocional</p>
-                                        <h2 className="text-[22px] font-semibold leading-tight tracking-normal text-gray-900">CrÃ©dito liberado para vocÃª</h2>
+                                        <h2 className="text-[22px] font-semibold leading-tight tracking-normal text-gray-900">Crédito liberado para você</h2>
                                     </div>
                                 </div>
 
@@ -646,7 +646,7 @@ export default function ChatsPage() {
                                     </div>
                                     <div className="mt-4 h-px bg-purple-100" />
                                     <p className="mt-4 text-sm leading-relaxed text-gray-600">
-                                        O valor jÃ¡ entrou no seu saldo e pode ser usado nas conversas e conteÃºdos do app.
+                                        O valor já entrou no seu saldo e pode ser usado nas conversas e conteúdos do app.
                                     </p>
                                 </div>
 
@@ -662,7 +662,7 @@ export default function ChatsPage() {
                 </div>
             )}
 
-            {/* Modal de Sucesso na VerificaÃ§Ã£o */}
+            {/* Modal de Sucesso na Verificação */}
             {showSuccessToast && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center p-5">
                     <div
@@ -676,27 +676,27 @@ export default function ChatsPage() {
                             </div>
                             <h2 className="text-xl font-bold text-gray-900 mb-2">Conta Verificada!</h2>
                             <p className="text-sm text-gray-600 leading-relaxed mb-6">
-                                ParabÃ©ns! Sua identidade foi validada pelo nosso time. Seu perfil jÃ¡ estÃ¡ pÃºblico e pronto para receber mensagens e mimos. Hora de faturar! ðŸ’¸ðŸš€
+                                Parabéns! Sua identidade foi validada pelo nosso time. Seu perfil já está público e pronto para receber mensagens e mimos. Hora de faturar! 💸🚀
                             </p>
                             <button
                                 onClick={() => setShowSuccessToast(false)}
                                 className="w-full rounded-2xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-purple-600/20 hover:from-purple-700 hover:to-fuchsia-700 transition-all active:scale-[0.99]"
                             >
-                                ComeÃ§ar a faturar
+                                Começar a faturar
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Drawer de OpÃ§Ãµes da Conversa */}
+            {/* Drawer de Opções da Conversa */}
             <Drawer.Root open={!!selectedRoomIdForMenu} onOpenChange={(open) => !open && setSelectedRoomIdForMenu(null)}>
                 <Drawer.Portal>
                     <Drawer.Overlay className="fixed inset-0 z-[115] bg-slate-950/40 backdrop-blur-[1px]" />
                     <Drawer.Content className="fixed inset-x-0 bottom-0 z-[120] mx-auto flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-t-[28px] bg-white shadow-[0_-20px_60px_rgba(15,23,42,0.15)] outline-none">
                         <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-200 mt-4 shrink-0" />
                         <div className="px-6 pb-8 pt-2">
-                            <Drawer.Title className="text-base font-bold text-gray-900 mb-5 text-center">OpÃ§Ãµes da conversa</Drawer.Title>
+                            <Drawer.Title className="text-base font-bold text-gray-900 mb-5 text-center">Opções da conversa</Drawer.Title>
                             <div className="flex flex-col gap-3">
                                 <button
                                     onClick={() => {
@@ -722,7 +722,7 @@ export default function ChatsPage() {
                 </Drawer.Portal>
             </Drawer.Root>
 
-            {/* Modal de ConfirmaÃ§Ã£o de ExclusÃ£o */}
+            {/* Modal de Confirmação de Exclusão */}
             {deleteConfirmRoomId && (
                 <div className="fixed inset-0 z-[120] flex items-center justify-center p-5">
                     <div
@@ -739,7 +739,7 @@ export default function ChatsPage() {
                                     <h3 className="text-base font-bold text-gray-900 leading-tight">Excluir conversa?</h3>
                                 </div>
                                 <p className="text-xs text-gray-500 leading-relaxed mb-6">
-                                    Essa conversa serÃ¡ ocultada da sua lista de conversas. O histÃ³rico de mensagens continuarÃ¡ salvo de forma segura.
+                                    Essa conversa será ocultada da sua lista de conversas. O histórico de mensagens continuará salvo de forma segura.
                                 </p>
                                 <div className="flex gap-3">
                                     <button
@@ -780,7 +780,7 @@ export default function ChatsPage() {
                         {myProfile?.isProfessional ? (
                             <div className="flex flex-col items-center max-w-xs">
                                 <p className="text-xs text-slate-500 leading-relaxed mb-6">
-                                    Compartilhe seu perfil para comeÃ§ar a receber mensagens.
+                                    Compartilhe seu perfil para começar a receber mensagens.
                                 </p>
 
                                 <button
@@ -804,20 +804,20 @@ export default function ChatsPage() {
                         ) : myProfile?.isTeam ? (
                             <div className="flex flex-col items-center max-w-xs">
                                 <p className="text-xs text-slate-500 leading-relaxed mb-6">
-                                    As conversas oficiais iniciadas pela equipe aparecerÃ£o aqui.
+                                    As conversas oficiais iniciadas pela equipe aparecerão aqui.
                                 </p>
                                 <button
                                     type="button"
                                     onClick={() => router.push('/activation')}
                                     className="inline-flex items-center justify-center gap-2 rounded-full bg-purple-600 hover:bg-purple-700 active:scale-[0.98] transition-all text-white text-xs font-bold py-3 px-6 shadow-md shadow-purple-600/20 cursor-pointer"
                                 >
-                                    Abrir ativaÃ§Ã£o
+                                    Abrir ativação
                                 </button>
                             </div>
                         ) : (
                             <div className="flex flex-col items-center max-w-xs">
                                 <p className="text-xs text-slate-500 leading-relaxed mb-6">
-                                    Suas conversas no MimoChat aparecerÃ£o aqui. Explore perfis para comeÃ§ar!
+                                    Suas conversas no MimoChat aparecerão aqui. Explore perfis para começar!
                                 </p>
                                 <button
                                     type="button"
@@ -843,7 +843,7 @@ export default function ChatsPage() {
                             })
                             .map((room: Room) => {
                             const otherUserId = room.participants.find((p) => p !== user?.id);
-                            // roomId como string de clerkIds â€” corresponde ao que o servidor envia no typing
+                            // roomId como string de clerkIds — corresponde ao que o servidor envia no typing
                             const derivedRoomId = room.roomId ?? room.participants.slice().sort().join('_');
                             const myUnreadCount = user?.id && room.unreadCount ? (room.unreadCount[user.id] || 0) : 0;
                             const hasUnread = myUnreadCount > 0;
@@ -913,13 +913,13 @@ export default function ChatsPage() {
                                                 <div className="flex items-center min-w-0 gap-2">
                                                     <span className={`text-base truncate ${hasUnread ? 'font-bold text-gray-900' : 'font-semibold text-gray-800'}`}>
                                                         {room.otherUser?.isDeleted
-                                                            ? 'UsuÃ¡rio ExcluÃ­do'
-                                                            : (room.otherUser?.name || room.otherUser?.username || 'UsuÃ¡rio ExcluÃ­do')}
+                                                            ? 'Usuário Excluído'
+                                                            : (room.otherUser?.name || room.otherUser?.username || 'Usuário Excluído')}
                                                     </span>
                                                     {!room.otherUser?.isDeleted && room.otherUser?.isTeam && (
                                                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
                                                             <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                                                            Equipe Mimo âœ“
+                                                            Equipe Mimo ✓
                                                         </span>
                                                     )}
                                                     {!room.otherUser?.isDeleted && room.otherUser?.isProfessional && room.otherUser?.identityStatus === 'approved' && (
@@ -936,7 +936,7 @@ export default function ChatsPage() {
                                                 </span>
                                             </div>
                                             <div className="flex items-center justify-between">
-                                                {/* Digitando... ou Ãºltima mensagem */}
+                                                {/* Digitando... ou última mensagem */}
                                                 {isRoomTyping ? (
                                                     <span className="text-sm text-purple-500 italic flex items-center gap-1.5">
                                                         digitando
@@ -957,27 +957,27 @@ export default function ChatsPage() {
                                                         {(() => {
                                                             const isProfessionalUser = Boolean(myProfile?.isProfessional);
 
-                                                            // 1. Para usuÃ¡ria do tipo profissional: SEMPRE exibe o conteÃºdo da mensagem normal
+                                                            // 1. Para usuária do tipo profissional: SEMPRE exibe o conteúdo da mensagem normal
                                                             if (isProfessionalUser) {
                                                                 return room.lastMessage || 'Toque para iniciar a conversa!';
                                                             }
 
-                                                            // 2. Para usuÃ¡rio masculino/cliente:
-                                                            // Exibe "Nova Mensagem" sem revelar o conteÃºdo quando pendente
+                                                            // 2. Para usuário masculino/cliente:
+                                                            // Exibe "Nova Mensagem" sem revelar o conteúdo quando pendente
                                                             const isPendingPrompt =
                                                                 room.lastMessageBillingStatus === 'pending' ||
                                                                 room.lastMessage === 'Nova mensagem' ||
                                                                 room.lastMessage === 'Nova Mensagem' ||
                                                                 room.lastMessage?.includes('Recarregue') ||
                                                                 room.lastMessage?.includes('Aguardando saldo') ||
-                                                                room.lastMessage?.includes('ConteÃºdo bloqueado');
+                                                                room.lastMessage?.includes('Conteúdo bloqueado');
 
                                                             if (isPendingPrompt) {
-                                                                const isAudio = room.lastMessage?.includes('ðŸŽ™ï¸') || room.lastMessage?.toLowerCase().includes('Ã¡udio') || room.lastMessage?.toLowerCase().includes('audio');
+                                                                const isAudio = room.lastMessage?.includes('🎙ï¸') || room.lastMessage?.toLowerCase().includes('áudio') || room.lastMessage?.toLowerCase().includes('audio');
                                                                 return (
                                                                     <span className="text-purple-600 inline-flex items-center gap-1 font-semibold">
                                                                         <Lock className="w-3.5 h-3.5 text-purple-500 shrink-0" />
-                                                                        {isAudio ? 'Nova mensagem de Ã¡udio' : 'Nova Mensagem'}
+                                                                        {isAudio ? 'Nova mensagem de áudio' : 'Nova Mensagem'}
                                                                     </span>
                                                                 );
                                                             }
