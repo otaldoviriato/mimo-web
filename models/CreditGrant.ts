@@ -12,6 +12,7 @@ export interface ICreditGrant extends Document {
     firstIp?: string;
     metadata?: Record<string, any>;
     noticeShown: boolean;
+    creditedAt?: Date;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -74,6 +75,7 @@ const CreditGrantSchema = new Schema<ICreditGrant>({
         default: false,
         required: true,
     },
+    creditedAt: { type: Date },
 }, {
     timestamps: true,
 });

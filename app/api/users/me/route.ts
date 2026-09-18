@@ -10,7 +10,7 @@ import { Transaction } from '@/models/Transaction';
 import { MicroTransaction } from '@/models/MicroTransaction';
 import { Subscription } from '@/models/Subscription';
 import { CampaignVisit } from '@/models/CampaignVisit';
-import { grantWelcomeCredit } from '@/lib/creditCampaign';
+import { grantWelcomeCredit, getWelcomeCreditNotice } from '@/lib/creditCampaign';
 import { Resend } from 'resend';
 import { subscriptionPriceBRLToCents } from '@/lib/subscriptionBilling';
 import { sendAdminAlert } from '@/lib/adminAlerts';
@@ -286,10 +286,7 @@ export async function GET(request: NextRequest) {
                 }
 
                 const welcomeResult = await grantWelcomeCredit(user.clerkId, user.email, ip, user.phone, user.taxId, campaignParams);
-                // Recarrega também quando uma concessão existente foi reconciliada.
-                // Sem isso, a auto-correção abaixo receberia o documento anterior e
-                // sobrescreveria novamente a carteira promocional com saldo zero.
-                if (welcomeResult.success || welcomeResult.reason === 'already_granted') {
+                if (welcomeResult.success) {
                     const updatedUser = await User.findOne({ clerkId: userId });
                     if (updatedUser) {
                         user = updatedUser;
@@ -304,20 +301,7 @@ export async function GET(request: NextRequest) {
         let welcomeCreditNotice = null;
         if (user.isProfessional === false) {
             try {
-                const activeUnshownGrant = await CreditGrant.findOne({
-                    userId: user.clerkId,
-                    status: 'active',
-                    noticeShown: false
-                }).populate('campaignId');
-
-                if (activeUnshownGrant) {
-                    welcomeCreditNotice = {
-                        grantId: activeUnshownGrant._id.toString(),
-                        amount: activeUnshownGrant.amountGranted,
-                        title: 'Você ganhou créditos de presente!',
-                        description: 'Liberamos créditos na sua carteira para você conversar e conhecer as criadoras agora mesmo.'
-                    };
-                }
+                welcomeCreditNotice = await getWelcomeCreditNotice(user.clerkId);
             } catch (noticeErr: any) {
                 console.error('[GET /api/users/me] Erro ao buscar aviso de crédito:', noticeErr);
             }

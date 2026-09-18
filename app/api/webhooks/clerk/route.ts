@@ -4,7 +4,6 @@ import { headers } from 'next/headers';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { Resend } from 'resend';
-import { grantWelcomeCredit } from '@/lib/creditCampaign';
 import { Campaign } from '@/models/Campaign';
 import { CampaignVisit } from '@/models/CampaignVisit';
 
@@ -88,8 +87,6 @@ export async function POST(req: Request) {
                     professionalAvailableCents: 0,
                     professionalReservedForWithdrawalCents: 0,
                     marketplaceWalletMigratedAt: new Date(),
-                    receiptTermsVersion: RECEIPT_TERMS_VERSION,
-                    receiptTermsAcceptedAt: new Date(),
                 }
             },
             { upsert: true, new: true }
@@ -108,16 +105,8 @@ export async function POST(req: Request) {
 
         console.log(`✅ Clerk Webhook: User created: ${generatedUsername} (Professional: ${isProfessional}, Status: ${professionalStatus})`);
 
-        // Se o usuário não for profissional (ou seja, for cliente), concede o crédito de boas-vindas
-        if (isProfessional === false) {
-            try {
-                const reqHeaders = await headers();
-                const ip = reqHeaders.get('x-forwarded-for')?.split(',')[0].trim() || undefined;
-                await grantWelcomeCredit(id, email, ip, undefined, undefined);
-            } catch (creditErr) {
-                console.error('Erro ao conceder crédito de boas-vindas no webhook do Clerk:', creditErr);
-            }
-        }
+        // O IP deste POST pertence ao Clerk, não ao cliente. A concessão
+        // acontece no primeiro GET autenticado /users/me com o IP real.
 
         // Envio de e-mail de notificação para o admin desativado conforme solicitado
     }
