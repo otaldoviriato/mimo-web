@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState } from 'react';
 import { useSignIn, useSignUp } from '@clerk/nextjs/legacy';
@@ -95,9 +95,6 @@ export default function LoginPromptModal({
     };
 
     const prepareLoginState = (isFullRedirect = false) => {
-        // Email activation stays on this mounted screen: its draft and route
-        // already exist in memory. Only OAuth needs redirect recovery storage.
-        if (!isFullRedirect) return;
         storePostAuthRedirect(returnTo);
         if (pendingMessage && typeof window !== 'undefined') {
             sessionStorage.setItem(PENDING_CHAT_MESSAGE_KEY, pendingMessage);

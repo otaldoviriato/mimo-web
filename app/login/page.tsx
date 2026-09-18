@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { clearMimoClientSession } from '@/lib/clientSession';
 import { REFERRAL_STORAGE_KEY, getReferralFromSearchParams, type ReferralMetadata } from '@/lib/referral';
-import { getPendingPostAuthRedirect, POST_AUTH_REDIRECT_STORAGE_KEY } from '@/lib/postAuthRedirect';
+import { getPendingPostAuthRedirect, consumePostAuthRedirect, POST_AUTH_REDIRECT_STORAGE_KEY } from '@/lib/postAuthRedirect';
 import { CAMPAIGN_ATTRIBUTION_STORAGE_KEY } from '@/components/CampaignVisitTracker';
 
 function GiftCapture() {
@@ -90,10 +90,11 @@ export default function LoginPage() {
             try {
                 const res = await fetch('/api/users/me', { credentials: 'same-origin' });
                 if (res.ok) {
-                    // Sessão válida no servidor: navega para o app
+                    // Sessão válida no servidor: navega para o app ou destino pendente
                     localStorage.setItem('mimo_post_login_check_rooms', 'true');
                     sessionStorage.removeItem('mimo_has_navigated_chats');
-                    window.location.href = '/chats';
+                    const target = consumePostAuthRedirect('/chats');
+                    window.location.href = target;
                 } else {
                     // Sessão desincronizada (ex: 401 no localhost/servidor): limpa a sessão fantasma
                     console.warn('[LoginPage] Sessão do cliente desincronizada com o servidor. Resetando estado...');
@@ -280,7 +281,8 @@ export default function LoginPage() {
                         beforeEmit: () => {
                             localStorage.setItem('mimo_post_login_check_rooms', 'true');
                             sessionStorage.removeItem('mimo_has_navigated_chats');
-                            window.location.href = '/chats';
+                            const target = consumePostAuthRedirect('/chats');
+                            window.location.href = target;
                         }
                     } as any);
                 } else {
@@ -295,7 +297,8 @@ export default function LoginPage() {
                         beforeEmit: () => {
                             localStorage.setItem('mimo_post_login_check_rooms', 'true');
                             sessionStorage.removeItem('mimo_has_navigated_chats');
-                            window.location.href = '/chats';
+                            const target = consumePostAuthRedirect('/chats');
+                            window.location.href = target;
                         }
                     } as any);
                 }
@@ -346,7 +349,7 @@ export default function LoginPage() {
             const oauthParams = {
                 strategy: 'oauth_google',
                 redirectUrl: '/sso-callback',
-                redirectUrlComplete: '/chats',
+                redirectUrlComplete: pendingRedirect || '/chats',
                 oidcPrompt: 'select_account',
             } as const;
 

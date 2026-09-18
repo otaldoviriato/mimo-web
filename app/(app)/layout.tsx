@@ -285,6 +285,9 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                     if (pending !== href) {
                         if (resolveStackRoute(pending)) {
                             href = pending;
+                            if (window.location.pathname !== pending) {
+                                window.history.replaceState(window.history.state, '', pending);
+                            }
                         } else {
                             router.replace(pending);
                             return;
@@ -427,6 +430,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             roomsLoaded &&
             !userData?.isProfessional &&
             pathname === '/chats' &&
+            screens.length === 0 &&
             !readStackEntry(window.history.state)
         ) {
             const hasPostLoginFlag = typeof window !== 'undefined' && localStorage.getItem('mimo_post_login_check_rooms') === 'true';
@@ -443,7 +447,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                 sessionStorage.setItem('mimo_has_navigated_chats', 'true');
             }
         }
-    }, [isProfileResolved, isFullyCompleted, needsReceiptConsent, roomsLoaded, userData?.isProfessional, rooms, pathname, router]);
+    }, [isProfileResolved, isFullyCompleted, needsReceiptConsent, roomsLoaded, userData?.isProfessional, rooms, pathname, screens.length, router]);
 
     // Em rotas públicas, não bloquear renderização por falta de login
     if (!isSignedIn && !isPublicRoute(pathname)) return null;

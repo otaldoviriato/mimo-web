@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { AuthenticateWithRedirectCallback } from '@clerk/nextjs';
+import { getPendingPostAuthRedirect } from '@/lib/postAuthRedirect';
 
 function LoadingCard() {
     const [progress, setProgress] = useState(0);
@@ -70,6 +71,8 @@ function LoadingCard() {
 }
 
 export default function SSOCallbackPage() {
+    const [targetRedirect] = useState(() => getPendingPostAuthRedirect() || '/chats');
+
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4">
             <div className="w-full max-w-sm text-center">
@@ -96,7 +99,7 @@ export default function SSOCallbackPage() {
             {/* Componente que processa a autenticação do Clerk por baixo dos panos */}
             {/* Required when a new OAuth user is transferred from sign-in to sign-up. */}
             <div id="clerk-captcha" />
-            <AuthenticateWithRedirectCallback signUpForceRedirectUrl="/chats" signInForceRedirectUrl="/chats" />
+            <AuthenticateWithRedirectCallback signUpForceRedirectUrl={targetRedirect} signInForceRedirectUrl={targetRedirect} />
         </div>
     );
 }
