@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import { useSignIn, useSignUp } from '@clerk/nextjs/legacy';
 import { useAuth } from '@clerk/nextjs';
 import { Drawer } from 'vaul';
+import { useQueryClient } from '@tanstack/react-query';
+import { QueryKeys } from '@/hooks/useQueries';
 import { storePostAuthRedirect } from '@/lib/postAuthRedirect';
 import { REFERRAL_STORAGE_KEY } from '@/lib/referral';
 import { CAMPAIGN_ATTRIBUTION_STORAGE_KEY } from '@/components/CampaignVisitTracker';
@@ -33,6 +35,7 @@ export default function LoginPromptModal({
     const { isLoaded: signInLoaded, signIn, setActive: setSignInActive } = useSignIn();
     const { isLoaded: signUpLoaded, signUp, setActive: setSignUpActive } = useSignUp();
 
+    const queryClient = useQueryClient();
     const [step, setStep] = useState<'initial' | 'email_input' | 'code_input'>('initial');
     const [slideDirection, setSlideDirection] = useState<'forward' | 'backward'>('forward');
     const [email, setEmail] = useState('');
@@ -257,6 +260,25 @@ export default function LoginPromptModal({
         setEmailLoading(true);
         setError('');
 
+        const syncSessionAndProfile = async () => {
+            try {
+                // Chama /api/users/me para acionar a concessão de contingência de boas-vindas no servidor
+                const res = await fetch('/api/users/me', { credentials: 'same-origin' });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data?.user) {
+                        queryClient.setQueryData(QueryKeys.me, data.user);
+                        if (typeof window !== 'undefined') {
+                            localStorage.setItem('mimo_profile', JSON.stringify(data.user));
+                        }
+                    }
+                }
+            } catch (syncErr) {
+                console.warn('[LoginPromptModal] Erro ao sincronizar perfil imediatamente:', syncErr);
+            }
+            await queryClient.invalidateQueries({ queryKey: QueryKeys.me });
+        };
+
         try {
             if (flowType === 'signUp') {
                 await signUp.attemptEmailAddressVerification({ code: cleanCode });
@@ -265,7 +287,7 @@ export default function LoginPromptModal({
                     if (setSignUpActive) {
                         await setSignUpActive({ session: signUp.createdSessionId });
                     }
-                    // Auth-enabled profile queries synchronize in the background.
+                    await syncSessionAndProfile();
                     onClose();
                     if (onLoginSuccess) {
                         onLoginSuccess();
@@ -280,7 +302,7 @@ export default function LoginPromptModal({
                     if (setSignInActive) {
                         await setSignInActive({ session: signIn.createdSessionId });
                     }
-                    // Auth-enabled profile queries synchronize in the background.
+                    await syncSessionAndProfile();
                     onClose();
                     if (onLoginSuccess) {
                         onLoginSuccess();

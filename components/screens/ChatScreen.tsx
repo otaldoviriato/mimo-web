@@ -5265,6 +5265,12 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     recipientUsername={receiver?.username}
                     pendingMessage={messageText}
                     onClose={() => setShowLoginModal(false)}
+                    onLoginSuccess={() => {
+                        queryClient.invalidateQueries({ queryKey: QueryKeys.me });
+                        if (user?.id) {
+                            queryClient.invalidateQueries({ queryKey: QueryKeys.rooms(user.id) });
+                        }
+                    }}
                 />,
                 document.body
             )}
