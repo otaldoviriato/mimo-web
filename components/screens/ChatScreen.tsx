@@ -4485,16 +4485,19 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                             const minH = itemSize * 2;
                                             const maxH = Math.min(390, typeof window !== 'undefined' ? window.innerHeight * 0.55 : 390);
                                             const currentH = el ? el.getBoundingClientRect().height : (recentMediaInteractiveHeight || minH);
-                                            const threshold = minH + (maxH - minH) * 0.35; // 35% do caminho expande ou retrai
 
                                             if (!recentMediaExpanded) {
-                                                if (currentH > threshold) {
+                                                // Para expandir, precisa subir 35% do percurso
+                                                const expandThreshold = minH + (maxH - minH) * 0.35;
+                                                if (currentH > expandThreshold) {
                                                     setRecentMediaExpanded(true);
                                                 } else {
                                                     setRecentMediaExpanded(false);
                                                 }
                                             } else {
-                                                if (currentH < threshold) {
+                                                // Para recolher, uma pequena puxada para baixo (apenas 12% do percurso ou 25px) já colapsa
+                                                const collapseThreshold = maxH - Math.max(25, (maxH - minH) * 0.12);
+                                                if (currentH < collapseThreshold) {
                                                     setRecentMediaExpanded(false);
                                                 } else {
                                                     setRecentMediaExpanded(true);
@@ -4539,10 +4542,10 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                 fileInputRef.current?.click();
                                             }
                                         }}
-                                        className="aspect-square bg-white hover:bg-purple-50 text-purple-700 flex items-center justify-center transition-colors active:scale-95 group"
+                                        className="aspect-square bg-purple-100/60 hover:bg-purple-100 text-purple-600 flex items-center justify-center transition-colors active:scale-95 group"
                                         aria-label="Adicionar mídia do aparelho"
                                     >
-                                        <Plus size={32} strokeWidth={2.2} className="group-hover:scale-110 transition-transform text-purple-700" />
+                                        <Plus size={32} strokeWidth={2.2} className="group-hover:scale-110 transition-transform text-purple-600" />
                                     </button>
 
                                     {/* Lista de mídias recentes com pequena margem sutil */}
