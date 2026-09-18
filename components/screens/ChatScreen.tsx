@@ -4446,8 +4446,11 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                             if (deltaY > 5 || isDraggingRecentMediaRef.current) {
                                                 isDraggingRecentMediaRef.current = true;
                                                 setIsDraggingRecentMedia(true);
-                                                const minH = dragStartHeightRef.current || 180;
-                                                const maxH = Math.min(380, window.innerHeight * 0.55);
+                                                const containerW = el ? el.clientWidth : window.innerWidth;
+                                                const cols = containerW >= 640 ? 5 : 4;
+                                                const itemSize = containerW / cols;
+                                                const minH = dragStartHeightRef.current || (itemSize * 2);
+                                                const maxH = Math.min(390, window.innerHeight * 0.55);
                                                 const targetHeight = Math.max(minH, Math.min(maxH, minH + deltaY));
                                                 setRecentMediaInteractiveHeight(targetHeight);
                                                 if (e.cancelable) {
@@ -4460,8 +4463,11 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                             if (deltaY < -5 || isDraggingRecentMediaRef.current) {
                                                 isDraggingRecentMediaRef.current = true;
                                                 setIsDraggingRecentMedia(true);
-                                                const startH = dragStartHeightRef.current || 380;
-                                                const minH = 180;
+                                                const containerW = el ? el.clientWidth : window.innerWidth;
+                                                const cols = containerW >= 640 ? 5 : 4;
+                                                const itemSize = containerW / cols;
+                                                const minH = itemSize * 2;
+                                                const startH = dragStartHeightRef.current || Math.min(390, window.innerHeight * 0.55);
                                                 const targetHeight = Math.max(minH, Math.min(startH, startH + deltaY));
                                                 setRecentMediaInteractiveHeight(targetHeight);
                                                 if (e.cancelable) {
@@ -4473,9 +4479,12 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                     onTouchEnd={() => {
                                         if (isDraggingRecentMediaRef.current) {
                                             const el = recentMediaContainerRef.current;
-                                            const currentH = el ? el.getBoundingClientRect().height : (recentMediaInteractiveHeight || 180);
-                                            const minH = 180;
-                                            const maxH = Math.min(380, typeof window !== 'undefined' ? window.innerHeight * 0.55 : 380);
+                                            const containerW = el ? el.clientWidth : (typeof window !== 'undefined' ? window.innerWidth : 360);
+                                            const cols = containerW >= 640 ? 5 : 4;
+                                            const itemSize = containerW / cols;
+                                            const minH = itemSize * 2;
+                                            const maxH = Math.min(390, typeof window !== 'undefined' ? window.innerHeight * 0.55 : 390);
+                                            const currentH = el ? el.getBoundingClientRect().height : (recentMediaInteractiveHeight || minH);
                                             const threshold = minH + (maxH - minH) * 0.35; // 35% do caminho expande ou retrai
 
                                             if (!recentMediaExpanded) {
@@ -4508,14 +4517,15 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                             ? { height: `${recentMediaInteractiveHeight}px`, maxHeight: `${recentMediaInteractiveHeight}px` }
                                             : {})
                                     }}
-                                    className={`grid grid-cols-4 sm:grid-cols-5 w-full select-none bg-slate-200 gap-[1.5px] p-[1.5px] ${
+                                    className={`w-full select-none bg-slate-200 ${
                                         isDraggingRecentMedia 
                                             ? 'overflow-hidden transition-none' 
                                             : recentMediaExpanded 
-                                                ? 'max-h-[380px] h-[380px] overflow-y-auto transition-[height,max-height] duration-300 ease-out' 
-                                                : 'max-h-[50vw] sm:max-h-48 overflow-hidden transition-[height,max-height] duration-300 ease-out'
+                                                ? 'max-h-[390px] h-[390px] overflow-y-auto transition-[height,max-height] duration-300 ease-out overscroll-contain' 
+                                                : 'max-h-[calc(50vw+3px)] sm:max-h-[calc((100%/5)*2)] overflow-hidden transition-[height,max-height] duration-300 ease-out'
                                     }`}
                                 >
+                                    <div className="grid grid-cols-4 sm:grid-cols-5 w-full gap-[1.5px] p-[1.5px]">
                                     {/* Item 0: Botão de Adicionar da Galeria/Dispositivo */}
                                     <button
                                         type="button"
@@ -4585,6 +4595,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                             </div>
                                         );
                                     })}
+                                    </div>
                                 </div>
                             )}
                         </div>
