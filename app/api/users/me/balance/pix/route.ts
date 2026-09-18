@@ -104,7 +104,7 @@ export async function GET() {
 
     const transactions = await Transaction.find({
       userId,
-      source: { $in: ['recharge', 'gift'] },
+      source: { $in: ['recharge', 'gift', 'campaign'] },
       status: 'PAID',
     })
       .sort({ createdAt: -1 })

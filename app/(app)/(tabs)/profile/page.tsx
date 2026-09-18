@@ -432,14 +432,16 @@ export default function ProfilePage() {
     // â”€â”€─ LAYOUT CLIENTE (COMUM COM SALDO E RECARGAS) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€─
     const depositHistoryItems = (depositHistory?.transactions ?? []).map((tx) => ({
         id: tx.id,
-        amount: tx.source === 'gift' ? tx.amount / 100 : tx.amount,
+        amount: tx.source === 'gift' || tx.source === 'campaign' ? tx.amount / 100 : tx.amount,
         createdAt: tx.createdAt,
         label: tx.source === 'gift'
             ? `Cupom${typeof tx.metadata?.giftCode === 'string' ? ` ${tx.metadata.giftCode}` : ''}`
+            : tx.source === 'campaign'
+                ? 'Crédito promocional'
             : tx.type === 'CC'
                 ? 'Cartão de Crédito'
                 : 'Pix',
-        type: tx.source === 'gift' ? 'gift' : tx.type === 'CC' ? 'card' : 'pix'
+        type: tx.source === 'gift' || tx.source === 'campaign' ? 'gift' : tx.type === 'CC' ? 'card' : 'pix'
     }));
 
     const teamMemberSince = userData?.createdAt

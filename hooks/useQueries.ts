@@ -703,7 +703,7 @@ export function useDepositHistory() {
                     id: string;
                     amount: number;
                     status: string;
-                    source: 'recharge' | 'gift';
+                    source: 'recharge' | 'gift' | 'campaign';
                     type: string;
                     metadata?: Record<string, unknown>;
                     createdAt: string;

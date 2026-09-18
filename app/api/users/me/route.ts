@@ -286,7 +286,10 @@ export async function GET(request: NextRequest) {
                 }
 
                 const welcomeResult = await grantWelcomeCredit(user.clerkId, user.email, ip, user.phone, user.taxId, campaignParams);
-                if (welcomeResult.success) {
+                // Recarrega também quando uma concessão existente foi reconciliada.
+                // Sem isso, a auto-correção abaixo receberia o documento anterior e
+                // sobrescreveria novamente a carteira promocional com saldo zero.
+                if (welcomeResult.success || welcomeResult.reason === 'already_granted') {
                     const updatedUser = await User.findOne({ clerkId: userId });
                     if (updatedUser) {
                         user = updatedUser;
