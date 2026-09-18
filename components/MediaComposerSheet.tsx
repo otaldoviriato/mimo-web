@@ -47,7 +47,10 @@ export function MediaComposerSheet({
     onConfirm 
 }: MediaComposerSheetProps) {
     const initPriceVal = initialPriceInCents > 0 ? initialPriceInCents / 100 : 0;
-    const [mediaPriceStr, setMediaPriceStr] = useState(initPriceVal > 0 ? initPriceVal.toFixed(2) : '');
+    const initialPriceStr = initPriceVal > 0 
+        ? (Number.isInteger(initPriceVal) ? initPriceVal.toString() : initPriceVal.toFixed(2)) 
+        : '';
+    const [mediaPriceStr, setMediaPriceStr] = useState(initialPriceStr);
     const [mediaPriceType, setMediaPriceType] = useState<'free' | 'paid'>(initPriceVal > 0 ? 'paid' : 'free');
     const [mediaPriceFormatted, setMediaPriceFormatted] = useState(
         initPriceVal > 0 
@@ -364,11 +367,12 @@ export function MediaComposerSheet({
                             <div className="flex flex-col gap-2.5 p-3.5">
                                 <div className="flex flex-wrap gap-2">
                                     {PRICE_OPTIONS.map((opt) => {
+                                        const numericPrice = parseFloat(mediaPriceStr);
                                         const isSelected = opt.value === 'free'
                                             ? mediaPriceType === 'free'
                                             : opt.value === 'custom'
-                                            ? mediaPriceType === 'paid' && !['5', '10', '20', '50'].includes(mediaPriceStr)
-                                            : mediaPriceType === 'paid' && mediaPriceStr === opt.value;
+                                            ? mediaPriceType === 'paid' && !['5', '10', '20', '50'].includes(mediaPriceStr) && !['5', '10', '20', '50'].includes(numericPrice.toString())
+                                            : mediaPriceType === 'paid' && (mediaPriceStr === opt.value || (!isNaN(numericPrice) && numericPrice === opt.price));
                                         return (
                                             <button
                                                 key={opt.value}
@@ -399,13 +403,12 @@ export function MediaComposerSheet({
                                         );
                                     })}
                                 </div>
-                                {mediaPriceType === 'paid' && !['5', '10', '20', '50'].includes(mediaPriceStr) && (
+                                {mediaPriceType === 'paid' && !['5', '10', '20', '50'].includes(mediaPriceStr) && !['5', '10', '20', '50'].includes(parseFloat(mediaPriceStr).toString()) && (
                                     <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 animate-in slide-in-from-top-1 duration-150">
                                         <span className="text-sm font-bold text-slate-400">R$</span>
                                         <input
                                             type="text"
                                             inputMode="decimal"
-                                            autoFocus
                                             className="flex-1 bg-transparent text-sm font-semibold text-slate-800 focus:outline-none placeholder:text-slate-300"
                                             placeholder="0,00"
                                             value={mediaPriceFormatted.replace('R$', '').trim() === '0,00' ? '' : mediaPriceFormatted.replace('R$', '').trim()}

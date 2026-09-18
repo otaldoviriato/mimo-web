@@ -4459,7 +4459,10 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                             }
                                         } 
                                         // Estado 2: Expandido com scroll no topo arrastando para baixo
-                                        else if (recentMediaExpanded && (atTop || isDragAtTopScrollRef.current)) {
+                                        // IMPORTANTE: Só inicia o arrasto de colapso se este gesto de toque COMEÇOU com o scroll no topo.
+                                        // Se o usuário estava scrollando a lista e chegou ao topo no meio do gesto, não colapsa;
+                                        // ele precisa soltar o toque e fazer um novo deslize para baixo a partir do topo.
+                                        else if (recentMediaExpanded && isDragAtTopScrollRef.current && atTop) {
                                             if (deltaY < -5 || isDraggingRecentMediaRef.current) {
                                                 isDraggingRecentMediaRef.current = true;
                                                 setIsDraggingRecentMedia(true);
