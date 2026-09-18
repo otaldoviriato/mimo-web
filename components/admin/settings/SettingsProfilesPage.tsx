@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Camera } from 'lucide-react';
+import { Camera, Plus, X } from 'lucide-react';
 import { UnsavedChangesBanner } from './UnsavedChangesBanner';
 import type { UseSettingsReturn } from '@/hooks/admin/useSettings';
 
@@ -14,6 +14,7 @@ type Props = Pick<UseSettingsReturn,
     | 'newClientHoursThreshold' | 'setNewClientHoursThreshold'
     | 'activeRechargedClientDaysThreshold' | 'setActiveRechargedClientDaysThreshold'
     | 'activeUnrechargedClientHoursThreshold' | 'setActiveUnrechargedClientHoursThreshold'
+    | 'availableConversationBadges' | 'setAvailableConversationBadges'
     | 'isDirtyProfiles' | 'saving' | 'saveSettings'
 >;
 
@@ -41,9 +42,26 @@ export function SettingsProfilesPage({
     newClientHoursThreshold, setNewClientHoursThreshold,
     activeRechargedClientDaysThreshold, setActiveRechargedClientDaysThreshold,
     activeUnrechargedClientHoursThreshold, setActiveUnrechargedClientHoursThreshold,
+    availableConversationBadges, setAvailableConversationBadges,
     isDirtyProfiles, saving, saveSettings,
 }: Props) {
+    const [newBadgeText, setNewBadgeText] = React.useState('');
     const inputCls = 'w-full max-w-xs px-3.5 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700 shadow-sm';
+
+    const handleAddBadge = (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        const trimmed = newBadgeText.trim();
+        if (!trimmed) return;
+        if (availableConversationBadges.some(b => b.toLowerCase() === trimmed.toLowerCase())) {
+            return;
+        }
+        setAvailableConversationBadges([...availableConversationBadges, trimmed]);
+        setNewBadgeText('');
+    };
+
+    const handleRemoveBadge = (badgeToRemove: string) => {
+        setAvailableConversationBadges(availableConversationBadges.filter(b => b !== badgeToRemove));
+    };
 
     return (
         <div className="space-y-6">
@@ -206,6 +224,57 @@ export function SettingsProfilesPage({
                         />
                     </div>
                 </SettingField>
+
+                <div className="mt-6 mb-4 pt-6 border-t border-slate-100">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Características da Conversa (Badges)</h3>
+                    <p className="text-xs text-slate-400 font-medium mt-1">
+                        Defina as opções de badges disponíveis para as profissionais selecionarem em seus perfis (ex: Troca de fotos, Troca de vídeos, Sexting).
+                    </p>
+                </div>
+
+                <div className="py-4 space-y-4">
+                    <div className="flex flex-wrap gap-2 items-center">
+                        {availableConversationBadges && availableConversationBadges.length > 0 ? (
+                            availableConversationBadges.map((badge) => (
+                                <span
+                                    key={badge}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 text-purple-700 text-xs font-semibold border border-purple-100 shadow-2xs"
+                                >
+                                    <span>{badge}</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRemoveBadge(badge)}
+                                        title={`Remover badge "${badge}"`}
+                                        className="w-4 h-4 rounded-full hover:bg-purple-200/60 flex items-center justify-center text-purple-500 hover:text-purple-800 transition-colors cursor-pointer"
+                                    >
+                                        <X size={12} />
+                                    </button>
+                                </span>
+                            ))
+                        ) : (
+                            <p className="text-xs text-slate-400 italic">Nenhum badge cadastrado no momento.</p>
+                        )}
+                    </div>
+
+                    <form onSubmit={handleAddBadge} className="flex items-center gap-2 max-w-md pt-2">
+                        <input
+                            type="text"
+                            value={newBadgeText}
+                            onChange={(e) => setNewBadgeText(e.target.value)}
+                            placeholder="Nome da característica (ex: Fetiches)..."
+                            maxLength={40}
+                            className="flex-1 px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/25 focus:border-purple-500 font-medium text-slate-700 shadow-xs"
+                        />
+                        <button
+                            type="submit"
+                            disabled={!newBadgeText.trim()}
+                            className="inline-flex items-center gap-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer disabled:cursor-not-allowed"
+                        >
+                            <Plus size={14} />
+                            Adicionar
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
     );

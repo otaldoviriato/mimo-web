@@ -27,6 +27,7 @@ interface Props {
         subscriptionPrice?: number;
         chargePerCharSubscribers?: number;
         chargePerCharNonSubscribers?: number;
+        conversationBadges?: string[];
         isOnline?: boolean;
     };
     publicItems: ProfileGalleryItem[];
@@ -218,6 +219,22 @@ export function ProfessionalProfilePresentation({ user, publicItems, exclusiveIt
                         <div className="mt-5">
                             <p id={bioId} ref={bioRef} className={`whitespace-pre-line break-words text-base leading-6 text-slate-600 ${expanded ? '' : 'line-clamp-4'}`}>{bio}</p>
                             {(bioOverflows || expanded) && <button type="button" aria-expanded={expanded} aria-controls={bioId} onClick={() => setExpanded(!expanded)} className="mt-2 min-h-11 text-sm font-semibold text-purple-600 hover:text-purple-800">{expanded ? 'Mostrar menos' : 'Ler mais'}</button>}
+                        </div>
+                    )}
+
+                    {user.conversationBadges && user.conversationBadges.length > 0 && (
+                        <div className="mt-5 space-y-2">
+                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Características da conversa</h3>
+                            <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                {user.conversationBadges.map((badge) => (
+                                    <span
+                                        key={badge}
+                                        className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200/80 shadow-2xs"
+                                    >
+                                        {badge}
+                                    </span>
+                                ))}
+                            </div>
                         </div>
                     )}
                 </section>

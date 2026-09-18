@@ -363,6 +363,7 @@ export default function ProfilePage() {
                             subscriptionPrice: userData?.subscriptionPrice,
                             chargePerCharSubscribers: userData?.chargePerCharSubscribers,
                             chargePerCharNonSubscribers: userData?.chargePerCharNonSubscribers,
+                            conversationBadges: userData?.conversationBadges,
                             isOnline: userData?.isOnline,
                         }}
                         publicItems={publicGalleryItems}

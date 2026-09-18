@@ -528,6 +528,15 @@ export async function GET(request: NextRequest) {
                     createdAt: card.createdAt,
                 })),
                 bio: user.bio || '',
+                conversationBadges: user.conversationBadges || [],
+                availableConversationBadges: settings?.availableConversationBadges || [
+                    'Troca de fotos',
+                    'Troca de vídeos',
+                    'Sexting',
+                    'Conversas sensuais',
+                    'Chamada de áudio',
+                    'Fetiches'
+                ],
                 isAdmin: user.clerkId === 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM' || Boolean(settings?.adminClerkIds?.includes(user.clerkId)),
                 maxPricePerChar,
                 maxSubscriptionPrice,
@@ -572,7 +581,7 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, completeProfile, subscriptionPrice, isSubscriptionEnabled, bio, emailNotificationsEnabled, newUserNotificationsEnabled, hasSentFirstMessage, hideFromExplore, birthDate, city, state } = body;
+        const { username, name, photoUrl, coverUrl, phone, taxId, isProfessional, completeProfile, subscriptionPrice, isSubscriptionEnabled, bio, conversationBadges, emailNotificationsEnabled, newUserNotificationsEnabled, hasSentFirstMessage, hideFromExplore, birthDate, city, state } = body;
 
         await connectToDatabase();
 
@@ -663,8 +672,26 @@ export async function PATCH(request: NextRequest) {
             updateData.bio = bio;
         }
 
+        if (conversationBadges !== undefined) {
+            if (!Array.isArray(conversationBadges)) {
+                return NextResponse.json({ error: 'conversationBadges deve ser uma lista de textos.' }, { status: 400 });
+            }
+            if (conversationBadges.length > 0 && !isProf) {
+                return NextResponse.json({ error: 'Apenas profissionais podem ter características da conversa.' }, { status: 400 });
+            }
+            const sanitizedBadges = Array.from(
+                new Set(
+                    conversationBadges
+                        .map((b: any) => typeof b === 'string' ? b.trim() : '')
+                        .filter((b: string) => b.length > 0 && b.length <= 50)
+                )
+            ).slice(0, 20);
+            updateData.conversationBadges = sanitizedBadges;
+        }
+
         if (isProfessional === false) {
             updateData.bio = '';
+            updateData.conversationBadges = [];
         }
 
         if (emailNotificationsEnabled !== undefined) {
@@ -825,6 +852,7 @@ export async function PATCH(request: NextRequest) {
                     createdAt: card.createdAt,
                 })),
                 bio: user.bio || '',
+                conversationBadges: user.conversationBadges || [],
                 maxPricePerChar,
                 maxSubscriptionPrice,
                 minSubscriptionPrice,

@@ -30,7 +30,7 @@ export async function GET(
                     ]
                 }
         ).select(
-            'clerkId username name email photoUrl coverUrl isProfessional identityStatus subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers subscribers balance bio isOnline lastSeen avgResponseTimeMinutes birthDate city state isTeam teamTitle isSuspended'
+            'clerkId username name email photoUrl coverUrl isProfessional identityStatus subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers subscribers balance bio conversationBadges isOnline lastSeen avgResponseTimeMinutes birthDate city state isTeam teamTitle isSuspended'
         );
 
         if (!user || user.isSuspended) {
@@ -95,6 +95,7 @@ export async function GET(
                 audioPriceMultiplier,
                 subscribers: effectiveSubscribers,
                 bio: user.bio || '',
+                conversationBadges: user.conversationBadges || [],
                 isOnline: user.isOnline ?? false,
                 lastSeen: user.lastSeen ?? null,
                 freeIntroEnabled: user.freeIntroEnabled === true,

@@ -6,6 +6,7 @@ import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useMyProfile, useUpdateProfile, QueryKeys } from '@/hooks/useQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { ProfilePhotosEditor } from '@/components/ProfilePhotosEditor';
+import { ConversationBadgesEditor } from '@/components/ConversationBadgesEditor';
 import { PrivateGalleryEditor } from '@/components/PrivateGalleryEditor';
 import { ArrowLeft, Settings, Check, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -146,7 +147,10 @@ export default function EditProfilePage() {
                             />
                         </section>
 
-                        {/* ── SEÇÃO 3: GALERIA PRIVADA ── */}
+                        {/* ── SEÇÃO 3: CARACTERÍSTICAS DA CONVERSA ── */}
+                        <ConversationBadgesEditor />
+
+                        {/* ── SEÇÃO 4: GALERIA PRIVADA ── */}
                         <PrivateGalleryEditor />
                     </>
                 ) : (

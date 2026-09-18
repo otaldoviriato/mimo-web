@@ -53,6 +53,7 @@ export interface SettingsData {
     welcomeBonusUrlParamValue?: string;
     welcomeBonusLimitByIp?: boolean;
     welcomeBonusBlockSameIpChat?: boolean;
+    availableConversationBadges?: string[];
 }
 
 export interface ChatMessage {

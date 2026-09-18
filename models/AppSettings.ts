@@ -50,6 +50,7 @@ export interface IAppSettings extends Document {
     exploreSortingCriteria: string[];
     exploreRankingMode?: 'algorithm' | 'revenue' | 'recent_visits' | 'last_seen' | 'attractiveness' | 'manual';
     exploreManualOrder?: string[];
+    availableConversationBadges?: string[];
     creatorEngagementEmailsEnabled: boolean;
     creatorEngagementStep1Enabled: boolean;
     creatorEngagementStep1Hours: number;
@@ -381,6 +382,17 @@ const AppSettingsSchema = new Schema<IAppSettings>({
     exploreManualOrder: {
         type: [String],
         default: [],
+    },
+    availableConversationBadges: {
+        type: [String],
+        default: [
+            'Troca de fotos',
+            'Troca de vídeos',
+            'Sexting',
+            'Conversas sensuais',
+            'Chamada de áudio',
+            'Fetiches'
+        ],
     },
     welcomeBonusEnabled: {
         type: Boolean,

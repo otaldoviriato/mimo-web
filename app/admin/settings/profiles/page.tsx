@@ -25,6 +25,8 @@ export default function AdminSettingsProfilesPage() {
             setActiveRechargedClientDaysThreshold={settings.setActiveRechargedClientDaysThreshold}
             activeUnrechargedClientHoursThreshold={settings.activeUnrechargedClientHoursThreshold}
             setActiveUnrechargedClientHoursThreshold={settings.setActiveUnrechargedClientHoursThreshold}
+            availableConversationBadges={settings.availableConversationBadges}
+            setAvailableConversationBadges={settings.setAvailableConversationBadges}
             isDirtyProfiles={settings.isDirtyProfiles}
             saving={settings.saving}
             saveSettings={settings.saveSettings}

@@ -75,6 +75,7 @@ export const userApi = {
         hasSentFirstMessage?: boolean;
         hideFromExplore?: boolean;
         bio?: string;
+        conversationBadges?: string[];
         isAvailable?: boolean;
     }) => {
         const response = await api.patch('/api/users/me', data);

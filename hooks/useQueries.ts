@@ -258,6 +258,7 @@ export function useUpdateProfile() {
             chargePerCharNonSubscribers?: number;
             pixKey?: string;
             bio?: string;
+            conversationBadges?: string[];
             taxId?: string;
             phone?: string;
             emailNotificationsEnabled?: boolean;

@@ -49,6 +49,14 @@ async function getOrCreateSettings() {
             welcomeBonusUrlParamValue: 'exoclick',
             welcomeBonusLimitByIp: true,
             welcomeBonusBlockSameIpChat: true,
+            availableConversationBadges: [
+                'Troca de fotos',
+                'Troca de vídeos',
+                'Sexting',
+                'Conversas sensuais',
+                'Chamada de áudio',
+                'Fetiches'
+            ],
         });
     } else {
         // Garantir que novos campos sejam populados se não existirem
@@ -94,6 +102,17 @@ async function getOrCreateSettings() {
         if (settings.welcomeBonusUrlParamValue === undefined) { settings.welcomeBonusUrlParamValue = 'exoclick'; updated = true; }
         if (settings.welcomeBonusLimitByIp === undefined) { settings.welcomeBonusLimitByIp = true; updated = true; }
         if (settings.welcomeBonusBlockSameIpChat === undefined) { settings.welcomeBonusBlockSameIpChat = true; updated = true; }
+        if (!Array.isArray(settings.availableConversationBadges) || settings.availableConversationBadges.length === 0) {
+            settings.availableConversationBadges = [
+                'Troca de fotos',
+                'Troca de vídeos',
+                'Sexting',
+                'Conversas sensuais',
+                'Chamada de áudio',
+                'Fetiches'
+            ];
+            updated = true;
+        }
         if (updated) {
             await settings.save();
         }
@@ -219,6 +238,7 @@ export async function PUT(request: NextRequest) {
             welcomeBonusUrlParamValue,
             welcomeBonusLimitByIp,
             welcomeBonusBlockSameIpChat,
+            availableConversationBadges,
         } = body;
 
         // Validações básicas
@@ -511,6 +531,21 @@ export async function PUT(request: NextRequest) {
 
         if (welcomeBonusBlockSameIpChat !== undefined) {
             settings.welcomeBonusBlockSameIpChat = Boolean(welcomeBonusBlockSameIpChat);
+        }
+
+        if (availableConversationBadges !== undefined) {
+            if (!Array.isArray(availableConversationBadges)) {
+                return NextResponse.json({ error: 'availableConversationBadges deve ser uma lista de textos' }, { status: 400 });
+            }
+            // Sanitiza: remove duplicatas, espaços extras e vazios
+            const sanitizedBadges = Array.from(
+                new Set(
+                    availableConversationBadges
+                        .map((b: any) => typeof b === 'string' ? b.trim() : '')
+                        .filter((b: string) => b.length > 0 && b.length <= 50)
+                )
+            );
+            settings.availableConversationBadges = sanitizedBadges;
         }
 
         // Validação de consistência

@@ -52,6 +52,7 @@ interface SettingsSnapshot {
     welcomeBonusUrlParamValue: string;
     welcomeBonusLimitByIp: boolean;
     welcomeBonusBlockSameIpChat: boolean;
+    availableConversationBadges: string[];
 }
 
 export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, userId: string | null | undefined) {
@@ -98,6 +99,14 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
     const [newClientHoursThreshold, setNewClientHoursThreshold] = useState(24);
     const [activeRechargedClientDaysThreshold, setActiveRechargedClientDaysThreshold] = useState(30);
     const [activeUnrechargedClientHoursThreshold, setActiveUnrechargedClientHoursThreshold] = useState(24);
+    const [availableConversationBadges, setAvailableConversationBadges] = useState<string[]>([
+        'Troca de fotos',
+        'Troca de vídeos',
+        'Sexting',
+        'Conversas sensuais',
+        'Chamada de áudio',
+        'Fetiches'
+    ]);
     const [exploreSortingCriteria, setExploreSortingCriteria] = useState<string[]>(['online', 'recentAccess']);
 
     // Parametrização de e-mails de engajamento de criadoras
@@ -172,6 +181,14 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         welcomeBonusUrlParamValue: s.welcomeBonusUrlParamValue ?? 'exoclick',
         welcomeBonusLimitByIp: s.welcomeBonusLimitByIp ?? true,
         welcomeBonusBlockSameIpChat: s.welcomeBonusBlockSameIpChat ?? true,
+        availableConversationBadges: s.availableConversationBadges ?? [
+            'Troca de fotos',
+            'Troca de vídeos',
+            'Sexting',
+            'Conversas sensuais',
+            'Chamada de áudio',
+            'Fetiches'
+        ],
     });
 
     useEffect(() => {
@@ -240,6 +257,14 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     setWelcomeBonusUrlParamValue(s.welcomeBonusUrlParamValue ?? 'exoclick');
                     setWelcomeBonusLimitByIp(s.welcomeBonusLimitByIp ?? true);
                     setWelcomeBonusBlockSameIpChat(s.welcomeBonusBlockSameIpChat ?? true);
+                    setAvailableConversationBadges(s.availableConversationBadges ?? [
+                        'Troca de fotos',
+                        'Troca de vídeos',
+                        'Sexting',
+                        'Conversas sensuais',
+                        'Chamada de áudio',
+                        'Fetiches'
+                    ]);
                     setSavedSnapshot(buildSnapshot(s, richAdmins));
                     setIsAuthorized(true);
                 } else if (response.status === 403) {
@@ -345,6 +370,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                     welcomeBonusUrlParamValue,
                     welcomeBonusLimitByIp,
                     welcomeBonusBlockSameIpChat,
+                    availableConversationBadges,
                 }),
             });
             if (response.ok) {
@@ -398,6 +424,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
                 setWelcomeBonusUrlParamValue(s.welcomeBonusUrlParamValue ?? 'exoclick');
                 setWelcomeBonusLimitByIp(s.welcomeBonusLimitByIp ?? true);
                 setWelcomeBonusBlockSameIpChat(s.welcomeBonusBlockSameIpChat ?? true);
+                setAvailableConversationBadges(s.availableConversationBadges ?? []);
             } else {
                 const errData = await response.json();
                 toast.error(errData.error || 'Erro ao salvar configurações.');
@@ -467,7 +494,8 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         newProfileDaysThreshold !== savedSnapshot.newProfileDaysThreshold ||
         newClientHoursThreshold !== savedSnapshot.newClientHoursThreshold ||
         activeRechargedClientDaysThreshold !== savedSnapshot.activeRechargedClientDaysThreshold ||
-        activeUnrechargedClientHoursThreshold !== savedSnapshot.activeUnrechargedClientHoursThreshold
+        activeUnrechargedClientHoursThreshold !== savedSnapshot.activeUnrechargedClientHoursThreshold ||
+        JSON.stringify(availableConversationBadges) !== JSON.stringify(savedSnapshot.availableConversationBadges)
     );
     const isDirtyPayments = savedSnapshot !== null && (
         pixEnabled !== savedSnapshot.pixEnabled ||
@@ -532,6 +560,7 @@ export function useSettings(isLoaded: boolean, isSignedIn: boolean | undefined, 
         newClientHoursThreshold, setNewClientHoursThreshold,
         activeRechargedClientDaysThreshold, setActiveRechargedClientDaysThreshold,
         activeUnrechargedClientHoursThreshold, setActiveUnrechargedClientHoursThreshold,
+        availableConversationBadges, setAvailableConversationBadges,
         exploreSortingCriteria, setExploreSortingCriteria,
         creatorEngagementEmailsEnabled, setCreatorEngagementEmailsEnabled,
         creatorEngagementStep1Enabled, setCreatorEngagementStep1Enabled,
