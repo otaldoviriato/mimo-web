@@ -13,6 +13,11 @@ export interface ITimelineEvent {
         | 'paid_message_attempt'
         | 'hidden_message_unlock_attempt'
         | 'recharge_modal_opened'
+        | 'pre_auth_message_attempt'
+        | 'login_modal_opened'
+        | 'post_auth_message_sent'
+        | 'professional_replied'
+        | 'recharge_attempt'
         | 'custom';
     title: string;
     detail?: string | null;
@@ -87,6 +92,18 @@ export interface ICampaignUserJourney extends Document {
     hasOpenedRechargeModal?: boolean;
     rechargeModalOpensCount?: number;
 
+    // Novo funil de conversão sem landing page / pré-auth / código promocional
+    hasAttemptedPreAuthMessage?: boolean;
+    preAuthMessageAttemptsCount?: number;
+    hasOpenedLoginModal?: boolean;
+    loginModalOpensCount?: number;
+    hasSentPostAuthMessage?: boolean;
+    postAuthMessagesCount?: number;
+    hasReceivedReply?: boolean;
+    receivedRepliesCount?: number;
+    hasAttemptedRecharge?: boolean;
+    rechargeAttemptsCount?: number;
+
     timeline: ITimelineEvent[];
     createdAt: Date;
     updatedAt: Date;
@@ -157,6 +174,18 @@ const schema = new Schema<ICampaignUserJourney>({
     hiddenMessageAttemptsCount: { type: Number, default: 0 },
     hasOpenedRechargeModal: { type: Boolean, default: false },
     rechargeModalOpensCount: { type: Number, default: 0 },
+
+    // Novo funil de conversão sem landing page / pré-auth / código promocional
+    hasAttemptedPreAuthMessage: { type: Boolean, default: false },
+    preAuthMessageAttemptsCount: { type: Number, default: 0 },
+    hasOpenedLoginModal: { type: Boolean, default: false },
+    loginModalOpensCount: { type: Number, default: 0 },
+    hasSentPostAuthMessage: { type: Boolean, default: false },
+    postAuthMessagesCount: { type: Number, default: 0 },
+    hasReceivedReply: { type: Boolean, default: false },
+    receivedRepliesCount: { type: Number, default: 0 },
+    hasAttemptedRecharge: { type: Boolean, default: false },
+    rechargeAttemptsCount: { type: Number, default: 0 },
 
     timeline: [{
         type: { type: String, required: true },

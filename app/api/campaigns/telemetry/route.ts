@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
 import { CampaignUserJourney } from '@/models/CampaignUserJourney';
 import { Campaign } from '@/models/Campaign';
+import { CampaignVisit } from '@/models/CampaignVisit';
 import { isStaffOrAdmin } from '@/lib/internalStaff';
 
 export const dynamic = 'force-dynamic';
@@ -12,12 +13,13 @@ export async function POST(request: NextRequest) {
         const { userId } = await auth();
         const body = await request.json().catch(() => ({}));
         const effectiveUserId = userId || String(body.userId || '').trim();
+        const visitorId = String(body.visitorId || '').trim();
 
-        if (!effectiveUserId) {
-            return NextResponse.json({ error: 'Identificador do usuário ausente' }, { status: 400 });
+        if (!effectiveUserId && !visitorId) {
+            return NextResponse.json({ error: 'Identificador do usuário ou visitante ausente' }, { status: 400 });
         }
 
-        if (await isStaffOrAdmin(effectiveUserId)) {
+        if (effectiveUserId && (await isStaffOrAdmin(effectiveUserId))) {
             return NextResponse.json({
                 success: true,
                 ignored: true,
@@ -32,11 +34,37 @@ export async function POST(request: NextRequest) {
 
         await connectToDatabase();
 
-        // Busca a jornada do usuário mais recente vinculada a campanhas
-        const journey = await CampaignUserJourney.findOne({ userId: effectiveUserId })
-            .sort({ signupAt: -1 })
-            .select('_id campaignId firstProfileViewed profilesVisited hasNavigatedPastFirstPhoto')
-            .lean();
+        // Se for um evento pré-cadastro (ex: tentativa de mensagem antes de logar ou abertura de modal de login) e temos visitorId:
+        if (visitorId && ['pre_auth_message_attempt', 'login_modal_opened', 'explore_scroll', 'profile_view'].includes(eventType)) {
+            const activeCampaign = await Campaign.findOne({ status: 'tracking' }).sort({ startedAt: -1 }).select('_id').lean();
+            if (activeCampaign) {
+                const visitUpdate: any = {};
+                if (eventType === 'pre_auth_message_attempt') {
+                    visitUpdate.firstMessageAttemptAt = new Date();
+                }
+                if (Object.keys(visitUpdate).length > 0) {
+                    await CampaignVisit.updateOne(
+                        { campaignId: activeCampaign._id, visitorId },
+                        { $set: visitUpdate }
+                    ).catch(() => {});
+                }
+            }
+        }
+
+        // Busca a jornada do usuário mais recente vinculada a campanhas (por userId ou por visitorId)
+        let journey = null;
+        if (effectiveUserId) {
+            journey = await CampaignUserJourney.findOne({ userId: effectiveUserId })
+                .sort({ signupAt: -1 })
+                .select('_id campaignId firstProfileViewed profilesVisited hasNavigatedPastFirstPhoto')
+                .lean();
+        }
+        if (!journey && visitorId) {
+            journey = await CampaignUserJourney.findOne({ visitorId })
+                .sort({ signupAt: -1 })
+                .select('_id campaignId firstProfileViewed profilesVisited hasNavigatedPastFirstPhoto')
+                .lean();
+        }
 
         if (!journey) {
             return NextResponse.json({
@@ -445,6 +473,173 @@ export async function POST(request: NextRequest) {
                                     detail: profIdentifier ? `${trigger} (com ${profIdentifier})` : trigger,
                                     timestamp: now,
                                     metadata: { professionalId, username, trigger, requiredCents }
+                                }],
+                                $slice: -150
+                            }
+                        }
+                    }
+                );
+                break;
+            }
+
+            case 'pre_auth_message_attempt': {
+                const professionalId = body.professionalId ? String(body.professionalId).trim() : null;
+                const username = body.username ? String(body.username).trim() : null;
+                const profIdentifier = username ? `@${username}` : (professionalId ? 'profissional' : '');
+
+                await CampaignUserJourney.updateOne(
+                    { _id: journeyId },
+                    {
+                        $set: {
+                            isOnline: true,
+                            lastActiveAt: now,
+                            lastAction: profIdentifier
+                                ? `Tentou enviar mensagem para ${profIdentifier} antes do cadastro`
+                                : 'Tentou enviar mensagem antes de se cadastrar',
+                            hasAttemptedPreAuthMessage: true,
+                            hasOpenedLoginModal: true,
+                        },
+                        $inc: { preAuthMessageAttemptsCount: 1, loginModalOpensCount: 1 },
+                        $push: {
+                            timeline: {
+                                $each: [{
+                                    type: 'pre_auth_message_attempt',
+                                    title: 'Tentou enviar mensagem sem estar logado',
+                                    detail: profIdentifier ? `Tentou enviar mensagem no chat de ${profIdentifier}. Modal de login/cadastro exibido.` : 'Tentou enviar mensagem. Modal de login/cadastro exibido.',
+                                    timestamp: now,
+                                    metadata: { professionalId, username }
+                                }],
+                                $slice: -150
+                            }
+                        }
+                    }
+                );
+                break;
+            }
+
+            case 'login_modal_opened': {
+                const professionalId = body.professionalId ? String(body.professionalId).trim() : null;
+                const username = body.username ? String(body.username).trim() : null;
+                const reason = String(body.reason || 'Modal de autenticação').trim();
+
+                await CampaignUserJourney.updateOne(
+                    { _id: journeyId },
+                    {
+                        $set: {
+                            isOnline: true,
+                            lastActiveAt: now,
+                            lastAction: 'Visualizou modal de cadastro/login',
+                            hasOpenedLoginModal: true,
+                        },
+                        $inc: { loginModalOpensCount: 1 },
+                        $push: {
+                            timeline: {
+                                $each: [{
+                                    type: 'login_modal_opened',
+                                    title: 'Abriu modal de cadastro/login',
+                                    detail: reason,
+                                    timestamp: now,
+                                    metadata: { professionalId, username, reason }
+                                }],
+                                $slice: -150
+                            }
+                        }
+                    }
+                );
+                break;
+            }
+
+            case 'post_auth_message_sent': {
+                const professionalId = body.professionalId ? String(body.professionalId).trim() : null;
+                const username = body.username ? String(body.username).trim() : null;
+                const profIdentifier = username ? `@${username}` : 'profissional';
+
+                await CampaignUserJourney.updateOne(
+                    { _id: journeyId },
+                    {
+                        $set: {
+                            isOnline: true,
+                            lastActiveAt: now,
+                            lastAction: `Enviou mensagem pós-cadastro para ${profIdentifier}`,
+                            hasSentPostAuthMessage: true,
+                        },
+                        $inc: { postAuthMessagesCount: 1 },
+                        $push: {
+                            timeline: {
+                                $each: [{
+                                    type: 'post_auth_message_sent',
+                                    title: `Enviou mensagem para ${profIdentifier}`,
+                                    detail: 'Mensagem enviada com sucesso usando crédito promocional ou saldo',
+                                    timestamp: now,
+                                    metadata: { professionalId, username }
+                                }],
+                                $slice: -150
+                            }
+                        }
+                    }
+                );
+                break;
+            }
+
+            case 'professional_replied': {
+                const professionalId = body.professionalId ? String(body.professionalId).trim() : null;
+                const username = body.username ? String(body.username).trim() : null;
+                const profIdentifier = username ? `@${username}` : 'profissional';
+
+                await CampaignUserJourney.updateOne(
+                    { _id: journeyId },
+                    {
+                        $set: {
+                            isOnline: true,
+                            lastActiveAt: now,
+                            lastAction: `Recebeu resposta de ${profIdentifier}`,
+                            hasReceivedReply: true,
+                        },
+                        $inc: { receivedRepliesCount: 1 },
+                        $push: {
+                            timeline: {
+                                $each: [{
+                                    type: 'professional_replied',
+                                    title: `Recebeu resposta de ${profIdentifier}`,
+                                    detail: 'Profissional interagiu respondendo a mensagem no chat',
+                                    timestamp: now,
+                                    metadata: { professionalId, username }
+                                }],
+                                $slice: -150
+                            }
+                        }
+                    }
+                );
+                break;
+            }
+
+            case 'recharge_attempt': {
+                const method = String(body.method || 'pix').toUpperCase();
+                const amount = Number(body.amount || 0);
+                const amountFormatted = amount > 0 ? `R$ ${amount.toFixed(2)}` : '';
+                const professionalId = body.professionalId ? String(body.professionalId).trim() : null;
+                const username = body.username ? String(body.username).trim() : null;
+
+                await CampaignUserJourney.updateOne(
+                    { _id: journeyId },
+                    {
+                        $set: {
+                            isOnline: true,
+                            lastActiveAt: now,
+                            lastAction: amountFormatted
+                                ? `Tentou recarga de ${amountFormatted} (${method})`
+                                : `Tentou recarga via ${method}`,
+                            hasAttemptedRecharge: true,
+                        },
+                        $inc: { rechargeAttemptsCount: 1 },
+                        $push: {
+                            timeline: {
+                                $each: [{
+                                    type: 'recharge_attempt',
+                                    title: `Tentativa de recarga (${method})`,
+                                    detail: amountFormatted ? `Valor selecionado: ${amountFormatted}` : `Método: ${method}`,
+                                    timestamp: now,
+                                    metadata: { method, amount, professionalId, username }
                                 }],
                                 $slice: -150
                             }

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { readStackEntry, replaceStackUrl, stackOverlayState } from '@/lib/stackHistory';
 import React, { useState, useEffect, useRef, use } from 'react';
 import { createPortal } from 'react-dom';
@@ -1619,6 +1619,15 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         nextIds.add(processedMsg._id);
                         return nextIds;
                     });
+
+                    // Telemetria do funil: resposta do profissional recebida pelo lead
+                    if (!userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved) {
+                        emitCampaignTelemetry({
+                            eventType: 'professional_replied',
+                            professionalId: processedMsg.senderId,
+                            username: receiver?.username,
+                        });
+                    }
                 }
                 return newMessages;
             });
@@ -2550,6 +2559,15 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                             return m;
                         }));
                         triggerFirstMessageModalIfEligible();
+
+                        // Telemetria do funil: mensagem enviada com sucesso pelo lead pós-cadastro
+                        if (!userData?.isProfessional && Boolean(receiver?.isProfessional) && !isTeamMemberInvolved) {
+                            emitCampaignTelemetry({
+                                eventType: 'post_auth_message_sent',
+                                professionalId: item.otherUserId,
+                                username: receiver?.username,
+                            });
+                        }
                     }
                 }
 
@@ -2590,6 +2608,12 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
         // Bloquear envio para não-logados: mostrar modal de login
         if (!isSignedIn) {
+            const effectivePartnerId = partnerClerkId || otherUserId;
+            emitCampaignTelemetry({
+                eventType: 'pre_auth_message_attempt',
+                professionalId: effectivePartnerId,
+                username: receiver?.username,
+            });
             setShowLoginModal(true);
             return;
         }

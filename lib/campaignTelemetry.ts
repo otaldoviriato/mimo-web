@@ -11,6 +11,11 @@ type TelemetryEvent =
     | { eventType: 'paid_message_attempt'; professionalId: string; username?: string; hasBalance: boolean; balanceCents?: number }
     | { eventType: 'hidden_message_unlock_attempt'; professionalId: string; username?: string; costCents?: number; balanceCents?: number }
     | { eventType: 'recharge_modal_opened'; trigger?: string; professionalId?: string; username?: string; requiredCents?: number }
+    | { eventType: 'pre_auth_message_attempt'; professionalId?: string; username?: string }
+    | { eventType: 'login_modal_opened'; reason?: string; professionalId?: string; username?: string }
+    | { eventType: 'post_auth_message_sent'; professionalId: string; username?: string }
+    | { eventType: 'professional_replied'; professionalId: string; username?: string }
+    | { eventType: 'recharge_attempt'; method?: string; amount?: number; professionalId?: string; username?: string }
     | { eventType: 'heartbeat' }
     | { eventType: 'page_leave' }
     | { eventType: 'custom'; actionText: string };
@@ -29,7 +34,15 @@ export function emitCampaignTelemetry(event: TelemetryEvent) {
         lastExploreScrollTime = now;
     }
 
-    const payload = JSON.stringify(event);
+    let visitorId: string | null = null;
+    try {
+        visitorId = localStorage.getItem('mimo_visitor_id');
+    } catch {}
+
+    const payload = JSON.stringify({
+        ...event,
+        ...(visitorId ? { visitorId } : {}),
+    });
 
     // Se estiver saindo da página, tenta navigator.sendBeacon
     if (event.eventType === 'page_leave' && typeof navigator !== 'undefined' && navigator.sendBeacon) {

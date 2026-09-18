@@ -146,6 +146,24 @@ export async function POST(request: NextRequest) {
         }).select('_id userInfo').lean();
 
         if (!existingJourney) {
+            const initialTimeline: any[] = [];
+            let hasPreAuth = false;
+            if (visit.firstMessageAttemptAt) {
+                hasPreAuth = true;
+                initialTimeline.push({
+                    type: 'pre_auth_message_attempt',
+                    title: 'Tentou enviar mensagem sem estar logado',
+                    detail: 'Tentativa no chat antes da autenticação. Modal de login/cadastro acionado.',
+                    timestamp: visit.firstMessageAttemptAt,
+                });
+            }
+            initialTimeline.push({
+                type: 'signup',
+                title: 'Cadastro concluído',
+                detail: 'Usuário finalizou o cadastro e entrou no aplicativo',
+                timestamp: signupDate,
+            });
+
             await CampaignUserJourney.create({
                 campaignId: activeCampaign._id,
                 userId,
@@ -163,12 +181,11 @@ export async function POST(request: NextRequest) {
                 hasScrolledExplore: false,
                 profilesVisitedCount: 0,
                 profilesVisited: [],
-                timeline: [{
-                    type: 'signup',
-                    title: 'Cadastro concluído',
-                    detail: 'Usuário finalizou o cadastro e entrou no aplicativo',
-                    timestamp: signupDate,
-                }],
+                hasAttemptedPreAuthMessage: hasPreAuth,
+                preAuthMessageAttemptsCount: hasPreAuth ? 1 : 0,
+                hasOpenedLoginModal: hasPreAuth,
+                loginModalOpensCount: hasPreAuth ? 1 : 0,
+                timeline: initialTimeline,
             });
             journeyCreated = true;
         } else if (name && (!existingJourney.userInfo?.name || existingJourney.userInfo?.username === 'usuario')) {

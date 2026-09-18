@@ -99,6 +99,16 @@ interface LeadJourney {
     hiddenMessageAttemptsCount?: number;
     hasOpenedRechargeModal?: boolean;
     rechargeModalOpensCount?: number;
+    hasAttemptedPreAuthMessage?: boolean;
+    preAuthMessageAttemptsCount?: number;
+    hasOpenedLoginModal?: boolean;
+    loginModalOpensCount?: number;
+    hasSentPostAuthMessage?: boolean;
+    postAuthMessagesCount?: number;
+    hasReceivedReply?: boolean;
+    receivedRepliesCount?: number;
+    hasAttemptedRecharge?: boolean;
+    rechargeAttemptsCount?: number;
     timeline: TimelineEvent[];
 }
 
@@ -145,12 +155,12 @@ export default function CampaignsPage() {
     // Formulários
     const [createForm, setCreateForm] = useState({
         name: '',
-        entryPoint: '/descubra',
+        entryPoint: '/search',
         description: '',
     });
     const [editForm, setEditForm] = useState({
         name: '',
-        entryPoint: '/descubra',
+        entryPoint: '/search',
         description: '',
         externalImpressions: '',
         externalClicks: '',
@@ -240,7 +250,7 @@ export default function CampaignsPage() {
 
             toast.success('Campanha criada com sucesso!');
             setIsCreateModalOpen(false);
-            setCreateForm({ name: '', entryPoint: '/descubra', description: '' });
+            setCreateForm({ name: '', entryPoint: '/search', description: '' });
             await fetchCampaigns(false);
         } catch (err: any) {
             toast.error(err.message || 'Erro ao salvar campanha');
@@ -326,7 +336,7 @@ export default function CampaignsPage() {
         setCampaignToEdit(c);
         setEditForm({
             name: c.name || '',
-            entryPoint: c.entryPoint || '/descubra',
+            entryPoint: c.entryPoint || '/search',
             description: c.description || '',
             externalImpressions: c.impressions ? String(c.impressions) : '',
             externalClicks: c.clicks ? String(c.clicks) : '',
@@ -652,51 +662,57 @@ export default function CampaignsPage() {
                                 </div>
                                 <div className="space-y-2 my-3 text-xs">
                                     <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                                        <span className="text-slate-600 font-medium">Scrollaram o Explorar:</span>
+                                        <span className="text-slate-600 font-medium">1. Scrollaram o Explorar:</span>
                                         <strong className="text-slate-900 font-bold">
                                             {activeCampaign.leads.filter(l => l.hasScrolledExplore).length}
                                         </strong>
                                     </div>
                                     <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                                        <span className="text-slate-600 font-medium">Visualizaram Perfis:</span>
+                                        <span className="text-slate-600 font-medium">2. Visualizaram Perfis:</span>
                                         <strong className="text-slate-900 font-bold">
                                             {activeCampaign.leads.filter(l => l.profilesVisitedCount > 0).length}
                                         </strong>
                                     </div>
                                     <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                                        <span className="text-slate-600 font-medium">Folhearam Fotos da Galeria:</span>
+                                        <span className="text-slate-600 font-medium">3. Folhearam Fotos:</span>
                                         <strong className="text-slate-900 font-bold">
                                             {activeCampaign.leads.filter(l => l.hasNavigatedPastFirstPhoto).length}
                                         </strong>
                                     </div>
                                     <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                                        <span className="text-slate-600 font-medium">Enviaram Mensagem Grátis:</span>
-                                        <strong className="text-emerald-700 font-bold">
-                                            {activeCampaign.leads.filter(l => l.hasSentFreeMessage || (l.freeMessagesCount || 0) > 0).length}
-                                        </strong>
-                                    </div>
-                                    <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                                        <span className="text-slate-600 font-medium">Esgotaram Mensagens Grátis:</span>
+                                        <span className="text-slate-600 font-medium">4. Tentaram Enviar Pré-Auth:</span>
                                         <strong className="text-amber-700 font-bold">
-                                            {activeCampaign.leads.filter(l => l.hasExhaustedFreeIntro).length}
+                                            {activeCampaign.leads.filter(l => l.hasAttemptedPreAuthMessage || (l.preAuthMessageAttemptsCount || 0) > 0 || l.hasOpenedLoginModal).length}
                                         </strong>
                                     </div>
                                     <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                                        <span className="text-slate-600 font-medium">Tentaram Mensagem Paga:</span>
+                                        <span className="text-slate-600 font-medium">5. Concluíram Cadastro:</span>
+                                        <strong className="text-emerald-700 font-bold">
+                                            {activeCampaign.signupsCount}
+                                        </strong>
+                                    </div>
+                                    <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                                        <span className="text-slate-600 font-medium">6. Enviaram Mensagem (Crédito):</span>
                                         <strong className="text-purple-700 font-bold">
-                                            {activeCampaign.leads.filter(l => l.hasAttemptedPaidMessage || (l.paidMessageAttemptsCount || 0) > 0).length}
+                                            {activeCampaign.leads.filter(l => l.hasSentPostAuthMessage || (l.postAuthMessagesCount || 0) > 0).length}
                                         </strong>
                                     </div>
                                     <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                                        <span className="text-slate-600 font-medium">Tentaram Ver Mensagem Oculta:</span>
-                                        <strong className="text-rose-700 font-bold">
-                                            {activeCampaign.leads.filter(l => l.hasAttemptedHiddenMessage || (l.hiddenMessageAttemptsCount || 0) > 0).length}
+                                        <span className="text-slate-600 font-medium">7. Receberam Resposta:</span>
+                                        <strong className="text-indigo-700 font-bold">
+                                            {activeCampaign.leads.filter(l => l.hasReceivedReply || (l.receivedRepliesCount || 0) > 0).length}
+                                        </strong>
+                                    </div>
+                                    <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                                        <span className="text-slate-600 font-medium">8. Abriram Modal de Recarga:</span>
+                                        <strong className="text-amber-800 font-bold">
+                                            {activeCampaign.leads.filter(l => l.hasOpenedRechargeModal || (l.rechargeTriggers?.length || 0) > 0 || (l.rechargeModalOpensCount || 0) > 0).length}
                                         </strong>
                                     </div>
                                     <div className="flex justify-between items-center py-1">
-                                        <span className="text-slate-600 font-medium">Abriram Modal de Recarga:</span>
-                                        <strong className="text-amber-700 font-bold">
-                                            {activeCampaign.leads.filter(l => l.hasOpenedRechargeModal || (l.rechargeTriggers?.length || 0) > 0 || (l.rechargeModalOpensCount || 0) > 0).length}
+                                        <span className="text-slate-600 font-medium">9. Tentaram Recarregar:</span>
+                                        <strong className="text-rose-700 font-bold">
+                                            {activeCampaign.leads.filter(l => l.hasAttemptedRecharge || (l.rechargeAttemptsCount || 0) > 0).length}
                                         </strong>
                                     </div>
                                 </div>
@@ -847,43 +863,33 @@ export default function CampaignsPage() {
                                                         {lead.hasNavigatedPastFirstPhoto ? 'Passou fotos' : '1ª foto'}
                                                     </span>
 
-                                                    {(lead.hasSentFreeMessage || (lead.freeMessagesCount || 0) > 0) && (
-                                                        <span
-                                                            className="text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                                            title="Enviou mensagem grátis"
-                                                        >
-                                                            <MessageSquare size={13} />
-                                                            Grátis ({lead.freeMessagesCount || 1})
-                                                        </span>
-                                                    )}
-
-                                                    {lead.hasExhaustedFreeIntro && (
+                                                    {(lead.hasAttemptedPreAuthMessage || (lead.preAuthMessageAttemptsCount || 0) > 0 || lead.hasOpenedLoginModal) && (
                                                         <span
                                                             className="text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200"
-                                                            title="Esgotou as mensagens grátis"
-                                                        >
-                                                            <CheckCircle2 size={13} />
-                                                            Grátis Fim
-                                                        </span>
-                                                    )}
-
-                                                    {(lead.hasAttemptedPaidMessage || (lead.paidMessageAttemptsCount || 0) > 0) && (
-                                                        <span
-                                                            className="text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1 bg-purple-50 text-purple-700 border border-purple-200"
-                                                            title="Tentou ou enviou mensagem paga"
+                                                            title="Tentou enviar mensagem antes de logar / abriu login"
                                                         >
                                                             <MessageSquare size={13} />
-                                                            Msg Paga ({lead.paidMessageAttemptsCount || 1})
+                                                            Pré-Auth ({lead.preAuthMessageAttemptsCount || lead.loginModalOpensCount || 1})
                                                         </span>
                                                     )}
 
-                                                    {(lead.hasAttemptedHiddenMessage || (lead.hiddenMessageAttemptsCount || 0) > 0) && (
+                                                    {(lead.hasSentPostAuthMessage || (lead.postAuthMessagesCount || 0) > 0) && (
                                                         <span
-                                                            className="text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1 bg-rose-50 text-rose-700 border border-rose-200"
-                                                            title="Tentou ver mensagem oculta sem saldo"
+                                                            className="text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1 bg-purple-50 text-purple-700 border border-purple-200"
+                                                            title="Enviou mensagem pós-cadastro com crédito promocional"
                                                         >
-                                                            <Eye size={13} />
-                                                            Tentou Oculta ({lead.hiddenMessageAttemptsCount || 1})
+                                                            <MessageSquare size={13} />
+                                                            Msg Promo ({lead.postAuthMessagesCount || 1})
+                                                        </span>
+                                                    )}
+
+                                                    {(lead.hasReceivedReply || (lead.receivedRepliesCount || 0) > 0) && (
+                                                        <span
+                                                            className="text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1 bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                                            title="Recebeu resposta do profissional"
+                                                        >
+                                                            <CheckCircle2 size={13} />
+                                                            Respondeu ({lead.receivedRepliesCount || 1})
                                                         </span>
                                                     )}
 
@@ -893,7 +899,17 @@ export default function CampaignsPage() {
                                                             title="Abriu modal de recarga"
                                                         >
                                                             <CreditCard size={13} />
-                                                            Recarga ({lead.rechargeModalOpensCount || lead.rechargeTriggers?.length || 1})
+                                                            Abriu Recarga ({lead.rechargeModalOpensCount || lead.rechargeTriggers?.length || 1})
+                                                        </span>
+                                                    )}
+
+                                                    {(lead.hasAttemptedRecharge || (lead.rechargeAttemptsCount || 0) > 0) && (
+                                                        <span
+                                                            className="text-xs px-2.5 py-1 rounded-xl font-bold flex items-center gap-1 bg-rose-50 text-rose-700 border border-rose-200"
+                                                            title="Tentou realizar recarga (PIX/Cartão)"
+                                                        >
+                                                            <CreditCard size={13} />
+                                                            Tentou Recarga ({lead.rechargeAttemptsCount || 1})
                                                         </span>
                                                     )}
 
@@ -1119,20 +1135,20 @@ export default function CampaignsPage() {
 
                             <div>
                                 <label className="text-xs font-bold text-slate-700 block mb-1">
-                                    Ponto de Entrada (Landing Page) <span className="text-rose-500">*</span>
+                                    Ponto de Entrada <span className="text-rose-500">*</span>
                                 </label>
                                 <div className="relative">
                                     <input
                                         type="text"
                                         required
-                                        placeholder="/descubra"
+                                        placeholder="/search"
                                         value={createForm.entryPoint}
                                         onChange={(e) => setCreateForm({ ...createForm, entryPoint: e.target.value })}
                                         className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600 font-mono"
                                     />
                                 </div>
                                 <span className="text-[11px] text-slate-400 mt-1 block">
-                                    Rota da landing page que os visitantes acessam ao clicar no anúncio (padrão: <code className="text-purple-600">/descubra</code>).
+                                    Rota da tela que os visitantes acessam ao clicar no anúncio (padrão: <code className="text-purple-600">/search</code>).
                                 </span>
                             </div>
 
@@ -1348,10 +1364,10 @@ export default function CampaignsPage() {
                                 </div>
 
                                 <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
-                                    <span className="text-slate-400 font-bold block mb-1">Enviou Mensagem Grátis?</span>
+                                    <span className="text-slate-400 font-bold block mb-1">Tentou Pré-Auth?</span>
                                     <div className="font-bold text-sm">
-                                        {(selectedLeadForDetails.hasSentFreeMessage || (selectedLeadForDetails.freeMessagesCount || 0) > 0) ? (
-                                            <span className="text-emerald-700">Sim ({selectedLeadForDetails.freeMessagesCount || 1} msgs)</span>
+                                        {(selectedLeadForDetails.hasAttemptedPreAuthMessage || (selectedLeadForDetails.preAuthMessageAttemptsCount || 0) > 0 || selectedLeadForDetails.hasOpenedLoginModal) ? (
+                                            <span className="text-amber-800 font-bold">Sim ({selectedLeadForDetails.preAuthMessageAttemptsCount || selectedLeadForDetails.loginModalOpensCount || 1}x)</span>
                                         ) : (
                                             <span className="text-slate-400 font-normal">Não</span>
                                         )}
@@ -1359,10 +1375,10 @@ export default function CampaignsPage() {
                                 </div>
 
                                 <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
-                                    <span className="text-slate-400 font-bold block mb-1">Esgotou as 3 Grátis?</span>
+                                    <span className="text-slate-400 font-bold block mb-1">Msg com Crédito?</span>
                                     <div className="font-bold text-sm">
-                                        {selectedLeadForDetails.hasExhaustedFreeIntro ? (
-                                            <span className="text-amber-800 font-black">Sim (3/3 esgotadas)</span>
+                                        {(selectedLeadForDetails.hasSentPostAuthMessage || (selectedLeadForDetails.postAuthMessagesCount || 0) > 0) ? (
+                                            <span className="text-purple-700 font-bold">Sim ({selectedLeadForDetails.postAuthMessagesCount || 1} msgs)</span>
                                         ) : (
                                             <span className="text-slate-400 font-normal">Não</span>
                                         )}
@@ -1370,10 +1386,10 @@ export default function CampaignsPage() {
                                 </div>
 
                                 <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
-                                    <span className="text-slate-400 font-bold block mb-1">Tentou Mensagem Paga</span>
+                                    <span className="text-slate-400 font-bold block mb-1">Profissional Respondeu?</span>
                                     <div className="font-bold text-sm">
-                                        {(selectedLeadForDetails.hasAttemptedPaidMessage || (selectedLeadForDetails.paidMessageAttemptsCount || 0) > 0) ? (
-                                            <span className="text-purple-700">{selectedLeadForDetails.paidMessageAttemptsCount || 1} tentativas</span>
+                                        {(selectedLeadForDetails.hasReceivedReply || (selectedLeadForDetails.receivedRepliesCount || 0) > 0) ? (
+                                            <span className="text-indigo-700 font-bold">Sim ({selectedLeadForDetails.receivedRepliesCount || 1} msgs)</span>
                                         ) : (
                                             <span className="text-slate-400 font-normal">Não</span>
                                         )}
@@ -1381,21 +1397,21 @@ export default function CampaignsPage() {
                                 </div>
 
                                 <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
-                                    <span className="text-slate-400 font-bold block mb-1">Tentou Ver Msg Oculta</span>
-                                    <div className="font-bold text-sm">
-                                        {(selectedLeadForDetails.hasAttemptedHiddenMessage || (selectedLeadForDetails.hiddenMessageAttemptsCount || 0) > 0) ? (
-                                            <span className="text-rose-700">{selectedLeadForDetails.hiddenMessageAttemptsCount || 1} tentativas</span>
-                                        ) : (
-                                            <span className="text-slate-400 font-normal">Não</span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
-                                    <span className="text-slate-400 font-bold block mb-1">Abriu Modal de Recarga</span>
+                                    <span className="text-slate-400 font-bold block mb-1">Abriu Recarga?</span>
                                     <div className="font-bold text-sm">
                                         {(selectedLeadForDetails.hasOpenedRechargeModal || (selectedLeadForDetails.rechargeTriggers?.length || 0) > 0 || (selectedLeadForDetails.rechargeModalOpensCount || 0) > 0) ? (
-                                            <span className="text-amber-700">{selectedLeadForDetails.rechargeModalOpensCount || selectedLeadForDetails.rechargeTriggers?.length || 1} vezes</span>
+                                            <span className="text-amber-700 font-bold">{selectedLeadForDetails.rechargeModalOpensCount || selectedLeadForDetails.rechargeTriggers?.length || 1} vezes</span>
+                                        ) : (
+                                            <span className="text-slate-400 font-normal">Não</span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                                    <span className="text-slate-400 font-bold block mb-1">Tentou Recarregar?</span>
+                                    <div className="font-bold text-sm">
+                                        {(selectedLeadForDetails.hasAttemptedRecharge || (selectedLeadForDetails.rechargeAttemptsCount || 0) > 0) ? (
+                                            <span className="text-rose-700 font-bold">Sim ({selectedLeadForDetails.rechargeAttemptsCount || 1}x)</span>
                                         ) : (
                                             <span className="text-slate-400 font-normal">Não</span>
                                         )}
@@ -1442,8 +1458,11 @@ export default function CampaignsPage() {
                                             const isRecharge = evt.type === 'recharge_modal' || evt.type === 'recharge_modal_opened';
                                             const isMessage = evt.type === 'message_click';
                                             const isProfile = evt.type === 'profile_view';
-                                            const isFreeMsg = evt.type === 'free_message_sent';
-                                            const isFreeExhausted = evt.type === 'free_intro_exhausted';
+                                            const isPreAuth = evt.type === 'pre_auth_message_attempt';
+                                            const isLoginModal = evt.type === 'login_modal_opened';
+                                            const isPostAuthMsg = evt.type === 'post_auth_message_sent';
+                                            const isProfessionalReply = evt.type === 'professional_replied';
+                                            const isRechargeAttempt = evt.type === 'recharge_attempt';
                                             const isPaidAttempt = evt.type === 'paid_message_attempt';
                                             const isHiddenAttempt = evt.type === 'hidden_message_unlock_attempt';
 
@@ -1455,14 +1474,26 @@ export default function CampaignsPage() {
                                                 markerBg = 'bg-emerald-500';
                                                 tagLabel = 'Cadastro';
                                                 tagColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
-                                            } else if (isFreeMsg) {
-                                                markerBg = 'bg-emerald-600';
-                                                tagLabel = 'Mensagem Grátis';
-                                                tagColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
-                                            } else if (isFreeExhausted) {
+                                            } else if (isPreAuth) {
                                                 markerBg = 'bg-amber-500';
-                                                tagLabel = '3 Grátis Esgotadas';
+                                                tagLabel = 'Tentativa Pré-Auth';
                                                 tagColor = 'bg-amber-50 text-amber-800 border-amber-200';
+                                            } else if (isLoginModal) {
+                                                markerBg = 'bg-amber-600';
+                                                tagLabel = 'Modal de Login';
+                                                tagColor = 'bg-amber-50 text-amber-800 border-amber-200';
+                                            } else if (isPostAuthMsg) {
+                                                markerBg = 'bg-purple-600';
+                                                tagLabel = 'Mensagem Enviada';
+                                                tagColor = 'bg-purple-50 text-purple-700 border-purple-200';
+                                            } else if (isProfessionalReply) {
+                                                markerBg = 'bg-indigo-600';
+                                                tagLabel = 'Resposta Recebida';
+                                                tagColor = 'bg-indigo-50 text-indigo-700 border-indigo-200';
+                                            } else if (isRechargeAttempt) {
+                                                markerBg = 'bg-rose-600';
+                                                tagLabel = 'Tentativa Recarga';
+                                                tagColor = 'bg-rose-50 text-rose-700 border-rose-200';
                                             } else if (isPaidAttempt) {
                                                 markerBg = 'bg-purple-600';
                                                 tagLabel = 'Mensagem Paga';
@@ -1616,29 +1647,29 @@ export default function CampaignsPage() {
                                                 <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-200">
                                                     {lead.profilesVisitedCount} perfis
                                                 </span>
-                                                {(lead.hasSentFreeMessage || (lead.freeMessagesCount || 0) > 0) && (
-                                                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200" title="Enviou mensagem grátis">
-                                                        Grátis ({lead.freeMessagesCount || 1})
+                                                {(lead.hasAttemptedPreAuthMessage || (lead.preAuthMessageAttemptsCount || 0) > 0 || lead.hasOpenedLoginModal) && (
+                                                    <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200" title="Tentou enviar mensagem pré-auth">
+                                                        Pré-Auth ({lead.preAuthMessageAttemptsCount || lead.loginModalOpensCount || 1})
                                                     </span>
                                                 )}
-                                                {lead.hasExhaustedFreeIntro && (
-                                                    <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200" title="Esgotou as mensagens grátis">
-                                                        Grátis Fim
+                                                {(lead.hasSentPostAuthMessage || (lead.postAuthMessagesCount || 0) > 0) && (
+                                                    <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-200" title="Enviou mensagem com crédito promocional">
+                                                        Msg Promo ({lead.postAuthMessagesCount || 1})
                                                     </span>
                                                 )}
-                                                {(lead.hasAttemptedPaidMessage || (lead.paidMessageAttemptsCount || 0) > 0) && (
-                                                    <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-200" title="Tentou ou enviou mensagem paga">
-                                                        Msg Paga ({lead.paidMessageAttemptsCount || 1})
-                                                    </span>
-                                                )}
-                                                {(lead.hasAttemptedHiddenMessage || (lead.hiddenMessageAttemptsCount || 0) > 0) && (
-                                                    <span className="text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200" title="Tentou ver mensagem oculta sem saldo">
-                                                        Tentou Oculta ({lead.hiddenMessageAttemptsCount || 1})
+                                                {(lead.hasReceivedReply || (lead.receivedRepliesCount || 0) > 0) && (
+                                                    <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-200" title="Recebeu resposta do profissional">
+                                                        Respondeu ({lead.receivedRepliesCount || 1})
                                                     </span>
                                                 )}
                                                 {(lead.hasOpenedRechargeModal || (lead.rechargeTriggers?.length || 0) > 0 || (lead.rechargeModalOpensCount || 0) > 0) && (
                                                     <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200" title="Abriu modal de recarga">
-                                                        Recarga ({lead.rechargeModalOpensCount || lead.rechargeTriggers?.length || 1})
+                                                        Abriu Recarga ({lead.rechargeModalOpensCount || lead.rechargeTriggers?.length || 1})
+                                                    </span>
+                                                )}
+                                                {(lead.hasAttemptedRecharge || (lead.rechargeAttemptsCount || 0) > 0) && (
+                                                    <span className="text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200" title="Tentou recarregar">
+                                                        Tentou Recarga ({lead.rechargeAttemptsCount || 1})
                                                     </span>
                                                 )}
                                                 <ChevronRight size={14} className="text-slate-400 ml-1" />
@@ -1737,7 +1768,7 @@ export default function CampaignsPage() {
 
                             <div>
                                 <label className="text-xs font-bold text-slate-700 block mb-1">
-                                    Ponto de Entrada (Landing Page) <span className="text-rose-500">*</span>
+                                    Ponto de Entrada <span className="text-rose-500">*</span>
                                 </label>
                                 <input
                                     type="text"

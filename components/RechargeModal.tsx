@@ -19,6 +19,7 @@ import {
     WalletCards,
     X,
 } from 'lucide-react';
+import { emitCampaignTelemetry } from '@/lib/campaignTelemetry';
 
 interface PaymentAvailability {
     pixEnabled: boolean;
@@ -472,6 +473,13 @@ export function RechargeModal({
         const amount = getFinalAmount();
         if (amount < 2) return;
         localStorage.setItem('mimo_last_recharge_amount', String(amount));
+
+        emitCampaignTelemetry({
+            eventType: 'recharge_attempt',
+            method: selectedMethod,
+            amount,
+        });
+
         if (selectedMethod === 'pix' && onGeneratePix) {
             setLoading(true);
             try {
