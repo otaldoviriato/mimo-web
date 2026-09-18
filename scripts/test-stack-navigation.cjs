@@ -49,6 +49,29 @@ test('back, forward and multi-entry traversal restore the corresponding full sta
     assert.equal(history.writes, 3);
 });
 
+test('session refresh repairs metadata without remount keys or extra history entries', () => {
+    const history = new History('/chat/ana');
+    const live = initialize(history);
+    history.replaceState({ __NA: true }, '', history.url);
+    const count = history.entries.length;
+    const repaired = initializeStackHistory(history, history.url, () => { throw new Error('must not create a key'); }, live);
+    assert.strictEqual(repaired, live);
+    assert.equal(history.entries.length, count);
+    assert.deepEqual(readStackEntry(history.state), live);
+    history.go(-1);
+    assert.equal(history.url, '/chats');
+});
+
+test('live state cannot override another route or a valid history entry', () => {
+    const history = new History('/chat/ana');
+    const live = initialize(history);
+    history.pushState(null, '', '/chat/bia');
+    const next = initializeStackHistory(history, history.url, () => 'bia-key', live);
+    assert.equal(next.screens[0].params.username, 'bia');
+    assert.notEqual(next.screens[0].key, live.screens[0].key);
+    assert.strictEqual(initializeStackHistory(history, history.url, () => 'unused', live).screens[0].key, 'bia-key');
+});
+
 test('settings uses profile as its parent; public profile uses chats', () => {
     assert.equal(initialize(new History('/settings')).basePath, '/profile');
     assert.equal(initialize(new History('/ana')).basePath, '/chats');

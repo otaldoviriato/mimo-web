@@ -95,6 +95,9 @@ export default function LoginPromptModal({
     };
 
     const prepareLoginState = (isFullRedirect = false) => {
+        // Email activation stays on this mounted screen: its draft and route
+        // already exist in memory. Only OAuth needs redirect recovery storage.
+        if (!isFullRedirect) return;
         storePostAuthRedirect(returnTo);
         if (pendingMessage && typeof window !== 'undefined') {
             sessionStorage.setItem(PENDING_CHAT_MESSAGE_KEY, pendingMessage);
@@ -265,14 +268,11 @@ export default function LoginPromptModal({
                     if (setSignUpActive) {
                         await setSignUpActive({ session: signUp.createdSessionId });
                     }
-                    // Sincroniza sessão no backend sem redirecionar
-                    try {
-                        await fetch('/api/users/me', { credentials: 'same-origin' });
-                    } catch {}
+                    // Auth-enabled profile queries synchronize in the background.
+                    onClose();
                     if (onLoginSuccess) {
                         onLoginSuccess();
                     }
-                    onClose();
                 } else {
                     throw new Error(`Cadastro incompleto. Status: ${signUp.status}`);
                 }
@@ -283,14 +283,11 @@ export default function LoginPromptModal({
                     if (setSignInActive) {
                         await setSignInActive({ session: signIn.createdSessionId });
                     }
-                    // Sincroniza sessão no backend sem redirecionar
-                    try {
-                        await fetch('/api/users/me', { credentials: 'same-origin' });
-                    } catch {}
+                    // Auth-enabled profile queries synchronize in the background.
+                    onClose();
                     if (onLoginSuccess) {
                         onLoginSuccess();
                     }
-                    onClose();
                 } else {
                     throw new Error(`Login incompleto. Status: ${signIn.status}`);
                 }

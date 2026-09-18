@@ -2,7 +2,8 @@
 
 The fixture imports the production stack provider and History API helpers into an
 isolated Next.js 16 app. The provider stays in the layout, as it does in Mimo.
-It has no authentication, API calls, database access, or production data.
+It has no real authentication, database access, or production data. Its session
+action reproduces Clerk's cookie-cache invalidation followed by a route refresh.
 
 From `mimo-web`:
 
@@ -27,6 +28,12 @@ Open `http://localhost:3010/chat/ana/info` and check:
 7. **Canonical URL**, then reload, keeps the screen key and does not add parents.
 8. Direct `/settings` uses `/profile` as base. `/ana` uses `/chats`.
    `/ana/chat?gift=ABC` and `/chats?openChat=ana&gift=ABC` resolve to a chat stack.
+9. From `/search`, **Open chat**, type in **Message draft**, and scroll the
+   conversation container. Save the header DOM node, screen key, history length
+   and document ID. **Activate session** must retain all of them, the name `Ana`,
+   the draft and scroll position. Repeat activation, then **App back**: it must
+   return directly to `/search`. Before the fix, activation changed the key,
+   replaced the header with `Criadora Mimo`, emptied the draft and reset scroll.
 
 Also exercise fast back/forward and jumps in the browser's history menu. Initial
 synthetic entries may be skipped by browser UI before user interaction; this is a

@@ -95,9 +95,16 @@ export function stackHistoryState(entry: StackEntry) {
     return { [STACK_HISTORY_KEY]: entry };
 }
 
-export function initializeStackHistory(history: HistoryWriter, href: string, createKey: () => string): StackEntry | null {
+export function initializeStackHistory(history: HistoryWriter, href: string, createKey: () => string, liveEntry?: StackEntry | null): StackEntry | null {
     const restored = readStackEntry(history.state, href);
     if (restored) return restored;
+    // Next's session-cookie invalidation/refresh can replace history.state while
+    // this provider and its screens are still mounted. Repair metadata only;
+    // rebuilding ancestry here changes React keys, drafts, scroll and headers.
+    if (liveEntry?.url === href) {
+        history.replaceState(stackHistoryState(liveEntry), '', href);
+        return liveEntry;
+    }
     const route = resolveStackRoute(href);
     if (!route) return null;
     let entry: StackEntry = { version: 1, basePath: route.basePath, url: route.basePath, screens: [] };

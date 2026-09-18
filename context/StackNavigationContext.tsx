@@ -67,8 +67,8 @@ export function StackNavigationProvider({ children }: { children: React.ReactNod
     }, [commitScreens]);
 
     const initialize = useCallback((href: string) => {
-        const entry = initializeStackHistory(window.history, href, () => crypto.randomUUID());
         const previous = entryRef.current;
+        const entry = initializeStackHistory(window.history, href, () => crypto.randomUUID(), previous);
         // Our own URL updates must not cancel exit animations.
         if (entry && previous && entry.basePath === previous.basePath &&
             entry.screens.length === previous.screens.length &&

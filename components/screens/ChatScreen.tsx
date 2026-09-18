@@ -859,7 +859,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     // professional vs non-professional routing once userData becomes available.
     const pendingMediaRef = useRef<{ file: File; isVideoFile: boolean } | null>(null);
 
-    const { data: userData, refetch: refetchMyProfile } = useMyProfile();
+    const { data: userData } = useMyProfile();
     const isRouteClerkId = otherUserId.startsWith('user_');
     const cleanedRouteUsername = isRouteClerkId ? '' : otherUserId.toLowerCase().replace(/^@/, '');
 
@@ -1275,14 +1275,16 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
     // Fallback HTTP para carregar mensagens da API se o socket atrasar ou falhar (executa apenas ao montar a sala)
     useEffect(() => {
-        const partner = partnerClerkId || otherUserId;
-        if (!user?.id || !partner) return;
-
-        const currentRoomId = roomId || [user.id, partner].sort().join('_');
+        // Wait for both canonical IDs; a username is not a room participant ID.
+        if (!user?.id || !roomId) return;
+        const controller = new AbortController();
+        const currentRoomId = roomId;
         axios.get(`/api/rooms/${user.id}/messages`, {
+            signal: controller.signal,
             params: { roomId: currentRoomId, limit: 50 }
         })
         .then((res) => {
+            if (controller.signal.aborted) return;
             if (Array.isArray(res.data)) {
                 setMessages((prev) => {
                     const rawList: any[] = res.data;
@@ -1311,12 +1313,14 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             }
         })
         .catch((err) => {
+            if (controller.signal.aborted) return;
             console.error('Erro no fallback HTTP de mensagens:', err);
         })
         .finally(() => {
-            setLoadingMessages(false);
+            if (!controller.signal.aborted) setLoadingMessages(false);
         });
-    }, [roomId, user?.id, otherUserId, partnerClerkId]);
+        return () => controller.abort();
+    }, [roomId, user?.id]);
 
     // Atualiza apenas o destrancamento em memória quando o saldo ou o limite de caracteres muda (SEM resetar cache ou estado)
     useEffect(() => {
@@ -4933,20 +4937,6 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     recipientUsername={receiver?.username}
                     pendingMessage={messageText}
                     onClose={() => setShowLoginModal(false)}
-                    onLoginSuccess={() => {
-                        refetchMyProfile();
-                        const partner = partnerClerkId || otherUserId;
-                        if (user?.id && partner) {
-                            const currentRoomId = roomId || [user.id, partner].sort().join('_');
-                            axios.get(`/api/rooms/${user.id}/messages`, {
-                                params: { roomId: currentRoomId, limit: 50 }
-                            }).then((res) => {
-                                if (Array.isArray(res.data) && res.data.length > 0) {
-                                    setMessages(res.data);
-                                }
-                            }).catch(() => {});
-                        }
-                    }}
                 />,
                 document.body
             )}
