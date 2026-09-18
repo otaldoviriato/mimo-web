@@ -727,6 +727,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         expiryMinutes?: number;
     } | null>(null);
     const [recentMediaDrawer, setRecentMediaDrawer] = useState<'image' | 'video' | null>(null);
+    const [recentMediaExpanded, setRecentMediaExpanded] = useState(false);
     const [recentMediaItems, setRecentMediaItems] = useState<Array<{
         _id: string;
         url: string;
@@ -1108,6 +1109,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     const videoFileInputRef = useRef<HTMLInputElement>(null);
     const typingTimeoutRef = useRef<any>(null);
     const partnerTypingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const drawerTouchStartYRef = useRef<number | null>(null);
 
     // Fila serial de envio para garantir ordem cronológica rigorosa e evitar que mensagens sumam
     const lastSentTimestampRef = useRef<number>(0);
@@ -2861,6 +2863,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         setAttachMenuVisible(false);
         if (userData?.isProfessional) {
             setRecentMediaDrawer(type);
+            setRecentMediaExpanded(false);
             fetchRecentMedia(type);
         } else {
             if (type === 'image') {
@@ -4388,92 +4391,112 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
                 {/* Gaveta / Grid de Mídias Recentes para Profissionais */}
                 {recentMediaDrawer && userData?.isProfessional && (
-                    <div className="mt-2.5 pt-2.5 border-t border-slate-100 flex flex-col gap-1.5 animate-in slide-in-from-bottom-2 duration-200">
-                        <div className="flex items-center justify-end px-1">
-                            <button
-                                type="button"
-                                onClick={() => setRecentMediaDrawer(null)}
-                                className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
-                                aria-label="Fechar"
-                            >
-                                <XIcon size={16} />
-                            </button>
-                        </div>
-
-                        {loadingRecentMedia ? (
-                            <div className="flex items-center justify-center py-8">
-                                <div className="w-6 h-6 rounded-full border-2 border-purple-600 border-t-transparent animate-spin" />
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-4 sm:grid-cols-5 gap-1 max-h-56 overflow-y-auto select-none">
-                                {/* Item 0: Botão de Adicionar da Galeria/Dispositivo */}
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setRecentMediaDrawer(null);
-                                        if (recentMediaDrawer === 'video') {
-                                            videoFileInputRef.current?.click();
-                                        } else {
-                                            fileInputRef.current?.click();
+                    <>
+                        {/* Backdrop invisível para fechar ao tocar em qualquer outro lugar fora do input/grid */}
+                        <div 
+                            className="fixed inset-0 z-10" 
+                            onClick={() => setRecentMediaDrawer(null)} 
+                        />
+                        <div className="relative z-20 mt-2 border-t border-slate-200/60 flex flex-col animate-in slide-in-from-bottom-2 duration-200">
+                            {loadingRecentMedia ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <div className="w-6 h-6 rounded-full border-2 border-purple-600 border-t-transparent animate-spin" />
+                                </div>
+                            ) : (
+                                <div 
+                                    onTouchStart={(e) => {
+                                        drawerTouchStartYRef.current = e.touches[0].clientY;
+                                    }}
+                                    onTouchMove={(e) => {
+                                        if (drawerTouchStartYRef.current !== null) {
+                                            const diffY = drawerTouchStartYRef.current - e.touches[0].clientY;
+                                            if (diffY > 25 && !recentMediaExpanded) {
+                                                setRecentMediaExpanded(true);
+                                                drawerTouchStartYRef.current = null;
+                                            }
                                         }
                                     }}
-                                    className="aspect-square bg-purple-600/10 hover:bg-purple-600/15 border border-purple-600/20 text-purple-700 flex items-center justify-center transition-colors active:scale-95 group"
-                                    aria-label="Adicionar mídia do aparelho"
+                                    onTouchEnd={() => {
+                                        drawerTouchStartYRef.current = null;
+                                    }}
+                                    onWheel={(e) => {
+                                        if (e.deltaY > 15 && !recentMediaExpanded) {
+                                            setRecentMediaExpanded(true);
+                                        }
+                                    }}
+                                    className={`grid grid-cols-4 sm:grid-cols-5 w-full select-none transition-[max-height] duration-300 ease-in-out ${
+                                        recentMediaExpanded ? 'max-h-80 overflow-y-auto' : 'max-h-[42vw] sm:max-h-48 overflow-hidden'
+                                    }`}
                                 >
-                                    <Plus size={28} strokeWidth={2.2} className="group-hover:scale-110 transition-transform text-purple-700" />
-                                </button>
+                                    {/* Item 0: Botão de Adicionar da Galeria/Dispositivo */}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setRecentMediaDrawer(null);
+                                            if (recentMediaDrawer === 'video') {
+                                                videoFileInputRef.current?.click();
+                                            } else {
+                                                fileInputRef.current?.click();
+                                            }
+                                        }}
+                                        className="aspect-square bg-purple-600/10 hover:bg-purple-600/15 text-purple-700 flex items-center justify-center transition-colors active:scale-95 group"
+                                        aria-label="Adicionar mídia do aparelho"
+                                    >
+                                        <Plus size={32} strokeWidth={2.2} className="group-hover:scale-110 transition-transform text-purple-700" />
+                                    </button>
 
-                                {/* Lista de mídias recentes */}
-                                {recentMediaItems.map((item) => {
-                                    const displayThumb = item.thumbnailUrl || item.originalImageUrl || item.url;
-                                    const isPaid = item.lockedImagePrice > 0;
-                                    const formattedPrice = isPaid 
-                                        ? (item.lockedImagePrice / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-                                        : null;
+                                    {/* Lista de mídias recentes coladas uma na outra */}
+                                    {recentMediaItems.map((item) => {
+                                        const displayThumb = item.thumbnailUrl || item.originalImageUrl || item.url;
+                                        const isPaid = item.lockedImagePrice > 0;
+                                        const formattedPrice = isPaid 
+                                            ? (item.lockedImagePrice / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                                            : null;
 
-                                    return (
-                                        <div
-                                            key={item._id}
-                                            onClick={() => {
-                                                setSelectedRecentMedia(item);
-                                                setSelectedFile(null);
-                                                setIsVideo(item.isVideo);
-                                                setPreviewUrl(displayThumb);
-                                                setRecentMediaDrawer(null);
-                                            }}
-                                            className="relative aspect-square overflow-hidden bg-slate-100 cursor-pointer group hover:opacity-90 transition-opacity"
-                                        >
-                                            <img
-                                                src={displayThumb}
-                                                alt=""
-                                                className="w-full h-full object-cover"
-                                            />
+                                        return (
+                                            <div
+                                                key={item._id}
+                                                onClick={() => {
+                                                    setSelectedRecentMedia(item);
+                                                    setSelectedFile(null);
+                                                    setIsVideo(item.isVideo);
+                                                    setPreviewUrl(displayThumb);
+                                                    setRecentMediaDrawer(null);
+                                                }}
+                                                className="relative aspect-square overflow-hidden bg-slate-100 cursor-pointer group hover:opacity-90 transition-opacity"
+                                            >
+                                                <img
+                                                    src={displayThumb}
+                                                    alt=""
+                                                    className="w-full h-full object-cover"
+                                                />
 
-                                            {/* Gradiente sutil inferior caso tenha preço ou vídeo */}
-                                            {(isPaid || item.isVideo) && (
-                                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none" />
-                                            )}
+                                                {/* Gradiente sutil caso tenha preço ou vídeo */}
+                                                {(isPaid || item.isVideo) && (
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none" />
+                                                )}
 
-                                            {/* Ícone de Vídeo discreto integrado */}
-                                            {item.isVideo && (
-                                                <div className="absolute top-1 left-1 text-white drop-shadow-sm">
-                                                    <VideoIcon size={13} strokeWidth={2.5} />
-                                                </div>
-                                            )}
+                                                {/* Ícone de Vídeo discreto integrado */}
+                                                {item.isVideo && (
+                                                    <div className="absolute top-1 left-1 text-white drop-shadow-sm">
+                                                        <VideoIcon size={13} strokeWidth={2.5} />
+                                                    </div>
+                                                )}
 
-                                            {/* Preço integrado diretamente no canto inferior da imagem */}
-                                            {isPaid && formattedPrice && (
-                                                <div className="absolute bottom-1 right-1 flex items-center gap-0.5 text-white text-[10px] font-bold tracking-tight drop-shadow">
-                                                    <LockIcon size={9} strokeWidth={2.5} />
-                                                    <span>{formattedPrice}</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
+                                                {/* Preço integrado diretamente no canto inferior da imagem */}
+                                                {isPaid && formattedPrice && (
+                                                    <div className="absolute bottom-1 right-1 flex items-center gap-0.5 text-white text-[10px] font-bold tracking-tight drop-shadow">
+                                                        <LockIcon size={9} strokeWidth={2.5} />
+                                                        <span>{formattedPrice}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </>
                 )}
 
             </div>
