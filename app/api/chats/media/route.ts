@@ -29,6 +29,9 @@ export async function POST(request: NextRequest) {
         const priceStr = formData.get('lockedPrice') as string;
         const isVideo = formData.get('isVideo') === 'true';
         const preUploadedVideoUrl = formData.get('videoUrl') as string | null;
+        const existingMediaUrl = formData.get('existingMediaUrl') as string | null;
+        const existingBlurredImageUrl = formData.get('existingBlurredImageUrl') as string | null;
+        const existingThumbnailUrl = formData.get('existingThumbnailUrl') as string | null;
         const tempId = formData.get('tempId') as string | null;
         const isTemporary = formData.get('isTemporary') === 'true';
         const expiryMinutesStr = formData.get('expiryMinutes') as string | null;
@@ -37,7 +40,7 @@ export async function POST(request: NextRequest) {
             expiryMinutes = parseFloat(expiryMinutesStr);
         }
 
-        if ((!file && !preUploadedVideoUrl) || !roomId || !receiverId || !priceStr) {
+        if ((!file && !preUploadedVideoUrl && !existingMediaUrl) || !roomId || !receiverId || !priceStr) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
@@ -56,7 +59,17 @@ export async function POST(request: NextRequest) {
 
         const fileId = uuidv4();
 
-        if (isVideo) {
+        if (existingMediaUrl) {
+            if (isVideo) {
+                videoUrl = existingMediaUrl;
+                thumbnailUrl = existingThumbnailUrl || '';
+                blurredUrl = isLocked ? (existingBlurredImageUrl || existingThumbnailUrl || '') : '';
+            } else {
+                originalUrl = existingMediaUrl;
+                thumbnailUrl = existingThumbnailUrl || existingMediaUrl;
+                blurredUrl = isLocked ? (existingBlurredImageUrl || '') : '';
+            }
+        } else if (isVideo) {
             // Se for vídeo, o vídeo já foi upado via signed URL ou está vindo como file (legado/pequeno)
             if (file && !videoUrl) {
                 const extension = file.name.split('.').pop() || 'mp4';

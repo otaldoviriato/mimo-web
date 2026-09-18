@@ -24,7 +24,7 @@ import { trackAcquisitionEvent } from '@/lib/clientAcquisitionAnalytics';
 import { emitCampaignTelemetry } from '@/lib/campaignTelemetry';
 import { FirstMessageNotificationModal } from '@/components/FirstMessageNotificationModal';
 import { userApi } from '@/services/api';
-import { AlertTriangle, ShieldCheck, Wallet, Clock, MessageCircle, LockKeyhole, Eye, EyeOff } from 'lucide-react';
+import { AlertTriangle, ShieldCheck, Wallet, Clock, MessageCircle, LockKeyhole, Eye, EyeOff, Plus, Image as ImageIcon, Video as VideoIcon, X as XIcon, Lock as LockIcon } from 'lucide-react';
 
 interface Message {
     _id: string;
@@ -715,6 +715,32 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [isVideo, setIsVideo] = useState(false);
+    const [selectedRecentMedia, setSelectedRecentMedia] = useState<{
+        url: string;
+        originalImageUrl?: string;
+        blurredImageUrl?: string;
+        videoUrl?: string;
+        thumbnailUrl?: string;
+        isVideo: boolean;
+        lockedImagePrice: number;
+        isTemporary?: boolean;
+        expiryMinutes?: number;
+    } | null>(null);
+    const [recentMediaDrawer, setRecentMediaDrawer] = useState<'image' | 'video' | null>(null);
+    const [recentMediaItems, setRecentMediaItems] = useState<Array<{
+        _id: string;
+        url: string;
+        originalImageUrl?: string;
+        blurredImageUrl?: string;
+        videoUrl?: string;
+        thumbnailUrl?: string;
+        isVideo: boolean;
+        lockedImagePrice: number;
+        isTemporary?: boolean;
+        expiryMinutes?: number;
+        timestamp: string | Date;
+    }>>([]);
+    const [loadingRecentMedia, setLoadingRecentMedia] = useState(false);
     const [uploadingMedia, setUploadingMedia] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<number | null>(null);
     const [uploadTasks, setUploadTasks] = useState<Record<string, UploadTask>>({});
@@ -2035,13 +2061,18 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     };
 
     const startMediaUpload = async (
-        file: File,
+        file: File | null,
         isVideoFile: boolean,
         priceInCents: number,
         tempId: string,
         localPreviewUrl: string,
         isTemporaryMedia: boolean = false,
-        expiryMinutes: number = 0
+        expiryMinutes: number = 0,
+        existingMediaData?: {
+            existingMediaUrl: string;
+            existingBlurredImageUrl?: string;
+            existingThumbnailUrl?: string;
+        }
     ) => {
         setUploadTasks(prev => ({
             ...prev,
@@ -2051,7 +2082,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         try {
             let finalVideoUrl = '';
             
-            if (isVideoFile) {
+            if (!existingMediaData && file && isVideoFile) {
                 const signedRes = await fetch('/api/chats/media/signed-url', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -2092,7 +2123,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             }
 
             let uploadFile = file;
-            if (!isVideoFile) {
+            if (!existingMediaData && file && !isVideoFile) {
                 try {
                     uploadFile = await compressImage(file);
                 } catch (err) {
@@ -2101,9 +2132,17 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             }
 
             const formData = new FormData();
-            if (isVideoFile) {
+            if (existingMediaData) {
+                formData.append('existingMediaUrl', existingMediaData.existingMediaUrl);
+                if (existingMediaData.existingBlurredImageUrl) {
+                    formData.append('existingBlurredImageUrl', existingMediaData.existingBlurredImageUrl);
+                }
+                if (existingMediaData.existingThumbnailUrl) {
+                    formData.append('existingThumbnailUrl', existingMediaData.existingThumbnailUrl);
+                }
+            } else if (isVideoFile) {
                 formData.append('videoUrl', finalVideoUrl);
-            } else {
+            } else if (uploadFile) {
                 formData.append('file', uploadFile);
             }
             
@@ -2118,7 +2157,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             formData.append('expiryMinutes', expiryMinutes.toString());
 
             
-            if (isVideoFile) {
+            if (!existingMediaData && file && isVideoFile) {
                 let thumbUrl = localPreviewUrl;
                 if (!thumbUrl || thumbUrl.startsWith('blob:')) {
                     thumbUrl = await generateVideoThumbnail(file);
@@ -2132,7 +2171,15 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
             const res = await axios.post('/api/chats/media', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
                 onUploadProgress: (progressEvent) => {
-                    if (!isVideoFile) {
+                    if (existingMediaData) {
+                        setUploadTasks(prev => {
+                            if (!prev[tempId]) return prev;
+                            return {
+                                ...prev,
+                                [tempId]: { ...prev[tempId], progress: 100 }
+                            };
+                        });
+                    } else if (!isVideoFile) {
                         const percentCompleted = Math.round(
                             (progressEvent.loaded * 100) / (progressEvent.total || 1)
                         );
@@ -2794,6 +2841,36 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         }
     };
 
+    const fetchRecentMedia = async (type: 'image' | 'video') => {
+        setLoadingRecentMedia(true);
+        try {
+            const res = await axios.get('/api/chats/media/recent', {
+                params: { type, limit: 30 }
+            });
+            if (res.data?.success && Array.isArray(res.data.media)) {
+                setRecentMediaItems(res.data.media);
+            }
+        } catch (err) {
+            console.error('Erro ao buscar mídias recentes:', err);
+        } finally {
+            setLoadingRecentMedia(false);
+        }
+    };
+
+    const openMediaPicker = (type: 'image' | 'video') => {
+        setAttachMenuVisible(false);
+        if (userData?.isProfessional) {
+            setRecentMediaDrawer(type);
+            fetchRecentMedia(type);
+        } else {
+            if (type === 'image') {
+                fileInputRef.current?.click();
+            } else {
+                videoFileInputRef.current?.click();
+            }
+        }
+    };
+
     const handleTyping = (text: string) => {
         setMessageText(text);
         if (socket) {
@@ -2883,13 +2960,15 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     // Usado pelo MediaComposerSheet (profissional configurou preço/duração) e pelo
     // fallback no compose bar (envio durante a janela em que userData ainda está carregando).
     const sendSelectedMedia = async (priceInCents: number, isTemporaryMedia: boolean, expiryMinutes: number, coverFrameDataUrl?: string) => {
-        if (!selectedFile) return;
+        if (!selectedFile && !selectedRecentMedia) return;
 
         const file = selectedFile;
+        const recentMedia = selectedRecentMedia;
         const isVideoFile = isVideo;
-        const preview = coverFrameDataUrl || previewUrl || '';
+        const preview = coverFrameDataUrl || previewUrl || recentMedia?.thumbnailUrl || recentMedia?.originalImageUrl || '';
 
         setSelectedFile(null);
+        setSelectedRecentMedia(null);
         setPreviewUrl(null);
 
         const effectivePartnerId = partnerClerkId || otherUserId;
@@ -2915,7 +2994,13 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         };
         setMessages(prev => [...prev, newMsg]);
 
-        startMediaUpload(file, isVideoFile, priceInCents, tempId, preview, isTemporaryMedia, expiryMinutes);
+        const existingMediaData = recentMedia ? {
+            existingMediaUrl: recentMedia.url,
+            existingBlurredImageUrl: recentMedia.blurredImageUrl,
+            existingThumbnailUrl: recentMedia.thumbnailUrl,
+        } : undefined;
+
+        startMediaUpload(file, isVideoFile, priceInCents, tempId, preview, isTemporaryMedia, expiryMinutes, existingMediaData);
     };
 
     const executeUnlock = async (messageId: string) => {
@@ -4109,17 +4194,21 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
 
 
                 {/* Sheet de Preview e Configuração da Mídia */}
-                {selectedFile && userData?.isProfessional && (
+                {(selectedFile || selectedRecentMedia) && userData?.isProfessional && (
                     <MediaComposerSheet
-                        file={selectedFile}
-                        previewUrl={previewUrl}
+                        file={selectedFile || undefined}
+                        previewUrl={previewUrl || selectedRecentMedia?.thumbnailUrl || selectedRecentMedia?.originalImageUrl || null}
                         isVideo={isVideo}
+                        initialPriceInCents={selectedRecentMedia?.lockedImagePrice || 0}
+                        initialIsTemporary={selectedRecentMedia?.isTemporary || false}
+                        initialExpiryMinutes={selectedRecentMedia?.expiryMinutes}
                         onCancel={() => {
                             setSelectedFile(null);
+                            setSelectedRecentMedia(null);
                             setPreviewUrl(null);
                         }}
                         onConfirm={(price, isTemp, expiry, coverFrame) => {
-                                                            sendSelectedMedia(price, isTemp, expiry, coverFrame);
+                            sendSelectedMedia(price, isTemp, expiry, coverFrame);
                         }}
                     />
                 )}
@@ -4129,7 +4218,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         <div className="relative shrink-0">
                             <button
                                 onClick={() => setAttachMenuVisible(!attachMenuVisible)}
-                                disabled={!connected || !!selectedFile}
+                                disabled={!connected || !!selectedFile || !!selectedRecentMedia}
                                 className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shrink-0 ${
                                     attachMenuVisible ? 'bg-purple-600 text-white rotate-45' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                                 }`}
@@ -4147,10 +4236,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                     />
                                     <div className="absolute bottom-14 left-0 bg-white rounded-2xl shadow-xl border border-gray-100 w-52 overflow-hidden z-30 animate-in slide-in-from-bottom-2 duration-200">
                                         <button
-                                            onClick={() => {
-                                                setAttachMenuVisible(false);
-                                                fileInputRef.current?.click();
-                                            }}
+                                            onClick={() => openMediaPicker('image')}
                                             className="flex items-center gap-3 w-full px-4 py-3.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors border-b border-gray-50"
                                         >
                                             <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
@@ -4163,10 +4249,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                             <span className="font-semibold text-xs">Enviar Foto</span>
                                         </button>
                                         <button
-                                            onClick={() => {
-                                                setAttachMenuVisible(false);
-                                                videoFileInputRef.current?.click();
-                                            }}
+                                            onClick={() => openMediaPicker('video')}
                                             className="flex items-center gap-3 w-full px-4 py-3.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                                         >
                                             <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
@@ -4198,8 +4281,8 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         <div onClick={() => inputRef.current?.focus()} className="flex-1 min-w-0 flex flex-col justify-center rounded-2xl px-3.5 py-2 min-h-[44px] max-h-[140px] transition-all bg-gray-100 cursor-text">
                             <textarea
                                 ref={inputRef}
-                                value={selectedFile ? "Mídia selecionada para envio..." : messageText}
-                                disabled={!!selectedFile}
+                                value={selectedFile || selectedRecentMedia ? "Mídia selecionada para envio..." : messageText}
+                                disabled={!!selectedFile || !!selectedRecentMedia}
                                 onChange={(e) => handleTyping(e.target.value)}
                                 onKeyDown={handleKeyDown}
                                 onFocus={() => setIsInputFocused(true)}
@@ -4234,7 +4317,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         </div>
                     )}
                     
-                    {(audioRecordingStatus === 'idle' && (messageText.trim() || selectedFile)) ? (
+                    {(audioRecordingStatus === 'idle' && (messageText.trim() || selectedFile || selectedRecentMedia)) ? (
                         <button
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
@@ -4250,8 +4333,8 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                     return;
                                 }
 
-                                if (selectedFile) {
-                                    sendSelectedMedia(0, false, 60);
+                                if (selectedFile || selectedRecentMedia) {
+                                    sendSelectedMedia(selectedRecentMedia?.lockedImagePrice || 0, selectedRecentMedia?.isTemporary || false, selectedRecentMedia?.expiryMinutes || 60);
                                 } else if (charCount > 0 && !userData?.isProfessional && receiver?.isProfessional && !monetizationDisabled && currentRate > 0 && balance < estimatedCostInCents) {
                                     openRechargeModal({
                                         currentBalanceInCents: balance,
@@ -4261,9 +4344,9 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                     handleSend();
                                 }
                             }}
-                            disabled={(!messageText.trim() && !selectedFile) || (isSignedIn && !connected)}
+                            disabled={(!messageText.trim() && !selectedFile && !selectedRecentMedia) || (isSignedIn && !connected)}
                             className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shrink-0 select-none ${
-                                (messageText.trim() || selectedFile) && (!isSignedIn || connected)
+                                (messageText.trim() || selectedFile || selectedRecentMedia) && (!isSignedIn || connected)
                                     ? 'bg-purple-600 hover:bg-purple-700 shadow-sm text-white cursor-pointer'
                                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                             }`}
@@ -4303,6 +4386,101 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                     )}
                 </div>
 
+                {/* Gaveta / Grid de Mídias Recentes para Profissionais */}
+                {recentMediaDrawer && userData?.isProfessional && (
+                    <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-2.5 animate-in slide-in-from-bottom-2 duration-200">
+                        <div className="flex items-center justify-between px-1">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-slate-800">
+                                    {recentMediaDrawer === 'video' ? 'Vídeos recentes' : 'Fotos recentes'}
+                                </span>
+                                <span className="text-[11px] font-medium text-slate-400">
+                                    Toque para reenviar ou adicione novo
+                                </span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setRecentMediaDrawer(null)}
+                                className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                            >
+                                <XIcon size={16} />
+                            </button>
+                        </div>
+
+                        {loadingRecentMedia ? (
+                            <div className="flex items-center justify-center py-10">
+                                <div className="w-7 h-7 rounded-full border-2 border-purple-600 border-t-transparent animate-spin" />
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 max-h-56 overflow-y-auto pb-1 select-none pr-0.5">
+                                {/* Item 0: Card para Adicionar Novo do Dispositivo */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setRecentMediaDrawer(null);
+                                        if (recentMediaDrawer === 'video') {
+                                            videoFileInputRef.current?.click();
+                                        } else {
+                                            fileInputRef.current?.click();
+                                        }
+                                    }}
+                                    className="aspect-square rounded-2xl border-2 border-dashed border-purple-300 hover:border-purple-500 bg-purple-50/50 hover:bg-purple-50 flex flex-col items-center justify-center gap-1.5 text-purple-700 transition-all active:scale-95 group shadow-sm"
+                                >
+                                    <div className="w-9 h-9 rounded-full bg-purple-600 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
+                                        <Plus size={20} strokeWidth={2.5} />
+                                    </div>
+                                    <span className="text-[11px] font-bold text-center leading-tight px-1 text-purple-900">
+                                        Do aparelho
+                                    </span>
+                                </button>
+
+                                {/* Lista de mídias recentes */}
+                                {recentMediaItems.map((item) => {
+                                    const displayThumb = item.thumbnailUrl || item.originalImageUrl || item.url;
+                                    const isPaid = item.lockedImagePrice > 0;
+                                    const formattedPrice = isPaid 
+                                        ? (item.lockedImagePrice / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                                        : null;
+
+                                    return (
+                                        <div
+                                            key={item._id}
+                                            onClick={() => {
+                                                setSelectedRecentMedia(item);
+                                                setSelectedFile(null);
+                                                setIsVideo(item.isVideo);
+                                                setPreviewUrl(displayThumb);
+                                                setRecentMediaDrawer(null);
+                                            }}
+                                            className="relative aspect-square rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 cursor-pointer group shadow-sm hover:border-purple-500 transition-all active:scale-95"
+                                        >
+                                            <img
+                                                src={displayThumb}
+                                                alt="Mídia recente"
+                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                            />
+
+                                            {/* Badge de Vídeo */}
+                                            {item.isVideo && (
+                                                <div className="absolute top-1.5 left-1.5 bg-black/60 backdrop-blur-xs text-white p-1 rounded-lg">
+                                                    <VideoIcon size={12} strokeWidth={2.5} />
+                                                </div>
+                                            )}
+
+                                            {/* Badge de Preço anterior */}
+                                            {isPaid && formattedPrice && (
+                                                <div className="absolute bottom-1.5 right-1.5 flex items-center gap-0.5 bg-black/70 backdrop-blur-xs text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-md border border-white/10 shadow-xs">
+                                                    <LockIcon size={9} strokeWidth={2.5} />
+                                                    <span>{formattedPrice}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
 
             </div>
 

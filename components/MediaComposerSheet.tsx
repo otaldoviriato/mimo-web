@@ -8,6 +8,9 @@ interface MediaComposerSheetProps {
     file?: File;
     previewUrl: string | null;
     isVideo: boolean;
+    initialPriceInCents?: number;
+    initialIsTemporary?: boolean;
+    initialExpiryMinutes?: number;
     onCancel: () => void;
     onConfirm: (priceInCents: number, isTemporary: boolean, expiryMinutes: number, coverFrameDataUrl?: string) => void;
 }
@@ -33,14 +36,43 @@ const DURATION_OPTIONS = [
     { label: 'Personalizado', value: 'custom_duration' },
 ] as const;
 
-export function MediaComposerSheet({ file, previewUrl, isVideo, onCancel, onConfirm }: MediaComposerSheetProps) {
-    const [mediaPriceStr, setMediaPriceStr] = useState('');
-    const [mediaPriceType, setMediaPriceType] = useState<'free' | 'paid'>('free');
-    const [mediaPriceFormatted, setMediaPriceFormatted] = useState('R$ 0,00');
-    const [isTemporary, setIsTemporary] = useState(false);
-    const [expiryOption, setExpiryOption] = useState<'permanent' | '10s' | '30s' | '1min' | '30min' | '24h' | '7d' | 'custom'>('permanent');
-    const [customExpiryValue, setCustomExpiryValue] = useState<number | "">(1);
-    const [customExpiryUnit, setCustomExpiryUnit] = useState<'seconds' | 'minutes' | 'hours' | 'days'>('hours');
+export function MediaComposerSheet({ 
+    file, 
+    previewUrl, 
+    isVideo, 
+    initialPriceInCents = 0,
+    initialIsTemporary = false,
+    initialExpiryMinutes,
+    onCancel, 
+    onConfirm 
+}: MediaComposerSheetProps) {
+    const initPriceVal = initialPriceInCents > 0 ? initialPriceInCents / 100 : 0;
+    const [mediaPriceStr, setMediaPriceStr] = useState(initPriceVal > 0 ? initPriceVal.toFixed(2) : '');
+    const [mediaPriceType, setMediaPriceType] = useState<'free' | 'paid'>(initPriceVal > 0 ? 'paid' : 'free');
+    const [mediaPriceFormatted, setMediaPriceFormatted] = useState(
+        initPriceVal > 0 
+            ? initPriceVal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) 
+            : 'R$ 0,00'
+    );
+    const [isTemporary, setIsTemporary] = useState(!!initialIsTemporary);
+
+    const getInitialExpirySettings = () => {
+        if (!initialIsTemporary || !initialExpiryMinutes) {
+            return { option: 'permanent' as const, val: 1, unit: 'hours' as const };
+        }
+        if (Math.abs(initialExpiryMinutes - (10 / 60)) < 0.001) return { option: '10s' as const, val: 10, unit: 'seconds' as const };
+        if (Math.abs(initialExpiryMinutes - (30 / 60)) < 0.001) return { option: '30s' as const, val: 30, unit: 'seconds' as const };
+        if (Math.abs(initialExpiryMinutes - 1) < 0.001) return { option: '1min' as const, val: 1, unit: 'minutes' as const };
+        if (Math.abs(initialExpiryMinutes - 30) < 0.001) return { option: '30min' as const, val: 30, unit: 'minutes' as const };
+        if (Math.abs(initialExpiryMinutes - 1440) < 0.001) return { option: '24h' as const, val: 24, unit: 'hours' as const };
+        if (Math.abs(initialExpiryMinutes - 10080) < 0.001) return { option: '7d' as const, val: 7, unit: 'days' as const };
+        return { option: 'custom' as const, val: initialExpiryMinutes, unit: 'minutes' as const };
+    };
+
+    const initialExpiry = getInitialExpirySettings();
+    const [expiryOption, setExpiryOption] = useState<'permanent' | '10s' | '30s' | '1min' | '30min' | '24h' | '7d' | 'custom'>(initialExpiry.option);
+    const [customExpiryValue, setCustomExpiryValue] = useState<number | "">(initialExpiry.val);
+    const [customExpiryUnit, setCustomExpiryUnit] = useState<'seconds' | 'minutes' | 'hours' | 'days'>(initialExpiry.unit);
 
     // Estados e refs de controle do vídeo interativo
     const [videoObjectUrl, setVideoObjectUrl] = useState<string | null>(null);
