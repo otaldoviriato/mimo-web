@@ -728,6 +728,8 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     } | null>(null);
     const [recentMediaDrawer, setRecentMediaDrawer] = useState<'image' | 'video' | null>(null);
     const [recentMediaExpanded, setRecentMediaExpanded] = useState(false);
+    const [recentMediaInteractiveHeight, setRecentMediaInteractiveHeight] = useState<number | null>(null);
+    const [isDraggingRecentMedia, setIsDraggingRecentMedia] = useState(false);
     const [recentMediaItems, setRecentMediaItems] = useState<Array<{
         _id: string;
         url: string;
@@ -1110,6 +1112,11 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
     const typingTimeoutRef = useRef<any>(null);
     const partnerTypingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const drawerTouchStartYRef = useRef<number | null>(null);
+    const recentMediaContainerRef = useRef<HTMLDivElement>(null);
+    const isDraggingRecentMediaRef = useRef(false);
+    const dragStartYRef = useRef(0);
+    const dragStartHeightRef = useRef(0);
+    const isDragAtTopScrollRef = useRef(false);
 
     // Fila serial de envio para garantir ordem cronológica rigorosa e evitar que mensagens sumam
     const lastSentTimestampRef = useRef<number>(0);
@@ -1140,6 +1147,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 detailsModalVisible || 
                 unlockModalVisible || 
                 couponClaimModal || 
+                Boolean(recentMediaDrawer) ||
                 galleryVisible;
 
             if (isAnyModalOrViewerOpen) return;
@@ -1164,7 +1172,7 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                 const isInteractive = 
                     target.tagName === 'TEXTAREA' || 
                     target.tagName === 'INPUT' || 
-                    Boolean(target.closest('input, textarea, select, button, [contenteditable="true"]'));
+                    Boolean(target.closest('input, textarea, select, button, [data-interactive="true"], [contenteditable="true"]'));
                 
                 if (!isInteractive) {
                     e.preventDefault();
@@ -1185,7 +1193,8 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         detailsModalVisible, 
         unlockModalVisible, 
         couponClaimModal, 
-        galleryVisible
+        galleryVisible,
+        recentMediaDrawer
     ]);
 
     // Efeito para resgatar cupom na tela de chat
@@ -2864,6 +2873,8 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         if (userData?.isProfessional) {
             setRecentMediaDrawer(type);
             setRecentMediaExpanded(false);
+            setRecentMediaInteractiveHeight(null);
+            setIsDraggingRecentMedia(false);
             fetchRecentMedia(type);
         } else {
             if (type === 'image') {
@@ -4395,37 +4406,114 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                         {/* Backdrop invisível para fechar ao tocar em qualquer outro lugar fora do input/grid */}
                         <div 
                             className="fixed inset-0 z-10" 
-                            onClick={() => setRecentMediaDrawer(null)} 
+                            onClick={() => {
+                                setRecentMediaDrawer(null);
+                                setRecentMediaInteractiveHeight(null);
+                                setIsDraggingRecentMedia(false);
+                            }} 
                         />
-                        <div className="relative z-20 mt-2 border-t border-slate-200/60 flex flex-col animate-in slide-in-from-bottom-2 duration-200">
+                        <div 
+                            data-interactive="true"
+                            className="relative z-20 mt-2 -mx-4 -mb-3 border-t border-slate-200/70 flex flex-col animate-in slide-in-from-bottom-2 duration-200"
+                        >
                             {loadingRecentMedia ? (
                                 <div className="flex items-center justify-center py-8">
                                     <div className="w-6 h-6 rounded-full border-2 border-purple-600 border-t-transparent animate-spin" />
                                 </div>
                             ) : (
                                 <div 
+                                    ref={recentMediaContainerRef}
+                                    data-interactive="true"
                                     onTouchStart={(e) => {
-                                        drawerTouchStartYRef.current = e.touches[0].clientY;
+                                        if (e.touches.length !== 1) return;
+                                        const touch = e.touches[0];
+                                        dragStartYRef.current = touch.clientY;
+                                        const el = recentMediaContainerRef.current;
+                                        const currentH = el ? el.getBoundingClientRect().height : 180;
+                                        dragStartHeightRef.current = currentH;
+                                        isDragAtTopScrollRef.current = (el?.scrollTop || 0) <= 0;
+                                        isDraggingRecentMediaRef.current = false;
                                     }}
                                     onTouchMove={(e) => {
-                                        if (drawerTouchStartYRef.current !== null) {
-                                            const diffY = drawerTouchStartYRef.current - e.touches[0].clientY;
-                                            if (diffY > 25 && !recentMediaExpanded) {
-                                                setRecentMediaExpanded(true);
-                                                drawerTouchStartYRef.current = null;
+                                        if (e.touches.length !== 1) return;
+                                        const touch = e.touches[0];
+                                        const deltaY = dragStartYRef.current - touch.clientY; // positivo se arrastar para cima
+                                        const el = recentMediaContainerRef.current;
+                                        const atTop = (el?.scrollTop || 0) <= 0;
+
+                                        // Estado 1: Colapsado (duas linhas) arrastando para cima
+                                        if (!recentMediaExpanded) {
+                                            if (deltaY > 5 || isDraggingRecentMediaRef.current) {
+                                                isDraggingRecentMediaRef.current = true;
+                                                setIsDraggingRecentMedia(true);
+                                                const minH = dragStartHeightRef.current || 180;
+                                                const maxH = Math.min(380, window.innerHeight * 0.55);
+                                                const targetHeight = Math.max(minH, Math.min(maxH, minH + deltaY));
+                                                setRecentMediaInteractiveHeight(targetHeight);
+                                                if (e.cancelable) {
+                                                    e.preventDefault();
+                                                }
+                                            }
+                                        } 
+                                        // Estado 2: Expandido com scroll no topo arrastando para baixo
+                                        else if (recentMediaExpanded && (atTop || isDragAtTopScrollRef.current)) {
+                                            if (deltaY < -5 || isDraggingRecentMediaRef.current) {
+                                                isDraggingRecentMediaRef.current = true;
+                                                setIsDraggingRecentMedia(true);
+                                                const startH = dragStartHeightRef.current || 380;
+                                                const minH = 180;
+                                                const targetHeight = Math.max(minH, Math.min(startH, startH + deltaY));
+                                                setRecentMediaInteractiveHeight(targetHeight);
+                                                if (e.cancelable) {
+                                                    e.preventDefault();
+                                                }
                                             }
                                         }
                                     }}
                                     onTouchEnd={() => {
-                                        drawerTouchStartYRef.current = null;
+                                        if (isDraggingRecentMediaRef.current) {
+                                            const el = recentMediaContainerRef.current;
+                                            const currentH = el ? el.getBoundingClientRect().height : (recentMediaInteractiveHeight || 180);
+                                            const minH = 180;
+                                            const maxH = Math.min(380, typeof window !== 'undefined' ? window.innerHeight * 0.55 : 380);
+                                            const threshold = minH + (maxH - minH) * 0.35; // 35% do caminho expande ou retrai
+
+                                            if (!recentMediaExpanded) {
+                                                if (currentH > threshold) {
+                                                    setRecentMediaExpanded(true);
+                                                } else {
+                                                    setRecentMediaExpanded(false);
+                                                }
+                                            } else {
+                                                if (currentH < threshold) {
+                                                    setRecentMediaExpanded(false);
+                                                } else {
+                                                    setRecentMediaExpanded(true);
+                                                }
+                                            }
+                                        }
+                                        isDraggingRecentMediaRef.current = false;
+                                        setIsDraggingRecentMedia(false);
+                                        setRecentMediaInteractiveHeight(null);
                                     }}
                                     onWheel={(e) => {
                                         if (e.deltaY > 15 && !recentMediaExpanded) {
                                             setRecentMediaExpanded(true);
+                                        } else if (e.deltaY < -15 && recentMediaExpanded && (recentMediaContainerRef.current?.scrollTop || 0) <= 0) {
+                                            setRecentMediaExpanded(false);
                                         }
                                     }}
-                                    className={`grid grid-cols-4 sm:grid-cols-5 w-full select-none transition-[max-height] duration-300 ease-in-out ${
-                                        recentMediaExpanded ? 'max-h-80 overflow-y-auto' : 'max-h-[42vw] sm:max-h-48 overflow-hidden'
+                                    style={{
+                                        ...(recentMediaInteractiveHeight !== null
+                                            ? { height: `${recentMediaInteractiveHeight}px`, maxHeight: `${recentMediaInteractiveHeight}px` }
+                                            : {})
+                                    }}
+                                    className={`grid grid-cols-4 sm:grid-cols-5 w-full select-none bg-slate-200 gap-[1.5px] p-[1.5px] ${
+                                        isDraggingRecentMedia 
+                                            ? 'overflow-hidden transition-none' 
+                                            : recentMediaExpanded 
+                                                ? 'max-h-[380px] h-[380px] overflow-y-auto transition-[height,max-height] duration-300 ease-out' 
+                                                : 'max-h-[50vw] sm:max-h-48 overflow-hidden transition-[height,max-height] duration-300 ease-out'
                                     }`}
                                 >
                                     {/* Item 0: Botão de Adicionar da Galeria/Dispositivo */}
@@ -4433,19 +4521,21 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                         type="button"
                                         onClick={() => {
                                             setRecentMediaDrawer(null);
+                                            setRecentMediaInteractiveHeight(null);
+                                            setIsDraggingRecentMedia(false);
                                             if (recentMediaDrawer === 'video') {
                                                 videoFileInputRef.current?.click();
                                             } else {
                                                 fileInputRef.current?.click();
                                             }
                                         }}
-                                        className="aspect-square bg-purple-600/10 hover:bg-purple-600/15 text-purple-700 flex items-center justify-center transition-colors active:scale-95 group"
+                                        className="aspect-square bg-white hover:bg-purple-50 text-purple-700 flex items-center justify-center transition-colors active:scale-95 group"
                                         aria-label="Adicionar mídia do aparelho"
                                     >
                                         <Plus size={32} strokeWidth={2.2} className="group-hover:scale-110 transition-transform text-purple-700" />
                                     </button>
 
-                                    {/* Lista de mídias recentes coladas uma na outra */}
+                                    {/* Lista de mídias recentes com pequena margem sutil */}
                                     {recentMediaItems.map((item) => {
                                         const displayThumb = item.thumbnailUrl || item.originalImageUrl || item.url;
                                         const isPaid = item.lockedImagePrice > 0;
@@ -4462,6 +4552,8 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                                     setIsVideo(item.isVideo);
                                                     setPreviewUrl(displayThumb);
                                                     setRecentMediaDrawer(null);
+                                                    setRecentMediaInteractiveHeight(null);
+                                                    setIsDraggingRecentMedia(false);
                                                 }}
                                                 className="relative aspect-square overflow-hidden bg-slate-100 cursor-pointer group hover:opacity-90 transition-opacity"
                                             >
