@@ -263,12 +263,14 @@ export default function SearchPage() {
                     }
                 } else {
                     const data = await userApi.searchByUsername(searchQuery);
-                    if (!cancelled) setFoundUsers(data.users || []);
+                    if (!cancelled) {
+                        setFoundUsers(data.users || []);
+                    }
                 }
             } catch (err: any) {
                 if (cancelled) return;
                 if (err.response?.status === 404) {
-                    setError('Nenhum perfil encontrado');
+                    setFoundUsers([]);
                 } else {
                     setError('Não foi possível buscar agora');
                 }

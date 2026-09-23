@@ -10,11 +10,8 @@ export const revalidate = 0;
 // GET /api/users/search?username=@username
 export async function GET(request: NextRequest) {
     try {
+        // userId é opcional para permitir a busca do Explorar sem login
         const { userId } = await auth();
-
-        if (!userId) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
 
         const searchParams = request.nextUrl.searchParams;
         const query = searchParams.get('username') || searchParams.get('query');
@@ -39,25 +36,29 @@ export async function GET(request: NextRequest) {
         await connectToDatabase();
 
         const [currentUser, userRooms] = await Promise.all([
-            User.findOne({ clerkId: userId }).select('isProfessional').lean(),
-            Room.find({ participants: userId }).select('participants').lean<Array<{ participants: string[] }>>().exec(),
+            userId ? User.findOne({ clerkId: userId }).select('isProfessional').lean() : Promise.resolve(null),
+            userId ? Room.find({ participants: userId }).select('participants').lean<Array<{ participants: string[] }>>().exec() : Promise.resolve([]),
         ]);
-        const talkedUserIds = new Set(
-            userRooms.flatMap((room) => room.participants).filter((participantId) => participantId !== userId),
-        );
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const queryFilter: any = {
-            clerkId: { $ne: userId },
-            isSuspended: { $ne: true }
-        };
 
         if (currentUser?.isProfessional) {
             return NextResponse.json({ users: [] });
         }
 
-        queryFilter.isProfessional = true;
-        queryFilter.professionalStatus = 'approved';
+        const talkedUserIds = new Set(
+            (userRooms || []).flatMap((room) => room.participants).filter((participantId) => participantId !== userId),
+        );
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const queryFilter: any = {
+            isSuspended: { $ne: true },
+            hideFromExplore: { $ne: true },
+            isProfessional: true,
+            professionalStatus: 'approved'
+        };
+
+        if (userId) {
+            queryFilter.clerkId = { $ne: userId };
+        }
 
         const foundUsers = await User.find({
             $and: searchTerms.map((term) => {
@@ -74,7 +75,7 @@ export async function GET(request: NextRequest) {
         }).select('clerkId username name email photoUrl coverUrl isProfessional identityStatus subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers bio createdAt avgResponseTimeMinutes freeIntroEnabled isOnline lastSeen birthDate city state').limit(40).lean() as any[];
 
         if (!foundUsers || foundUsers.length === 0) {
-            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+            return NextResponse.json({ users: [] });
         }
 
         // Buscar fotos públicas livres da galeria para estes usuários encontrados
