@@ -10,7 +10,6 @@ import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { 
     ArrowRight, 
-    Lock, 
     LockKeyholeOpen 
 } from 'lucide-react';
 
@@ -30,7 +29,6 @@ interface ChatItem {
     showBadge?: boolean;
     isRead?: boolean;
     isMediaUnlocked?: boolean;
-    isMediaLoading?: boolean;
     mediaPrice?: number;
 }
 
@@ -238,7 +236,7 @@ export function ParaCriadorasContent() {
         timeoutsRef.current = [];
     };
 
-    // Sincroniza estado com eventos de histórico (botão voltar/avançar do navegador)
+    // Sincroniza estado com eventos de histórico do navegador (botão voltar/avançar)
     useEffect(() => {
         const handlePopState = () => {
             const urlStep = parseInt(new URLSearchParams(window.location.search).get('step') || '0', 10) || 0;
@@ -248,7 +246,7 @@ export function ParaCriadorasContent() {
         return () => window.removeEventListener('popstate', handlePopState);
     }, []);
 
-    // Função de navegação com pushState no histórico da URL
+    // Navegação com pushState no histórico da URL
     const goToStep = (nextVal: number) => {
         if (nextVal === activeStep) return;
         setIsExitingText(true);
@@ -261,12 +259,12 @@ export function ParaCriadorasContent() {
         }, 220);
     };
 
-    // Executa as adições incrementais de mensagens por etapa sem apagar as anteriores
+    // Orquestração das mensagens acumulativas
     useEffect(() => {
         clearAllTimeouts();
 
         if (activeStep === 0) {
-            // Etapa 0: Inicia as 4 mensagens de conversa
+            // Etapa 0: Conversa inicial de 4 mensagens
             setMessages([]);
             setTypingSender(null);
 
@@ -337,13 +335,13 @@ export function ParaCriadorasContent() {
                 timeoutsRef.current.push(tMsg);
 
                 if (item.sender === 'creator' && item.gain) {
-                    // Check azul após ser visualizada
+                    // Check azul de leitura
                     const tRead = setTimeout(() => {
                         setMessages(prev => prev.map(m => m.id === item.id ? { ...m, isRead: true } : m));
                     }, accumulated + 500);
                     timeoutsRef.current.push(tRead);
 
-                    // Valor sai de trás do balão roxo
+                    // Valor recebido surge deslizando de trás do balão roxo
                     const tBadgeIn = setTimeout(() => {
                         setMessages(prev => prev.map(m => m.id === item.id ? { ...m, showBadge: true } : m));
                     }, accumulated + 750);
@@ -357,8 +355,7 @@ export function ParaCriadorasContent() {
                 }
             });
         } else if (activeStep === 1) {
-            // Etapa 1: Continua a conversa e envia uma foto/vídeo exclusivo
-            // Se as mensagens anteriores ainda não existem (ex: acessou direto a URL ?step=1), popula base
+            // Etapa 1: A conversa continua com pedido e envio de mídia bloqueada
             setMessages(prev => {
                 if (prev.length >= 4) return prev;
                 return [
@@ -369,7 +366,7 @@ export function ParaCriadorasContent() {
                 ];
             });
 
-            // Se ainda não adicionou a mensagem de mídia (id: 5 e 6), adiciona na sequência
+            // 1. Fã pede a foto
             let acc = 400;
             const tFanPedir = setTimeout(() => {
                 setMessages(prev => {
@@ -382,11 +379,13 @@ export function ParaCriadorasContent() {
             }, acc);
             timeoutsRef.current.push(tFanPedir);
 
-            acc += 1400;
+            // 2. Criadora digita
+            acc += 1300;
             const tTypingMedia = setTimeout(() => setTypingSender('creator'), acc);
             timeoutsRef.current.push(tTypingMedia);
 
-            acc += 1300;
+            // 3. Criadora envia a foto privada
+            acc += 1400;
             const tCreatorMedia = setTimeout(() => {
                 setTypingSender(null);
                 setMessages(prev => {
@@ -399,16 +398,54 @@ export function ParaCriadorasContent() {
                             type: 'media',
                             time: '12:51',
                             mediaPrice: 29.90,
+                            gain: 29.90,
                             isMediaUnlocked: false,
-                            isRead: false
+                            isRead: false,
+                            showBadge: false
                         }
                     ];
                 });
             }, acc);
             timeoutsRef.current.push(tCreatorMedia);
 
+            // 4. O outro usuário (fã) desbloqueia a imagem automaticamente após 1.5s
+            acc += 1600;
+            const tAutoUnlock = setTimeout(() => {
+                setMessages(prev => prev.map(m => {
+                    if (m.id === 6) {
+                        return { ...m, isMediaUnlocked: true, isRead: true };
+                    }
+                    return m;
+                }));
+            }, acc);
+            timeoutsRef.current.push(tAutoUnlock);
+
+            // 5. O valor ganho pela imagem sai deslizando de trás da imagem
+            acc += 350;
+            const tBadgeImgIn = setTimeout(() => {
+                setMessages(prev => prev.map(m => {
+                    if (m.id === 6) {
+                        return { ...m, showBadge: true };
+                    }
+                    return m;
+                }));
+            }, acc);
+            timeoutsRef.current.push(tBadgeImgIn);
+
+            // 6. O valor recolhe de volta após 2 segundos
+            acc += 2000;
+            const tBadgeImgOut = setTimeout(() => {
+                setMessages(prev => prev.map(m => {
+                    if (m.id === 6) {
+                        return { ...m, showBadge: false };
+                    }
+                    return m;
+                }));
+            }, acc);
+            timeoutsRef.current.push(tBadgeImgOut);
+
         } else if (activeStep === 2) {
-            // Etapa 2: Continua a conversa e fã envia um Mimo em Pix de reconhecimento
+            // Etapa 2: A conversa continua com envio de Mimo em Pix pelo fã
             setMessages(prev => {
                 let base = [...prev];
                 if (base.length < 4) {
@@ -419,19 +456,42 @@ export function ParaCriadorasContent() {
                         { id: 4, sender: 'creator', type: 'text', text: 'Consigo sim! O Mimo me notifica e respondo durante a minha rotina.', time: '12:50', isRead: true }
                     ];
                 }
+                if (!base.some(m => m.id === 5)) {
+                    base.push({ id: 5, sender: 'fan', type: 'text', text: 'Você tem fotos exclusivas por aqui? Quero ver! 🫣', time: '12:51' });
+                }
                 if (!base.some(m => m.id === 6)) {
-                    base.push({ id: 6, sender: 'creator', type: 'media', time: '12:51', isMediaUnlocked: true });
+                    base.push({ id: 6, sender: 'creator', type: 'media', time: '12:51', isMediaUnlocked: true, isRead: true });
                 }
                 return base;
             });
 
-            const tMimo = setTimeout(() => {
+            // Fã digita e envia balão de carinho antes do Mimo
+            let acc = 400;
+            const tFanTyping = setTimeout(() => setTypingSender('fan'), acc);
+            timeoutsRef.current.push(tFanTyping);
+
+            acc += 1100;
+            const tFanText = setTimeout(() => {
+                setTypingSender(null);
                 setMessages(prev => {
                     if (prev.some(m => m.id === 7)) return prev;
                     return [
                         ...prev,
+                        { id: 7, sender: 'fan', type: 'text', text: 'Sua atenção aqui é maravilhosa! Vou te mandar um mimo 💜', time: '12:52' }
+                    ];
+                });
+            }, acc);
+            timeoutsRef.current.push(tFanText);
+
+            // Mimo é enviado pelo fã (balão branco oficial estilo ChatScreen)
+            acc += 1200;
+            const tMimo = setTimeout(() => {
+                setMessages(prev => {
+                    if (prev.some(m => m.id === 8)) return prev;
+                    return [
+                        ...prev,
                         {
-                            id: 7,
+                            id: 8,
                             sender: 'fan',
                             type: 'mimo',
                             gain: 50.00,
@@ -439,22 +499,14 @@ export function ParaCriadorasContent() {
                         }
                     ];
                 });
-            }, 600);
+            }, acc);
             timeoutsRef.current.push(tMimo);
         }
 
         return () => clearAllTimeouts();
     }, [activeStep]);
 
-    // Ação ao simular desbloqueio da mídia no chat
-    const handleUnlockSimulatedMedia = (msgId: number) => {
-        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, isMediaLoading: true } : m));
-        setTimeout(() => {
-            setMessages(prev => prev.map(m => m.id === msgId ? { ...m, isMediaLoading: false, isMediaUnlocked: true, isRead: true } : m));
-        }, 1100);
-    };
-
-    // Auto-scroll no container de mensagens conforme surgem
+    // Auto-scroll para manter a mensagem mais recente visível no topo da leitura
     const chatContainerRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
         if (chatContainerRef.current) {
@@ -465,49 +517,49 @@ export function ParaCriadorasContent() {
         }
     }, [messages, typingSender]);
 
-    // ─── TEXTOS POR ETAPA (TÍTULO MAIOR E SUBTÍTULO DISCRETO) ───
+    // ─── TEXTOS POR ETAPA COM TÍTULO MAIOR E COR DA MARCA ───
     function renderStepTexts() {
         switch (activeStep) {
             case 0:
                 return (
-                    <div className="space-y-1.5 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
-                        <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.12]">
-                            Aplicativo de chat onde você ganha para conversar
+                    <div className="space-y-2 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
+                        <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-[1.08]">
+                            Aplicativo de chat onde você <span className="text-purple-600">ganha para conversar</span>
                         </h1>
-                        <p className="text-sm sm:text-base text-slate-500 font-medium leading-relaxed">
+                        <p className="text-base sm:text-lg text-slate-500 font-medium leading-relaxed">
                             Receba por mensagem visualizada
                         </p>
                     </div>
                 );
             case 1:
                 return (
-                    <div className="space-y-1.5 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
-                        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.12]">
-                            Cobre pelas suas fotos e vídeos
+                    <div className="space-y-2 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
+                        <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-[1.08]">
+                            Cobre pelas suas <span className="text-purple-600">fotos e vídeos</span>
                         </h2>
-                        <p className="text-sm sm:text-base text-slate-500 font-medium leading-relaxed">
+                        <p className="text-base sm:text-lg text-slate-500 font-medium leading-relaxed">
                             Envie mídias privadas e receba via Pix no desbloqueio
                         </p>
                     </div>
                 );
             case 2:
                 return (
-                    <div className="space-y-1.5 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
-                        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.12]">
-                            Receba mimos dos seus apoiadores
+                    <div className="space-y-2 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
+                        <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-[1.08]">
+                            Receba <span className="text-purple-600">mimos em dinheiro</span> dos seus apoiadores
                         </h2>
-                        <p className="text-sm sm:text-base text-slate-500 font-medium leading-relaxed">
+                        <p className="text-base sm:text-lg text-slate-500 font-medium leading-relaxed">
                             Mimos e gorjetas em dinheiro direto no chat
                         </p>
                     </div>
                 );
             case 3:
                 return (
-                    <div className="space-y-1.5 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
-                        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.12]">
-                            Comece agora no MimoChat
+                    <div className="space-y-2 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
+                        <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-[1.08]">
+                            Comece agora no <span className="text-purple-600">MimoChat</span>
                         </h2>
-                        <p className="text-sm sm:text-base text-slate-500 font-medium leading-relaxed">
+                        <p className="text-base sm:text-lg text-slate-500 font-medium leading-relaxed">
                             Crie seu perfil profissional e comece a monetizar
                         </p>
                     </div>
@@ -533,7 +585,7 @@ export function ParaCriadorasContent() {
 
     return (
         <div className="h-[100dvh] w-full bg-[#fafafc] text-slate-800 font-sans selection:bg-purple-100 selection:text-purple-900 relative overflow-hidden flex flex-col justify-between z-10">
-            {/* Keyframes de Bounce para os balões de mensagem */}
+            {/* Keyframes de Bounce */}
             <style>{`
                 @keyframes balloonBounceIn {
                     0% {
@@ -561,7 +613,7 @@ export function ParaCriadorasContent() {
             <div className="absolute top-[-10%] left-[-10%] w-[380px] h-[380px] rounded-full bg-purple-400/10 blur-[100px] pointer-events-none select-none z-0" />
             <div className="absolute bottom-[-10%] right-[-10%] w-[350px] h-[350px] rounded-full bg-pink-400/8 blur-[100px] pointer-events-none select-none z-0" />
 
-            {/* HEADER: LOGO À ESQUERDA, PULAR DISCRETO (SEM PÍLULA) À DIREITA */}
+            {/* HEADER: LOGO À ESQUERDA, PULAR DISCRETO À DIREITA */}
             <header className="shrink-0 z-30 flex items-center justify-between px-5 sm:px-8 py-3.5 sm:py-4 h-16 w-full select-none">
                 <Link href="/" className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-600 to-purple-700 flex items-center justify-center shadow-md shadow-purple-600/20">
@@ -597,97 +649,128 @@ export function ParaCriadorasContent() {
                 )}
             </header>
 
-            {/* CORPO PRINCIPAL COM CONVERSA ITERATIVA E ACCUMULATIVA */}
+            {/* CORPO PRINCIPAL COM CHAT SURGINDO A PARTIR DO TOPO */}
             <main className="flex-1 min-h-0 w-full max-w-3xl mx-auto px-4 sm:px-6 flex flex-col justify-between py-2 sm:py-3 relative z-20">
                 
                 {/* 1. TÍTULO E SUBTÍTULO NO TOPO */}
-                <div className={`shrink-0 mb-3 sm:mb-4 transition-all duration-300 ${isExitingText ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'}`}>
+                <div className={`shrink-0 mb-2 sm:mb-3 transition-all duration-300 ${isExitingText ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'}`}>
                     {renderStepTexts()}
                 </div>
 
-                {/* 2. ESPAÇO CENTRAL: CHAT ITERATIVO (ETAPAS 0 A 2) OU FORMULÁRIO (ETAPA 3) */}
-                <div className="flex-1 min-h-0 w-full flex items-center justify-center relative py-1">
+                {/* 2. ESPAÇO CENTRAL: CHAT SURGINDO DE CIMA PARA BAIXO (JUSTIFY-START) */}
+                <div className="flex-1 min-h-0 w-full flex flex-col justify-start relative py-1 overflow-hidden">
                     {activeStep < 3 ? (
                         <div 
                             ref={chatContainerRef}
-                            className="w-full max-w-md mx-auto max-h-full flex flex-col gap-3 overflow-y-auto overflow-x-hidden scrollbar-none py-2 px-1"
+                            className="w-full max-w-md mx-auto h-full flex flex-col justify-start gap-3 overflow-y-auto overflow-x-hidden scrollbar-none py-1 px-1"
                         >
                             {messages.map((msg) => {
                                 const isCreator = msg.sender === 'creator';
 
-                                // Renderização de Mídia Privada (Etapa 1)
+                                // Renderização de Mídia Privada (Etapa 1) com Checks correspondentes e auto-desbloqueio
                                 if (msg.type === 'media') {
                                     return (
                                         <div key={msg.id} className="w-full flex justify-end">
-                                            <div className="relative inline-flex flex-col items-end animate-balloon-bounce">
-                                                <div className="relative w-56 sm:w-64 aspect-4/3 rounded-2xl overflow-hidden border border-slate-200/80 shadow-md">
-                                                    <img
-                                                        src="/assets/laura.png"
-                                                        alt="Mídia Privada"
-                                                        className="w-full h-full object-cover transition-all duration-700 ease-out"
-                                                        style={{ filter: msg.isMediaUnlocked ? 'blur(0px)' : 'blur(16px)' }}
-                                                    />
-                                                    {!msg.isMediaUnlocked ? (
-                                                        <div className="absolute inset-0 bg-slate-900/35 backdrop-blur-xs flex flex-col items-center justify-center p-3 text-center">
-                                                            <button
-                                                                onClick={() => handleUnlockSimulatedMedia(msg.id)}
-                                                                disabled={msg.isMediaLoading}
-                                                                className="bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow-lg shadow-purple-900/30 flex items-center gap-1.5 cursor-pointer transition transform active:scale-95"
-                                                            >
-                                                                {msg.isMediaLoading ? (
-                                                                    <>
-                                                                        <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                                                                        <span>Desbloqueando...</span>
-                                                                    </>
-                                                                ) : (
-                                                                    <>
-                                                                        <Lock className="w-3 h-3" />
-                                                                        <span>Desbloquear R$ {(msg.mediaPrice || 29.90).toFixed(2).replace('.', ',')}</span>
-                                                                    </>
-                                                                )}
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="absolute top-2 left-2 bg-emerald-500/90 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md flex items-center gap-1">
-                                                            <LockKeyholeOpen className="w-2.5 h-2.5" />
-                                                            <span>Desbloqueada</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center gap-1 mt-1 px-1">
-                                                    <span className="text-[10px] text-slate-400 font-medium">{msg.time}</span>
-                                                    <span className={`text-[10px] font-bold ${msg.isRead ? 'text-blue-500' : 'text-purple-400'}`}>✓✓</span>
+                                            <div className="relative inline-flex items-end">
+                                                {/* Indicador de Ganho por trás da imagem */}
+                                                {msg.gain && (
+                                                    <div
+                                                        className={`absolute right-full bottom-1 mb-0.5 transition-all duration-500 ease-out z-0 overflow-hidden flex items-center pointer-events-none ${
+                                                            msg.showBadge
+                                                                ? 'max-w-[100px] opacity-100 pr-2 translate-x-0'
+                                                                : 'max-w-0 opacity-0 pr-0 translate-x-3'
+                                                        }`}
+                                                    >
+                                                        <span className="text-[11px] font-semibold text-emerald-500 whitespace-nowrap select-none">
+                                                            + R$ {msg.gain.toFixed(2).replace('.', ',')}
+                                                        </span>
+                                                    </div>
+                                                )}
+
+                                                <div className="relative z-10 flex flex-col items-end animate-balloon-bounce">
+                                                    <div className="relative w-56 sm:w-64 aspect-4/3 rounded-2xl overflow-hidden border border-slate-200/80 shadow-md">
+                                                        <img
+                                                            src="/assets/laura.png"
+                                                            alt="Mídia Privada"
+                                                            className="w-full h-full object-cover transition-all duration-700 ease-out"
+                                                            style={{ filter: msg.isMediaUnlocked ? 'blur(0px)' : 'blur(16px)' }}
+                                                        />
+                                                        {!msg.isMediaUnlocked ? (
+                                                            <div className="absolute inset-0 bg-slate-900/35 backdrop-blur-xs flex flex-col items-center justify-center p-3 text-center">
+                                                                <span className="bg-purple-600/90 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow-md flex items-center gap-1.5">
+                                                                    <span>Aguardando desbloqueio • R$ {(msg.mediaPrice || 29.90).toFixed(2).replace('.', ',')}</span>
+                                                                </span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="absolute top-2 left-2 bg-emerald-500/90 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md flex items-center gap-1">
+                                                                <LockKeyholeOpen className="w-2.5 h-2.5" />
+                                                                <span>Desbloqueada</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 mt-1 px-1">
+                                                        <span className="text-[10px] text-slate-400 font-medium">{msg.time}</span>
+                                                        <span
+                                                            className={`text-[10px] inline-flex items-center select-none font-bold transition-colors duration-300 ${
+                                                                msg.isRead ? 'text-blue-500' : 'text-purple-300/80'
+                                                            }`}
+                                                            title={msg.isRead ? 'Visualizada' : 'Entregue'}
+                                                        >
+                                                            <span className="relative leading-none">✓</span>
+                                                            <span className="relative -ml-1 leading-none">✓</span>
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
                                     );
                                 }
 
-                                // Renderização de Mimo Recebido (Etapa 2)
+                                // Renderização de Mimo (Etapa 2) no balão branco autêntico do ChatScreen com contexto do fã
                                 if (msg.type === 'mimo') {
                                     return (
-                                        <div key={msg.id} className="w-full flex justify-center my-1 animate-balloon-bounce">
-                                            <div className="bg-white border-2 border-purple-200/90 rounded-2xl p-3 sm:p-3.5 shadow-md shadow-purple-500/5 flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center shrink-0 border border-purple-100">
-                                                    <img src="/assets/gift.png" alt="Mimo Recebido" className="w-6 h-6 object-contain" />
+                                        <div key={msg.id} className="w-full flex justify-start my-1 animate-balloon-bounce">
+                                            <div className="relative z-10 bg-white border border-slate-200/90 rounded-2xl rounded-bl-xs shadow-sm max-w-[280px] sm:max-w-[320px] overflow-hidden">
+                                                <div className="px-5 py-4 flex flex-col items-center gap-2.5">
+                                                    <div className="relative">
+                                                        <div className="absolute inset-0 blur-xl opacity-20 bg-purple-600" />
+                                                        <img 
+                                                            src="/assets/gift.png" 
+                                                            alt="Mimo" 
+                                                            className="w-16 h-16 object-contain relative drop-shadow-md" 
+                                                        />
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <p className="text-[10px] font-black uppercase tracking-wider text-purple-600 mb-0.5">
+                                                            Você recebeu um mimo
+                                                        </p>
+                                                        <p className="text-2xl font-black text-slate-900 tracking-tight">
+                                                            R$ {(msg.gain || 50).toFixed(2).replace('.', ',')}
+                                                        </p>
+                                                    </div>
+                                                    <div className="px-3 py-1 bg-emerald-50 rounded-full border border-emerald-200/60 flex items-center gap-1.5">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                                        <span className="text-[10px] font-bold text-emerald-700">
+                                                            Saldo Adicionado
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                                <div className="leading-tight">
-                                                    <span className="text-[10px] font-extrabold text-purple-600 uppercase tracking-wider block">Mimo Recebido via Pix</span>
-                                                    <span className="text-base font-black text-slate-900 block">+ R$ {(msg.gain || 50).toFixed(2).replace('.', ',')}</span>
+                                                <div className="px-4 py-2 bg-slate-50/70 border-t border-slate-100 flex items-center justify-end">
+                                                    <span className="text-[10px] text-slate-400 font-medium">{msg.time}</span>
                                                 </div>
                                             </div>
                                         </div>
                                     );
                                 }
 
-                                // Mensagens de Texto
+                                // Mensagens de Texto padrão (fã à esquerda, criadora à direita)
                                 return (
                                     <div
                                         key={msg.id}
                                         className={`w-full flex ${isCreator ? 'justify-end' : 'justify-start'}`}
                                     >
                                         <div className="relative inline-flex items-end">
-                                            {/* Indicador de Ganho (alinhado com a borda de baixo do balão, saindo e retornando suavemente) */}
+                                            {/* Indicador de Ganho por trás do balão roxo */}
                                             {isCreator && msg.gain && (
                                                 <div
                                                     className={`absolute right-full bottom-1 mb-0.5 transition-all duration-500 ease-out z-0 overflow-hidden flex items-center pointer-events-none ${
