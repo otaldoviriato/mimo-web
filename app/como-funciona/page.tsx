@@ -918,7 +918,9 @@ export function ParaCriadorasContent() {
 export default function ParaCriadorasPage() {
     return (
         <ClerkProvider>
-            <ParaCriadorasContent />
+            <React.Suspense fallback={null}>
+                <ParaCriadorasContent />
+            </React.Suspense>
         </ClerkProvider>
     );
 }
