@@ -778,28 +778,16 @@ export default function ChatsPage() {
                         </h2>
 
                         {myProfile?.isProfessional ? (
-                            <div className="flex flex-col items-center max-w-xs">
-                                <p className="text-xs text-slate-500 leading-relaxed mb-6">
-                                    Compartilhe seu perfil para começar a receber mensagens.
-                                </p>
-
-                                <button
-                                    type="button"
-                                    onClick={handleShareProfile}
-                                    className="inline-flex items-center justify-center gap-2 rounded-full bg-purple-600 hover:bg-purple-700 active:scale-[0.98] transition-all text-white text-xs font-bold py-3 px-6 shadow-md shadow-purple-600/20 cursor-pointer"
-                                >
-                                    {copiedProfileLink ? (
-                                        <>
-                                            <CheckCircle2 className="h-4 w-4 text-emerald-300" />
-                                            Link copiado!
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Share2 className="h-4 w-4" />
-                                            Compartilhar meu perfil
-                                        </>
-                                    )}
-                                </button>
+                            <div className="flex flex-col items-center max-w-xs text-center">
+                                {myProfile.professionalStatus === 'pending' ? (
+                                    <p className="text-xs text-slate-500 leading-relaxed">
+                                        Seu perfil está em análise. Assim que for aprovado, novas conversas aparecerão aqui.
+                                    </p>
+                                ) : (
+                                    <p className="text-xs text-slate-500 leading-relaxed">
+                                        Novas conversas recebidas aparecerão aqui.
+                                    </p>
+                                )}
                             </div>
                         ) : myProfile?.isTeam ? (
                             <div className="flex flex-col items-center max-w-xs">
