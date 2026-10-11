@@ -414,16 +414,15 @@ export default function LoginPage() {
             </Suspense>
             <div className="relative z-10 w-full min-w-0 max-w-sm">
                 {/* Header */}
-                <div className="text-center mb-10">
-                    <div className="inline-flex w-20 h-20 items-center justify-center bg-gradient-to-br from-purple-600 to-purple-700 rounded-3xl mb-5 shadow-lg shadow-purple-600/20">
+                <div className="text-center mb-8">
+                    <div className="inline-flex w-20 h-20 items-center justify-center bg-gradient-to-br from-purple-600 to-purple-700 rounded-3xl mb-4 shadow-lg shadow-purple-600/20">
                         <img
                             src="/Logo.svg"
                             alt="MimoChat"
                             className="w-12 h-12 object-contain"
                         />
                     </div>
-                    <h1 className="text-3xl font-bold text-gray-900 mb-1">MimoChat</h1>
-                    <p className="text-gray-500 text-base">Conectando você de verdade</p>
+                    <h1 className="text-3xl font-bold text-gray-900">MimoChat</h1>
                 </div>
 
                 {/* Form */}
