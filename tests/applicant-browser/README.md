@@ -1,5 +1,7 @@
 # Cadastro de candidatas — verificação isolada
 
+Também cobre o programa de indicações: `node scripts/test-professional-referrals-browser.cjs` verifica a tela real em quatro larguras, estados, progresso e cópia do link, com dados fictícios. `npm run test:referrals` testa saques líquidos acumulados, idempotência, rollback simulado, carteiras legadas e autorização da API. Os testes transacionais usam um adaptador em memória; a concorrência real do MongoDB e callbacks reais do Asaas precisam de homologação. A integração exige MongoDB com suporte a transações e `ASAAS_WEBHOOK_AUTH_TOKEN` (ou o alias legado `ASSAS_WEBHOOK_AUTH_TOKEN`) configurado; callbacks sem autenticação são recusados.
+
 Esta fixture importa o formulário e o banner reais, substitui apenas a sessão Clerk e intercepta APIs no navegador. Não lê `.env` do aplicativo nem acessa serviços remotos.
 
 1. Execute `npx next dev tests/applicant-browser --webpack --hostname 127.0.0.1 --port 3012` na raiz de mimo-web.

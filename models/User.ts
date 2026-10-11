@@ -28,6 +28,7 @@ export interface IUser extends Document {
     email: string;
     applicantEnrollment?: boolean;
     applicantCompletedAt?: Date;
+    professionalReferralRewardedAt?: Date;
     referredByProfessionalId?: string;
     taxId?: string;
     birthDate?: Date;
@@ -129,6 +130,7 @@ const UserSchema = new Schema<IUser>({
     },
     applicantEnrollment: { type: Boolean, default: false },
     applicantCompletedAt: Date,
+    professionalReferralRewardedAt: Date,
     referredByProfessionalId: { type: String, index: true },
     taxId: {
         type: String,

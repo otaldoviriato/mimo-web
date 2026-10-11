@@ -57,7 +57,7 @@ export default function TabShell({ children, activePath }: { children: React.Rea
 
     const currentTabLabel = 
         pathname === '/activation' ? 'Ativação' :
-        pathname === '/wallet' ? 'Carteira' :
+        pathname.startsWith('/wallet') ? 'Carteira' :
         pathname === '/search' ? 'Explorar' :
         pathname === '/profile' ? 'Perfil' : 'Conversas';
 

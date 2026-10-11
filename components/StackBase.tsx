@@ -13,6 +13,7 @@ const pages = {
     '/wallet': dynamic(() => import('@/app/(app)/(tabs)/wallet/page'), { loading }),
     '/activation': dynamic(() => import('@/app/(app)/(tabs)/activation/page'), { loading }),
     '/profile/edit': dynamic(() => import('@/app/(app)/profile/edit/page'), { loading }),
+    '/wallet/referrals': dynamic(() => import('@/app/(app)/(tabs)/wallet/referrals/page'), { loading }),
     '/wallet/statement': dynamic(() => import('@/app/(app)/(tabs)/wallet/statement/page'), { loading }),
     '/verificacao-identidade': dynamic(() => import('@/app/(app)/verificacao-identidade/page'), { loading }),
 };
@@ -24,7 +25,7 @@ export function StackBase({ path, active }: { path: string; active: boolean }) {
     const Page = pages[path as keyof typeof pages];
     if (!Page) return null;
     if (!active && !visited) return null;
-    return isTabPath(path) || path === '/wallet/statement'
+    return isTabPath(path) || path === '/wallet/statement' || path === '/wallet/referrals'
         ? <TabShell activePath={path}><Page /></TabShell>
         : <Page />;
 }

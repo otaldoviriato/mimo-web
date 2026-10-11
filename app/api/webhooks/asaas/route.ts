@@ -1,3 +1,4 @@
+import { settleProfessionalReferralReward } from '@/lib/professionalReferralReward';
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { connectToDatabase } from '@/lib/db';
@@ -35,7 +36,7 @@ type AsaasWebhookBody = {
 function isAuthorized(request: NextRequest) {
     const expectedToken = process.env.ASAAS_WEBHOOK_AUTH_TOKEN || process.env.ASSAS_WEBHOOK_AUTH_TOKEN;
 
-    if (!expectedToken) return true;
+    if (!expectedToken) return false;
 
     const receivedToken =
         request.headers.get('asaas-access-token') ||
@@ -78,6 +79,7 @@ export async function POST(request: NextRequest) {
 
             if (event === 'TRANSFER_DONE') {
                 if (withdraw.status === 'concluido') {
+                    await settleProfessionalReferralReward(withdraw.userId);
                     return NextResponse.json({ received: true, message: 'Already marked as completed' });
                 }
 
@@ -106,6 +108,8 @@ export async function POST(request: NextRequest) {
                         }
                     });
                 }
+
+                await settleProfessionalReferralReward(withdraw.userId);
 
                 if (user) {
                     await sendPushNotification(
@@ -144,7 +148,7 @@ export async function POST(request: NextRequest) {
                     }
                 }
             } else if (event === 'TRANSFER_FAILED' || event === 'TRANSFER_CANCELLED') {
-                if (withdraw.status === 'rejeitado') {
+                if (withdraw.status === 'rejeitado' || withdraw.status === 'concluido') {
                     return NextResponse.json({ received: true, message: 'Already marked as rejected' });
                 }
 

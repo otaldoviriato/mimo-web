@@ -1,4 +1,5 @@
 'use client';
+import { ProfessionalReferralCard } from '@/components/wallet/ProfessionalReferralCard';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -368,6 +369,8 @@ export default function WalletPage() {
         <div className="flex flex-col h-full bg-slate-50 text-gray-850 overflow-y-auto pb-28 md:pb-6 relative no-scrollbar">
             {/* Bento Grid Container */}
             <div className="p-4 flex flex-col gap-4 max-w-3xl w-full mx-auto relative z-0">
+
+                {userData?.isProfessional && !userData?.isTeam && <ProfessionalReferralCard />}
 
                 {/* ── BENTO BLOCK 1: CARD DE SALDO PRINCIPAL ── */}
                 <div className="bg-gradient-to-br from-purple-50/90 to-indigo-50/50 rounded-2xl p-5 flex flex-col justify-between min-h-[150px] relative overflow-hidden shadow-[0_8px_30px_rgb(124,58,237,0.02)] text-slate-800 border border-purple-100/80">

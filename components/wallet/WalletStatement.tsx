@@ -6,7 +6,7 @@ import { Avatar } from '@/components/Avatar';
 
 export interface WalletStatementEntry {
     id: string;
-    kind: 'message' | 'media_unlock' | 'gift' | 'subscription' | 'adjustment';
+    kind: 'message' | 'media_unlock' | 'gift' | 'subscription' | 'adjustment' | 'referral';
     title: string;
     description: string;
     amount: number;
@@ -24,7 +24,7 @@ export interface WalletStatementData {
 
 type Props = { data?: WalletStatementData; isLoading: boolean; showValues: boolean };
 const formatCurrency = (amount: number, show: boolean) => show ? (amount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ ••••';
-const iconByKind = { message: MessageSquare, media_unlock: ImageIcon, gift: Gift, subscription: UserRoundPlus, adjustment: RefreshCw };
+const iconByKind = { message: MessageSquare, media_unlock: ImageIcon, gift: Gift, subscription: UserRoundPlus, adjustment: RefreshCw, referral: Gift };
 
 export function WalletStatement({ data, isLoading, showValues }: Props) {
     const [filter, setFilter] = useState<'earnings' | 'withdrawals'>('earnings');

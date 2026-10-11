@@ -400,6 +400,7 @@ export default function ProfilePage() {
                             setSelectedItem(items[index]);
                         }}
                     />
+                    {!isTeam && <div className="px-4 pb-4"><button type="button" onClick={() => router.push('/wallet/referrals')} className="w-full rounded-xl bg-purple-50 px-3 py-3 text-sm font-semibold text-purple-700 hover:bg-purple-100">Indicar uma profissional</button></div>}
                 </PullToRefresh>
 
                 {/* Modal fullscreen de visualização de foto */}

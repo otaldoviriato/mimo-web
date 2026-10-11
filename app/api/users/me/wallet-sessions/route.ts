@@ -1,3 +1,4 @@
+import { FinancialLedgerEntry } from '@/models/FinancialLedgerEntry';
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
@@ -11,7 +12,7 @@ export const dynamic = 'force-dynamic';
 
 type StatementEntry = {
     id: string;
-    kind: 'message' | 'media_unlock' | 'gift' | 'subscription' | 'adjustment';
+    kind: 'message' | 'media_unlock' | 'gift' | 'subscription' | 'adjustment' | 'referral';
     title: string;
     description: string;
     amount: number;
@@ -26,7 +27,7 @@ export async function GET() {
         if (!userId) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         await connectToDatabase();
 
-        const [user, withdrawals, paidMessages, microCredits, subscriptions, manualAdjustments] = await Promise.all([
+        const [user, withdrawals, paidMessages, microCredits, subscriptions, manualAdjustments, referralRewards] = await Promise.all([
             User.findOne({ clerkId: userId }).select('balance professionalAvailableCents isProfessional').lean(),
             WithdrawRequest.find({ userId }).sort({ createdAt: -1 }).limit(50).lean(),
             Message.find({
@@ -46,6 +47,7 @@ export async function GET() {
                 .sort({ timestamp: -1 }).limit(200).lean(),
             Transaction.find({ userId, source: 'adjustment', status: 'COMPLETED' })
                 .sort({ timestamp: -1 }).limit(100).lean(),
+            FinancialLedgerEntry.find({ ownerId: userId, eventType: 'professional_referral_reward' }).sort({ effectiveAt: -1 }).limit(200).lean(),
         ]);
 
         if (!user) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
@@ -119,6 +121,14 @@ export async function GET() {
                 description: justification ? `Justificativa: ${justification}` : 'Ajuste de saldo efetuado pelo Backoffice',
                 amount: signedAmount,
                 timestamp: new Date(transaction.timestamp || transaction.createdAt),
+            });
+        }
+
+        for (const reward of referralRewards) {
+            entries.push({
+                id: `referral_${reward._id}`, kind: 'referral', title: 'Bônus por indicação',
+                description: reward.metadata?.username ? `@${reward.metadata.username} concluiu a qualificação` : 'Profissional indicada qualificada',
+                amount: reward.amountCents, timestamp: new Date(reward.effectiveAt),
             });
         }
 

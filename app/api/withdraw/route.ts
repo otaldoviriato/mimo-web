@@ -1,3 +1,4 @@
+import { settleProfessionalReferralReward } from '@/lib/professionalReferralReward';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
@@ -26,6 +27,8 @@ export async function POST(request: NextRequest) {
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
+
+        if (user.isProfessional && user.professionalStatus !== 'approved') return NextResponse.json({ error: 'Aguarde a aprovação do seu perfil para realizar saques.' }, { status: 403 });
 
         if (!user.taxId) {
             return NextResponse.json({ error: 'CPF não cadastrado. É necessário ter um CPF verificado para realizar saques.' }, { status: 400 });
@@ -101,13 +104,15 @@ export async function POST(request: NextRequest) {
 
         // 6. Reserva o saldo disponível para o saque.
         if (user.isProfessional) {
-            user.professionalAvailableCents = 0;
-            user.balance = 0;
+            // Subtract only the amount transferred; preserve rewards/earnings credited concurrently.
+            await User.updateOne({ _id: user._id }, { $inc: {
+                professionalAvailableCents: -amountToWithdraw, balance: -amountToWithdraw,
+            } });
         } else {
             user.customerCashAvailableCents = 0;
             user.balance = 0;
+            await user.save();
         }
-        await user.save();
 
         // 7. Envia e-mail de notificação para viriatoceo@gmail.com com detalhes da taxa
         try {
@@ -147,6 +152,7 @@ export async function POST(request: NextRequest) {
                     if (withdraw && withdraw.status === 'processando') {
                         withdraw.status = 'concluido';
                         await withdraw.save();
+                        await settleProfessionalReferralReward(withdraw.userId);
 
                         const existingTx = await Transaction.findOne({ 'metadata.withdrawRequestId': withdraw._id.toString() });
                         if (!existingTx) {
