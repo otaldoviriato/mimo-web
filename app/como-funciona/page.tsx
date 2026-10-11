@@ -10,11 +10,8 @@ import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { 
     ArrowRight, 
-    ArrowLeft,
-    Send,
-    Lock,
-    LockKeyholeOpen,
-    Zap
+    Lock, 
+    LockKeyholeOpen 
 } from 'lucide-react';
 
 const buildProfessionalMetadata = () => ({
@@ -25,7 +22,7 @@ const buildProfessionalMetadata = () => ({
 
 export function ParaCriadorasContent() {
     // Passos:
-    // 0: Conversa com balões animados e slide de valor recebido
+    // 0: Chat interativo onde quem ganha é quem envia a mensagem e ela é visualizada (2 checks azuis)
     // 1: Mídias pagas desbloqueáveis
     // 2: Mimos recebidos
     // 3: Criar conta / Login (Clerk)
@@ -265,96 +262,122 @@ export function ParaCriadorasContent() {
 
     const isAuthReady = signInLoaded && signUpLoaded;
 
-    // ─── MENSAGENS E ANIMAÇÃO CADENCIADA (PASSO 0) ───
+    // ─── CHAT INTERATIVO (PASSO 0) ───
     interface ChatItem {
+        id: number;
         sender: 'fan' | 'creator';
         text: string;
+        time: string;
         gain?: number;
         showBadge?: boolean;
+        isRead?: boolean;
     }
 
     const [visibleMessages, setVisibleMessages] = useState<ChatItem[]>([]);
-    const [chatTyping, setChatTyping] = useState(false);
+    const [typingSender, setTypingSender] = useState<'fan' | 'creator' | null>(null);
 
     useEffect(() => {
         if (activeStep !== 0) {
             setVisibleMessages([]);
-            setChatTyping(false);
+            setTypingSender(null);
             return;
         }
 
         let isMounted = true;
         const timeouts: NodeJS.Timeout[] = [];
 
-        const script: Array<{ sender: 'fan' | 'creator'; text: string; gain?: number; delayBefore: number; typingTime: number }> = [
+        // Roteiro de 4 mensagens:
+        // Mensagem 1 (fã - esquerda): fã inicia a conversa
+        // Mensagem 2 (criadora - direita, roxa): criadora responde, após visualizada (checks azuis), ganho surge saindo de trás do balão roxo
+        // Mensagem 3 (fã - esquerda): fã continua
+        // Mensagem 4 (criadora - direita, roxa): criadora responde, ganho proporcional surge saindo de trás do balão roxo
+        const script = [
             {
-                sender: 'fan',
+                id: 1,
+                sender: 'fan' as const,
                 text: 'Oi Laura! Vi seu Insta... Queria conversar com você!',
-                gain: 4.50,
-                delayBefore: 600,
+                time: '12:48',
+                delayBefore: 700,
                 typingTime: 1200,
             },
             {
-                sender: 'creator',
+                id: 2,
+                sender: 'creator' as const,
                 text: 'Oi Carlos! Tudo bem? Aqui a gente conversa no privado com calma 💜',
-                delayBefore: 1200,
-                typingTime: 1500,
+                time: '12:49',
+                gain: 4.80,
+                delayBefore: 1400,
+                typingTime: 1600,
             },
             {
-                sender: 'fan',
+                id: 3,
+                sender: 'fan' as const,
                 text: 'Perfeito! E você consegue me responder com frequência?',
-                gain: 5.50,
-                delayBefore: 1400,
+                time: '12:49',
+                delayBefore: 1500,
                 typingTime: 1300,
             },
             {
-                sender: 'creator',
+                id: 4,
+                sender: 'creator' as const,
                 text: 'Consigo sim! O Mimo me notifica e respondo durante a minha rotina ✨',
-                delayBefore: 1200,
-                typingTime: 1500,
+                time: '12:50',
+                gain: 5.60,
+                delayBefore: 1400,
+                typingTime: 1600,
             }
         ];
 
         let accumulatedTime = 0;
 
-        script.forEach((item, index) => {
-            // 1. Inicia digitação
+        script.forEach((item) => {
+            // 1. Inicia indicador de digitação do autor
             accumulatedTime += item.delayBefore;
             const t1 = setTimeout(() => {
                 if (!isMounted) return;
-                setChatTyping(true);
+                setTypingSender(item.sender);
             }, accumulatedTime);
             timeouts.push(t1);
 
-            // 2. Aparece o balão com bounce
+            // 2. Balão surge na tela com bounce
             accumulatedTime += item.typingTime;
             const t2 = setTimeout(() => {
                 if (!isMounted) return;
-                setChatTyping(false);
+                setTypingSender(null);
                 setVisibleMessages(prev => [
                     ...prev,
                     {
+                        id: item.id,
                         sender: item.sender,
                         text: item.text,
+                        time: item.time,
                         gain: item.gain,
-                        showBadge: false
+                        showBadge: false,
+                        isRead: false
                     }
                 ]);
             }, accumulatedTime);
             timeouts.push(t2);
 
-            // 3. Se tiver ganho, o valor desliza para fora de trás do balão após o bounce assentar (500ms)
-            if (item.gain) {
-                const t3 = setTimeout(() => {
+            // 3. Se for mensagem da criadora, visualização e valor recebido surgem
+            if (item.sender === 'creator' && item.gain) {
+                // Marca como visualizada (checks azuis) 600ms após ser enviada
+                const tRead = setTimeout(() => {
                     if (!isMounted) return;
-                    setVisibleMessages(prev => prev.map((msg, i) => {
-                        if (i === index) {
-                            return { ...msg, showBadge: true };
-                        }
-                        return msg;
-                    }));
-                }, accumulatedTime + 450);
-                timeouts.push(t3);
+                    setVisibleMessages(prev => prev.map(msg => 
+                        msg.id === item.id ? { ...msg, isRead: true } : msg
+                    ));
+                }, accumulatedTime + 600);
+                timeouts.push(tRead);
+
+                // O valor recebido desliza saindo suavemente de trás do balão roxo logo após ser visualizada
+                const tBadge = setTimeout(() => {
+                    if (!isMounted) return;
+                    setVisibleMessages(prev => prev.map(msg => 
+                        msg.id === item.id ? { ...msg, showBadge: true } : msg
+                    ));
+                }, accumulatedTime + 850);
+                timeouts.push(tBadge);
             }
         });
 
@@ -395,55 +418,49 @@ export function ParaCriadorasContent() {
         }
     }
 
-    function prevStep() {
-        if (activeStep > 0) {
-            changeStep(activeStep - 1);
-        }
-    }
-
-    // ─── TEXTOS POR ETAPA ───
+    // ─── TEXTOS POR ETAPA COM MAIS COR E DESTAQUE ───
     function renderStepTexts() {
         switch (activeStep) {
             case 0:
                 return (
-                    <div className="space-y-1.5 sm:space-y-2 text-center lg:text-left">
-                        <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight leading-snug">
-                            Aplicativo de chat onde você ganha para conversar
+                    <div className="space-y-2 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
+                        <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.12]">
+                            Aplicativo de chat onde você <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-purple-800">ganha para conversar</span>
                         </h1>
-                        <p className="text-sm sm:text-base text-slate-500 font-medium">
+                        <p className="text-base sm:text-lg text-purple-600/90 font-bold tracking-tight">
                             Receba por mensagem visualizada
                         </p>
                     </div>
                 );
             case 1:
                 return (
-                    <div className="space-y-1.5 sm:space-y-2 text-center lg:text-left">
-                        <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight leading-snug">
-                            Cobre pelas suas fotos e vídeos
+                    <div className="space-y-2 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
+                        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.12]">
+                            Cobre pelas suas <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-purple-800">fotos e vídeos</span>
                         </h2>
-                        <p className="text-sm sm:text-base text-slate-500 font-medium">
+                        <p className="text-base sm:text-lg text-purple-600/90 font-bold tracking-tight">
                             Envie mídias privadas e receba via Pix na hora do desbloqueio
                         </p>
                     </div>
                 );
             case 2:
                 return (
-                    <div className="space-y-1.5 sm:space-y-2 text-center lg:text-left">
-                        <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight leading-snug">
-                            Receba mimos dos seus apoiadores
+                    <div className="space-y-2 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
+                        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.12]">
+                            Receba <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-purple-800">mimos em dinheiro</span> dos seus apoiadores
                         </h2>
-                        <p className="text-sm sm:text-base text-slate-500 font-medium">
-                            Mimos e gorjetas em dinheiro direto no chat
+                        <p className="text-base sm:text-lg text-purple-600/90 font-bold tracking-tight">
+                            Mimos e gorjetas direto no chat sem burocracia
                         </p>
                     </div>
                 );
             case 3:
                 return (
-                    <div className="space-y-1.5 sm:space-y-2 text-center lg:text-left">
-                        <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight leading-snug">
-                            Comece agora no MimoChat
+                    <div className="space-y-2 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
+                        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.12]">
+                            Comece agora no <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-purple-800">MimoChat</span>
                         </h2>
-                        <p className="text-sm sm:text-base text-slate-500 font-medium">
+                        <p className="text-base sm:text-lg text-purple-600/90 font-bold tracking-tight">
                             Crie seu perfil profissional e comece a monetizar
                         </p>
                     </div>
@@ -459,7 +476,7 @@ export function ParaCriadorasContent() {
         return (
             <button
                 onClick={nextStep}
-                className="w-full sm:max-w-md mx-auto lg:mx-0 py-3.5 px-8 text-sm sm:text-base font-extrabold text-white bg-purple-600 hover:bg-purple-700 active:bg-purple-800 rounded-2xl transition shadow-lg shadow-purple-600/25 hover:scale-[1.01] active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
+                className="w-full sm:max-w-md mx-auto lg:mx-0 py-3.5 px-8 text-base font-extrabold text-white bg-purple-600 hover:bg-purple-700 active:bg-purple-800 rounded-2xl transition shadow-lg shadow-purple-600/25 hover:scale-[1.01] active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
             >
                 <span>Próximo</span>
                 <ArrowRight className="w-4 h-4 shrink-0" />
@@ -469,19 +486,19 @@ export function ParaCriadorasContent() {
 
     return (
         <div className="h-[100dvh] w-full bg-[#fafafc] text-slate-800 font-sans selection:bg-purple-100 selection:text-purple-900 relative overflow-hidden flex flex-col justify-between z-10">
-            {/* Keyframes de Bounce e Slide do Valor */}
+            {/* Keyframes de Bounce para balões e Slide suave do valor */}
             <style>{`
-                @keyframes bounceBalloon {
+                @keyframes balloonBounceIn {
                     0% {
                         opacity: 0;
-                        transform: scale(0.82) translateY(16px);
+                        transform: scale(0.85) translateY(12px);
                     }
                     60% {
                         opacity: 1;
-                        transform: scale(1.03) translateY(-3px);
+                        transform: scale(1.02) translateY(-2px);
                     }
                     80% {
-                        transform: scale(0.98) translateY(1px);
+                        transform: scale(0.99) translateY(1px);
                     }
                     100% {
                         opacity: 1;
@@ -489,11 +506,11 @@ export function ParaCriadorasContent() {
                     }
                 }
                 .animate-balloon-bounce {
-                    animation: bounceBalloon 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+                    animation: balloonBounceIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
                 }
             `}</style>
 
-            {/* Fundo suave */}
+            {/* Fundo sutil em tons lavanda */}
             <div className="absolute top-[-10%] left-[-10%] w-[380px] h-[380px] rounded-full bg-purple-400/10 blur-[100px] pointer-events-none select-none z-0" />
             <div className="absolute bottom-[-10%] right-[-10%] w-[350px] h-[350px] rounded-full bg-pink-400/8 blur-[100px] pointer-events-none select-none z-0" />
 
@@ -533,65 +550,96 @@ export function ParaCriadorasContent() {
                 )}
             </header>
 
-            {/* CORPO PRINCIPAL COM CONTEÚDO PERFEITAMENTE ENCAIXADO */}
-            <main className="flex-1 min-h-0 w-full max-w-5xl mx-auto px-4 sm:px-6 flex flex-col justify-between py-2 sm:py-4 relative z-20">
+            {/* CORPO PRINCIPAL: TOPO (TEXTO), CENTRO (ANIMAÇÃO), RODAPÉ (BOTÃO) */}
+            <main className="flex-1 min-h-0 w-full max-w-4xl mx-auto px-4 sm:px-6 flex flex-col justify-between py-2 sm:py-4 relative z-20">
                 
                 {/* 1. TÍTULO E SUBTÍTULO NO TOPO */}
-                <div className="shrink-0 mb-2 sm:mb-4 transition-all duration-300">
+                <div className="shrink-0 mb-3 sm:mb-5 transition-all duration-300">
                     {renderStepTexts()}
                 </div>
 
-                {/* 2. ESPAÇO CENTRAL: ANIMAÇÃO DOS BALÕES / CENÁRIO */}
+                {/* 2. ESPAÇO CENTRAL: BALÕES DE CHAT / CENÁRIO */}
                 <div className="flex-1 min-h-0 w-full flex items-center justify-center overflow-y-auto overflow-x-hidden scrollbar-none py-1">
                     
-                    {/* PASSO 0: BALÕES DE CHAT ANIMADOS COM BOUNCE E SLIDE DO VALOR RECEBIDO */}
+                    {/* PASSO 0: BALÕES DE CHAT COM LADOS CORRETOS, CHECKS E SLIDE DE VALOR RECEBIDO */}
                     {activeStep === 0 && (
-                        <div className="w-full max-w-md mx-auto flex flex-col gap-2.5 sm:gap-3 justify-center">
-                            {visibleMessages.map((msg, idx) => (
-                                <div
-                                    key={idx}
-                                    className={`relative flex items-center gap-1.5 animate-balloon-bounce ${
-                                        msg.sender === 'fan' ? 'self-start' : 'self-end'
-                                    }`}
-                                >
-                                    {/* Indicador de ganho: sai deslizando de trás do balão do fã como na sala de chat real */}
-                                    {msg.gain && (
-                                        <div
-                                            className={`transition-all duration-500 ease-out z-0 overflow-hidden flex items-center shrink-0 ${
-                                                msg.showBadge
-                                                    ? 'max-w-[90px] opacity-100 mr-1.5 sm:mr-2 scale-100'
-                                                    : 'max-w-0 opacity-0 mr-0 scale-75 pointer-events-none'
-                                            }`}
-                                        >
-                                            <span
-                                                className={`transform transition-transform duration-500 ease-out ${
-                                                    msg.showBadge ? 'translate-x-0' : '-translate-x-4'
-                                                } text-[11px] sm:text-xs font-black text-emerald-600 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full whitespace-nowrap shadow-2xs`}
-                                            >
-                                                + R$ {msg.gain.toFixed(2).replace('.', ',')}
-                                            </span>
-                                        </div>
-                                    )}
+                        <div className="w-full max-w-md mx-auto flex flex-col gap-3 justify-center">
+                            {visibleMessages.map((msg) => {
+                                const isCreator = msg.sender === 'creator';
 
-                                    {/* Balão da Mensagem */}
+                                return (
                                     <div
-                                        className={`relative z-10 p-3 sm:p-3.5 text-xs sm:text-sm leading-relaxed max-w-[260px] sm:max-w-[320px] shadow-sm select-none ${
-                                            msg.sender === 'fan'
-                                                ? 'bg-white border border-slate-200/80 text-slate-800 rounded-2xl rounded-tl-xs'
-                                                : 'bg-purple-600 text-white font-medium rounded-2xl rounded-tr-xs shadow-purple-600/20'
+                                        key={msg.id}
+                                        className={`w-full flex ${isCreator ? 'justify-end' : 'justify-start'}`}
+                                    >
+                                        <div className="relative inline-flex items-center">
+                                            {/* Indicador de Ganho (slide saindo suavemente de trás do balão roxo da criadora) */}
+                                            {isCreator && msg.gain && (
+                                                <div
+                                                    className={`absolute right-full top-1/2 -translate-y-1/2 transition-all duration-500 ease-out z-0 overflow-hidden flex items-center pointer-events-none ${
+                                                        msg.showBadge
+                                                            ? 'max-w-[100px] opacity-100 pr-2 translate-x-0'
+                                                            : 'max-w-0 opacity-0 pr-0 translate-x-4'
+                                                    }`}
+                                                >
+                                                    <span className="text-xs font-black text-emerald-600 whitespace-nowrap select-none">
+                                                        + R$ {msg.gain.toFixed(2).replace('.', ',')}
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            {/* Balão de Mensagem */}
+                                            <div
+                                                className={`relative z-10 px-3.5 py-2 sm:px-4 sm:py-2.5 max-w-[260px] sm:max-w-[320px] shadow-sm select-none animate-balloon-bounce ${
+                                                    isCreator
+                                                        ? 'bg-purple-600 text-white rounded-2xl rounded-br-xs shadow-purple-600/20'
+                                                        : 'bg-white border border-slate-200/90 text-slate-800 rounded-2xl rounded-bl-xs'
+                                                }`}
+                                            >
+                                                {/* Texto */}
+                                                <p className="text-xs sm:text-[13px] leading-relaxed font-normal">
+                                                    {msg.text}
+                                                </p>
+
+                                                {/* Linha de Horário e Status */}
+                                                <div className="flex items-center justify-end gap-1.5 mt-1 leading-none">
+                                                    <span className={`text-[10px] font-medium ${isCreator ? 'text-purple-200/80' : 'text-slate-400'}`}>
+                                                        {msg.time}
+                                                    </span>
+
+                                                    {/* Checks oficiais do Mimo (para mensagens da criadora) */}
+                                                    {isCreator && (
+                                                        <span
+                                                            className={`text-[10px] inline-flex items-center select-none font-bold transition-colors duration-300 ${
+                                                                msg.isRead ? 'text-blue-300' : 'text-purple-300/80'
+                                                            }`}
+                                                            title={msg.isRead ? 'Visualizada' : 'Entregue'}
+                                                        >
+                                                            <span className="relative leading-none">✓</span>
+                                                            <span className="relative -ml-1 leading-none">✓</span>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+
+                            {/* Indicador de digitando animado (do lado de quem está digitando) */}
+                            {typingSender && (
+                                <div className={`w-full flex ${typingSender === 'creator' ? 'justify-end' : 'justify-start'}`}>
+                                    <div
+                                        className={`py-2 px-3 rounded-2xl shadow-xs animate-balloon-bounce flex items-center gap-1.5 ${
+                                            typingSender === 'creator'
+                                                ? 'bg-purple-600/90 text-white rounded-br-xs'
+                                                : 'bg-white border border-slate-200/80 text-slate-400 rounded-bl-xs'
                                         }`}
                                     >
-                                        {msg.text}
+                                        <span className={`w-1.5 h-1.5 rounded-full animate-bounce ${typingSender === 'creator' ? 'bg-white' : 'bg-purple-600'}`}></span>
+                                        <span className={`w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:0.15s] ${typingSender === 'creator' ? 'bg-white' : 'bg-purple-600'}`}></span>
+                                        <span className={`w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:0.3s] ${typingSender === 'creator' ? 'bg-white' : 'bg-purple-600'}`}></span>
                                     </div>
-                                </div>
-                            ))}
-
-                            {/* Indicador de digitando animado */}
-                            {chatTyping && (
-                                <div className="self-start flex items-center gap-1.5 bg-white border border-slate-200/80 py-2 px-3 rounded-2xl rounded-tl-xs shadow-xs text-slate-400 animate-balloon-bounce">
-                                    <span className="w-1.5 h-1.5 bg-purple-600 rounded-full animate-bounce"></span>
-                                    <span className="w-1.5 h-1.5 bg-purple-600 rounded-full animate-bounce [animation-delay:0.15s]"></span>
-                                    <span className="w-1.5 h-1.5 bg-purple-600 rounded-full animate-bounce [animation-delay:0.3s]"></span>
                                 </div>
                             )}
                         </div>
@@ -788,7 +836,7 @@ export function ParaCriadorasContent() {
 
                 </div>
 
-                {/* 3. BOTÃO PRESO NO RODAPÉ */}
+                {/* 3. BOTÃO FIXO NO RODAPÉ */}
                 <div className="shrink-0 pt-2 sm:pt-3 pb-1 w-full flex justify-center">
                     {renderStepAction()}
                 </div>
