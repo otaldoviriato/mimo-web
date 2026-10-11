@@ -35,7 +35,7 @@ export function ProfessionalReviewFrame({ pending, children }: { pending: boolea
     };
 
     return <div>
-        <div className={showBanner ? 'professional-review-viewport' : undefined} style={showBanner ? { '--app-viewport-height': `calc(100dvh - ${height}px)`, height: `calc(100dvh - ${height}px)`, transform: 'translateZ(0)', overflow: 'hidden' } as CSSProperties : undefined}>
+        <div>
             {children}
         </div>
         {showBanner && <div ref={banner} role="status" className="fixed top-[72px] inset-x-0 z-30 border-b border-purple-200 bg-purple-50/95 backdrop-blur-sm px-4 py-3 text-purple-950 shadow-sm animate-in fade-in slide-in-from-top-1 duration-200">
