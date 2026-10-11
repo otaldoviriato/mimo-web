@@ -12,6 +12,7 @@ import { clearMimoClientSession } from '@/lib/clientSession';
 import { REFERRAL_STORAGE_KEY, getReferralFromSearchParams, type ReferralMetadata } from '@/lib/referral';
 import { getPendingPostAuthRedirect, consumePostAuthRedirect, POST_AUTH_REDIRECT_STORAGE_KEY } from '@/lib/postAuthRedirect';
 import { CAMPAIGN_ATTRIBUTION_STORAGE_KEY } from '@/components/CampaignVisitTracker';
+import { DiscoverProfileBackground } from '@/components/landing/NetflixStyleLanding';
 
 function GiftCapture() {
     const searchParams = useSearchParams();
@@ -406,14 +407,15 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
+        <div className="relative min-h-screen flex items-center justify-center bg-radial from-[#eee0ff] via-[#faf8fd] to-white py-12 px-4 overflow-hidden selection:bg-purple-600 selection:text-white">
+            <DiscoverProfileBackground />
             <Suspense fallback={null}>
                 <GiftCapture />
             </Suspense>
-            <div className="w-full min-w-0 max-w-sm">
+            <div className="relative z-10 w-full min-w-0 max-w-sm">
                 {/* Header */}
                 <div className="text-center mb-10">
-                    <div className="inline-flex w-20 h-20 items-center justify-center bg-gradient-to-br from-purple-600 to-purple-700 rounded-3xl mb-5 shadow-lg">
+                    <div className="inline-flex w-20 h-20 items-center justify-center bg-gradient-to-br from-purple-600 to-purple-700 rounded-3xl mb-5 shadow-lg shadow-purple-600/20">
                         <img
                             src="/Logo.svg"
                             alt="MimoChat"
@@ -425,7 +427,7 @@ export default function LoginPage() {
                 </div>
 
                 {/* Form */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl shadow-purple-950/5 border border-purple-100/80 p-6">
                     {!pendingVerification ? (
                         <div className="flex flex-col gap-4">
                             <Input
