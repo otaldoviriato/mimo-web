@@ -1,5 +1,4 @@
 export const PUBLIC_CONTENT_ROUTES = [
-    '/descubra',
     '/institucional',
     '/como-funciona',
     '/ajuda',
