@@ -623,8 +623,8 @@ function ParaCriadorasContent() {
                                     {/* Header Roxo */}
                                     <div className={`${isMobile ? 'px-2 py-1' : 'px-3 py-2'} bg-purple-600 flex items-center justify-between border-b border-purple-500/20 select-none shadow-sm shrink-0 leading-none`}>
                                         <div className="flex items-center gap-1.5">
-                                            <div className={`${isMobile ? 'w-4 h-4' : 'w-6 h-6'} rounded-md bg-purple-900/40 flex items-center justify-center text-white/95`}>
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`${isMobile ? 'w-2 h-2' : 'w-3.5 h-3.5'}`}><polyline points="20 12 20 22 4 22 4 12"></polyline><rect x="2" y="7" width="20" height="5" rx="1"></rect><line x1="12" y1="22" x2="12" y2="7"></line><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg>
+                                            <div className={`${isMobile ? 'w-4 h-4 rounded-[4px]' : 'w-6 h-6 rounded-md'} bg-purple-700/60 flex items-center justify-center p-0.5`}>
+                                                <Image src="/Logo.svg" alt="Mimo" width={14} height={14} className={`${isMobile ? 'w-2.5 h-2.5' : 'w-4 h-4'} object-contain`} />
                                             </div>
                                             <div className="flex items-center gap-1 leading-none">
                                                 <span className={`${isMobile ? 'text-[9px]' : 'text-[13px]'} text-white font-black tracking-tight`}>Mimo</span>
@@ -830,7 +830,7 @@ function ParaCriadorasContent() {
                                                                 <button 
                                                                     onClick={handleSimulateUnlock}
                                                                     disabled={mediaLoading}
-                                                                    className={`bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-black rounded-lg shadow-md transition active:scale-[0.96] flex items-center gap-1 cursor-pointer select-none ${
+                                                                    className={`bg-purple-600 hover:bg-purple-700 text-white font-black rounded-lg shadow-md transition active:scale-[0.96] flex items-center gap-1 cursor-pointer select-none ${
                                                                         isMobile ? 'px-2 py-1 text-[7.5px]' : 'px-3 py-1.5 text-[8.5px]'
                                                                     }`}
                                                                 >
@@ -953,7 +953,7 @@ function ParaCriadorasContent() {
                 return (
                     <div className="space-y-4">
                         <h1 className={`text-3xl sm:text-4xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.05] ${isExiting ? 'animate-slide-out-title' : 'animate-title-elastic'}`}>
-                            O único aplicativo de chat onde você <span className="bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 bg-clip-text text-transparent">ganha por conversar</span>.
+                            O único aplicativo de chat onde você <span className="text-purple-600">ganha por conversar</span>.
                         </h1>
                         <p className={`text-sm sm:text-sm lg:text-base text-slate-500 max-w-xl mx-auto lg:mx-0 leading-relaxed ${isExiting ? 'animate-slide-out-subtitle' : 'animate-subtitle-elastic'}`}>
                             O Mimo é um chat privado onde seu tempo e atenção se transformam em lucros reais.
@@ -964,7 +964,7 @@ function ParaCriadorasContent() {
                 return (
                     <div className="space-y-3 lg:space-y-4">
                         <h2 className={`text-3xl sm:text-4xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.05] ${isExiting ? 'animate-slide-out-title' : 'animate-title-elastic'}`}>
-                            O seu tempo vale <span className="bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 bg-clip-text text-transparent">dinheiro de verdade</span>.
+                            O seu tempo vale <span className="text-purple-600">dinheiro de verdade</span>.
                         </h2>
                         <p className={`text-sm sm:text-sm lg:text-base text-slate-500 max-w-xl mx-auto lg:mx-0 leading-relaxed ${isExiting ? 'animate-slide-out-subtitle' : 'animate-subtitle-elastic'}`}>
                             Defina o preço das suas mensagens e receba proporcionalmente por caractere em cada resposta dada.
@@ -975,7 +975,7 @@ function ParaCriadorasContent() {
                 return (
                     <div className="space-y-3 lg:space-y-4">
                         <h2 className={`text-3xl sm:text-4xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.05] ${isExiting ? 'animate-slide-out-title' : 'animate-title-elastic'}`}>
-                            Cobre pelas suas <span className="bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 bg-clip-text text-transparent">fotos e vídeos</span>.
+                            Cobre pelas suas <span className="text-purple-600">fotos e vídeos</span>.
                         </h2>
                         <p className={`text-sm sm:text-sm lg:text-base text-slate-500 max-w-xl mx-auto lg:mx-0 leading-relaxed ${isExiting ? 'animate-slide-out-subtitle' : 'animate-subtitle-elastic'}`}>
                             Envie mídias privadas e borradas no chat. A pessoa faz um Pix para desbloquear na hora e assistir.
@@ -1007,7 +1007,7 @@ function ParaCriadorasContent() {
                 return (
                     <div className="space-y-3 lg:space-y-4">
                         <h2 className={`text-3xl sm:text-4xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.05] ${isExiting ? 'animate-slide-out-title' : 'animate-title-elastic'}`}>
-                            Receba <span className="bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 bg-clip-text text-transparent">mimos espontâneos</span> de apoiadores.
+                            Receba <span className="text-purple-600">mimos espontâneos</span> de apoiadores.
                         </h2>
                         <p className={`text-sm sm:text-sm lg:text-base text-slate-500 max-w-xl mx-auto lg:mx-0 leading-relaxed ${isExiting ? 'animate-slide-out-subtitle' : 'animate-subtitle-elastic'}`}>
                             As pessoas podem enviar mimos em dinheiro diretamente no chat, como forma de carinho, sem precisar de nada em troca.
@@ -1021,7 +1021,7 @@ function ParaCriadorasContent() {
                             <Zap className="w-8 h-8 text-purple-600 animate-pulse" />
                         </div>
                         <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight animate-title-elastic">
-                            Comece sua Jornada no <span className="bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 bg-clip-text text-transparent">Mimo Chat</span> 💜
+                            Comece sua Jornada no <span className="text-purple-600">MimoChat</span>
                         </h2>
                         <p className="text-sm lg:text-base text-slate-500 leading-relaxed font-medium max-w-lg animate-subtitle-elastic">
                             Crie seu perfil no MimoChat hoje mesmo para começar a interagir, monetizar suas conversas e ter total controle do seu conteúdo.
@@ -1041,7 +1041,7 @@ function ParaCriadorasContent() {
                     <div className={`pt-2 flex justify-center lg:justify-start ${isExiting ? 'animate-slide-out-button' : 'animate-button-elastic'}`}>
                         <button
                             onClick={nextStep}
-                            className="w-full md:max-w-md py-4 lg:py-4.5 px-8 sm:px-10 text-sm sm:text-sm lg:text-base font-extrabold text-white bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 rounded-2xl transition shadow-xl shadow-purple-300/30 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] cursor-pointer"
+                            className="w-full md:max-w-md py-4 lg:py-4.5 px-8 sm:px-10 text-sm sm:text-sm lg:text-base font-extrabold text-white bg-purple-600 hover:bg-purple-700 active:bg-purple-800 rounded-2xl transition shadow-lg shadow-purple-600/25 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] cursor-pointer"
                         >
                             Quero ganhar conversando
                             <ArrowRight className="w-4 h-4 ml-1 inline" />
@@ -1053,7 +1053,7 @@ function ParaCriadorasContent() {
                     <div className={`pt-1 flex items-center justify-center lg:justify-start gap-3 ${isExiting ? 'animate-slide-out-button' : 'animate-button-elastic'}`}>
                         <button
                             onClick={nextStep}
-                            className="w-full md:max-w-md py-4 lg:py-4.5 px-8 sm:px-10 text-sm sm:text-sm lg:text-base font-extrabold text-white bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 rounded-2xl transition shadow-xl shadow-purple-300/30 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] cursor-pointer"
+                            className="w-full md:max-w-md py-4 lg:py-4.5 px-8 sm:px-10 text-sm sm:text-sm lg:text-base font-extrabold text-white bg-purple-600 hover:bg-purple-700 active:bg-purple-800 rounded-2xl transition shadow-lg shadow-purple-600/25 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] cursor-pointer"
                         >
                             Entendi! E fotos/vídeos?
                             <ArrowRight className="w-4 h-4 ml-1 inline" />
@@ -1065,7 +1065,7 @@ function ParaCriadorasContent() {
                     <div className={`pt-1 flex items-center justify-center lg:justify-start gap-3 ${isExiting ? 'animate-slide-out-button' : 'animate-button-elastic'}`}>
                         <button
                             onClick={nextStep}
-                            className="w-full md:max-w-md py-4 lg:py-4.5 px-8 sm:px-10 text-sm sm:text-sm lg:text-base font-extrabold text-white bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 rounded-2xl transition shadow-xl shadow-purple-300/30 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] cursor-pointer"
+                            className="w-full md:max-w-md py-4 lg:py-4.5 px-8 sm:px-10 text-sm sm:text-sm lg:text-base font-extrabold text-white bg-purple-600 hover:bg-purple-700 active:bg-purple-800 rounded-2xl transition shadow-lg shadow-purple-600/25 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] cursor-pointer"
                         >
                             Gostei! Como funcionam os Mimos?
                             <ArrowRight className="w-4 h-4 ml-1 inline" />
@@ -1077,7 +1077,7 @@ function ParaCriadorasContent() {
                     <div className={`pt-1 flex items-center justify-center lg:justify-start gap-3 ${isExiting ? 'animate-slide-out-button' : 'animate-button-elastic'}`}>
                         <button
                             onClick={nextStep}
-                            className="w-full md:max-w-md py-4 lg:py-4.5 px-8 sm:px-10 text-sm sm:text-sm lg:text-base font-extrabold text-white bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 rounded-2xl transition shadow-xl shadow-purple-300/30 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] cursor-pointer"
+                            className="w-full md:max-w-md py-4 lg:py-4.5 px-8 sm:px-10 text-sm sm:text-sm lg:text-base font-extrabold text-white bg-purple-600 hover:bg-purple-700 active:bg-purple-800 rounded-2xl transition shadow-lg shadow-purple-600/25 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] cursor-pointer"
                         >
                             Quero fazer parte do Mimo
                             <ArrowRight className="w-4 h-4 ml-1 inline" />
@@ -1270,14 +1270,21 @@ function ParaCriadorasContent() {
                             <ArrowLeft className="w-4 h-4" />
                         </button>
                     )}
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-purple-600 via-fuchsia-600 to-indigo-600 flex items-center justify-center text-white font-black text-sm shadow-sm">
-                            M
+                    <Link href="/" className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-600 to-purple-700 flex items-center justify-center shadow-md shadow-purple-600/20">
+                            <Image
+                                src="/Logo.svg"
+                                alt="MimoChat"
+                                width={20}
+                                height={20}
+                                priority
+                                className="w-5 h-5 object-contain"
+                            />
                         </div>
-                        <span className="text-lg font-black tracking-tight text-slate-900">
-                            mimo<span className="text-purple-600 font-extrabold text-[9px] ml-1 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded-md uppercase tracking-wider">Chat</span>
+                        <span className="text-xl font-bold tracking-tight text-slate-900">
+                            MimoChat
                         </span>
-                    </div>
+                    </Link>
                 </div>
 
                 <div className="flex items-center gap-3 pointer-events-auto">
@@ -1343,7 +1350,7 @@ function ParaCriadorasContent() {
                                             loading={emailLoading}
                                             disabled={!isAuthReady}
                                             size="lg"
-                                            className="w-full bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 border-0 text-white rounded-2xl py-3.5 font-bold shadow-md hover:scale-[1.01] active:scale-[0.99] transition"
+                                            className="w-full bg-purple-600 hover:bg-purple-700 active:bg-purple-800 border-0 text-white rounded-2xl py-3.5 font-bold shadow-md shadow-purple-600/25 hover:scale-[1.01] active:scale-[0.99] transition cursor-pointer"
                                         />
 
                                         <div className="flex items-center gap-3 my-1">
@@ -1375,8 +1382,8 @@ function ParaCriadorasContent() {
                                             {showAgeGateTooltip && (
                                                 <div className="absolute bottom-full left-0 mb-3 w-full max-w-[280px] bg-purple-950/95 backdrop-blur-md text-white text-[11px] font-extrabold py-2.5 px-3.5 rounded-xl shadow-lg shadow-purple-500/10 z-20 flex items-center gap-2 border border-purple-500/30 transition-all duration-300 animate-in fade-in slide-in-from-bottom-2">
                                                     <span className="relative flex h-2 w-2 shrink-0">
-                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-fuchsia-400 opacity-75"></span>
-                                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-fuchsia-500"></span>
+                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
                                                     </span>
                                                     <span className="tracking-wide text-purple-100">Marque esta opção para continuar</span>
                                                     <div className="absolute top-full left-4 -mt-1 w-2 h-2 bg-purple-950/95 rotate-45 border-r border-b border-purple-500/30"></div>
@@ -1430,7 +1437,7 @@ function ParaCriadorasContent() {
                                             onClick={onVerifyCode}
                                             loading={emailLoading}
                                             size="lg"
-                                            className="w-full bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 border-0 text-white rounded-2xl py-3.5 font-bold shadow-md cursor-pointer"
+                                            className="w-full bg-purple-600 hover:bg-purple-700 active:bg-purple-800 border-0 text-white rounded-2xl py-3.5 font-bold shadow-md shadow-purple-600/25 cursor-pointer"
                                         />
 
                                         <Button
@@ -1451,7 +1458,7 @@ function ParaCriadorasContent() {
                         ) : (
                             /* CELULAR PERSISTENTE (ATIVO DURANTE OS PASSOS 0 A 3) */
                             <>
-                                <div className="absolute inset-0 bg-gradient-to-tr from-purple-400/5 to-fuchsia-400/5 rounded-[3rem] blur-xl opacity-40 pointer-events-none z-0"></div>
+                                <div className="absolute inset-0 bg-purple-500/5 rounded-[3rem] blur-xl opacity-40 pointer-events-none z-0"></div>
                                 
                                 <div className={`z-10 w-full flex justify-center lg:justify-end relative ${
                                     isFullyLoaded ? 'phone-slide-active' : 'phone-slide-enter'
