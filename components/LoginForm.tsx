@@ -357,6 +357,9 @@ export function LoginForm({ applicant = false }: { applicant?: boolean }) {
                 redirectUrl: '/sso-callback',
                 redirectUrlComplete: pendingRedirect || '/chats',
                 oidcPrompt: 'select_account',
+                additionalData: {
+                    prompt: 'select_account',
+                },
             } as const;
 
             if (pendingReferral || pendingCampaign) {
@@ -370,7 +373,7 @@ export function LoginForm({ applicant = false }: { applicant?: boolean }) {
                 return;
             }
 
-            await signIn.authenticateWithRedirect(oauthParams);
+            await signIn.authenticateWithRedirect(oauthParams as any);
         };
 
         try {

@@ -135,6 +135,9 @@ export default function LoginPromptModal({
                 redirectUrl: '/sso-callback',
                 redirectUrlComplete: returnTo || '/chats',
                 oidcPrompt: 'select_account',
+                additionalData: {
+                    prompt: 'select_account',
+                },
             } as const;
 
             if (pendingReferral || pendingCampaign) {
@@ -148,7 +151,7 @@ export default function LoginPromptModal({
                 return;
             }
 
-            await signIn.authenticateWithRedirect(oauthParams);
+            await signIn.authenticateWithRedirect(oauthParams as any);
         };
 
         try {

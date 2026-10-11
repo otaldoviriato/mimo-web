@@ -205,8 +205,11 @@ export function ParaCriadorasContent() {
                 redirectUrl: '/sso-callback',
                 redirectUrlComplete: '/chats',
                 oidcPrompt: 'select_account',
+                additionalData: {
+                    prompt: 'select_account',
+                },
                 unsafeMetadata: buildProfessionalMetadata()
-            });
+            } as any);
         } catch (err: unknown) {
             if (isAlreadySignedInError(err)) {
                 router.replace('/chats');
