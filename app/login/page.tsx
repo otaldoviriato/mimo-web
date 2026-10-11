@@ -423,6 +423,7 @@ export default function LoginPage() {
                         />
                     </div>
                     <h1 className="text-3xl font-bold text-gray-900">MimoChat</h1>
+                    <p className="text-sm font-medium text-slate-500 mt-1">Converse com mulheres reais</p>
                 </div>
 
                 {/* Form */}

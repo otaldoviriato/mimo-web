@@ -4,24 +4,21 @@ import { Viewport } from 'next';
 import { AppProviders } from '@/components/AppProviders';
 
 export const metadata: Metadata = {
-    title: 'Mimo Chat | Monetize suas Mensagens e Interações com Fãs',
-    description: 'No Mimo Chat você se conecta de verdade. A plataforma premium para criadores monetizarem mensagens, directs e conteúdos exclusivos de forma assíncrona e segura via Pix.',
+    title: 'Mimo Chat | Converse com mulheres reais',
+    description: 'Converse com mulheres reais no Mimo Chat. Plataforma de conversas privadas, fotos e vídeos exclusivos com total segurança e respostas rápidas.',
     keywords: [
         'mimo chat',
-        'monetizar direct',
+        'converse com mulheres reais',
+        'conversas privadas',
         'mensagens pagas',
-        'privacy',
-        'onlyfans',
         'conteudo exclusivo',
-        'interacao com fas',
         'receber mimos',
-        'privacy chat',
-        'abacatepay'
+        'privacy chat'
     ],
     manifest: '/manifest.json',
     openGraph: {
-        title: 'Mimo Chat | Monetize suas Mensagens e Interações com Fãs',
-        description: 'Cansada de responder direct de graça? No Mimo você cobra por mensagem e recebe direto no Pix.',
+        title: 'Mimo Chat | Converse com mulheres reais',
+        description: 'Converse com mulheres reais no Mimo Chat. Plataforma de conversas privadas, fotos e vídeos exclusivos com total segurança e respostas rápidas.',
         url: 'https://www.mimochat.com.br',
         siteName: 'Mimo Chat',
         images: [
@@ -29,7 +26,7 @@ export const metadata: Metadata = {
                 url: 'https://www.mimochat.com.br/assets/og-image.png',
                 width: 1200,
                 height: 630,
-                alt: 'Mimo Chat - Monetize suas Mensagens e Interações com Fãs',
+                alt: 'Mimo Chat | Converse com mulheres reais',
             },
         ],
         locale: 'pt_BR',
@@ -38,8 +35,8 @@ export const metadata: Metadata = {
     },
     twitter: {
         card: 'summary_large_image',
-        title: 'Mimo Chat | Monetize suas Mensagens e Interações com Fãs',
-        description: 'Cansada de responder direct de graça? No Mimo você cobra por mensagem e recebe direto no Pix.',
+        title: 'Mimo Chat | Converse com mulheres reais',
+        description: 'Converse com mulheres reais no Mimo Chat. Plataforma de conversas privadas, fotos e vídeos exclusivos com total segurança e respostas rápidas.',
         images: ['https://www.mimochat.com.br/assets/og-image.png'],
     },
     appleWebApp: {
