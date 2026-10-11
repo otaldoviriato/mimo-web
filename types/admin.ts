@@ -57,11 +57,23 @@ export interface SettingsData {
 }
 
 export interface ChatMessage {
+    _id?: string;
     sender: string;
     text: string;
     time: string;
     cost: number;
     timestamp?: string;
+    originalImageUrl?: string;
+    blurredImageUrl?: string;
+    videoUrl?: string;
+    thumbnailUrl?: string;
+    audioUrl?: string;
+    audioDuration?: number;
+    isVideo?: boolean;
+    isAudio?: boolean;
+    isLockedImage?: boolean;
+    lockedImagePrice?: number;
+    isGift?: boolean;
 }
 
 export interface ChatRoom {

@@ -12,6 +12,10 @@ import {
     RefreshCw,
     X,
     Eye,
+    EyeOff,
+    Image as ImageIcon,
+    Video,
+    Mic,
     MessageSquare
 } from 'lucide-react';
 import Image from 'next/image';
@@ -55,6 +59,17 @@ interface ContextMessage {
     timestamp: string;
     cost: number;
     isSuspect: boolean;
+    originalImageUrl?: string;
+    blurredImageUrl?: string;
+    videoUrl?: string;
+    thumbnailUrl?: string;
+    audioUrl?: string;
+    audioDuration?: number;
+    isVideo?: boolean;
+    isAudio?: boolean;
+    isLockedImage?: boolean;
+    lockedImagePrice?: number;
+    isGift?: boolean;
     sender: {
         name?: string;
         username?: string;
@@ -87,6 +102,7 @@ export function RoomsTab() {
     // Modal de Contexto (5 antes + 5 depois)
     const [activeReview, setActiveReview] = useState<ReviewItem | null>(null);
     const [contextMessages, setContextMessages] = useState<ContextMessage[]>([]);
+    const [revealedMediaIds, setRevealedMediaIds] = useState<Set<string>>(new Set());
     const [loadingContext, setLoadingContext] = useState(false);
     const [decisionNote, setDecisionNote] = useState('');
     const [savingDecision, setSavingDecision] = useState(false);
@@ -138,6 +154,7 @@ export function RoomsTab() {
     const handleOpenContext = async (review: ReviewItem) => {
         setActiveReview(review);
         setDecisionNote(review.decisionReason || '');
+        setRevealedMediaIds(new Set());
         setLoadingContext(true);
         try {
             const res = await fetch(`/api/admin/moderation-reviews/${review.id}`);
@@ -576,9 +593,84 @@ export function RoomsTab() {
                                                 </div>
                                             </div>
 
-                                            <div className="text-xs text-slate-800 leading-relaxed font-medium pl-8 whitespace-pre-wrap break-words">
-                                                {msg.content}
-                                            </div>
+                                            {msg.content && (
+                                                <div className="text-xs text-slate-800 leading-relaxed font-medium pl-8 whitespace-pre-wrap break-words">
+                                                    {msg.content}
+                                                </div>
+                                            )}
+
+                                            {/* Exibição de Mídias (Ocultadas por padrão, com opção de visualizar) */}
+                                            {(() => {
+                                                const mediaUrl = msg.isVideo ? (msg.videoUrl || msg.originalImageUrl) : (msg.originalImageUrl || msg.blurredImageUrl);
+                                                const hasVisualMedia = Boolean(mediaUrl);
+                                                const hasAudioMedia = Boolean(msg.audioUrl);
+                                                if (!hasVisualMedia && !hasAudioMedia) return null;
+
+                                                const isRevealed = revealedMediaIds.has(msg.id || String(index));
+                                                const toggleMedia = () => {
+                                                    setRevealedMediaIds(prev => {
+                                                        const next = new Set(prev);
+                                                        const key = msg.id || String(index);
+                                                        if (next.has(key)) next.delete(key);
+                                                        else next.add(key);
+                                                        return next;
+                                                    });
+                                                };
+
+                                                return (
+                                                    <div className="pl-8 mt-2.5 space-y-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={toggleMedia}
+                                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors border border-slate-200/80 cursor-pointer shadow-2xs"
+                                                            >
+                                                                {isRevealed ? (
+                                                                    <>
+                                                                        <EyeOff size={13} className="text-slate-500" />
+                                                                        <span>Ocultar Mídia</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <Eye size={13} className="text-purple-600" />
+                                                                        <span>Visualizar Mídia {msg.isVideo ? '(Vídeo)' : msg.audioUrl ? '(Áudio)' : '(Imagem)'}</span>
+                                                                    </>
+                                                                )}
+                                                            </button>
+                                                            {msg.isLockedImage && (
+                                                                <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100">
+                                                                    Mídia Paga
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        {isRevealed && (
+                                                            <div className="mt-2 rounded-2xl overflow-hidden border border-slate-200 bg-slate-900/5 max-w-sm">
+                                                                {hasVisualMedia && (
+                                                                    msg.isVideo ? (
+                                                                        <video
+                                                                            src={mediaUrl}
+                                                                            controls
+                                                                            className="w-full max-h-72 object-contain bg-black rounded-2xl"
+                                                                        />
+                                                                    ) : (
+                                                                        <img
+                                                                            src={mediaUrl}
+                                                                            alt="Mídia da mensagem"
+                                                                            className="w-full max-h-72 object-contain rounded-2xl bg-slate-100"
+                                                                        />
+                                                                    )
+                                                                )}
+                                                                {hasAudioMedia && (
+                                                                    <div className="p-3 bg-white">
+                                                                        <audio src={msg.audioUrl} controls className="w-full h-9" />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
                                     );
                                 })

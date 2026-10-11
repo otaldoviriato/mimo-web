@@ -127,6 +127,17 @@ export async function GET(
                 time: formattedTime,
                 cost: (msg.cost || 0) / 100, // converte centavos para reais
                 timestamp: msg.timestamp,
+                originalImageUrl: msg.originalImageUrl,
+                blurredImageUrl: msg.blurredImageUrl,
+                videoUrl: msg.videoUrl,
+                thumbnailUrl: msg.thumbnailUrl,
+                audioUrl: msg.audioUrl,
+                audioDuration: msg.audioDuration,
+                isVideo: msg.isVideo,
+                isAudio: msg.isAudio,
+                isLockedImage: msg.isLockedImage,
+                lockedImagePrice: msg.lockedImagePrice ? msg.lockedImagePrice / 100 : undefined,
+                isGift: msg.isGift,
             };
         });
 

@@ -19,6 +19,7 @@ import {
     Mail, 
     User,
     Eye,
+    EyeOff,
     MessageCircle,
     AlertTriangle,
     ShieldAlert,
@@ -84,11 +85,23 @@ interface GalleryItemType {
 }
 
 interface ChatMessage {
+    _id?: string;
     sender: string;
     text: string;
     time: string;
     cost: number;
     timestamp?: string;
+    originalImageUrl?: string;
+    blurredImageUrl?: string;
+    videoUrl?: string;
+    thumbnailUrl?: string;
+    audioUrl?: string;
+    audioDuration?: number;
+    isVideo?: boolean;
+    isAudio?: boolean;
+    isLockedImage?: boolean;
+    lockedImagePrice?: number;
+    isGift?: boolean;
 }
 
 interface ChatRoom {
@@ -182,6 +195,7 @@ export default function UserDetailPage() {
     const [minimumEarningsCents, setMinimumEarningsCents] = useState<number>(1000);
     const [loadingRooms, setLoadingRooms] = useState(true);
     const [selectedAuditChat, setSelectedAuditChat] = useState<ChatRoom | null>(null);
+    const [revealedAuditMediaIds, setRevealedAuditMediaIds] = useState<Set<string>>(new Set());
     const [auditLoadingMore, setAuditLoadingMore] = useState(false);
     const [auditHasMore, setAuditHasMore] = useState(true);
     const [isFirstAuditLoad, setIsFirstAuditLoad] = useState(false);
@@ -236,6 +250,7 @@ export default function UserDetailPage() {
             ...chat,
             history: []
         });
+        setRevealedAuditMediaIds(new Set());
         setAuditHasMore(true);
         setIsFirstAuditLoad(true);
 
@@ -1819,7 +1834,85 @@ export default function UserDetailPage() {
                                                 ? 'bg-slate-900 text-slate-100 rounded-tl-none border border-slate-800' 
                                                 : 'bg-purple-950/80 text-purple-100 rounded-tr-none border border-purple-900/60'
                                         }`}>
-                                            <p className="break-all whitespace-pre-wrap">{msg.text}</p>
+                                            {msg.text && <p className="break-all whitespace-pre-wrap">{msg.text}</p>}
+
+                                            {/* Mídias Ocultadas por Padrão */}
+                                            {(() => {
+                                                const mediaUrl = msg.isVideo ? (msg.videoUrl || msg.originalImageUrl) : (msg.originalImageUrl || msg.blurredImageUrl);
+                                                const hasVisualMedia = Boolean(mediaUrl);
+                                                const hasAudioMedia = Boolean(msg.audioUrl);
+                                                if (!hasVisualMedia && !hasAudioMedia) return null;
+
+                                                const key = msg._id || `${msg.sender}-${msg.timestamp || idx}`;
+                                                const isRevealed = revealedAuditMediaIds.has(key);
+                                                const toggleMedia = () => {
+                                                    setRevealedAuditMediaIds(prev => {
+                                                        const next = new Set(prev);
+                                                        if (next.has(key)) next.delete(key);
+                                                        else next.add(key);
+                                                        return next;
+                                                    });
+                                                };
+
+                                                return (
+                                                    <div className="mt-2.5 space-y-2">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <button
+                                                                type="button"
+                                                                onClick={toggleMedia}
+                                                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer border ${
+                                                                    isUserA 
+                                                                        ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700' 
+                                                                        : 'bg-purple-900/60 hover:bg-purple-900 text-purple-200 border-purple-800'
+                                                                }`}
+                                                            >
+                                                                {isRevealed ? (
+                                                                    <>
+                                                                        <EyeOff size={13} className="text-slate-400" />
+                                                                        <span>Ocultar Mídia</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <Eye size={13} className="text-purple-300" />
+                                                                        <span>Visualizar Mídia {msg.isVideo ? '(Vídeo)' : msg.audioUrl ? '(Áudio)' : '(Imagem)'}</span>
+                                                                    </>
+                                                                )}
+                                                            </button>
+                                                            {msg.isLockedImage && (
+                                                                <span className="text-[10px] font-bold text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/30">
+                                                                    Mídia Paga
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        {isRevealed && (
+                                                            <div className="rounded-xl overflow-hidden border border-slate-700/80 bg-black/40 max-w-xs mt-1.5">
+                                                                {hasVisualMedia && (
+                                                                    msg.isVideo ? (
+                                                                        <video
+                                                                            src={mediaUrl}
+                                                                            controls
+                                                                            className="w-full max-h-64 object-contain bg-black rounded-xl"
+                                                                        />
+                                                                    ) : (
+                                                                        <img
+                                                                            src={mediaUrl}
+                                                                            alt="Mídia da mensagem"
+                                                                            className="w-full max-h-64 object-contain rounded-xl bg-slate-900"
+                                                                        />
+                                                                    )
+                                                                )}
+                                                                {hasAudioMedia && (
+                                                                    <div className="p-2.5 bg-slate-900">
+                                                                        <audio src={msg.audioUrl} controls className="w-full h-8" />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
+
                                             {/* Info de Faturamento */}
                                             {msg.cost > 0 && (
                                                 <span className="inline-flex items-center gap-0.5 mt-2 px-1.5 py-0.5 text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-md">
