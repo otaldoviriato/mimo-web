@@ -3264,17 +3264,17 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                 <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                         </button>
-                        <div className="flex-1 flex items-center gap-2.5 min-w-0">
-                            <p className="text-white font-bold whitespace-nowrap text-base">
+                        <div className="flex-1 flex flex-col justify-center min-w-0">
+                            <p className="text-white font-bold whitespace-nowrap text-base leading-tight">
                                 {selectedMessageIds.size} selecionada{selectedMessageIds.size > 1 ? 's' : ''}
                             </p>
                             {userData?.isProfessional && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/15 backdrop-blur-xs border border-white/20 text-white font-medium text-xs tracking-tight shadow-xs whitespace-nowrap">
-                                    <span className="text-purple-200/90 font-normal">Total</span>
+                                <p className="text-[11px] text-white/80 font-medium leading-tight mt-0.5 whitespace-nowrap">
+                                    <span>Total: </span>
                                     <span className="font-bold text-emerald-300">
                                         R$ {(totalSelectedEarnings / 100).toFixed(2).replace('.', ',')}
                                     </span>
-                                </span>
+                                </p>
                             )}
                         </div>
                         <div className="flex items-center gap-3">
