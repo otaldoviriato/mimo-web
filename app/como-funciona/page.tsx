@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ClerkProvider, useAuth } from '@clerk/nextjs';
 import { useSignIn, useSignUp } from '@clerk/nextjs/legacy';
 import { Button } from '@/components/Button';
@@ -20,18 +20,30 @@ const buildProfessionalMetadata = () => ({
     profileRoleSource: 'creator_landing',
 });
 
+interface ChatItem {
+    id: number;
+    sender: 'fan' | 'creator';
+    type?: 'text' | 'media' | 'mimo';
+    text?: string;
+    time: string;
+    gain?: number;
+    showBadge?: boolean;
+    isRead?: boolean;
+    isMediaUnlocked?: boolean;
+    isMediaLoading?: boolean;
+    mediaPrice?: number;
+}
+
 export function ParaCriadorasContent() {
-    // Passos:
-    // 0: Chat interativo onde quem ganha é quem envia a mensagem e ela é visualizada (2 checks azuis)
-    // 1: Mídias pagas desbloqueáveis
-    // 2: Mimos recebidos
-    // 3: Criar conta / Login (Clerk)
-    const [activeStep, setActiveStep] = useState(0);
-    const [step, setStep] = useState(0);
-    const [isExiting, setIsExiting] = useState(false);
+    const router = useRouter();
+    const searchParams = useSearchParams();
+
+    // Sincronização de etapas com a URL (?step=0,1,2,3)
+    const initialStep = Math.min(Math.max(parseInt(searchParams.get('step') || '0', 10) || 0, 0), 3);
+    const [activeStep, setActiveStep] = useState(initialStep);
+    const [isExitingText, setIsExitingText] = useState(false);
 
     // ─── AUTENTICAÇÃO DO CLERK ───
-    const router = useRouter();
     const { isSignedIn, isLoaded: authLoaded } = useAuth();
     const { isLoaded: signInLoaded, signIn, setActive: setSignInActive } = useSignIn();
     const { isLoaded: signUpLoaded, signUp, setActive: setSignUpActive } = useSignUp();
@@ -48,26 +60,16 @@ export function ParaCriadorasContent() {
     const [tooltipTimeoutId, setTooltipTimeoutId] = useState<NodeJS.Timeout | null>(null);
 
     const triggerAgeGateTooltip = () => {
-        if (tooltipTimeoutId) {
-            clearTimeout(tooltipTimeoutId);
-        }
+        if (tooltipTimeoutId) clearTimeout(tooltipTimeoutId);
         setShowAgeGateTooltip(true);
-        const id = setTimeout(() => {
-            setShowAgeGateTooltip(false);
-        }, 3000);
+        const id = setTimeout(() => setShowAgeGateTooltip(false), 3000);
         setTooltipTimeoutId(id);
     };
 
     const isAlreadySignedInError = (err: unknown): boolean => {
         const e = err as any;
         const code = e?.errors?.[0]?.code || '';
-        const message = (
-            e?.errors?.[0]?.longMessage ||
-            e?.errors?.[0]?.message ||
-            e?.message ||
-            ''
-        ).toLowerCase();
-
+        const message = (e?.errors?.[0]?.longMessage || e?.errors?.[0]?.message || e?.message || '').toLowerCase();
         return (
             code === 'already_signed_in' ||
             code === 'session_exists' ||
@@ -78,29 +80,20 @@ export function ParaCriadorasContent() {
     };
 
     const clerkError = (err: unknown, fallback: string): string => {
-        if (isAlreadySignedInError(err)) {
-            return '';
-        }
+        if (isAlreadySignedInError(err)) return '';
         const e = err as any;
-        return e?.errors?.[0]?.longMessage
-            || e?.errors?.[0]?.message
-            || e?.message
-            || fallback;
+        return e?.errors?.[0]?.longMessage || e?.errors?.[0]?.message || e?.message || fallback;
     };
 
     const onSendCode = async () => {
         if (!email.trim()) { setError('Por favor, insira seu email'); return; }
         if (!signInLoaded || !signUpLoaded) { setError('Serviço de autenticação não carregado'); return; }
-        if (!ageAccepted) { 
-            triggerAgeGateTooltip(); 
-            return; 
-        }
+        if (!ageAccepted) { triggerAgeGateTooltip(); return; }
 
         setEmailLoading(true);
         setError('');
 
         const targetEmail = email.trim().toLowerCase();
-
         if (targetEmail === 'homologacao-asaas@mimochat.com.br') {
             setFlowType('signIn');
             setPendingVerification(true);
@@ -110,30 +103,19 @@ export function ParaCriadorasContent() {
 
         try {
             await signIn!.create({ identifier: email });
-            const emailFactor = signIn!.supportedFirstFactors?.find(
-                (f: any) => f.strategy === 'email_code'
-            ) as any;
-
+            const emailFactor = signIn!.supportedFirstFactors?.find((f: any) => f.strategy === 'email_code') as any;
             if (!emailFactor) {
                 setError('Verificação por email não está disponível nesta conta');
                 return;
             }
-
-            await signIn!.prepareFirstFactor({
-                strategy: 'email_code',
-                emailAddressId: emailFactor.emailAddressId,
-            });
-
+            await signIn!.prepareFirstFactor({ strategy: 'email_code', emailAddressId: emailFactor.emailAddressId });
             setFlowType('signIn');
             setPendingVerification(true);
         } catch (err: unknown) {
             const errCode = (err as any)?.errors?.[0]?.code;
-
             if (errCode === 'form_identifier_not_found') {
                 try {
-                    const signUpParams: any = { emailAddress: email };
-                    signUpParams.unsafeMetadata = buildProfessionalMetadata();
-
+                    const signUpParams: any = { emailAddress: email, unsafeMetadata: buildProfessionalMetadata() };
                     await signUp!.create(signUpParams);
                     await signUp!.prepareEmailAddressVerification({ strategy: 'email_code' });
                     setFlowType('signUp');
@@ -157,29 +139,24 @@ export function ParaCriadorasContent() {
         setError('');
 
         const targetEmail = email.trim().toLowerCase();
-
         if (targetEmail === 'homologacao-asaas@mimochat.com.br') {
             if (code.trim() !== '111111') {
                 setError('Código incorreto');
                 setEmailLoading(false);
                 return;
             }
-
             try {
                 const response = await fetch('/api/auth/asaas-bypass', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: targetEmail, code: '111111' })
                 });
-
                 const data = await response.json();
-                
                 if (!response.ok || !data.url) {
                     setError(data.error || 'Erro ao gerar token de acesso de homologação.');
                     setEmailLoading(false);
                     return;
                 }
-
                 window.location.href = data.url;
             } catch (err: any) {
                 setError(`Erro ao autenticar: ${err.message || err}`);
@@ -192,21 +169,16 @@ export function ParaCriadorasContent() {
             if (flowType === 'signUp') {
                 await signUp!.attemptEmailAddressVerification({ code });
                 if (signUp!.status === 'complete') {
-                    if (typeof window !== 'undefined') {
-                        localStorage.setItem('mimo_signup_flow', 'professional');
-                    }
+                    if (typeof window !== 'undefined') localStorage.setItem('mimo_signup_flow', 'professional');
                     await setSignUpActive!({ session: signUp!.createdSessionId });
                     router.replace('/chats');
                 } else {
-                    console.error('[SignUp Error] Status incompleto após verificação:', signUp!.status, 'Campos em falta:', (signUp as any).missingFields);
-                    throw new Error(`Cadastro incompleto. Status: ${signUp!.status}. Requisitos pendentes: ${(signUp as any).missingFields?.join(', ') || 'Nenhum'}`);
+                    throw new Error(`Cadastro incompleto. Status: ${signUp!.status}.`);
                 }
             } else {
                 await signIn!.attemptFirstFactor({ strategy: 'email_code', code });
                 if (signIn!.status === 'complete') {
-                    if (typeof window !== 'undefined') {
-                        localStorage.setItem('mimo_signup_flow', 'professional');
-                    }
+                    if (typeof window !== 'undefined') localStorage.setItem('mimo_signup_flow', 'professional');
                     await setSignInActive!({ session: signIn!.createdSessionId });
                     router.replace('/chats');
                 }
@@ -223,19 +195,13 @@ export function ParaCriadorasContent() {
             setError('Serviço de autenticação não carregado');
             return;
         }
-        if (!ageAccepted) {
-            triggerAgeGateTooltip();
-            return;
-        }
+        if (!ageAccepted) { triggerAgeGateTooltip(); return; }
 
         setGoogleLoading(true);
         setError('');
 
         try {
-            if (typeof window !== 'undefined') {
-                localStorage.setItem('mimo_signup_flow', 'professional');
-            }
-
+            if (typeof window !== 'undefined') localStorage.setItem('mimo_signup_flow', 'professional');
             await signUp.authenticateWithRedirect({
                 strategy: 'oauth_google',
                 redirectUrl: '/sso-callback',
@@ -262,205 +228,286 @@ export function ParaCriadorasContent() {
 
     const isAuthReady = signInLoaded && signUpLoaded;
 
-    // ─── CHAT INTERATIVO (PASSO 0) ───
-    interface ChatItem {
-        id: number;
-        sender: 'fan' | 'creator';
-        text: string;
-        time: string;
-        gain?: number;
-        showBadge?: boolean;
-        isRead?: boolean;
-    }
-
-    const [visibleMessages, setVisibleMessages] = useState<ChatItem[]>([]);
+    // ─── CHAT CONTÍNUO E ITERATIVO (ACUMULATIVO POR ETAPA) ───
+    const [messages, setMessages] = useState<ChatItem[]>([]);
     const [typingSender, setTypingSender] = useState<'fan' | 'creator' | null>(null);
+    const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
 
+    const clearAllTimeouts = () => {
+        timeoutsRef.current.forEach(t => clearTimeout(t));
+        timeoutsRef.current = [];
+    };
+
+    // Sincroniza estado com eventos de histórico (botão voltar/avançar do navegador)
     useEffect(() => {
-        if (activeStep !== 0) {
-            setVisibleMessages([]);
-            setTypingSender(null);
-            return;
-        }
-
-        let isMounted = true;
-        const timeouts: NodeJS.Timeout[] = [];
-
-        // Roteiro de 4 mensagens:
-        // Mensagem 1 (fã - esquerda): fã inicia a conversa
-        // Mensagem 2 (criadora - direita, roxa): criadora responde, após visualizada (checks azuis), ganho surge saindo de trás do balão roxo
-        // Mensagem 3 (fã - esquerda): fã continua
-        // Mensagem 4 (criadora - direita, roxa): criadora responde, ganho proporcional surge saindo de trás do balão roxo
-        const script = [
-            {
-                id: 1,
-                sender: 'fan' as const,
-                text: 'Oi Laura! Vi seu Insta... Queria conversar com você!',
-                time: '12:48',
-                delayBefore: 700,
-                typingTime: 1200,
-            },
-            {
-                id: 2,
-                sender: 'creator' as const,
-                text: 'Oi Carlos! Tudo bem? Aqui a gente conversa no privado com calma 💜',
-                time: '12:49',
-                gain: 4.80,
-                delayBefore: 1400,
-                typingTime: 1600,
-            },
-            {
-                id: 3,
-                sender: 'fan' as const,
-                text: 'Perfeito! E você consegue me responder com frequência?',
-                time: '12:49',
-                delayBefore: 1500,
-                typingTime: 1300,
-            },
-            {
-                id: 4,
-                sender: 'creator' as const,
-                text: 'Consigo sim! O Mimo me notifica e respondo durante a minha rotina ✨',
-                time: '12:50',
-                gain: 5.60,
-                delayBefore: 1400,
-                typingTime: 1600,
-            }
-        ];
-
-        let accumulatedTime = 0;
-
-        script.forEach((item) => {
-            // 1. Inicia indicador de digitação do autor
-            accumulatedTime += item.delayBefore;
-            const t1 = setTimeout(() => {
-                if (!isMounted) return;
-                setTypingSender(item.sender);
-            }, accumulatedTime);
-            timeouts.push(t1);
-
-            // 2. Balão surge na tela com bounce
-            accumulatedTime += item.typingTime;
-            const t2 = setTimeout(() => {
-                if (!isMounted) return;
-                setTypingSender(null);
-                setVisibleMessages(prev => [
-                    ...prev,
-                    {
-                        id: item.id,
-                        sender: item.sender,
-                        text: item.text,
-                        time: item.time,
-                        gain: item.gain,
-                        showBadge: false,
-                        isRead: false
-                    }
-                ]);
-            }, accumulatedTime);
-            timeouts.push(t2);
-
-            // 3. Se for mensagem da criadora, visualização e valor recebido surgem
-            if (item.sender === 'creator' && item.gain) {
-                // Marca como visualizada (checks azuis) 600ms após ser enviada
-                const tRead = setTimeout(() => {
-                    if (!isMounted) return;
-                    setVisibleMessages(prev => prev.map(msg => 
-                        msg.id === item.id ? { ...msg, isRead: true } : msg
-                    ));
-                }, accumulatedTime + 600);
-                timeouts.push(tRead);
-
-                // O valor recebido desliza saindo suavemente de trás do balão roxo logo após ser visualizada
-                const tBadge = setTimeout(() => {
-                    if (!isMounted) return;
-                    setVisibleMessages(prev => prev.map(msg => 
-                        msg.id === item.id ? { ...msg, showBadge: true } : msg
-                    ));
-                }, accumulatedTime + 850);
-                timeouts.push(tBadge);
-            }
-        });
-
-        return () => {
-            isMounted = false;
-            timeouts.forEach(t => clearTimeout(t));
+        const handlePopState = () => {
+            const urlStep = parseInt(new URLSearchParams(window.location.search).get('step') || '0', 10) || 0;
+            setActiveStep(Math.min(Math.max(urlStep, 0), 3));
         };
-    }, [activeStep]);
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, []);
 
-    // ─── ESTADOS DO PASSO 1 (MÍDIAS) ───
-    const [mediaUnlocked, setMediaUnlocked] = useState(false);
-    const [mediaLoading, setMediaLoading] = useState(false);
-    const [mediaPrice, setMediaPrice] = useState(29.90);
-
-    function handleSimulateUnlock() {
-        if (mediaUnlocked || mediaLoading) return;
-        setMediaLoading(true);
-        setTimeout(() => {
-            setMediaLoading(false);
-            setMediaUnlocked(true);
-        }, 1200);
-    }
-
-    // ─── NAVEGAÇÃO DOS PASSOS ───
-    function changeStep(nextVal: number) {
+    // Função de navegação com pushState no histórico da URL
+    const goToStep = (nextVal: number) => {
         if (nextVal === activeStep) return;
-        setIsExiting(true);
+        setIsExitingText(true);
         setTimeout(() => {
             setActiveStep(nextVal);
-            setStep(nextVal);
-            setIsExiting(false);
-        }, 250);
-    }
+            setIsExitingText(false);
+            const url = new URL(window.location.href);
+            url.searchParams.set('step', String(nextVal));
+            window.history.pushState({ step: nextVal }, '', url.toString());
+        }, 220);
+    };
 
-    function nextStep() {
-        if (activeStep < 3) {
-            changeStep(activeStep + 1);
+    // Executa as adições incrementais de mensagens por etapa sem apagar as anteriores
+    useEffect(() => {
+        clearAllTimeouts();
+
+        if (activeStep === 0) {
+            // Etapa 0: Inicia as 4 mensagens de conversa
+            setMessages([]);
+            setTypingSender(null);
+
+            const scriptEtapa0 = [
+                {
+                    id: 1,
+                    sender: 'fan' as const,
+                    type: 'text' as const,
+                    text: 'Oi Laura! Vi seu Insta... Queria conversar com você!',
+                    time: '12:48',
+                    delayBefore: 600,
+                    typingTime: 1200,
+                },
+                {
+                    id: 2,
+                    sender: 'creator' as const,
+                    type: 'text' as const,
+                    text: 'Oi Carlos! Tudo bem? Aqui a gente conversa no privado com calma 💜',
+                    time: '12:49',
+                    gain: 4.80,
+                    delayBefore: 1300,
+                    typingTime: 1500,
+                },
+                {
+                    id: 3,
+                    sender: 'fan' as const,
+                    type: 'text' as const,
+                    text: 'Perfeito! E você consegue me responder com frequência?',
+                    time: '12:49',
+                    delayBefore: 1400,
+                    typingTime: 1200,
+                },
+                {
+                    id: 4,
+                    sender: 'creator' as const,
+                    type: 'text' as const,
+                    text: 'Consigo sim! O Mimo me notifica e respondo durante a minha rotina.',
+                    time: '12:50',
+                    gain: 5.60,
+                    delayBefore: 1300,
+                    typingTime: 1500,
+                }
+            ];
+
+            let accumulated = 0;
+            scriptEtapa0.forEach((item) => {
+                accumulated += item.delayBefore;
+                const tTyping = setTimeout(() => setTypingSender(item.sender), accumulated);
+                timeoutsRef.current.push(tTyping);
+
+                accumulated += item.typingTime;
+                const tMsg = setTimeout(() => {
+                    setTypingSender(null);
+                    setMessages(prev => [
+                        ...prev,
+                        {
+                            id: item.id,
+                            sender: item.sender,
+                            type: item.type,
+                            text: item.text,
+                            time: item.time,
+                            gain: item.gain,
+                            showBadge: false,
+                            isRead: false
+                        }
+                    ]);
+                }, accumulated);
+                timeoutsRef.current.push(tMsg);
+
+                if (item.sender === 'creator' && item.gain) {
+                    // Check azul após ser visualizada
+                    const tRead = setTimeout(() => {
+                        setMessages(prev => prev.map(m => m.id === item.id ? { ...m, isRead: true } : m));
+                    }, accumulated + 500);
+                    timeoutsRef.current.push(tRead);
+
+                    // Valor sai de trás do balão roxo
+                    const tBadgeIn = setTimeout(() => {
+                        setMessages(prev => prev.map(m => m.id === item.id ? { ...m, showBadge: true } : m));
+                    }, accumulated + 750);
+                    timeoutsRef.current.push(tBadgeIn);
+
+                    // Valor retorna para trás do balão após 2 segundos
+                    const tBadgeOut = setTimeout(() => {
+                        setMessages(prev => prev.map(m => m.id === item.id ? { ...m, showBadge: false } : m));
+                    }, accumulated + 2750);
+                    timeoutsRef.current.push(tBadgeOut);
+                }
+            });
+        } else if (activeStep === 1) {
+            // Etapa 1: Continua a conversa e envia uma foto/vídeo exclusivo
+            // Se as mensagens anteriores ainda não existem (ex: acessou direto a URL ?step=1), popula base
+            setMessages(prev => {
+                if (prev.length >= 4) return prev;
+                return [
+                    { id: 1, sender: 'fan', type: 'text', text: 'Oi Laura! Vi seu Insta... Queria conversar com você!', time: '12:48' },
+                    { id: 2, sender: 'creator', type: 'text', text: 'Oi Carlos! Tudo bem? Aqui a gente conversa no privado com calma 💜', time: '12:49', isRead: true },
+                    { id: 3, sender: 'fan', type: 'text', text: 'Perfeito! E você consegue me responder com frequência?', time: '12:49' },
+                    { id: 4, sender: 'creator', type: 'text', text: 'Consigo sim! O Mimo me notifica e respondo durante a minha rotina.', time: '12:50', isRead: true }
+                ];
+            });
+
+            // Se ainda não adicionou a mensagem de mídia (id: 5 e 6), adiciona na sequência
+            let acc = 400;
+            const tFanPedir = setTimeout(() => {
+                setMessages(prev => {
+                    if (prev.some(m => m.id === 5)) return prev;
+                    return [
+                        ...prev,
+                        { id: 5, sender: 'fan', type: 'text', text: 'Você tem fotos exclusivas por aqui? Quero ver! 🫣', time: '12:51' }
+                    ];
+                });
+            }, acc);
+            timeoutsRef.current.push(tFanPedir);
+
+            acc += 1400;
+            const tTypingMedia = setTimeout(() => setTypingSender('creator'), acc);
+            timeoutsRef.current.push(tTypingMedia);
+
+            acc += 1300;
+            const tCreatorMedia = setTimeout(() => {
+                setTypingSender(null);
+                setMessages(prev => {
+                    if (prev.some(m => m.id === 6)) return prev;
+                    return [
+                        ...prev,
+                        {
+                            id: 6,
+                            sender: 'creator',
+                            type: 'media',
+                            time: '12:51',
+                            mediaPrice: 29.90,
+                            isMediaUnlocked: false,
+                            isRead: false
+                        }
+                    ];
+                });
+            }, acc);
+            timeoutsRef.current.push(tCreatorMedia);
+
+        } else if (activeStep === 2) {
+            // Etapa 2: Continua a conversa e fã envia um Mimo em Pix de reconhecimento
+            setMessages(prev => {
+                let base = [...prev];
+                if (base.length < 4) {
+                    base = [
+                        { id: 1, sender: 'fan', type: 'text', text: 'Oi Laura! Vi seu Insta... Queria conversar com você!', time: '12:48' },
+                        { id: 2, sender: 'creator', type: 'text', text: 'Oi Carlos! Tudo bem? Aqui a gente conversa no privado com calma 💜', time: '12:49', isRead: true },
+                        { id: 3, sender: 'fan', type: 'text', text: 'Perfeito! E você consegue me responder com frequência?', time: '12:49' },
+                        { id: 4, sender: 'creator', type: 'text', text: 'Consigo sim! O Mimo me notifica e respondo durante a minha rotina.', time: '12:50', isRead: true }
+                    ];
+                }
+                if (!base.some(m => m.id === 6)) {
+                    base.push({ id: 6, sender: 'creator', type: 'media', time: '12:51', isMediaUnlocked: true });
+                }
+                return base;
+            });
+
+            const tMimo = setTimeout(() => {
+                setMessages(prev => {
+                    if (prev.some(m => m.id === 7)) return prev;
+                    return [
+                        ...prev,
+                        {
+                            id: 7,
+                            sender: 'fan',
+                            type: 'mimo',
+                            gain: 50.00,
+                            time: '12:52'
+                        }
+                    ];
+                });
+            }, 600);
+            timeoutsRef.current.push(tMimo);
         }
-    }
 
-    // ─── TEXTOS POR ETAPA COM MAIS COR E DESTAQUE ───
+        return () => clearAllTimeouts();
+    }, [activeStep]);
+
+    // Ação ao simular desbloqueio da mídia no chat
+    const handleUnlockSimulatedMedia = (msgId: number) => {
+        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, isMediaLoading: true } : m));
+        setTimeout(() => {
+            setMessages(prev => prev.map(m => m.id === msgId ? { ...m, isMediaLoading: false, isMediaUnlocked: true, isRead: true } : m));
+        }, 1100);
+    };
+
+    // Auto-scroll no container de mensagens conforme surgem
+    const chatContainerRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTo({
+                top: chatContainerRef.current.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+    }, [messages, typingSender]);
+
+    // ─── TEXTOS POR ETAPA (TÍTULO MAIOR E SUBTÍTULO DISCRETO) ───
     function renderStepTexts() {
         switch (activeStep) {
             case 0:
                 return (
-                    <div className="space-y-2 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
+                    <div className="space-y-1.5 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
                         <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.12]">
-                            Aplicativo de chat onde você <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-purple-800">ganha para conversar</span>
+                            Aplicativo de chat onde você ganha para conversar
                         </h1>
-                        <p className="text-base sm:text-lg text-purple-600/90 font-bold tracking-tight">
+                        <p className="text-sm sm:text-base text-slate-500 font-medium leading-relaxed">
                             Receba por mensagem visualizada
                         </p>
                     </div>
                 );
             case 1:
                 return (
-                    <div className="space-y-2 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
+                    <div className="space-y-1.5 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
                         <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.12]">
-                            Cobre pelas suas <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-purple-800">fotos e vídeos</span>
+                            Cobre pelas suas fotos e vídeos
                         </h2>
-                        <p className="text-base sm:text-lg text-purple-600/90 font-bold tracking-tight">
-                            Envie mídias privadas e receba via Pix na hora do desbloqueio
+                        <p className="text-sm sm:text-base text-slate-500 font-medium leading-relaxed">
+                            Envie mídias privadas e receba via Pix no desbloqueio
                         </p>
                     </div>
                 );
             case 2:
                 return (
-                    <div className="space-y-2 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
+                    <div className="space-y-1.5 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
                         <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.12]">
-                            Receba <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-purple-800">mimos em dinheiro</span> dos seus apoiadores
+                            Receba mimos dos seus apoiadores
                         </h2>
-                        <p className="text-base sm:text-lg text-purple-600/90 font-bold tracking-tight">
-                            Mimos e gorjetas direto no chat sem burocracia
+                        <p className="text-sm sm:text-base text-slate-500 font-medium leading-relaxed">
+                            Mimos e gorjetas em dinheiro direto no chat
                         </p>
                     </div>
                 );
             case 3:
                 return (
-                    <div className="space-y-2 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
+                    <div className="space-y-1.5 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
                         <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.12]">
-                            Comece agora no <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-purple-800">MimoChat</span>
+                            Comece agora no MimoChat
                         </h2>
-                        <p className="text-base sm:text-lg text-purple-600/90 font-bold tracking-tight">
+                        <p className="text-sm sm:text-base text-slate-500 font-medium leading-relaxed">
                             Crie seu perfil profissional e comece a monetizar
                         </p>
                     </div>
@@ -475,7 +522,7 @@ export function ParaCriadorasContent() {
         if (activeStep >= 3) return null;
         return (
             <button
-                onClick={nextStep}
+                onClick={() => goToStep(activeStep + 1)}
                 className="w-full sm:max-w-md mx-auto lg:mx-0 py-3.5 px-8 text-base font-extrabold text-white bg-purple-600 hover:bg-purple-700 active:bg-purple-800 rounded-2xl transition shadow-lg shadow-purple-600/25 hover:scale-[1.01] active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
             >
                 <span>Próximo</span>
@@ -486,7 +533,7 @@ export function ParaCriadorasContent() {
 
     return (
         <div className="h-[100dvh] w-full bg-[#fafafc] text-slate-800 font-sans selection:bg-purple-100 selection:text-purple-900 relative overflow-hidden flex flex-col justify-between z-10">
-            {/* Keyframes de Bounce para balões e Slide suave do valor */}
+            {/* Keyframes de Bounce para os balões de mensagem */}
             <style>{`
                 @keyframes balloonBounceIn {
                     0% {
@@ -510,11 +557,11 @@ export function ParaCriadorasContent() {
                 }
             `}</style>
 
-            {/* Fundo sutil em tons lavanda */}
+            {/* Fundo sutil */}
             <div className="absolute top-[-10%] left-[-10%] w-[380px] h-[380px] rounded-full bg-purple-400/10 blur-[100px] pointer-events-none select-none z-0" />
             <div className="absolute bottom-[-10%] right-[-10%] w-[350px] h-[350px] rounded-full bg-pink-400/8 blur-[100px] pointer-events-none select-none z-0" />
 
-            {/* HEADER SIMPLES: LOGO À ESQUERDA, PULAR À DIREITA */}
+            {/* HEADER: LOGO À ESQUERDA, PULAR DISCRETO (SEM PÍLULA) À DIREITA */}
             <header className="shrink-0 z-30 flex items-center justify-between px-5 sm:px-8 py-3.5 sm:py-4 h-16 w-full select-none">
                 <Link href="/" className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-600 to-purple-700 flex items-center justify-center shadow-md shadow-purple-600/20">
@@ -534,8 +581,8 @@ export function ParaCriadorasContent() {
 
                 {activeStep < 3 ? (
                     <button
-                        onClick={() => changeStep(3)}
-                        className="px-3.5 py-1.5 text-xs font-bold text-slate-500 hover:text-purple-600 bg-white hover:bg-purple-50 border border-slate-200 hover:border-purple-200 rounded-xl transition shadow-2xs cursor-pointer flex items-center gap-1"
+                        onClick={() => goToStep(3)}
+                        className="text-xs font-semibold text-slate-400 hover:text-slate-800 transition-colors cursor-pointer flex items-center gap-1 py-1 px-1.5 select-none"
                     >
                         <span>Pular</span>
                         <ArrowRight className="w-3.5 h-3.5" />
@@ -543,46 +590,113 @@ export function ParaCriadorasContent() {
                 ) : (
                     <Link
                         href="/login"
-                        className="px-3.5 py-1.5 text-xs font-bold text-slate-600 hover:text-purple-600 bg-white border border-slate-200 rounded-xl transition shadow-2xs cursor-pointer"
+                        className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
                     >
                         Entrar
                     </Link>
                 )}
             </header>
 
-            {/* CORPO PRINCIPAL: TOPO (TEXTO), CENTRO (ANIMAÇÃO), RODAPÉ (BOTÃO) */}
-            <main className="flex-1 min-h-0 w-full max-w-4xl mx-auto px-4 sm:px-6 flex flex-col justify-between py-2 sm:py-4 relative z-20">
+            {/* CORPO PRINCIPAL COM CONVERSA ITERATIVA E ACCUMULATIVA */}
+            <main className="flex-1 min-h-0 w-full max-w-3xl mx-auto px-4 sm:px-6 flex flex-col justify-between py-2 sm:py-3 relative z-20">
                 
                 {/* 1. TÍTULO E SUBTÍTULO NO TOPO */}
-                <div className="shrink-0 mb-3 sm:mb-5 transition-all duration-300">
+                <div className={`shrink-0 mb-3 sm:mb-4 transition-all duration-300 ${isExitingText ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'}`}>
                     {renderStepTexts()}
                 </div>
 
-                {/* 2. ESPAÇO CENTRAL: BALÕES DE CHAT / CENÁRIO */}
-                <div className="flex-1 min-h-0 w-full flex items-center justify-center overflow-y-auto overflow-x-hidden scrollbar-none py-1">
-                    
-                    {/* PASSO 0: BALÕES DE CHAT COM LADOS CORRETOS, CHECKS E SLIDE DE VALOR RECEBIDO */}
-                    {activeStep === 0 && (
-                        <div className="w-full max-w-md mx-auto flex flex-col gap-3 justify-center">
-                            {visibleMessages.map((msg) => {
+                {/* 2. ESPAÇO CENTRAL: CHAT ITERATIVO (ETAPAS 0 A 2) OU FORMULÁRIO (ETAPA 3) */}
+                <div className="flex-1 min-h-0 w-full flex items-center justify-center relative py-1">
+                    {activeStep < 3 ? (
+                        <div 
+                            ref={chatContainerRef}
+                            className="w-full max-w-md mx-auto max-h-full flex flex-col gap-3 overflow-y-auto overflow-x-hidden scrollbar-none py-2 px-1"
+                        >
+                            {messages.map((msg) => {
                                 const isCreator = msg.sender === 'creator';
 
+                                // Renderização de Mídia Privada (Etapa 1)
+                                if (msg.type === 'media') {
+                                    return (
+                                        <div key={msg.id} className="w-full flex justify-end">
+                                            <div className="relative inline-flex flex-col items-end animate-balloon-bounce">
+                                                <div className="relative w-56 sm:w-64 aspect-4/3 rounded-2xl overflow-hidden border border-slate-200/80 shadow-md">
+                                                    <img
+                                                        src="/assets/laura.png"
+                                                        alt="Mídia Privada"
+                                                        className="w-full h-full object-cover transition-all duration-700 ease-out"
+                                                        style={{ filter: msg.isMediaUnlocked ? 'blur(0px)' : 'blur(16px)' }}
+                                                    />
+                                                    {!msg.isMediaUnlocked ? (
+                                                        <div className="absolute inset-0 bg-slate-900/35 backdrop-blur-xs flex flex-col items-center justify-center p-3 text-center">
+                                                            <button
+                                                                onClick={() => handleUnlockSimulatedMedia(msg.id)}
+                                                                disabled={msg.isMediaLoading}
+                                                                className="bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow-lg shadow-purple-900/30 flex items-center gap-1.5 cursor-pointer transition transform active:scale-95"
+                                                            >
+                                                                {msg.isMediaLoading ? (
+                                                                    <>
+                                                                        <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                                                                        <span>Desbloqueando...</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <Lock className="w-3 h-3" />
+                                                                        <span>Desbloquear R$ {(msg.mediaPrice || 29.90).toFixed(2).replace('.', ',')}</span>
+                                                                    </>
+                                                                )}
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="absolute top-2 left-2 bg-emerald-500/90 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md flex items-center gap-1">
+                                                            <LockKeyholeOpen className="w-2.5 h-2.5" />
+                                                            <span>Desbloqueada</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-1 mt-1 px-1">
+                                                    <span className="text-[10px] text-slate-400 font-medium">{msg.time}</span>
+                                                    <span className={`text-[10px] font-bold ${msg.isRead ? 'text-blue-500' : 'text-purple-400'}`}>✓✓</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                // Renderização de Mimo Recebido (Etapa 2)
+                                if (msg.type === 'mimo') {
+                                    return (
+                                        <div key={msg.id} className="w-full flex justify-center my-1 animate-balloon-bounce">
+                                            <div className="bg-white border-2 border-purple-200/90 rounded-2xl p-3 sm:p-3.5 shadow-md shadow-purple-500/5 flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center shrink-0 border border-purple-100">
+                                                    <img src="/assets/gift.png" alt="Mimo Recebido" className="w-6 h-6 object-contain" />
+                                                </div>
+                                                <div className="leading-tight">
+                                                    <span className="text-[10px] font-extrabold text-purple-600 uppercase tracking-wider block">Mimo Recebido via Pix</span>
+                                                    <span className="text-base font-black text-slate-900 block">+ R$ {(msg.gain || 50).toFixed(2).replace('.', ',')}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                // Mensagens de Texto
                                 return (
                                     <div
                                         key={msg.id}
                                         className={`w-full flex ${isCreator ? 'justify-end' : 'justify-start'}`}
                                     >
-                                        <div className="relative inline-flex items-center">
-                                            {/* Indicador de Ganho (slide saindo suavemente de trás do balão roxo da criadora) */}
+                                        <div className="relative inline-flex items-end">
+                                            {/* Indicador de Ganho (alinhado com a borda de baixo do balão, saindo e retornando suavemente) */}
                                             {isCreator && msg.gain && (
                                                 <div
-                                                    className={`absolute right-full top-1/2 -translate-y-1/2 transition-all duration-500 ease-out z-0 overflow-hidden flex items-center pointer-events-none ${
+                                                    className={`absolute right-full bottom-1 mb-0.5 transition-all duration-500 ease-out z-0 overflow-hidden flex items-center pointer-events-none ${
                                                         msg.showBadge
                                                             ? 'max-w-[100px] opacity-100 pr-2 translate-x-0'
-                                                            : 'max-w-0 opacity-0 pr-0 translate-x-4'
+                                                            : 'max-w-0 opacity-0 pr-0 translate-x-3'
                                                     }`}
                                                 >
-                                                    <span className="text-xs font-black text-emerald-600 whitespace-nowrap select-none">
+                                                    <span className="text-[11px] font-semibold text-emerald-500 whitespace-nowrap select-none">
                                                         + R$ {msg.gain.toFixed(2).replace('.', ',')}
                                                     </span>
                                                 </div>
@@ -596,18 +710,16 @@ export function ParaCriadorasContent() {
                                                         : 'bg-white border border-slate-200/90 text-slate-800 rounded-2xl rounded-bl-xs'
                                                 }`}
                                             >
-                                                {/* Texto */}
                                                 <p className="text-xs sm:text-[13px] leading-relaxed font-normal">
                                                     {msg.text}
                                                 </p>
 
-                                                {/* Linha de Horário e Status */}
+                                                {/* Horário e Status */}
                                                 <div className="flex items-center justify-end gap-1.5 mt-1 leading-none">
                                                     <span className={`text-[10px] font-medium ${isCreator ? 'text-purple-200/80' : 'text-slate-400'}`}>
                                                         {msg.time}
                                                     </span>
 
-                                                    {/* Checks oficiais do Mimo (para mensagens da criadora) */}
                                                     {isCreator && (
                                                         <span
                                                             className={`text-[10px] inline-flex items-center select-none font-bold transition-colors duration-300 ${
@@ -626,7 +738,7 @@ export function ParaCriadorasContent() {
                                 );
                             })}
 
-                            {/* Indicador de digitando animado (do lado de quem está digitando) */}
+                            {/* Indicador de digitando animado */}
                             {typingSender && (
                                 <div className={`w-full flex ${typingSender === 'creator' ? 'justify-end' : 'justify-start'}`}>
                                     <div
@@ -643,65 +755,8 @@ export function ParaCriadorasContent() {
                                 </div>
                             )}
                         </div>
-                    )}
-
-                    {/* PASSO 1: FOTO/VÍDEO BLOQUEADO DESBLOQUEÁVEL */}
-                    {activeStep === 1 && (
-                        <div className="w-full max-w-sm mx-auto flex flex-col items-center gap-3 animate-balloon-bounce">
-                            <div className="relative w-64 aspect-4/3 rounded-2xl overflow-hidden border border-slate-200/80 shadow-md">
-                                <img
-                                    src="/assets/laura.png"
-                                    alt="Mídia Exclusiva"
-                                    className="w-full h-full object-cover transition-all duration-700 ease-out"
-                                    style={{ filter: mediaUnlocked ? 'blur(0px)' : 'blur(16px)' }}
-                                />
-                                {!mediaUnlocked ? (
-                                    <div className="absolute inset-0 bg-slate-900/35 backdrop-blur-xs flex flex-col items-center justify-center p-3 text-center">
-                                        <button
-                                            onClick={handleSimulateUnlock}
-                                            disabled={mediaLoading}
-                                            className="bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-purple-900/30 flex items-center gap-2 cursor-pointer transition transform active:scale-95"
-                                        >
-                                            {mediaLoading ? (
-                                                <>
-                                                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                                                    <span>Desbloqueando...</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Lock className="w-3.5 h-3.5" />
-                                                    <span>Desbloquear R$ {mediaPrice.toFixed(2)}</span>
-                                                </>
-                                            )}
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="absolute top-2.5 left-2.5 bg-emerald-500/90 backdrop-blur-md text-white text-[11px] font-black px-2.5 py-1 rounded-full shadow-md flex items-center gap-1">
-                                        <LockKeyholeOpen className="w-3 h-3" />
-                                        <span>Desbloqueada</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* PASSO 2: MIMO RECEBIDO */}
-                    {activeStep === 2 && (
-                        <div className="w-full max-w-sm mx-auto flex flex-col items-center justify-center animate-balloon-bounce">
-                            <div className="bg-white border-2 border-purple-200 rounded-2xl p-4 shadow-lg shadow-purple-500/10 flex items-center gap-3.5">
-                                <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center shrink-0 border border-purple-100">
-                                    <img src="/assets/gift.png" alt="Mimo Recebido" className="w-8 h-8 object-contain" />
-                                </div>
-                                <div>
-                                    <span className="text-[10px] font-black text-purple-600 uppercase tracking-wider block">Mimo Recebido via Pix</span>
-                                    <span className="text-xl font-black text-slate-900 block">+ R$ 50,00</span>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* PASSO 3: FORMULÁRIO DE CADASTRO/LOGIN DO CLERK */}
-                    {activeStep === 3 && (
+                    ) : (
+                        /* ETAPA 3: FORMULÁRIO DE CADASTRO/LOGIN DO CLERK */
                         <div className="w-full max-w-md mx-auto bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-7 shadow-xl shadow-purple-950/5 relative animate-balloon-bounce">
                             <div id="clerk-captcha" />
                             
@@ -758,7 +813,6 @@ export function ParaCriadorasContent() {
                                         className="w-full border-slate-200 text-slate-700 hover:bg-slate-50 rounded-2xl py-3 font-bold shadow-sm cursor-pointer"
                                     />
 
-                                    {/* Checkbox de Maioridade e Termos */}
                                     <div className="relative flex items-start gap-2 mt-1 text-left select-none">
                                         {showAgeGateTooltip && (
                                             <div className="absolute bottom-full left-0 mb-3 w-full max-w-[280px] bg-purple-950/95 backdrop-blur-md text-white text-[11px] font-extrabold py-2 px-3 rounded-xl shadow-lg z-20 flex items-center gap-2 border border-purple-500/30">
@@ -833,11 +887,10 @@ export function ParaCriadorasContent() {
                             )}
                         </div>
                     )}
-
                 </div>
 
                 {/* 3. BOTÃO FIXO NO RODAPÉ */}
-                <div className="shrink-0 pt-2 sm:pt-3 pb-1 w-full flex justify-center">
+                <div className="shrink-0 pt-2 pb-1 w-full flex justify-center">
                     {renderStepAction()}
                 </div>
 
@@ -848,7 +901,7 @@ export function ParaCriadorasContent() {
                 {[0, 1, 2, 3].map((s) => (
                     <button
                         key={s}
-                        onClick={() => changeStep(s)}
+                        onClick={() => goToStep(s)}
                         className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
                             activeStep === s 
                                 ? 'w-6 bg-purple-600' 
