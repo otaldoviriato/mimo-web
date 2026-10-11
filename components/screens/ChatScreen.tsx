@@ -1,6 +1,6 @@
 'use client';
 import { readStackEntry, replaceStackUrl, stackOverlayState } from '@/lib/stackHistory';
-import React, { useState, useEffect, useRef, use } from 'react';
+import React, { useState, useEffect, useRef, use, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { usePathname } from 'next/navigation';
 import axios from 'axios';
@@ -3231,6 +3231,21 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
         );
     }
 
+    // Calcula os ganhos totais recebidos para as mensagens selecionadas (caso seja profissional)
+    const totalSelectedEarnings = useMemo(() => {
+        if (!userData?.isProfessional || selectedMessageIds.size === 0) return 0;
+        let total = 0;
+        messages.forEach((msg) => {
+            if (selectedMessageIds.has(msg._id) && msg.senderId === user?.id && msg.billingStatus === 'paid') {
+                const effective = (msg.receiverEarnings && msg.receiverEarnings > 0)
+                    ? msg.receiverEarnings
+                    : (msg.cost && msg.cost > 0 ? Math.round(msg.cost * 0.8) : 0);
+                total += effective;
+            }
+        });
+        return total;
+    }, [messages, selectedMessageIds, userData?.isProfessional, user?.id]);
+
     return (
         <div 
             ref={chatRootRef}
@@ -3249,8 +3264,18 @@ export default function ChatPage({ params, userId: propUserId, initialUser: prop
                                 <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                         </button>
-                        <div className="flex-1">
-                            <p className="text-white font-bold">{selectedMessageIds.size} selecionada{selectedMessageIds.size > 1 ? 's' : ''}</p>
+                        <div className="flex-1 flex items-center gap-2.5 min-w-0">
+                            <p className="text-white font-bold whitespace-nowrap text-base">
+                                {selectedMessageIds.size} selecionada{selectedMessageIds.size > 1 ? 's' : ''}
+                            </p>
+                            {userData?.isProfessional && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/15 backdrop-blur-xs border border-white/20 text-white font-medium text-xs tracking-tight shadow-xs whitespace-nowrap">
+                                    <span className="text-purple-200/90 font-normal">Total</span>
+                                    <span className="font-bold text-emerald-300">
+                                        R$ {(totalSelectedEarnings / 100).toFixed(2).replace('.', ',')}
+                                    </span>
+                                </span>
+                            )}
                         </div>
                         <div className="flex items-center gap-3">
                             <button
