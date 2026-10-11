@@ -7,7 +7,7 @@ Esta fixture importa o formulário e o banner reais, substitui apenas a sessão 
 1. Execute `npx next dev tests/applicant-browser --webpack --hostname 127.0.0.1 --port 3012` na raiz de mimo-web.
 2. Disponibilize Playwright em `NODE_PATH` e execute `node scripts/test-applicant-browser.cjs` (usa Edge headless).
 
-Verifica sugestão e edição manual de username, maioridade no cliente, retomada após reload, ausência de overflow horizontal e banner/navegação em 320, 360, 768 e 1280 pixels. Capturas ficam em `scratch/applicant`.
+Verifica username escolhido manualmente sem preenchimento automático, placeholder do avatar, seleção/recorte/troca da foto, ausência do controle nativo de arquivo, máscara DD/MM/AAAA e envio ISO, maioridade no cliente, retomada após reload, ausência de overflow horizontal e banner/navegação em 320, 360, 768 e 1280 pixels. Capturas ficam em `scratch/applicant`.
 
 Os handlers de cadastro e indicação são exercitados com doubles de Clerk/MongoDB por `npm run test:applicant`. O servidor de chat inclui os bloqueios comerciais em `npm test`.
 
