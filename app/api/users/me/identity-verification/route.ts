@@ -385,7 +385,7 @@ export async function POST(request: NextRequest) {
                 $set: {
                     taxId: cpfClean,
                     birthDate: birthDateObj,
-                    professionalStatus: user.isProfessional ? 'approved' : null,
+                    professionalStatus: user.applicantEnrollment ? user.professionalStatus : (user.isProfessional ? 'approved' : null),
                     isProfessional: user.isProfessional ?? false,
                     onboardingStep: nextOnboardingStep,
                     notes: ''
@@ -402,7 +402,7 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
             success: true,
-            professionalStatus: user.isProfessional ? 'approved' : null
+            professionalStatus: user.applicantEnrollment ? user.professionalStatus : (user.isProfessional ? 'approved' : null)
         });
     } catch (error: unknown) {
         console.error('Erro na validação de CPF:', error);

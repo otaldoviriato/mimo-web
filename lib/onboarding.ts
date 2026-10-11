@@ -2,6 +2,8 @@ export type OnboardingStep = 'welcome' | 'identity' | 'profile' | 'completed';
 
 type OnboardingUser = {
     isProfessional?: boolean | null;
+    applicantEnrollment?: boolean;
+    applicantCompletedAt?: Date | string | null;
     taxId?: string | null;
     birthDate?: Date | string | null;
     name?: string | null;
@@ -17,6 +19,10 @@ function hasValue(value: unknown) {
 export function calculateOnboardingStep(user: OnboardingUser | null | undefined): OnboardingStep {
     if (!user || user.isProfessional === undefined || user.isProfessional === null) {
         return 'welcome';
+    }
+
+    if (user.isProfessional && user.applicantEnrollment) {
+        return user.applicantCompletedAt ? 'completed' : 'profile';
     }
 
     if (user.isProfessional && (!hasValue(user.taxId) || !user.birthDate)) {

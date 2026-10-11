@@ -23,12 +23,17 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
         }
 
+        if (file.size > 10 * 1024 * 1024) return NextResponse.json({ error: 'Escolha uma imagem de até 10 MB.' }, { status: 400 });
+
         // Validar tipo de arquivo
         if (!file.type.startsWith('image/')) {
             return NextResponse.json({ error: 'File must be an image' }, { status: 400 });
         }
 
         await connectToDatabase();
+
+        const owner = await User.findOne({ clerkId: userId });
+        if (!owner || owner.isSuspended) return NextResponse.json({ error: 'Perfil não encontrado.' }, { status: 403 });
 
         const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -43,6 +48,7 @@ export async function POST(request: NextRequest) {
                 .webp({ quality: 80 })
                 .toBuffer();
         } catch (err) {
+            if (owner.applicantEnrollment) return NextResponse.json({ error: 'Envie uma imagem válida.' }, { status: 400 });
             console.error('Failed to convert image to WebP with sharp, uploading original:', err);
             fileExtension = file.name.split('.').pop() || 'jpg';
             contentType = file.type;

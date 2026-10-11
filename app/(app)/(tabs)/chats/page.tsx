@@ -206,7 +206,7 @@ export default function ChatsPage() {
 
     const renderVerificationBanner = () => {
         if (!myProfile) return null;
-        if (!myProfile.isProfessional) return null;
+        if (!myProfile.isProfessional || myProfile.applicantEnrollment) return null;
         // O card de verificação de identidade só deve aparecer para criadoras que JÁ tenham ao menos 1 conversa iniciada
         if ((rooms?.length ?? 0) === 0) return null;
 

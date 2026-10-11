@@ -26,6 +26,9 @@ export interface IUser extends Document {
     username: string;
     name?: string;
     email: string;
+    applicantEnrollment?: boolean;
+    applicantCompletedAt?: Date;
+    referredByProfessionalId?: string;
     taxId?: string;
     birthDate?: Date;
     city?: string;
@@ -124,6 +127,9 @@ const UserSchema = new Schema<IUser>({
         required: true,
         unique: true,
     },
+    applicantEnrollment: { type: Boolean, default: false },
+    applicantCompletedAt: Date,
+    referredByProfessionalId: { type: String, index: true },
     taxId: {
         type: String,
     },

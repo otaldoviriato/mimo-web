@@ -77,8 +77,8 @@ export async function POST(req: Request) {
         await User.findOneAndUpdate(
             { clerkId: id },
             {
-                $set: updateSet,
                 $setOnInsert: {
+                    ...updateSet,
                     balance: 0,
                     promotionalBalance: 0,
                     customerCashAvailableCents: 0,
@@ -122,7 +122,7 @@ export async function POST(req: Request) {
         };
 
         await User.findOneAndUpdate(
-            { clerkId: id },
+            { clerkId: id, applicantEnrollment: { $ne: true } },
             { $set: updateData }
         );
 

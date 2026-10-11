@@ -20,6 +20,7 @@ export async function GET(
         }
 
         const isOwner = requesterId === ownerId;
+        if (owner.isProfessional && owner.professionalStatus !== 'approved' && !isOwner) return NextResponse.json({ error: 'Perfil não encontrado.' }, { status: 404 });
         let isSubscriber = false;
 
         if (owner.isProfessional && requesterId && !isOwner) {

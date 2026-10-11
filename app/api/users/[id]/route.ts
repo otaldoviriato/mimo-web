@@ -1,3 +1,4 @@
+import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
@@ -30,8 +31,14 @@ export async function GET(
                     ]
                 }
         ).select(
-            'clerkId username name email photoUrl coverUrl isProfessional identityStatus subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers subscribers balance bio conversationBadges isOnline lastSeen avgResponseTimeMinutes birthDate city state isTeam teamTitle isSuspended'
+            'clerkId username name email photoUrl coverUrl isProfessional professionalStatus identityStatus subscriptionPrice chargePerCharSubscribers chargePerCharNonSubscribers subscribers balance bio conversationBadges isOnline lastSeen avgResponseTimeMinutes birthDate city state isTeam teamTitle isSuspended'
         );
+
+        const { userId: viewerId } = await auth();
+        if (user?.isProfessional && user.professionalStatus !== 'approved' && viewerId !== user.clerkId) {
+            const viewer = viewerId ? await User.findOne({ clerkId: viewerId }).select('isTeam').lean() : null;
+            if (!viewer?.isTeam) return NextResponse.json({ error: 'Perfil não encontrado.' }, { status: 404 });
+        }
 
         if (!user || user.isSuspended) {
             return NextResponse.json({

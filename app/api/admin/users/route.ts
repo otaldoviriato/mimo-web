@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
         }
 
         let queryChain = User.find(filter)
-            .select('clerkId username name email photoUrl balance isProfessional isTeam teamTitle onboardingStep createdAt taxId phone pixKey subscriptionPrice lastSeen isOnline accessCount lastAccessAt')
+            .select('professionalStatus applicantEnrollment applicantCompletedAt referredByProfessionalId clerkId username name email photoUrl balance isProfessional isTeam teamTitle onboardingStep createdAt taxId phone pixKey subscriptionPrice lastSeen isOnline accessCount lastAccessAt')
             .sort({ createdAt: -1 });
 
         if (limitVal > 0) {
@@ -168,6 +168,11 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
             users: usersList.map(u => ({
                 id: u.clerkId,
+                databaseId: u._id.toString(),
+                professionalStatus: u.professionalStatus,
+                applicantEnrollment: u.applicantEnrollment,
+                applicantCompletedAt: u.applicantCompletedAt,
+                referredByProfessionalId: u.referredByProfessionalId,
                 clerkId: u.clerkId,
                 username: u.username,
                 name: u.name || u.username,

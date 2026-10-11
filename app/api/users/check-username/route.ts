@@ -1,3 +1,4 @@
+import { isReservedRoute } from '@/lib/routes';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
         const rawUsername = request.nextUrl.searchParams.get('username') || '';
         const cleanUsername = rawUsername.trim().toLowerCase().replace('@', '');
 
-        if (!cleanUsername || cleanUsername.length < 2 || !/^[a-z0-9._-]+$/.test(cleanUsername)) {
+        if (cleanUsername.length > 30 || isReservedRoute(`/${cleanUsername}`) || !cleanUsername || cleanUsername.length < 2 || !/^[a-z0-9._-]+$/.test(cleanUsername)) {
             return NextResponse.json({ error: 'Invalid username' }, { status: 400 });
         }
 

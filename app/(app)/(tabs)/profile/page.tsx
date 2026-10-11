@@ -524,12 +524,12 @@ export default function ProfilePage() {
                             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
                             
                             {/* Ponto Verde Online (Bottom Right) sem sobreposição */}
-                            <span 
+                            {(!userData?.isProfessional || userData?.professionalStatus === 'approved') && <span
                                 className="w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white absolute bottom-0 right-0 shadow-2xs z-10 flex items-center justify-center" 
                                 title="Você está online"
                             >
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            </span>
+                            </span>}
                         </div>
                         
                         {/* Informações do Usuário */}

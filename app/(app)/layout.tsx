@@ -1,4 +1,5 @@
 'use client';
+import { ProfessionalReviewFrame } from '@/components/ProfessionalReviewFrame';
 import { ReceiptConsentModal } from '@/components/ReceiptConsentModal';
 import { requiresReceiptConsent } from '@/lib/receiptBilling';
 import { Gift, X } from 'lucide-react';
@@ -224,13 +225,13 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const released = localStorage.getItem('mimo_professional_released');
-            if (released === 'false') {
+            if (released === 'false' && userData?.professionalStatus === 'approved') {
                 setIsProfessionalReleased(false);
             } else {
                 setIsProfessionalReleased(true);
             }
         }
-    }, [pathname]);
+    }, [pathname, userData?.professionalStatus]);
 
     useEffect(() => {
         if (isProfessionalReleased === false) {
@@ -417,10 +418,14 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     }, [isFullyCompleted]);
 
     useEffect(() => {
+        if (userData?.applicantEnrollment && !isFullyCompleted && isProfileResolved) {
+            router.replace('/participar/cadastro');
+            return;
+        }
         if (pathname === '/onboarding') return;
 
         if (isProfileResolved && !isFullyCompleted && !needsReceiptConsent && !isPublicRoute(pathname)) {
-            router.replace('/onboarding');
+            router.replace(userData?.applicantEnrollment ? '/participar/cadastro' : '/onboarding');
             return;
         }
 
@@ -447,14 +452,14 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                 sessionStorage.setItem('mimo_has_navigated_chats', 'true');
             }
         }
-    }, [isProfileResolved, isFullyCompleted, needsReceiptConsent, roomsLoaded, userData?.isProfessional, rooms, pathname, screens.length, router]);
+    }, [isProfileResolved, isFullyCompleted, needsReceiptConsent, roomsLoaded, userData?.isProfessional, userData?.applicantEnrollment, rooms, pathname, screens.length, router]);
 
     // Em rotas públicas, não bloquear renderização por falta de login
     if (!isSignedIn && !isPublicRoute(pathname)) return null;
     if (needsReceiptConsent) return <ReceiptConsentModal onAccepted={refetchProfile} />;
 
     // Permite que /onboarding renderize seus próprios filhos — ele gerencia todo o fluxo de cadastro.
-    if (pathname === '/onboarding') {
+    if (pathname === '/onboarding' && !userData?.applicantEnrollment) {
         return <>{children}</>;
     }
 
@@ -485,6 +490,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     }
 
     return (
+        <ProfessionalReviewFrame pending={!!userData?.isProfessional && userData?.professionalStatus === 'pending'}>
         <div className="bg-slate-50 min-h-screen w-full relative overflow-hidden">
             <div inert={screens.length > 0} aria-hidden={screens.length > 0 || undefined} className={isProfessionalReleased === false ? 'opacity-0 pointer-events-none' : 'opacity-100 transition-opacity duration-500'}>
                 {basePath || isStackBasePath(pathname) ? <StackBase path={basePath || pathname} active={screens.every(screen => screen.isClosing)} /> : children}
@@ -632,6 +638,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                 </div>
             )}
         </div>
+        </ProfessionalReviewFrame>
     );
 }
 

@@ -118,6 +118,8 @@ export async function POST(
             return NextResponse.json({ error: 'Perfil não encontrado, não profissional ou não verificado' }, { status: 404 });
         }
 
+        if (requester?.isProfessional && requester.professionalStatus !== 'approved') return NextResponse.json({ error: 'Seu perfil ainda não está aprovado para interações comerciais.' }, { status: 403 });
+
         const ownerId = owner.clerkId;
 
         if (requesterId === ownerId) {

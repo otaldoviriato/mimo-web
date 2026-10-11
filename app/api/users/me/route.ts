@@ -1,3 +1,5 @@
+import { validateApplicantBirthDate } from '@/lib/applicant';
+import { isReservedRoute } from '@/lib/routes';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/db';
@@ -481,6 +483,8 @@ export async function GET(request: NextRequest) {
                 receiptTermsVersion: user.receiptTermsVersion,
                 receiptTermsAcceptedAt: user.receiptTermsAcceptedAt,
                 onboardingStep: user.onboardingStep,
+                applicantEnrollment: user.applicantEnrollment,
+                applicantCompletedAt: user.applicantCompletedAt,
                 email: user.email,
                 phone: user.phone,
                 taxId: user.taxId,
@@ -580,6 +584,15 @@ export async function PATCH(request: NextRequest) {
 
         const currentUser = await User.findOne({ clerkId: userId });
 
+        if (currentUser?.applicantEnrollment) {
+            if (birthDate !== undefined) {
+                const birthError = validateApplicantBirthDate(typeof birthDate === 'string' ? birthDate.slice(0, 10) : birthDate);
+                if (birthError) return NextResponse.json({ error: birthError }, { status: 400 });
+            }
+            if (photoUrl !== undefined && photoUrl !== currentUser.photoUrl) return NextResponse.json({ error: 'Use o upload de foto de perfil.' }, { status: 400 });
+            if (username !== undefined && (typeof username !== 'string' || !/^[a-z0-9._-]{2,30}$/.test(username) || isReservedRoute(`/${username}`))) return NextResponse.json({ error: 'Username inválido.' }, { status: 400 });
+        }
+
         // Valida mudança de isProfessional (mesma lógica que era do chargeMode)
         if (
             isProfessional !== undefined
@@ -613,6 +626,8 @@ export async function PATCH(request: NextRequest) {
         const nextIsProfessional = currentUser?.isProfessional ?? false;
 
         updateData.onboardingStep = calculateOnboardingStep({
+            applicantEnrollment: currentUser?.applicantEnrollment,
+            applicantCompletedAt: currentUser?.applicantCompletedAt,
             photoUrl: nextPhoto,
             name: nextName,
             username: nextUsername,
@@ -809,6 +824,8 @@ export async function PATCH(request: NextRequest) {
                 receiptTermsVersion: user.receiptTermsVersion,
                 receiptTermsAcceptedAt: user.receiptTermsAcceptedAt,
                 onboardingStep: user.onboardingStep,
+                applicantEnrollment: user.applicantEnrollment,
+                applicantCompletedAt: user.applicantCompletedAt,
                 email: user.email,
                 phone: user.phone,
                 taxId: user.taxId,

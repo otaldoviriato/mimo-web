@@ -1,0 +1,589 @@
+'use client';
+
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useAuth } from '@clerk/nextjs';
+import { useSignIn, useSignUp } from '@clerk/nextjs/legacy';
+import { Button } from '@/components/Button';
+import { Input } from '@/components/Input';
+import Link from 'next/link';
+import { useQueryClient } from '@tanstack/react-query';
+import { clearMimoClientSession } from '@/lib/clientSession';
+import { REFERRAL_STORAGE_KEY, getReferralFromSearchParams, type ReferralMetadata } from '@/lib/referral';
+import { getPendingPostAuthRedirect, consumePostAuthRedirect, POST_AUTH_REDIRECT_STORAGE_KEY } from '@/lib/postAuthRedirect';
+import { CAMPAIGN_ATTRIBUTION_STORAGE_KEY } from '@/components/CampaignVisitTracker';
+import { DiscoverProfileBackground } from '@/components/landing/NetflixStyleLanding';
+
+function GiftCapture() {
+    const searchParams = useSearchParams();
+    useEffect(() => {
+        const gift = searchParams.get('gift');
+        if (gift?.trim()) {
+            // localStorage persiste em redirects OAuth no PWA (sessionStorage pode ser destruído)
+            localStorage.setItem('mimo_pending_gift', gift.trim());
+        }
+        const referral = getReferralFromSearchParams(searchParams);
+        if (referral) {
+            localStorage.setItem(REFERRAL_STORAGE_KEY, JSON.stringify(referral));
+        }
+    }, [searchParams]);
+    return null;
+}
+
+export function LoginForm({ applicant = false }: { applicant?: boolean }) {
+    const router = useRouter();
+    const queryClient = useQueryClient();
+    const { isSignedIn, isLoaded: authLoaded, getToken, signOut } = useAuth();
+    const { isLoaded: signInLoaded, signIn, setActive: setSignInActive } = useSignIn();
+    const { isLoaded: signUpLoaded, signUp, setActive: setSignUpActive } = useSignUp();
+
+    const [email, setEmail] = useState('');
+    const [code, setCode] = useState('');
+    const [flowType, setFlowType] = useState<'signIn' | 'signUp' | null>(null);
+    const [pendingVerification, setPendingVerification] = useState(false);
+    const [emailLoading, setEmailLoading] = useState(false);
+    const [googleLoading, setGoogleLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [ageAccepted, setAgeAccepted] = useState(false);
+    const [showAgeGateTooltip, setShowAgeGateTooltip] = useState(false);
+    const [tooltipTimeoutId, setTooltipTimeoutId] = useState<NodeJS.Timeout | null>(null);
+    const [isVerifyingServerSession, setIsVerifyingServerSession] = useState(false);
+
+    const triggerAgeGateTooltip = () => {
+        if (tooltipTimeoutId) {
+            clearTimeout(tooltipTimeoutId);
+        }
+        setShowAgeGateTooltip(true);
+        const id = setTimeout(() => {
+            setShowAgeGateTooltip(false);
+        }, 3000);
+        setTooltipTimeoutId(id);
+    };
+
+    const isAlreadySignedInError = (err: unknown): boolean => {
+        const e = err as any;
+        const code = e?.errors?.[0]?.code || '';
+        const message = (
+            e?.errors?.[0]?.longMessage ||
+            e?.errors?.[0]?.message ||
+            e?.message ||
+            ''
+        ).toLowerCase();
+
+        return (
+            code === 'already_signed_in' ||
+            code === 'session_exists' ||
+            message.includes('already signed in') ||
+            message.includes('already_signed_in') ||
+            message.includes('session_exists')
+        );
+    };
+
+    // Valida se a sessão do cliente no Clerk está sincronizada e ativa no servidor (/api/users/me)
+    useEffect(() => {
+        let isMounted = true;
+
+        const checkSessionAndRedirect = async () => {
+            if (!authLoaded || !isSignedIn) return;
+
+            setIsVerifyingServerSession(true);
+
+            try {
+                if (applicant) {
+                    const token = await getToken();
+                    if (token) window.location.href = '/participar/cadastro';
+                    return;
+                }
+                const res = await fetch('/api/users/me', { credentials: 'same-origin' });
+                if (res.ok) {
+                    // Sessão válida no servidor: navega para o app ou destino pendente
+                    localStorage.setItem('mimo_post_login_check_rooms', 'true');
+                    sessionStorage.removeItem('mimo_has_navigated_chats');
+                    const target = applicant ? '/participar/cadastro' : consumePostAuthRedirect('/chats');
+                    window.location.href = target;
+                } else {
+                    // Sessão desincronizada (ex: 401 no localhost/servidor): limpa a sessão fantasma
+                    console.warn('[LoginPage] Sessão do cliente desincronizada com o servidor. Resetando estado...');
+                    clearMimoClientSession(queryClient);
+                    await signOut();
+                    if (isMounted) setIsVerifyingServerSession(false);
+                }
+            } catch (err) {
+                console.error('[LoginPage] Erro ao verificar sessão:', err);
+                if (isMounted) setIsVerifyingServerSession(false);
+            }
+        };
+
+        checkSessionAndRedirect();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [authLoaded, isSignedIn, signOut, queryClient, applicant, getToken]);
+
+    const clerkError = (err: unknown, fallback: string): string => {
+        if (isAlreadySignedInError(err)) {
+            return '';
+        }
+        const e = err as any;
+        return e?.errors?.[0]?.longMessage
+            || e?.errors?.[0]?.message
+            || e?.message
+            || fallback;
+    };
+
+    const getPendingReferral = (): ReferralMetadata | undefined => {
+        if (typeof window === 'undefined') return undefined;
+        const stored = localStorage.getItem(REFERRAL_STORAGE_KEY);
+        if (!stored) return undefined;
+
+        try {
+            const parsed = JSON.parse(stored) as ReferralMetadata;
+            return parsed?.professionalId ? parsed : undefined;
+        } catch {
+            localStorage.removeItem(REFERRAL_STORAGE_KEY);
+            return undefined;
+        }
+    };
+
+    const getPendingCampaign = (): Record<string, unknown> | undefined => {
+        if (typeof window === 'undefined') return undefined;
+        try {
+            const stored = localStorage.getItem(CAMPAIGN_ATTRIBUTION_STORAGE_KEY);
+            return stored ? JSON.parse(stored) : undefined;
+        } catch {
+            return undefined;
+        }
+    };
+
+    const onSendCode = async () => {
+        if (!email.trim()) { setError('Por favor, insira seu email'); return; }
+        if (!signInLoaded || !signUpLoaded) { setError('Serviço de autenticação não carregado'); return; }
+        if (!ageAccepted) {
+            triggerAgeGateTooltip();
+            return;
+        }
+
+        setEmailLoading(true);
+        setError('');
+
+        const targetEmail = email.trim().toLowerCase();
+
+        // Exceção de homologação Asaas - Pula o envio de e-mail OTP real do Clerk
+        if (targetEmail === 'homologacao-asaas@mimochat.com.br') {
+            setFlowType('signIn');
+            setPendingVerification(true);
+            setEmailLoading(false);
+            return;
+        }
+
+        try {
+            // Tenta login — se a conta existir, retorna os fatores disponíveis
+            await signIn!.create({ identifier: email });
+            const emailFactor = signIn!.supportedFirstFactors?.find(
+                (f: any) => f.strategy === 'email_code'
+            ) as any;
+
+            if (!emailFactor) {
+                setError('Verificação por email não está disponível nesta conta');
+                return;
+            }
+
+            await signIn!.prepareFirstFactor({
+                strategy: 'email_code',
+                emailAddressId: emailFactor.emailAddressId,
+            });
+
+            setFlowType('signIn');
+            setPendingVerification(true);
+        } catch (err: unknown) {
+            if (isAlreadySignedInError(err)) {
+                try {
+                    await signOut();
+                } catch {}
+            }
+
+            const errCode = (err as any)?.errors?.[0]?.code;
+
+            if (errCode === 'form_identifier_not_found') {
+                // Conta não existe — cria transparentemente sem o usuário perceber
+                try {
+                    const pendingReferral = getPendingReferral();
+                    const pendingCampaign = getPendingCampaign();
+                    const signUpParams: any = {
+                        emailAddress: email,
+                        ...((pendingReferral || pendingCampaign) ? { unsafeMetadata: {
+                            ...(pendingReferral ? { mimoReferral: pendingReferral } : {}),
+                            ...(pendingCampaign ? { mimoCampaign: pendingCampaign } : {}),
+                        } } : {}),
+                    };
+
+                    await signUp!.create(signUpParams);
+                    await signUp!.prepareEmailAddressVerification({ strategy: 'email_code' });
+                    setFlowType('signUp');
+                    setPendingVerification(true);
+                } catch (signUpErr: unknown) {
+                    if (isAlreadySignedInError(signUpErr)) {
+                        try { await signOut(); } catch {}
+                    }
+                    setError(clerkError(signUpErr, 'Erro ao criar conta'));
+                }
+            } else {
+                setError(clerkError(err, 'Erro ao enviar código'));
+            }
+        } finally {
+            setEmailLoading(false);
+        }
+    };
+
+    const onVerifyCode = async () => {
+        if (!code.trim()) { setError('Por favor, insira o código'); return; }
+        if (!signInLoaded || !signUpLoaded) { setError('Serviço de autenticação não carregado'); return; }
+
+        setEmailLoading(true);
+        setError('');
+
+        const targetEmail = email.trim().toLowerCase();
+
+        // Exceção de homologação Asaas - Valida código 111111 e loga via Sign-in Token gerado pelo backend
+        if (targetEmail === 'homologacao-asaas@mimochat.com.br') {
+            if (code.trim() !== '111111') {
+                setError('Código incorreto');
+                setEmailLoading(false);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/auth/asaas-bypass', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: targetEmail, code: '111111' })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || !data.url) {
+                    setError(data.error || 'Erro ao gerar token de acesso de homologação.');
+                    setEmailLoading(false);
+                    return;
+                }
+
+                window.location.href = data.url;
+
+            } catch (err: any) {
+                console.error('[Login Asaas Bypass Error]:', err);
+                setError(`Erro ao autenticar: ${err.message || err}`);
+                setEmailLoading(false);
+            }
+            return;
+        }
+
+        try {
+            if (flowType === 'signUp') {
+                await signUp!.attemptEmailAddressVerification({ code });
+                if (signUp!.status === 'complete') {
+                    await setSignUpActive!({
+                        session: signUp!.createdSessionId,
+                        beforeEmit: () => {
+                            localStorage.setItem('mimo_post_login_check_rooms', 'true');
+                            sessionStorage.removeItem('mimo_has_navigated_chats');
+                            const target = applicant ? '/participar/cadastro' : consumePostAuthRedirect('/chats');
+                            window.location.href = target;
+                        }
+                    } as any);
+                } else {
+                    console.error('[SignUp Error] Status incompleto após verificação:', signUp!.status, 'Campos em falta:', (signUp as any).missingFields);
+                    throw new Error(`Cadastro incompleto. Status: ${signUp!.status}. Requisitos pendentes: ${(signUp as any).missingFields?.join(', ') || 'Nenhum'}`);
+                }
+            } else {
+                await signIn!.attemptFirstFactor({ strategy: 'email_code', code });
+                if (signIn!.status === 'complete') {
+                    await setSignInActive!({
+                        session: signIn!.createdSessionId,
+                        beforeEmit: () => {
+                            localStorage.setItem('mimo_post_login_check_rooms', 'true');
+                            sessionStorage.removeItem('mimo_has_navigated_chats');
+                            const target = applicant ? '/participar/cadastro' : consumePostAuthRedirect('/chats');
+                            window.location.href = target;
+                        }
+                    } as any);
+                }
+            }
+        } catch (err: unknown) {
+            if (isAlreadySignedInError(err)) {
+                try { await signOut(); } catch {}
+            }
+            setError(clerkError(err, 'Código inválido ou expirado'));
+        } finally {
+            setEmailLoading(false);
+        }
+    };
+
+    const onSignInWithGoogle = async () => {
+        if (!signInLoaded || !signUpLoaded || !signIn || !signUp) {
+            setError('Serviço de autenticação não carregado');
+            return;
+        }
+        if (!ageAccepted) {
+            triggerAgeGateTooltip();
+            return;
+        }
+
+        setGoogleLoading(true);
+        setError('');
+
+        const executeGoogleAuth = async () => {
+            const pendingGift = typeof window !== 'undefined' ? localStorage.getItem('mimo_pending_gift') : null;
+            const pendingReferral = getPendingReferral();
+            const pendingCampaign = getPendingCampaign();
+            const pendingRedirect = applicant ? '/participar/cadastro' : getPendingPostAuthRedirect();
+            clearMimoClientSession(queryClient);
+            if (pendingGift && typeof window !== 'undefined') {
+                localStorage.setItem('mimo_pending_gift', pendingGift);
+            }
+            if (pendingReferral && typeof window !== 'undefined') {
+                localStorage.setItem(REFERRAL_STORAGE_KEY, JSON.stringify(pendingReferral));
+            }
+            if (pendingRedirect && typeof window !== 'undefined') {
+                localStorage.setItem(POST_AUTH_REDIRECT_STORAGE_KEY, pendingRedirect);
+            }
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('mimo_post_login_check_rooms', 'true');
+                sessionStorage.removeItem('mimo_has_navigated_chats');
+            }
+
+            const oauthParams = {
+                strategy: 'oauth_google',
+                redirectUrl: '/sso-callback',
+                redirectUrlComplete: pendingRedirect || '/chats',
+                oidcPrompt: 'select_account',
+            } as const;
+
+            if (pendingReferral || pendingCampaign) {
+                await signUp.authenticateWithRedirect({
+                    ...oauthParams,
+                    unsafeMetadata: {
+                        ...(pendingReferral ? { mimoReferral: pendingReferral } : {}),
+                        ...(pendingCampaign ? { mimoCampaign: pendingCampaign } : {}),
+                    },
+                } as any);
+                return;
+            }
+
+            await signIn.authenticateWithRedirect(oauthParams);
+        };
+
+        try {
+            await executeGoogleAuth();
+        } catch (err: unknown) {
+            if (isAlreadySignedInError(err)) {
+                console.warn('[LoginPage] Erro de sessão existente no Google OAuth. Resetando e tentando novamente...');
+                try {
+                    await signOut();
+                    await executeGoogleAuth();
+                    return;
+                } catch (retryErr) {
+                    console.error('[LoginPage] Erro após reset no Google OAuth:', retryErr);
+                }
+            }
+            setError(clerkError(err, 'Erro no login com Google'));
+            setGoogleLoading(false);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            if (pendingVerification) onVerifyCode();
+            else onSendCode();
+        }
+    };
+
+    const isReady = authLoaded && signInLoaded && signUpLoaded;
+
+    if (!authLoaded || isVerifyingServerSession) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 select-none">
+                <div className="flex flex-col items-center gap-3">
+                    <div className="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-sm text-gray-400 font-medium">Carregando...</p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="relative min-h-screen flex items-center justify-center bg-radial from-[#eee0ff] via-[#faf8fd] to-white py-12 px-4 overflow-hidden selection:bg-purple-600 selection:text-white">
+            <DiscoverProfileBackground />
+            <Suspense fallback={null}>
+                <GiftCapture />
+            </Suspense>
+            <div className="relative z-10 w-full min-w-0 max-w-sm">
+                {/* Header */}
+                <div className="text-center mb-8">
+                    <div className="inline-flex w-20 h-20 items-center justify-center bg-gradient-to-br from-purple-600 to-purple-700 rounded-3xl mb-4 shadow-lg shadow-purple-600/20">
+                        <img
+                            src="/Logo.svg"
+                            alt="MimoChat"
+                            className="w-12 h-12 object-contain"
+                        />
+                    </div>
+                    <h1 className="text-3xl font-bold text-gray-900">{applicant ? 'Faça parte do Mimo' : 'MimoChat'}</h1>
+                    <p className="text-sm font-medium text-slate-500 mt-1">{applicant ? 'Crie sua conta e prepare seu perfil' : 'Converse com mulheres reais'}</p>
+                </div>
+
+                {/* Form */}
+                <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl shadow-purple-950/5 border border-purple-100/80 p-6">
+                    {!pendingVerification ? (
+                        <div className="flex flex-col gap-4">
+                            <Input
+                                label="Email"
+                                type="email"
+                                placeholder="seu@email.com"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                autoCapitalize="none"
+                                autoComplete="email"
+                                error={error}
+                                disabled={!isReady}
+                            />
+
+                            <Button
+                                title="Continuar com Email"
+                                onPress={onSendCode}
+                                loading={emailLoading}
+                                disabled={!isReady}
+                                size="lg"
+                                className="w-full"
+                            />
+
+                            <div className="flex items-center gap-3 my-1">
+                                <div className="flex-1 h-px bg-gray-200" />
+                                <span className="text-sm text-gray-400">ou</span>
+                                <div className="flex-1 h-px bg-gray-200" />
+                            </div>
+
+                            <Button
+                                title={googleLoading ? 'Aguarde...' : 'Entrar com Google'}
+                                onPress={onSignInWithGoogle}
+                                loading={googleLoading}
+                                disabled={!isReady}
+                                variant="outline"
+                                size="lg"
+                                icon={
+                                    <svg width="18" height="18" viewBox="0 0 24 24">
+                                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                                    </svg>
+                                }
+                                className="w-full"
+                            />
+
+                            {/* Mantém o desafio do Clerk dentro do cartão, abaixo do Google em formato normal/retangular */}
+                            <div
+                                id="clerk-captcha"
+                                data-cl-size="normal"
+                                className="flex w-full justify-center items-center my-2 min-h-[65px] empty:hidden"
+                            />
+
+                            {/* Checkbox de Maioridade e Consentimento Legal */}
+                            <div className="relative flex items-start gap-2.5 mt-2 mb-0.5 text-left select-none">
+                                {showAgeGateTooltip && (
+                                    <div className="absolute bottom-full left-0 mb-3 w-full max-w-[280px] bg-purple-950/95 backdrop-blur-md text-white text-[11px] font-extrabold py-2.5 px-3.5 rounded-xl shadow-lg shadow-purple-500/10 z-20 flex items-center gap-2 border border-purple-500/30 transition-all duration-300 animate-in fade-in slide-in-from-bottom-2">
+                                        <span className="relative flex h-2 w-2 shrink-0">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-fuchsia-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-fuchsia-500"></span>
+                                        </span>
+                                        <span className="tracking-wide text-purple-100">Marque esta opção para continuar</span>
+                                        {/* Setinha apontando para baixo */}
+                                        <div className="absolute top-full left-4 -mt-1 w-2 h-2 bg-purple-950/95 rotate-45 border-r border-b border-purple-500/30"></div>
+                                    </div>
+                                )}
+                                <input
+                                    type="checkbox"
+                                    id="age-gate-checkbox"
+                                    checked={ageAccepted}
+                                    onChange={(e) => setAgeAccepted(e.target.checked)}
+                                    className="mt-0.5 h-3.5 w-3.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 accent-purple-600 cursor-pointer shrink-0"
+                                />
+                                <label htmlFor="age-gate-checkbox" className="text-[11px] text-gray-400 leading-snug cursor-pointer">
+                                    Declaro que sou <strong className="text-gray-500 font-semibold">maior de 18 anos</strong> e concordo com os{' '}
+                                    <Link href="/termos-de-uso" target="_blank" className="text-purple-500 hover:text-purple-600 underline">
+                                        Termos de Uso
+                                    </Link>{' '}
+                                    e{' '}
+                                    <Link href="/politica-de-privacidade" target="_blank" className="text-purple-500 hover:text-purple-600 underline">
+                                        Política de Privacidade
+                                    </Link>{' '}
+                                    do MimoChat.
+                                </label>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-4">
+                            <div className="text-center">
+                                <p className="text-sm text-gray-500">
+                                    Enviamos um código para
+                                </p>
+                                <p className="text-sm font-semibold text-gray-800 mt-0.5">{email}</p>
+                            </div>
+
+                            <Input
+                                label="Código de verificação"
+                                type="text"
+                                inputMode="numeric"
+                                placeholder="000000"
+                                value={code}
+                                onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                                onKeyDown={handleKeyDown}
+                                maxLength={6}
+                                error={error}
+                                className="text-center text-2xl tracking-widest"
+                                autoComplete="one-time-code"
+                            />
+
+                            <Button
+                                title="Verificar"
+                                onPress={onVerifyCode}
+                                loading={emailLoading}
+                                size="lg"
+                                className="w-full"
+                            />
+
+                            <Button
+                                title="Usar outro email"
+                                onPress={() => {
+                                    setPendingVerification(false);
+                                    setFlowType(null);
+                                    setCode('');
+                                    setError('');
+                                }}
+                                variant="ghost"
+                                size="md"
+                                className="w-full"
+                            />
+                        </div>
+                    )}
+                </div>
+
+
+                <div className="mt-8 text-center text-[10px] text-gray-400 leading-relaxed space-y-1">
+                    <div className="border-t border-gray-100 pt-4 mt-4 space-y-0.5 select-none">
+                        <p className="font-semibold text-gray-500">LEAD CONTEUDOS DIGITAIS LTDA</p>
+                        <p>
+                            CNPJ: 60.312.273/0001-01 | EEL CONTEUDOS DIGITAIS |{' '}
+                            <Link href="/institucional" className="underline hover:text-purple-600 font-semibold">
+                                Sobre Nós
+                            </Link>
+                        </p>
+                        <p className="text-purple-400 font-medium hover:text-purple-500">
+                            <a href="mailto:suporte@mimochat.com.br">suporte@mimochat.com.br</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}

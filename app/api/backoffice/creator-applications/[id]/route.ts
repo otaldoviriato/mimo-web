@@ -82,7 +82,7 @@ export async function PATCH(
         await connectToDatabase();
 
         const body = await request.json();
-        const update: { professionalStatus?: string | null; notes?: string } = {};
+        const update: { professionalStatus?: string | null; notes?: string; isAvailable?: boolean } = {};
 
         if (body.status !== undefined) {
             if (!STATUSES.includes(body.status)) {
@@ -109,6 +109,9 @@ export async function PATCH(
         if (!oldUser) {
             return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 });
         }
+
+        if (oldUser.applicantEnrollment && body.status === 'approved' && !oldUser.applicantCompletedAt) return NextResponse.json({ error: 'A candidata precisa concluir o cadastro inicial.' }, { status: 400 });
+        if (oldUser.applicantEnrollment && body.status !== undefined) update.isAvailable = body.status === 'approved';
 
         const oldStatus = oldUser.professionalStatus;
 

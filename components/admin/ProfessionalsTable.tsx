@@ -67,6 +67,19 @@ export function ProfessionalsTable() {
         }
     };
 
+    const reviewApplicant = async (databaseId: string, status: 'approved' | 'rejected') => {
+        if (!confirm(status === 'approved' ? 'Aprovar este perfil e liberar atendimento a clientes?' : 'Rejeitar este perfil?')) return;
+        try {
+            const response = await fetch(`/api/backoffice/creator-applications/${databaseId}`, {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }),
+            });
+            if (!response.ok) throw new Error('Não foi possível atualizar a análise.');
+            setSelectedUserMenu(null);
+            await fetchUsers(searchQuery);
+            toast.success('Análise atualizada.');
+        } catch { toast.error('Não foi possível atualizar a análise.'); }
+    };
+
     // Debounce para a barra de pesquisa
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -255,6 +268,9 @@ export function ProfessionalsTable() {
                                                             </span>
                                                         )}
                                                     </div>
+                                                    {user.applicantEnrollment && <span className="text-xs font-semibold text-purple-700">
+                                                        {user.professionalStatus === 'approved' ? 'Aprovada' : user.professionalStatus === 'rejected' ? 'Rejeitada' : user.applicantCompletedAt ? 'Em análise' : 'Cadastro incompleto'}
+                                                    </span>}
                                                     <span className="text-xs text-slate-400 font-medium flex items-center gap-1 mt-0.5">
                                                         <Mail size={12} />
                                                         {user.email}
@@ -383,6 +399,11 @@ export function ProfessionalsTable() {
                                                                 <Edit size={14} className="text-slate-400" />
                                                                 Editar Perfil
                                                             </button>
+
+                                                            {user.applicantEnrollment && user.applicantCompletedAt && user.professionalStatus !== 'approved' && <>
+                                                                <button onClick={() => void reviewApplicant(user.databaseId, 'approved')} className="w-full px-4 py-2 text-left text-xs font-bold text-emerald-700 hover:bg-emerald-50">Aprovar perfil</button>
+                                                                <button onClick={() => void reviewApplicant(user.databaseId, 'rejected')} className="w-full px-4 py-2 text-left text-xs font-bold text-rose-700 hover:bg-rose-50">Rejeitar perfil</button>
+                                                            </>}
 
                                                             <button
                                                                 onClick={(e) => {

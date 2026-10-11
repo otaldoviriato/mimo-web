@@ -316,3 +316,9 @@ html.transition-forward, html.transition-backward {
   animation: shimmer 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+
+/* Keep fixed navigation and virtual screens inside the space below review status. */
+.professional-review-viewport .h-screen,
+.professional-review-viewport .h-dvh { height: var(--app-viewport-height); }
+.professional-review-viewport .min-h-screen,
+.professional-review-viewport .min-h-dvh { min-height: var(--app-viewport-height); }

@@ -13,6 +13,7 @@ const isPublicRoute = createRouteMatcher([
     '/manifest.json',
     '/firebase-messaging-sw.js',
     '/.well-known/(.*)',
+    '/api/participar/intencao',
     '/api/creator-applications(.*)',
     '/api/campaigns/visit(.*)',
     '/api/users/featured(.*)',
