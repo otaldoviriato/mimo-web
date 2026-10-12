@@ -13,6 +13,7 @@ const fs = require('node:fs');
         page.on('pageerror', error => errors.push(error.message));
         await page.route('**/api/**', async route => {
             const url = new URL(route.request().url());
+            if (url.pathname === '/api/users/me') return route.fulfill({ json: { isProfessional: false } });
             if (url.pathname === '/api/users/me/photo') return route.fulfill({ json: { photoUrl: avatar } });
             if (url.pathname === '/api/participar' && route.request().method() === 'PATCH') { savedBody = route.request().postDataJSON(); return route.fulfill({ json: { profile: { completed: complete } } }); }
             if (url.pathname === '/api/participar') return route.fulfill({ json: { profile: { name: '', username: 'candidata_fixture', birthDate: '', photoUrl: '', completed: false } } });
@@ -52,6 +53,10 @@ const fs = require('node:fs');
         await page.getByAltText('Sua foto de perfil').waitFor();
         await page.getByRole('button', { name: 'Trocar foto', exact: true }).waitFor();
         assert.equal(await page.locator('input[type=file]').isVisible(), false);
+        await page.getByRole('button', { name: '@ana.julia', exact: true }).waitFor();
+        await page.setViewportSize({ width: 390, height: 1100 });
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.screenshot({ path: 'scratch/applicant/form-mobile.png', fullPage: true });
         await page.getByRole('button', { name: 'Concluir cadastro', exact: true }).click();
         await page.getByRole('alert').filter({ hasText: 'Não foi possível concluir' }).waitFor();
         assert.equal(savedBody.complete, true);
@@ -63,14 +68,18 @@ const fs = require('node:fs');
         }
         await page.setViewportSize({ width: 360, height: 1000 });
         await page.locator('main').evaluate(element => element.scrollTop = 0);
-        await page.screenshot({ path: 'scratch/applicant/form-mobile.png', fullPage: true });
         complete = true;
         await page.route('**/chats', route => route.fulfill({ contentType: 'text/html', body: '<h1>Conversas</h1>' }));
         await page.getByRole('button', { name: 'Concluir cadastro', exact: true }).click();
         await page.waitForURL('**/chats');
+        // Reproduce an abandoned /participar visit before returning to normal login.
+        await page.evaluate(() => localStorage.setItem('mimo_redirect_after_login', '/participar/cadastro'));
+        await page.goto('http://127.0.0.1:3012/login');
+        await page.waitForURL('**/chats');
+        assert.equal(await page.evaluate(() => localStorage.getItem('mimo_redirect_after_login')), null);
         assert.deepEqual(errors, []);
         if (process.argv.includes('--registration-only')) {
-            console.log('PASS: registration suggestions, selection, manual edits, reload without draft, photo crop/upload, age validation, completion redirect, 320/360/768/1280px.');
+            console.log('PASS: registration suggestions, selection, manual edits, reload without draft, photo crop/upload, age validation, completion redirect, normal login rejects stale applicant destination, 320/360/768/1280px.');
             return;
         }
         await page.goto('http://127.0.0.1:3012/review');

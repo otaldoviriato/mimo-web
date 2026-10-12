@@ -17,9 +17,16 @@ export function sanitizePostAuthRedirect(value: unknown): string | undefined {
     }
 }
 
-export function getPendingPostAuthRedirect(): string | undefined {
+export function getPendingPostAuthRedirect({ allowApplicant = false }: { allowApplicant?: boolean } = {}): string | undefined {
     if (typeof window === 'undefined') return undefined;
-    return sanitizePostAuthRedirect(localStorage.getItem(POST_AUTH_REDIRECT_STORAGE_KEY));
+    const redirect = sanitizePostAuthRedirect(localStorage.getItem(POST_AUTH_REDIRECT_STORAGE_KEY));
+    // Normal login must never inherit an abandoned professional signup.
+    // Only the OAuth callback may explicitly resume the applicant flow.
+    if (redirect && !allowApplicant) {
+        const pathname = new URL(redirect, 'https://mimo.local').pathname;
+        if (pathname === '/participar' || pathname.startsWith('/participar/')) return undefined;
+    }
+    return redirect;
 }
 
 export function storePostAuthRedirect(value: unknown) {

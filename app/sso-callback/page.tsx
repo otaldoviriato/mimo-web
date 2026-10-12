@@ -71,7 +71,7 @@ function LoadingCard() {
 }
 
 export default function SSOCallbackPage() {
-    const [targetRedirect] = useState(() => getPendingPostAuthRedirect() || '/chats');
+    const [targetRedirect] = useState(() => getPendingPostAuthRedirect({ allowApplicant: true }) || '/chats');
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4">

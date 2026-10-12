@@ -2,7 +2,6 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { LoginForm } from '@/components/LoginForm';
-import { storePostAuthRedirect } from '@/lib/postAuthRedirect';
 
 function Participation() {
     const search = useSearchParams();
@@ -10,7 +9,6 @@ function Participation() {
     const [error, setError] = useState(false);
     useEffect(() => {
         let active = true;
-        storePostAuthRedirect('/participar/cadastro');
         fetch('/api/participar/intencao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ indicacao: search.get('indicacao') }) })
             .then(response => { if (!response.ok) throw new Error(); if (active) setReady(true); })
             .catch(() => { if (active) setError(true); });

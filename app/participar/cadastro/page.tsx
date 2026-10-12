@@ -3,6 +3,7 @@ import { useAuth } from '@clerk/nextjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, UserRound, ArrowRight, LoaderCircle } from 'lucide-react';
 import { ImageCropper } from '@/components/ImageCropper';
+import { DiscoverProfileBackground } from '@/components/landing/NetflixStyleLanding';
 import { validateApplicantBirthDate } from '@/lib/applicant';
 import { POST_AUTH_REDIRECT_STORAGE_KEY } from '@/lib/postAuthRedirect';
 
@@ -105,48 +106,46 @@ export default function ApplicantRegistration() {
         } catch (err) { setError((err as Error).message); } finally { setBusy(false); }
     }
     const fieldClass = "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-base text-slate-900 transition-colors placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-60";
-    return <main className="relative min-h-dvh bg-white px-5 py-7 sm:bg-radial sm:from-[#eee0ff] sm:via-[#faf8fd] sm:to-white sm:px-6 sm:py-12 selection:bg-purple-600 selection:text-white">
-        <div className="relative z-10 mx-auto w-full max-w-md sm:rounded-3xl sm:border sm:border-purple-100/80 sm:bg-white/95 sm:p-8 sm:shadow-xl sm:shadow-purple-950/5">
+    return <main className="relative min-h-dvh overflow-hidden bg-radial from-[#eee0ff] via-[#faf8fd] to-white px-4 py-8 sm:py-12 selection:bg-purple-600 selection:text-white">
+        <DiscoverProfileBackground />
+        <div className="relative z-10 mx-auto w-full min-w-0 max-w-sm">
             {/* Header com identidade oficial MimoChat */}
-            <header className="mb-7 text-left">
-                <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple-600 to-purple-700 shadow-md shadow-purple-600/20 mb-4">
+            <header className="mb-6 text-center">
+                <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-purple-600 to-purple-700 shadow-lg shadow-purple-600/20 sm:h-20 sm:w-20">
                     <img
                         src="/Logo.svg"
                         alt="MimoChat"
-                        className="h-7 w-7 object-contain"
+                        className="h-10 w-10 object-contain sm:h-12 sm:w-12"
                     />
                 </div>
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Vamos montar seu perfil</h1>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600">Escolha como você quer aparecer no Mimo.</p>
+                <h1 className="text-3xl font-bold tracking-tight text-gray-900">Seu perfil no Mimo</h1>
+                <p className="mt-2 text-sm font-medium text-slate-600">Só mais alguns detalhes para começar.</p>
             </header>
 
             {ready ? (
-                <div>
-                    <form className="space-y-6" onSubmit={event => { event.preventDefault(); void save(); }}>
+                <div className="rounded-2xl border border-purple-100/80 bg-white/95 p-5 shadow-xl shadow-purple-950/5 backdrop-blur-md sm:p-6">
+                    <form className="space-y-5" onSubmit={event => { event.preventDefault(); void save(); }}>
                         {/* Seção Foto de Perfil */}
-                        <section className="flex items-center gap-4 border-b border-slate-100 pb-6">
+                        <section className="flex items-center gap-4 border-b border-purple-100/70 pb-4">
                             <button
                                 type="button"
                                 disabled={busy}
                                 onClick={() => photoInput.current?.click()}
                                 aria-label={draft.photoUrl ? 'Trocar foto de perfil' : 'Adicionar foto de perfil'}
-                                className="group relative h-20 w-20 shrink-0 overflow-hidden rounded-full bg-purple-50 text-purple-400 ring-2 ring-purple-200/80 transition focus-visible:outline-2 focus-visible:outline-purple-500 hover:ring-purple-400"
+                                className="group relative h-16 w-16 shrink-0 rounded-full bg-purple-50 text-purple-400 ring-2 ring-purple-200/80 transition focus-visible:outline-2 focus-visible:outline-purple-500 hover:ring-purple-400"
                             >
                                 {draft.photoUrl ? (
-                                    <img src={draft.photoUrl} alt="Sua foto de perfil" className="h-full w-full object-cover" />
+                                    <img src={draft.photoUrl} alt="Sua foto de perfil" className="h-full w-full rounded-full object-cover" />
                                 ) : (
                                     <UserRound aria-hidden="true" className="mx-auto h-7 w-7 text-purple-300 transition group-hover:text-purple-400" strokeWidth={1.5} />
                                 )}
-                                <span className="absolute bottom-0 inset-x-0 bg-black/40 py-0.5 text-[9px] font-medium text-white opacity-0 transition group-hover:opacity-100 flex items-center justify-center gap-0.5">
-                                    <Camera size={10} /> Alterar
-                                </span>
-                                <span className="absolute bottom-0 right-0 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-purple-600 text-white shadow-sm">
-                                    <Camera size={10} />
+                                <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-purple-600 text-white shadow-sm">
+                                    <Camera size={12} aria-hidden="true" />
                                 </span>
                             </button>
                             <div className="min-w-0 flex-1">
                                 <h2 className="text-sm font-semibold text-slate-900">Foto de perfil</h2>
-                                <p className="mt-1 text-sm text-slate-600 leading-relaxed">Uma foto nítida e bem iluminada do seu rosto.</p>
+                                <p className="mt-1 text-xs leading-relaxed text-slate-500">Escolha uma foto nítida do seu rosto.</p>
                                 <button
                                     type="button"
                                     disabled={busy}
@@ -179,7 +178,7 @@ export default function ApplicantRegistration() {
                         </section>
 
                         {/* Campos do formulário */}
-                        <div className="space-y-5">
+                        <div className="space-y-4">
                             <div>
                                 <label htmlFor="applicant-name" className="mb-2 block text-sm font-medium text-slate-800">
                                     Nome no perfil
@@ -239,12 +238,12 @@ export default function ApplicantRegistration() {
                                     {suggestionsLoading && <p className="mt-2 text-xs text-slate-500">Buscando nomes disponíveis...</p>}
                                     {suggestionsError && <p className="mt-2 text-xs text-slate-600">{suggestionsError}</p>}
                                     {suggestions.length > 0 && <div className="mt-3">
-                                        <p className="mb-2 text-xs text-slate-600">Sugestões para você · toque para escolher</p>
+                                        <p className="mb-2 text-xs text-slate-600">Toque em uma sugestão disponível</p>
                                         <div className="flex flex-wrap gap-2">
                                             {suggestions.map(username => <button key={username} type="button" disabled={busy}
                                                 aria-pressed={draft.username === username}
                                                 onClick={() => { setDraft(current => ({ ...current, username })); setAvailability(''); }}
-                                                className="min-h-11 max-w-full break-all rounded-xl border border-purple-100 bg-purple-50 px-3 py-2 text-left text-sm font-medium text-purple-700 transition hover:bg-purple-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600 aria-pressed:border-purple-600 aria-pressed:bg-purple-100 disabled:opacity-60">
+                                                className="min-h-11 max-w-full break-all rounded-xl border border-purple-100 bg-purple-50 px-2.5 py-2 text-left text-xs font-semibold text-purple-700 transition hover:bg-purple-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600 aria-pressed:border-purple-600 aria-pressed:bg-purple-100 disabled:opacity-60">
                                                 @{username}
                                             </button>)}
                                         </div>
