@@ -571,9 +571,27 @@ export function LoginForm({ applicant = false }: { applicant?: boolean }) {
                     )}
                 </div>
 
+                {/* Alternância discreta de fluxo (Profissional / Usuário) */}
+                <p className="mt-4 text-center text-xs text-gray-500">
+                    {applicant ? (
+                        <>
+                            Já tem uma conta de usuário?{' '}
+                            <Link href="/login" className="text-purple-600 font-medium hover:underline hover:text-purple-700">
+                                Fazer login
+                            </Link>
+                        </>
+                    ) : (
+                        <>
+                            Quer criar um perfil profissional?{' '}
+                            <Link href="/participar" className="text-purple-600 font-medium hover:underline hover:text-purple-700">
+                                Inscreva-se aqui
+                            </Link>
+                        </>
+                    )}
+                </p>
 
-                <div className="mt-8 text-center text-[10px] text-gray-400 leading-relaxed space-y-1">
-                    <div className="border-t border-gray-100 pt-4 mt-4 space-y-0.5 select-none">
+                <div className="mt-6 text-center text-[10px] text-gray-400 leading-relaxed space-y-1">
+                    <div className="border-t border-gray-100 pt-4 mt-2 space-y-0.5 select-none">
                         <p className="font-semibold text-gray-500">LEAD CONTEUDOS DIGITAIS LTDA</p>
                         <p>
                             CNPJ: 60.312.273/0001-01 | EEL CONTEUDOS DIGITAIS |{' '}
