@@ -9,6 +9,7 @@ import { useUser, useAuth } from '@clerk/nextjs';
 import { PWAPromoModal } from '@/components/PWAPromoModal';
 import { NotifPromoModal } from '@/components/NotifPromoModal';
 import { Settings, ShieldAlert, Search, Pencil, UserCheck, ShieldCheck, Menu } from 'lucide-react';
+import { ProfessionalReviewBanner } from '@/components/ProfessionalReviewBanner';
 
 export default function TabShell({ children, activePath }: { children: React.ReactNode; activePath?: string }) {
     const routePath = usePathname();
@@ -286,6 +287,8 @@ export default function TabShell({ children, activePath }: { children: React.Rea
                         )}
                     </div>
                 </div>
+
+                <ProfessionalReviewBanner />
 
                 {children}
             </div>
