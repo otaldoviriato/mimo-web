@@ -44,6 +44,8 @@ export async function GET(
             return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
         }
 
+        const isUserAdmin = settings?.adminClerkIds?.includes(clerkId) || clerkId === FALLBACK_ADMIN;
+
         const galleryItems = await GalleryItem.find({ ownerId: clerkId }).sort({ createdAt: -1 }).lean();
         const withdrawals = await WithdrawRequest.find({ userId: clerkId }).sort({ createdAt: -1 }).lean() as any[];
 
@@ -134,6 +136,7 @@ export async function GET(
         return NextResponse.json({
             user: {
                 ...userObj,
+                isAdmin: isUserAdmin,
                 chargePerCharSubscribers: defaultSub,
                 chargePerCharNonSubscribers: defaultNonSub,
                 createdAt: userObj.createdAt ? new Date(userObj.createdAt).toLocaleDateString('pt-BR') : 'N/A',
@@ -195,6 +198,7 @@ export async function PATCH(
         const { 
             name, 
             email, 
+            role, // 'client' | 'professional' | 'team' | 'admin'
             isProfessional, 
             taxId, 
             phone, 
@@ -207,7 +211,60 @@ export async function PATCH(
         const updateFields: any = {};
         if (name !== undefined) updateFields.name = name;
         if (email !== undefined) updateFields.email = email;
-        if (isProfessional !== undefined) updateFields.isProfessional = isProfessional;
+        
+        // Tratamento da Role (Cliente, Profissional, Equipe ou Administrador)
+        let resolvedIsProfessional: boolean | undefined = undefined;
+        let isNowAdmin: boolean | undefined = undefined;
+
+        if (role !== undefined) {
+            if (role === 'admin') {
+                updateFields.isProfessional = false;
+                updateFields.isTeam = false;
+                resolvedIsProfessional = false;
+                isNowAdmin = true;
+            } else if (role === 'team') {
+                updateFields.isProfessional = false;
+                updateFields.isTeam = true;
+                if (!updateFields.teamTitle) {
+                    updateFields.teamTitle = 'Equipe Mimo';
+                }
+                resolvedIsProfessional = false;
+                isNowAdmin = false;
+            } else if (role === 'professional') {
+                updateFields.isProfessional = true;
+                updateFields.professionalStatus = 'approved';
+                updateFields.isTeam = false;
+                resolvedIsProfessional = true;
+                isNowAdmin = false;
+            } else if (role === 'client') {
+                updateFields.isProfessional = false;
+                updateFields.isTeam = false;
+                resolvedIsProfessional = false;
+                isNowAdmin = false;
+            }
+        } else if (isProfessional !== undefined) {
+            updateFields.isProfessional = isProfessional;
+            resolvedIsProfessional = isProfessional;
+        }
+
+        // Se a role definiu status de Admin, sincroniza no AppSettings
+        if (isNowAdmin !== undefined && settings) {
+            let adminList = Array.isArray(settings.adminClerkIds) ? [...settings.adminClerkIds] : [];
+            if (isNowAdmin) {
+                if (!adminList.includes(clerkId)) {
+                    adminList.push(clerkId);
+                    settings.adminClerkIds = adminList;
+                    await settings.save();
+                }
+            } else {
+                // Não permite remover o Fallback Admin de administrador
+                if (clerkId !== FALLBACK_ADMIN && adminList.includes(clerkId)) {
+                    settings.adminClerkIds = adminList.filter((id: string) => id !== clerkId);
+                    await settings.save();
+                }
+            }
+        }
+
         if (taxId !== undefined) updateFields.taxId = taxId;
         if (phone !== undefined) updateFields.phone = phone;
         if (subscriptionPrice !== undefined) {
@@ -240,7 +297,7 @@ export async function PATCH(
             updateFields.bio = bio;
         }
 
-        if (isProfessional === false) {
+        if (resolvedIsProfessional === false) {
             updateFields.bio = '';
         }
 
@@ -264,9 +321,9 @@ export async function PATCH(
                 });
             }
 
-            if (isProfessional !== undefined) {
+            if (resolvedIsProfessional !== undefined) {
                 await client.users.updateUserMetadata(clerkId, {
-                    unsafeMetadata: buildProfileRoleMetadata(isProfessional ? 'professional' : 'client'),
+                    unsafeMetadata: buildProfileRoleMetadata(resolvedIsProfessional ? 'professional' : 'client'),
                 });
             }
         } catch (clerkErr: any) {
@@ -277,7 +334,17 @@ export async function PATCH(
             }
         }
 
-        return NextResponse.json({ success: true, user: updatedUser });
+        const finalIsAdmin = isNowAdmin !== undefined 
+            ? isNowAdmin 
+            : (settings?.adminClerkIds?.includes(clerkId) || clerkId === FALLBACK_ADMIN);
+
+        return NextResponse.json({ 
+            success: true, 
+            user: {
+                ...updatedUser.toObject(),
+                isAdmin: finalIsAdmin
+            } 
+        });
 
     } catch (error: any) {
         console.error('Erro ao atualizar usuário pelo admin:', error);

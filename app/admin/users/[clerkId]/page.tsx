@@ -51,9 +51,10 @@ interface UserDetail {
     taxId?: string;
     phone?: string;
     photoUrl?: string;
-    coverUrl?: string;
     balance: number;
     isProfessional: boolean;
+    isTeam?: boolean;
+    isAdmin?: boolean;
     subscriptionPrice: number;
     chargePerCharSubscribers: number;
     chargePerCharNonSubscribers: number;
@@ -211,6 +212,7 @@ export default function UserDetailPage() {
     const [username, setUsername] = useState('');
     const [balance, setBalance] = useState<number>(0);
     const [isProfessional, setIsProfessional] = useState(false);
+    const [role, setRole] = useState<'client' | 'professional' | 'team' | 'admin'>('client');
     const [taxId, setTaxId] = useState('');
     const [phone, setPhone] = useState('');
     const [pixKey, setPixKey] = useState('');
@@ -218,7 +220,6 @@ export default function UserDetailPage() {
     // Inputs adicionais de profissional
     const [subscriptionPrice, setSubscriptionPrice] = useState<number>(0);
     const [photoUrl, setPhotoUrl] = useState('');
-    const [coverUrl, setCoverUrl] = useState('');
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -386,12 +387,23 @@ export default function UserDetailPage() {
                     setUsername(data.user.username || '');
                     setBalance((data.user.balance || 0) / 100);
                     setIsProfessional(data.user.isProfessional || false);
+
+                    // Determina a role inicial
+                    if (data.user.isAdmin) {
+                        setRole('admin');
+                    } else if (data.user.isTeam) {
+                        setRole('team');
+                    } else if (data.user.isProfessional) {
+                        setRole('professional');
+                    } else {
+                        setRole('client');
+                    }
+
                     setTaxId(data.user.taxId || '');
                     setPhone(data.user.phone || '');
                     setPixKey(data.user.pixKey || '');
                     setSubscriptionPrice(data.user.subscriptionPrice || 0);
                     setPhotoUrl(data.user.photoUrl || '');
-                    setCoverUrl(data.user.coverUrl || '');
 
                     setIsAuthorized(true);
                     fetchRooms();
@@ -426,19 +438,28 @@ export default function UserDetailPage() {
                     name,
                     email,
                     username,
-                    isProfessional,
+                    role,
                     taxId,
                     phone,
                     pixKey,
                     subscriptionPrice,
-                    photoUrl,
-                    coverUrl
+                    photoUrl
                 })
             });
 
             if (res.ok) {
                 const data = await res.json();
                 setUser(data.user);
+                setIsProfessional(data.user.isProfessional || false);
+                if (data.user.isAdmin) {
+                    setRole('admin');
+                } else if (data.user.isTeam) {
+                    setRole('team');
+                } else if (data.user.isProfessional) {
+                    setRole('professional');
+                } else {
+                    setRole('client');
+                }
                 toast.success('Perfil atualizado com sucesso!', {
                     style: { borderRadius: '12px', background: '#1E293B', color: '#FFF', fontWeight: 600 }
                 });
@@ -720,44 +741,68 @@ export default function UserDetailPage() {
 
     return (
         <div className="space-y-8 max-w-5xl w-full mx-auto pb-24">
-                    {/* Botão Voltar e Cabeçalho */}
-                    <div className="flex items-center justify-between">
+                    {/* Cabeçalho de Navegação e Perfil */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <button
-                            onClick={() => router.push(isProfessional ? '/admin/professionals' : '/admin/clients')}
-                            className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors bg-white px-4 py-2.5 rounded-xl border border-slate-200 shadow-sm cursor-pointer"
+                            onClick={() => router.push(role === 'professional' ? '/admin/professionals' : role === 'team' ? '/admin/team' : '/admin/clients')}
+                            className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-slate-900 transition-colors bg-white px-4 py-2.5 rounded-xl border border-slate-200/90 shadow-xs cursor-pointer w-fit"
                         >
                             <ArrowLeft size={14} />
-                            Voltar para {isProfessional ? 'Profissionais' : 'Clientes'}
+                            Voltar para {role === 'professional' ? 'Profissionais' : role === 'team' ? 'Equipe' : 'Clientes'}
                         </button>
 
-                        <div className="text-right">
-                            <span className="text-[10px] text-purple-600 font-bold uppercase tracking-widest bg-purple-50 px-2.5 py-1 rounded-md border border-purple-100">
-                                {isProfessional ? 'Perfil Profissional' : 'Perfil Cliente'}
+                        <div className="flex items-center gap-2">
+                            <span className={`text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full border ${
+                                role === 'admin'
+                                    ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                    : role === 'team'
+                                    ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                    : role === 'professional'
+                                    ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                    : 'bg-slate-100 text-slate-700 border-slate-200'
+                            }`}>
+                                {role === 'admin' && 'Administrador'}
+                                {role === 'team' && 'Membro da Equipe'}
+                                {role === 'professional' && 'Perfil Profissional'}
+                                {role === 'client' && 'Perfil Cliente'}
                             </span>
                         </div>
                     </div>
 
-                    {/* Preview Rápido / Capa do Usuário */}
-                    <div className="bg-white border border-slate-200/80 rounded-3xl overflow-hidden shadow-sm">
-                        <div className="h-32 w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-500 relative">
-                            {coverUrl && (
-                                <img src={coverUrl} alt="Capa" className="w-full h-full object-cover" />
-                            )}
-                            <div className="absolute inset-0 bg-black/10" />
-                        </div>
-                        <div className="px-8 pb-6 flex flex-col sm:flex-row items-center sm:items-end gap-5 -mt-10 relative z-10">
+                    {/* Card de Identificação do Usuário (Sem foto de capa) */}
+                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 md:p-7 shadow-xs">
+                        <div className="flex flex-col sm:flex-row items-center sm:items-center gap-5">
                             {photoUrl ? (
-                                <img src={photoUrl} alt="Avatar" className="w-24 h-24 rounded-2xl object-cover border-4 border-white shadow-md bg-white" />
+                                <img 
+                                    src={photoUrl} 
+                                    alt="Avatar" 
+                                    className="w-20 h-20 md:w-24 md:h-24 rounded-2xl object-cover border-2 border-slate-100 shadow-xs bg-slate-50 shrink-0" 
+                                />
                             ) : (
-                                <div className="w-24 h-24 rounded-2xl bg-purple-100 border-4 border-white shadow-md flex items-center justify-center text-purple-600 font-black text-2xl">
+                                <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl bg-purple-100 border-2 border-purple-200 text-purple-700 font-black text-2xl md:text-3xl flex items-center justify-center shrink-0">
                                     {name ? name.substring(0, 2).toUpperCase() : 'MI'}
                                 </div>
                             )}
-                            <div className="text-center sm:text-left flex-1 pb-1">
-                                 <h2 className="text-xl font-bold text-slate-800 tracking-tight flex items-center justify-center sm:justify-start gap-2">
-                                     {name || username}
-                                 </h2>
-                                <p className="text-xs text-slate-400 font-semibold">@{username} • Clerk: {clerkId}</p>
+
+                            <div className="text-center sm:text-left flex-1 min-w-0">
+                                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1">
+                                    <h2 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight truncate">
+                                        {name || username}
+                                    </h2>
+                                </div>
+                                <p className="text-xs text-slate-500 font-semibold mb-2">
+                                    @{username}
+                                </p>
+                                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 text-[11px] text-slate-500 font-mono">
+                                    <span className="bg-slate-50 border border-slate-200/70 px-2.5 py-1 rounded-lg">
+                                        Clerk: <span className="font-semibold text-slate-700">{clerkId}</span>
+                                    </span>
+                                    {user?.createdAt && (
+                                        <span className="bg-slate-50 border border-slate-200/70 px-2.5 py-1 rounded-lg font-sans">
+                                            Cadastrado em: <span className="font-semibold text-slate-700">{user.createdAt}</span>
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -833,15 +878,29 @@ export default function UserDetailPage() {
                                             placeholder="(00) 00000-0000"
                                         />
                                     </div>
+
+                                    <div className="space-y-1 sm:col-span-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                            <ImageIcon size={12} />
+                                            URL da Foto de Perfil
+                                        </label>
+                                        <input 
+                                            type="text" 
+                                            value={photoUrl}
+                                            onChange={(e) => setPhotoUrl(e.target.value)}
+                                            className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700"
+                                            placeholder="https://..."
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
                             {/* Seção Profissional */}
-                            {isProfessional && (
+                            {role === 'professional' && (
                                 <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
                                     <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-3 flex items-center gap-2">
                                         <Coins size={16} className="text-purple-600 animate-pulse" />
-                                        Configuração de Ganhos e Mídia
+                                        Configuração de Ganhos e Assinatura
                                     </h3>
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -869,26 +928,6 @@ export default function UserDetailPage() {
                                                 placeholder="CPF, E-mail ou Telefone"
                                             />
                                         </div>
-
-                                        <div className="space-y-1 sm:col-span-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">URL do Avatar (Foto do Perfil)</label>
-                                            <input 
-                                                type="text" 
-                                                value={photoUrl}
-                                                onChange={(e) => setPhotoUrl(e.target.value)}
-                                                className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700"
-                                            />
-                                        </div>
-
-                                        <div className="space-y-1 sm:col-span-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">URL da Foto de Capa</label>
-                                            <input 
-                                                type="text" 
-                                                value={coverUrl}
-                                                onChange={(e) => setCoverUrl(e.target.value)}
-                                                className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700"
-                                            />
-                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -898,49 +937,60 @@ export default function UserDetailPage() {
                         <div className="space-y-6">
                             <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-5">
                                 <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-3 flex items-center gap-2">
-                                    <Coins size={16} className="text-amber-500" />
+                                    <ShieldCheck size={16} className="text-purple-600" />
                                     Saldo e Cargo
                                 </h3>
 
-        {/* Card Informativo de Saldo Atual + Ação Oficial de Ajuste */}
-        <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Saldo da Carteira</span>
-                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full">
-                    Saldo Real
-                </span>
-            </div>
-            <div>
-                <span className="text-2xl font-black text-slate-900 tracking-tight block">
-                    {balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </span>
-                <span className="text-[10px] text-slate-400 font-medium mt-0.5 block">
-                    Alterações de saldo geram registro oficial com justificativa.
-                </span>
-            </div>
-            <button 
-                type="button"
-                onClick={handleOpenAdjustmentModal}
-                className="w-full py-2.5 px-3 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm shadow-purple-600/10"
-            >
-                <PlusCircle size={14} />
-                Inserir ou Debitar Saldo
-            </button>
-        </div>
+                                {/* Card Informativo de Saldo Atual + Ação Oficial de Ajuste */}
+                                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Saldo da Carteira</span>
+                                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full">
+                                            Saldo Real
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="text-2xl font-black text-slate-900 tracking-tight block">
+                                            {balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                        </span>
+                                        <span className="text-[10px] text-slate-400 font-medium mt-0.5 block">
+                                            Alterações de saldo geram registro oficial com justificativa.
+                                        </span>
+                                    </div>
+                                    <button 
+                                        type="button"
+                                        onClick={handleOpenAdjustmentModal}
+                                        className="w-full py-2.5 px-3 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm shadow-purple-600/10"
+                                    >
+                                        <PlusCircle size={14} />
+                                        Inserir ou Debitar Saldo
+                                    </button>
+                                </div>
 
-                                <div className="pt-2 border-t border-slate-100">
-                                    <label className="flex items-center gap-2.5 cursor-pointer group">
-                                        <input 
-                                            type="checkbox"
-                                            checked={isProfessional}
-                                            onChange={(e) => setIsProfessional(e.target.checked)}
-                                            className="accent-purple-600 rounded cursor-pointer w-4 h-4"
-                                        />
-                                        <div>
-                                            <span className="text-xs font-bold text-slate-700 group-hover:text-purple-600 transition-colors block">Perfil Profissional</span>
-                                            <span className="text-[10px] text-slate-400 font-medium block leading-tight">Profissionais vendem assinaturas e recebem pelos atendimentos monetizados.</span>
-                                        </div>
+                                <div className="pt-2 border-t border-slate-100 space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                                        Cargo da Conta
                                     </label>
+                                    <select
+                                        value={role}
+                                        onChange={(e) => {
+                                            const newRole = e.target.value as 'client' | 'professional' | 'team' | 'admin';
+                                            setRole(newRole);
+                                            setIsProfessional(newRole === 'professional');
+                                        }}
+                                        className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700 cursor-pointer"
+                                    >
+                                        <option value="client">Cliente</option>
+                                        <option value="professional">Profissional</option>
+                                        <option value="team">Equipe</option>
+                                        <option value="admin">Administrador</option>
+                                    </select>
+                                    <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
+                                        {role === 'client' && 'Usuário regular que consome saldo e conversa com criadoras.'}
+                                        {role === 'professional' && 'Criadora que possui perfil público, vende assinaturas e monetiza conversas.'}
+                                        {role === 'team' && 'Membro do time interno com permissões de suporte e ativação de perfis.'}
+                                        {role === 'admin' && 'Acesso total administrativo ao painel MimoAdmin e configurações.'}
+                                    </p>
                                 </div>
                             </div>
 
