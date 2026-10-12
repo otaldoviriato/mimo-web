@@ -144,7 +144,38 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        const currentCount = await GalleryItem.countDocuments({ ownerId: userId, galleryType });
+        let nextOrder = 0;
+        if (galleryType === 'public') {
+            const currentUser = await User.findOne({ clerkId: userId }).select('photoUrl');
+            if (currentUser?.photoUrl) {
+                const hasProfilePhoto = await GalleryItem.exists({
+                    ownerId: userId,
+                    imageUrl: currentUser.photoUrl,
+                });
+                if (!hasProfilePhoto) {
+                    await GalleryItem.create({
+                        ownerId: userId,
+                        imageUrl: currentUser.photoUrl,
+                        visibility: 'public',
+                        galleryType: 'public',
+                        mediaType: 'photo',
+                        order: 0,
+                    });
+                }
+            }
+
+            const lastPublicItem = await GalleryItem.findOne({
+                ownerId: userId,
+                $or: [{ galleryType: 'public' }, { galleryType: { $exists: false } }]
+            }).sort({ order: -1 });
+            nextOrder = typeof lastPublicItem?.order === 'number' ? lastPublicItem.order + 1 : 0;
+        } else {
+            const lastPrivateItem = await GalleryItem.findOne({
+                ownerId: userId,
+                galleryType: 'private'
+            }).sort({ order: -1 });
+            nextOrder = typeof lastPrivateItem?.order === 'number' ? lastPrivateItem.order + 1 : 0;
+        }
 
         // Criar item na galeria
         const newItem = await GalleryItem.create({
@@ -153,15 +184,18 @@ export async function POST(request: NextRequest) {
             visibility,
             galleryType,
             mediaType: isVideo ? 'video' : 'photo',
-            order: currentCount,
+            order: nextOrder,
         });
 
-        // Se for a primeira foto pública, atualiza também a photoUrl do usuário
-        if (galleryType === 'public' && currentCount === 0) {
-            await User.updateOne(
-                { clerkId: userId },
-                { $set: { photoUrl: imageUrl } }
-            );
+        // Apenas atualiza a photoUrl do usuário se ele NÃO tinha nenhuma foto de perfil
+        if (galleryType === 'public') {
+            const currentUser = await User.findOne({ clerkId: userId }).select('photoUrl');
+            if (!currentUser?.photoUrl) {
+                await User.updateOne(
+                    { clerkId: userId },
+                    { $set: { photoUrl: imageUrl } }
+                );
+            }
         }
 
         return NextResponse.json({ item: newItem });
