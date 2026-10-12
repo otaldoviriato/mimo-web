@@ -27,6 +27,8 @@ export default function ApplicantRegistration() {
     const [suggestionsError, setSuggestionsError] = useState('');
     const enterApp = useCallback(() => {
         localStorage.removeItem(POST_AUTH_REDIRECT_STORAGE_KEY);
+        // The next document must not hydrate an unfinished profile from before completion.
+        localStorage.removeItem('mimo_profile');
         window.location.replace('/chats');
     }, []);
     useEffect(() => {

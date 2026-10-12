@@ -151,6 +151,8 @@ export function useMyProfile() {
     const isLoggedOut = isSignedIn === false || !clerkUser?.id;
     return {
         ...query,
+        // Local/in-memory snapshots are useful for display, but cannot decide onboarding redirects.
+        isConfirmed: query.isFetchedAfterMount && !query.isError && !isDifferentClerkUser && !isLoggedOut,
         data: (isDifferentClerkUser || isLoggedOut) ? undefined : query.data,
     };
 }

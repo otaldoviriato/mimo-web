@@ -45,7 +45,7 @@ const isPublicRoute = (path: string) => {
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const { isLoaded, isSignedIn, getToken } = useAuth();
     const { user } = useUser();
-    const { data: userData, isLoading: isProfileLoading, refetch: refetchProfile } = useMyProfile();
+    const { data: userData, isLoading: isProfileLoading, isConfirmed: isProfileConfirmed, isError: isProfileError, refetch: refetchProfile } = useMyProfile();
     
     // Garante que o perfil carregado no cache/Query pertence ao usuário atualmente logado no Clerk
     const isProfileValid = !!(userData && user && userData.clerkId === user.id);
@@ -54,7 +54,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
     const needsReceiptConsent = isProfileValid && requiresReceiptConsent(userData);
     const isFullyCompleted = onboardingStep === 'completed' && !needsReceiptConsent;
-    const isProfileResolved = isLoaded && isSignedIn && !isProfileLoading && isProfileValid;
+    // Persisted profiles may predate registration completion. Never redirect from that snapshot.
+    const isProfileResolved = isLoaded && isSignedIn && !isProfileLoading && isProfileValid && isProfileConfirmed;
     const shouldBlockAppRender = isLoaded && isSignedIn && (!isProfileResolved || !isFullyCompleted);
 
     const router = useRouter();
@@ -456,6 +457,10 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
     // Em rotas públicas, não bloquear renderização por falta de login
     if (!isSignedIn && !isPublicRoute(pathname)) return null;
+    if (isProfileError && !isFullyCompleted && !isPublicRoute(pathname)) return <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-slate-50 px-6 text-center">
+        <p role="alert" className="text-sm text-slate-700">Não foi possível atualizar seu perfil. Tente novamente.</p>
+        <button type="button" onClick={() => void refetchProfile()} className="rounded-xl bg-purple-600 px-5 py-3 text-sm font-semibold text-white">Tentar novamente</button>
+    </div>;
     if (needsReceiptConsent) return <ReceiptConsentModal onAccepted={refetchProfile} />;
 
     // Permite que /onboarding renderize seus próprios filhos — ele gerencia todo o fluxo de cadastro.

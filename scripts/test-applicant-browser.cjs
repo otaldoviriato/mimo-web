@@ -124,9 +124,11 @@ const fs = require('node:fs');
         await page.setViewportSize({ width: 360, height: 1000 });
         await page.locator('main').evaluate(element => element.scrollTop = 0);
         complete = true;
+        await page.evaluate(() => localStorage.setItem('mimo_profile', JSON.stringify({ clerkId: 'fixture', applicantEnrollment: true, onboardingStep: 'profile' })));
         await page.route('**/chats', route => route.fulfill({ contentType: 'text/html', body: '<h1>Conversas</h1>' }));
         await page.getByRole('button', { name: 'Concluir cadastro', exact: true }).click();
         await page.waitForURL('**/chats');
+        assert.equal(await page.evaluate(() => localStorage.getItem('mimo_profile')), null);
         // Reproduce an abandoned /participar visit before returning to normal login.
         await page.evaluate(() => localStorage.setItem('mimo_redirect_after_login', '/participar/cadastro'));
         await page.goto('http://127.0.0.1:3012/login');
