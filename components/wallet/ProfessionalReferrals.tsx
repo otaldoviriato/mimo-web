@@ -20,9 +20,9 @@ export function ProfessionalReferrals({ data }: { data: ProfessionalReferralsDat
     return <div className="space-y-4">
         <section className="rounded-2xl border border-purple-200 bg-gradient-to-br from-purple-50 to-white p-5">
             <Gift className="mb-3 h-8 w-8 text-purple-600" />
-            <h2 className="text-xl font-bold text-slate-900">Indique profissionais.<br />Ganhe {money(data.bonusCents)} por indicação.</h2>
-            <p className="mt-3 text-sm leading-relaxed text-slate-600">Você ganha quando a profissional indicada acumula {money(data.thresholdCents)} líquidos em saques concluídos. Pode ser em vários saques: R$ 10 + R$ 20 + R$ 20 também vale.</p>
-            <p className="mt-2 text-xs leading-relaxed text-slate-500">Um bônus por profissional indicada, creditado automaticamente no seu saldo disponível. Saques pendentes, cancelados ou recusados não contam.</p>
+            <h2 className="text-xl font-bold text-slate-900">Indique outras pessoas.<br />Ganhe {money(data.bonusCents)} por indicação.</h2>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600">Você ganha quando a pessoa indicada acumula {money(data.thresholdCents)} líquidos em saques concluídos. Pode ser em vários saques: R$ 10 + R$ 20 + R$ 20 também vale.</p>
+            <p className="mt-2 text-xs leading-relaxed text-slate-500">Um bônus por pessoa indicada, creditado automaticamente no seu saldo disponível. Saques pendentes, cancelados ou recusados não contam.</p>
             {data.sharePath ? <>
                 <label className="mt-5 block text-xs font-semibold text-slate-600" htmlFor="professional-referral-link">Seu link de indicação</label>
                 <input id="professional-referral-link" readOnly value={typeof window === 'undefined' ? data.sharePath : new URL(data.sharePath, window.location.origin).href} onFocus={event => event.target.select()} className="mt-2 w-full min-w-0 rounded-xl border border-purple-200 bg-white p-3 text-xs text-slate-700" />
