@@ -201,7 +201,7 @@ export default function ApplicantRegistration() {
                                     </span>
                                     <input
                                         id="applicant-username"
-                                        aria-describedby="username-help"
+                                        aria-describedby={availability ? 'username-help' : undefined}
                                         className={`${fieldClass} pl-8`}
                                         placeholder="seu_usuario"
                                         autoCapitalize="none"
@@ -219,13 +219,13 @@ export default function ApplicantRegistration() {
                                         }}
                                     />
                                 </div>
-                                <p
+                                {availability && <p
                                     id="username-help"
                                     aria-live="polite"
                                     className={`mt-1 text-[11px] leading-snug ${availability === 'Nome de usuário disponível' ? 'text-emerald-700 font-medium' : 'text-slate-600'}`}
                                 >
-                                    {availability || 'Use letras, números, ponto, hífen ou underline.'}
-                                </p>
+                                    {availability}
+                                </p>}
                                 <div aria-live="polite" aria-busy={suggestionsLoading}>
                                     {suggestionsLoading && <p className="mt-1 text-[11px] text-slate-500">Buscando nomes disponíveis...</p>}
                                     {suggestionsError && <p className="mt-1 text-[11px] text-slate-600">{suggestionsError}</p>}
@@ -248,7 +248,6 @@ export default function ApplicantRegistration() {
                                 </label>
                                 <input
                                     id="applicant-birth"
-                                    aria-describedby="birth-help"
                                     className={fieldClass}
                                     type="text"
                                     inputMode="numeric"
@@ -260,9 +259,6 @@ export default function ApplicantRegistration() {
                                     disabled={busy}
                                     onChange={event => setDraft(current => ({ ...current, birthDate: maskDate(event.target.value) }))}
                                 />
-                                <p id="birth-help" className="mt-1 text-[11px] leading-snug text-slate-600">
-                                    18 anos ou mais. Sua data não é pública.
-                                </p>
                             </div>
                         </div>
 
