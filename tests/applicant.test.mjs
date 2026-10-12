@@ -88,6 +88,15 @@ test('authenticated enrollment binds referral once and repeating enrollment crea
     assert.equal(f.inserts(), 1);
     assert.equal(f.user().name, 'Draft');
 });
+
+test('professional registration ignores legacy anonymous names but preserves chosen names', async () => {
+    const f = fixture();
+    await f.handlers.POST(f.request());
+    f.user().name = 'Anônimo[646]';
+    assert.equal((await (await f.handlers.POST(f.request())).json()).profile.name, '');
+    f.user().name = 'Julia';
+    assert.equal((await (await f.handlers.POST(f.request())).json()).profile.name, 'Julia');
+});
 test('old client accounts and unsigned requests cannot gain a professional role', async () => {
     const f = fixture(); f.ageAccount();
     assert.equal((await f.handlers.POST(f.request())).status, 409);

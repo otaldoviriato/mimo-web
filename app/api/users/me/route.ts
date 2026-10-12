@@ -181,11 +181,11 @@ export async function GET(request: NextRequest) {
             }
 
             // Se o usuário ainda não tiver nome (ou estiver vazio), atribui um nome anônimo padrão
-            if (!user.name || !user.name.trim()) {
+            if (!user.isProfessional && !user.applicantEnrollment && (!user.name || !user.name.trim())) {
                 const anonymousName = await generateUniqueAnonymousName();
                 user.name = anonymousName;
                 try {
-                    await User.updateOne({ _id: user._id }, { $set: { name: anonymousName } });
+                    await User.updateOne({ _id: user._id, isProfessional: { $ne: true }, applicantEnrollment: { $ne: true }, $or: [{ name: '' }, { name: null }] }, { $set: { name: anonymousName } });
                 } catch (anonErr) {
                     console.warn('[GET /api/users/me] Falha ao atribuir nome anônimo para usuário sem nome:', anonErr);
                 }

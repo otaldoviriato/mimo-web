@@ -3,7 +3,6 @@ import { useAuth } from '@clerk/nextjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, UserRound, ArrowRight, LoaderCircle } from 'lucide-react';
 import { ImageCropper } from '@/components/ImageCropper';
-import { DiscoverProfileBackground } from '@/components/landing/NetflixStyleLanding';
 import { validateApplicantBirthDate } from '@/lib/applicant';
 import { POST_AUTH_REDIRECT_STORAGE_KEY } from '@/lib/postAuthRedirect';
 
@@ -42,7 +41,7 @@ export default function ApplicantRegistration() {
             if (!response.ok) throw new Error(data.error || 'Não foi possível carregar seu cadastro.');
             if (data.redirectTo || data.profile.completed) { enterApp(); return; }
             const profile = { ...empty, ...data.profile };
-            setDraft({ ...profile, username: profile.username.startsWith('candidata_') ? '' : profile.username, birthDate: displayDate(profile.birthDate) });
+            setDraft({ ...profile, name: /^an[oô]nimo\[\d+\]$/i.test(profile.name.trim()) ? '' : profile.name, username: profile.username.startsWith('candidata_') ? '' : profile.username, birthDate: displayDate(profile.birthDate) });
             setReady(true);
         })().catch(err => setError(err.message));
     }, [isLoaded, isSignedIn, getToken, enterApp]);
@@ -105,28 +104,24 @@ export default function ApplicantRegistration() {
             else throw new Error('Não foi possível concluir seu cadastro. Tente novamente.');
         } catch (err) { setError((err as Error).message); } finally { setBusy(false); }
     }
-    const fieldClass = "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-base text-slate-900 transition-colors placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-60";
-    return <main className="relative min-h-dvh overflow-hidden bg-radial from-[#eee0ff] via-[#faf8fd] to-white px-4 py-8 sm:py-12 selection:bg-purple-600 selection:text-white">
-        <DiscoverProfileBackground />
+    const fieldClass = "w-full h-10 rounded-xl border border-purple-100 bg-white px-3 text-base text-slate-900 transition-colors placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-60";
+    return <main className="relative min-h-dvh flex items-center bg-gradient-to-b from-purple-100 via-[#faf7ff] to-white px-4 py-3 selection:bg-purple-600 selection:text-white">
         <div className="relative z-10 mx-auto w-full min-w-0 max-w-sm">
             {/* Header com identidade oficial MimoChat */}
-            <header className="mb-6 text-center">
-                <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-purple-600 to-purple-700 shadow-lg shadow-purple-600/20 sm:h-20 sm:w-20">
-                    <img
-                        src="/Logo.svg"
-                        alt="MimoChat"
-                        className="h-10 w-10 object-contain sm:h-12 sm:w-12"
-                    />
+            <header className="mb-3 text-center">
+                <div className="mb-2 flex items-center justify-center gap-2 text-sm font-bold text-purple-700">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-600"><img src="/Logo.svg" alt="" className="h-5 w-5" /></span>
+                    Mimo
                 </div>
-                <h1 className="text-3xl font-bold tracking-tight text-gray-900">Seu perfil no Mimo</h1>
-                <p className="mt-2 text-sm font-medium text-slate-600">Só mais alguns detalhes para começar.</p>
+                <h1 className="text-xl font-bold tracking-tight text-gray-900">Seu perfil no Mimo</h1>
+                <p className="mt-1 text-xs text-slate-500">Só mais alguns detalhes para começar.</p>
             </header>
 
             {ready ? (
-                <div className="rounded-2xl border border-purple-100/80 bg-white/95 p-5 shadow-xl shadow-purple-950/5 backdrop-blur-md sm:p-6">
-                    <form className="space-y-5" onSubmit={event => { event.preventDefault(); void save(); }}>
+                <div className="rounded-3xl border border-purple-100 bg-white p-4 shadow-xl shadow-purple-950/5">
+                    <form className="space-y-3" onSubmit={event => { event.preventDefault(); void save(); }}>
                         {/* Seção Foto de Perfil */}
-                        <section className="flex items-center gap-4 border-b border-purple-100/70 pb-4">
+                        <section className="flex flex-col items-center text-center">
                             <button
                                 type="button"
                                 disabled={busy}
@@ -143,14 +138,12 @@ export default function ApplicantRegistration() {
                                     <Camera size={12} aria-hidden="true" />
                                 </span>
                             </button>
-                            <div className="min-w-0 flex-1">
-                                <h2 className="text-sm font-semibold text-slate-900">Foto de perfil</h2>
-                                <p className="mt-1 text-xs leading-relaxed text-slate-500">Escolha uma foto nítida do seu rosto.</p>
+                            <div className="min-w-0">
                                 <button
                                     type="button"
                                     disabled={busy}
                                     onClick={() => photoInput.current?.click()}
-                                    className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-purple-600 transition hover:text-purple-700"
+                                    className="mt-1 inline-flex min-h-7 items-center text-xs font-semibold text-purple-600 transition hover:text-purple-700"
                                 >
                                     {draft.photoUrl ? 'Trocar foto' : 'Adicionar foto'}
                                 </button>
@@ -178,9 +171,9 @@ export default function ApplicantRegistration() {
                         </section>
 
                         {/* Campos do formulário */}
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             <div>
-                                <label htmlFor="applicant-name" className="mb-2 block text-sm font-medium text-slate-800">
+                                <label htmlFor="applicant-name" className="mb-1 block text-xs font-medium text-slate-800">
                                     Nome no perfil
                                 </label>
                                 <input
@@ -200,17 +193,17 @@ export default function ApplicantRegistration() {
                             </div>
 
                             <div>
-                                <label htmlFor="applicant-username" className="mb-2 block text-sm font-medium text-slate-800">
+                                <label htmlFor="applicant-username" className="mb-1 block text-xs font-medium text-slate-800">
                                     Nome de usuário
                                 </label>
                                 <div className="relative">
-                                    <span aria-hidden="true" className="pointer-events-none absolute left-4 top-3.5 text-base font-medium text-slate-400">
+                                    <span aria-hidden="true" className="pointer-events-none absolute left-3 top-2 text-base font-medium text-slate-400">
                                         @
                                     </span>
                                     <input
                                         id="applicant-username"
                                         aria-describedby="username-help"
-                                        className={`${fieldClass} pl-10`}
+                                        className={`${fieldClass} pl-8`}
                                         placeholder="seu_usuario"
                                         autoCapitalize="none"
                                         autoComplete="off"
@@ -230,20 +223,19 @@ export default function ApplicantRegistration() {
                                 <p
                                     id="username-help"
                                     aria-live="polite"
-                                    className={`mt-2 text-xs leading-relaxed ${availability === 'Nome de usuário disponível' ? 'text-emerald-700 font-medium' : 'text-slate-600'}`}
+                                    className={`mt-1 text-[11px] leading-snug ${availability === 'Nome de usuário disponível' ? 'text-emerald-700 font-medium' : 'text-slate-600'}`}
                                 >
                                     {availability || 'Use letras, números, ponto, hífen ou underline.'}
                                 </p>
                                 <div aria-live="polite" aria-busy={suggestionsLoading}>
-                                    {suggestionsLoading && <p className="mt-2 text-xs text-slate-500">Buscando nomes disponíveis...</p>}
-                                    {suggestionsError && <p className="mt-2 text-xs text-slate-600">{suggestionsError}</p>}
-                                    {suggestions.length > 0 && <div className="mt-3">
-                                        <p className="mb-2 text-xs text-slate-600">Toque em uma sugestão disponível</p>
-                                        <div className="flex flex-wrap gap-2">
+                                    {suggestionsLoading && <p className="mt-1 text-[11px] text-slate-500">Buscando nomes disponíveis...</p>}
+                                    {suggestionsError && <p className="mt-1 text-[11px] text-slate-600">{suggestionsError}</p>}
+                                    {suggestions.length > 0 && <div className="mt-1.5">
+                                        <div className="grid grid-cols-3 gap-1.5">
                                             {suggestions.map(username => <button key={username} type="button" disabled={busy}
-                                                aria-pressed={draft.username === username}
+                                                title={`@${username}`} aria-label={`@${username}`} aria-pressed={draft.username === username}
                                                 onClick={() => { setDraft(current => ({ ...current, username })); setAvailability(''); }}
-                                                className="min-h-11 max-w-full break-all rounded-xl border border-purple-100 bg-purple-50 px-2.5 py-2 text-left text-xs font-semibold text-purple-700 transition hover:bg-purple-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600 aria-pressed:border-purple-600 aria-pressed:bg-purple-100 disabled:opacity-60">
+                                                className="min-h-7 min-w-0 truncate rounded-lg border border-purple-100 bg-purple-50 px-1.5 py-1 text-center text-[11px] font-semibold text-purple-700 transition hover:bg-purple-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600 aria-pressed:border-purple-600 aria-pressed:bg-purple-100 disabled:opacity-60">
                                                 @{username}
                                             </button>)}
                                         </div>
@@ -252,7 +244,7 @@ export default function ApplicantRegistration() {
                             </div>
 
                             <div>
-                                <label htmlFor="applicant-birth" className="mb-2 block text-sm font-medium text-slate-800">
+                                <label htmlFor="applicant-birth" className="mb-1 block text-xs font-medium text-slate-800">
                                     Data de nascimento
                                 </label>
                                 <input
@@ -269,8 +261,8 @@ export default function ApplicantRegistration() {
                                     disabled={busy}
                                     onChange={event => setDraft(current => ({ ...current, birthDate: maskDate(event.target.value) }))}
                                 />
-                                <p id="birth-help" className="mt-2 text-xs leading-relaxed text-slate-600">
-                                    Você precisa ter 18 anos ou mais. Essa data não aparece no perfil.
+                                <p id="birth-help" className="mt-1 text-[11px] leading-snug text-slate-600">
+                                    18 anos ou mais. Sua data não é pública.
                                 </p>
                             </div>
                         </div>
@@ -283,7 +275,7 @@ export default function ApplicantRegistration() {
 
                         <div className="space-y-1.5 pt-1">
                             <button
-                                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-purple-600 px-4 py-3.5 text-base font-semibold text-white shadow-sm shadow-purple-600/15 transition hover:bg-purple-700 active:bg-purple-800 disabled:opacity-60 cursor-pointer"
+                                className="flex w-full items-center justify-center gap-2 h-11 rounded-xl bg-purple-600 px-4 text-sm font-semibold text-white shadow-sm shadow-purple-600/15 transition hover:bg-purple-700 active:bg-purple-800 disabled:opacity-60 cursor-pointer"
                                 type="submit"
                                 disabled={busy}
                             >
@@ -304,10 +296,10 @@ export default function ApplicantRegistration() {
                 </div>
             )}
 
-            <footer className="mt-6 text-center">
+            <footer className="mt-2 text-center">
                 <button
                     type="button"
-                    className="min-h-11 px-4 text-sm text-slate-500 transition hover:text-slate-700 cursor-pointer"
+                    className="min-h-8 px-4 text-xs text-slate-500 transition hover:text-slate-700 cursor-pointer"
                     onClick={() => void signOut({ redirectUrl: '/participar' })}
                 >
                     Sair da conta

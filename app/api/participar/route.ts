@@ -7,7 +7,9 @@ import { validateApplicantBirthDate } from '@/lib/applicant';
 import { isReservedRoute } from '@/lib/routes';
 
 function profile(user: { name?: string; username: string; birthDate?: Date; photoUrl?: string; applicantCompletedAt?: Date }) {
-    return { name: user.name || '', username: user.username, birthDate: user.birthDate?.toISOString().slice(0, 10) || '', photoUrl: user.photoUrl || '', completed: !!user.applicantCompletedAt };
+    // Ignore legacy client placeholders while the professional chooses her public name.
+    const name = !user.applicantCompletedAt && /^an[oô]nimo\[\d+\]$/i.test(user.name?.trim() || '') ? '' : user.name || '';
+    return { name, username: user.username, birthDate: user.birthDate?.toISOString().slice(0, 10) || '', photoUrl: user.photoUrl || '', completed: !!user.applicantCompletedAt };
 }
 
 // Only this authenticated endpoint enrolls new accounts. Browser/Clerk metadata never grants a role.

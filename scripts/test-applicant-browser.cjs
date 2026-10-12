@@ -16,13 +16,16 @@ const fs = require('node:fs');
             if (url.pathname === '/api/users/me') return route.fulfill({ json: { isProfessional: false } });
             if (url.pathname === '/api/users/me/photo') return route.fulfill({ json: { photoUrl: avatar } });
             if (url.pathname === '/api/participar' && route.request().method() === 'PATCH') { savedBody = route.request().postDataJSON(); return route.fulfill({ json: { profile: { completed: complete } } }); }
-            if (url.pathname === '/api/participar') return route.fulfill({ json: { profile: { name: '', username: 'candidata_fixture', birthDate: '', photoUrl: '', completed: false } } });
+            if (url.pathname === '/api/participar') return route.fulfill({ json: { profile: { name: 'Anônimo[646]', username: 'candidata_fixture', birthDate: '', photoUrl: '', completed: false } } });
             if (url.pathname === '/api/users/username-suggestions') return route.fulfill({ json: { suggestions: ['anajulia', 'ana.julia', 'ana_julia'] } });
             if (url.pathname === '/api/users/check-username') return route.fulfill({ json: { available: true } });
             return route.fulfill({ status: 404, json: {} });
         });
         await page.route('**/Logo.svg', route => route.fulfill({ contentType: 'image/svg+xml', body: fs.readFileSync('public/Logo.svg') }));
         await page.goto('http://127.0.0.1:3012');
+        await page.getByLabel('Nome no perfil', { exact: true }).waitFor();
+        assert.equal(await page.getByLabel('Nome no perfil', { exact: true }).inputValue(), '');
+        assert.equal(await page.locator('button[aria-pressed]').count(), 0);
         await page.getByLabel('Nome no perfil', { exact: true }).fill('Ána Júlia');
         assert.equal(await page.getByLabel('Nome de usuário', { exact: true }).inputValue(), '');
         await page.getByRole('button', { name: '@ana.julia', exact: true }).click();
@@ -54,7 +57,18 @@ const fs = require('node:fs');
         await page.getByRole('button', { name: 'Trocar foto', exact: true }).waitFor();
         assert.equal(await page.locator('input[type=file]').isVisible(), false);
         await page.getByRole('button', { name: '@ana.julia', exact: true }).waitFor();
-        await page.setViewportSize({ width: 390, height: 1100 });
+        for (const [width, height] of [[320, 640], [360, 740], [390, 780], [768, 780]]) {
+            await page.setViewportSize({ width, height });
+            const layout = await page.evaluate(() => {
+                const main = document.querySelector('main');
+                const avatar = document.querySelector('button[aria-label="Trocar foto de perfil"]');
+                const rect = avatar.getBoundingClientRect();
+                return { height: main.getBoundingClientRect().height, viewport: innerHeight, centered: Math.abs((rect.left + rect.right) / 2 - innerWidth / 2) < 2 };
+            });
+            assert.ok(layout.height <= layout.viewport + 1, `form must fit ${width}x${height}: ${JSON.stringify(layout)}`);
+            assert.equal(layout.centered, true);
+        }
+        await page.setViewportSize({ width: 390, height: 780 });
         await page.evaluate(() => window.scrollTo(0, 0));
         await page.screenshot({ path: 'scratch/applicant/form-mobile.png', fullPage: true });
         await page.getByRole('button', { name: 'Concluir cadastro', exact: true }).click();
