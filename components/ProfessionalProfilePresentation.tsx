@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { ChevronLeft, ChevronRight, Eye, EyeOff, Images, Lock, Pause, Play, ShieldCheck, Pencil } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
+import { PrivateGalleryEditor } from '@/components/PrivateGalleryEditor';
 
 export interface ProfileGalleryItem {
     _id: string;
@@ -239,34 +240,24 @@ export function ProfessionalProfilePresentation({ user, publicItems, exclusiveIt
                     )}
                 </section>
 
-                {(user.isSubscriptionEnabled || isSubscriber || isOwner) && (
+                {isOwner ? (
+                    <PrivateGalleryEditor />
+                ) : (user.isSubscriptionEnabled || isSubscriber) ? (
                     <section aria-label="Assinatura" className="rounded-2xl border border-purple-100 bg-purple-50/40 p-5">
                         <div className="flex items-center justify-between">
-                            <p className="text-xs font-semibold text-purple-600">{isSubscriber ? 'Você é assinante' : isOwner ? 'Sua assinatura' : 'Assinatura'}</p>
-                            {isOwner && (
-                                <button
-                                    type="button"
-                                    onClick={() => onEditSubscription ? onEditSubscription() : router.push('/settings#subscription')}
-                                    aria-label="Editar assinatura"
-                                    title="Editar assinatura"
-                                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/90 hover:bg-white text-purple-700 hover:text-purple-900 border border-purple-200/80 shadow-2xs text-xs font-semibold transition-all active:scale-95 cursor-pointer"
-                                >
-                                    <Pencil size={12} className="text-purple-600" />
-                                    <span>Editar</span>
-                                </button>
-                            )}
+                            <p className="text-xs font-semibold text-purple-600">{isSubscriber ? 'Você é assinante' : 'Assinatura'}</p>
                         </div>
                         <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-900">Prioridade nas respostas</h2>
                         {discountPercentage > 0 && <p className="mt-2 text-sm font-medium leading-6 text-purple-700">{discountPercentage}% de desconto no custo das mensagens.</p>}
                         {hasExclusive && <p className="mt-2 text-sm leading-6 text-slate-600">Inclui acesso às fotos exclusivas para assinantes.</p>}
                         {typeof user.subscriptionPrice === 'number' && <p className="mt-4 text-2xl font-bold tracking-tight text-slate-900">{user.subscriptionPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}<span className="text-sm font-normal tracking-normal text-slate-500"> / 30 dias</span></p>}
-                        {!isSubscriber && !isOwner && user.isSubscriptionEnabled && <Button title="Assinar perfil" variant="outline" onClick={onSubscribe} loading={subscribing || loadingGallery} className="mt-4 w-full" />}
+                        {!isSubscriber && user.isSubscriptionEnabled && <Button title="Assinar perfil" variant="outline" onClick={onSubscribe} loading={subscribing || loadingGallery} className="mt-4 w-full" />}
                         {isSubscriber && <p className="mt-3 text-sm font-medium text-purple-700">Assinatura ativa</p>}
                         <p className="mt-4 text-xs leading-5 text-slate-500">A assinatura não inclui o custo das mensagens, cobrado separadamente.</p>
                     </section>
-                )}
+                ) : null}
 
-                {hasExclusive && (
+                {!isOwner && hasExclusive && (
                     <section aria-label="Conteúdo para assinantes" className="border-t border-slate-100 pt-6">
                         <div className="mb-4 flex items-center gap-2"><Lock size={16} className="shrink-0 text-purple-600" /><h2 className="text-lg font-semibold text-slate-900">Conteúdos para assinantes</h2></div>
                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
