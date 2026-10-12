@@ -60,9 +60,21 @@ export function BirthDatePicker({ value, onChange, disabled, className }: { valu
     const days = new Date(date.year, date.month + 1, 0).getDate();
     const day = Math.min(date.day, days);
     const iso = `${date.year}-${String(date.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const error = validateApplicantBirthDate(iso);
+    const [error, setError] = useState<string | null>(null);
+    function updateDate(next: (previous: typeof date) => typeof date) {
+        setError(null);
+        setDate(next);
+    }
+    function confirmDate() {
+        const validationError = validateApplicantBirthDate(iso);
+        setError(validationError);
+        if (validationError) return;
+        onChange(iso.split('-').reverse().join('/'));
+        setOpen(false);
+    }
     function changeOpen(next: boolean) {
         if (next) {
+            setError(null);
             const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
             const part = (type: string) => Number(parts.find(item => item.type === type)?.value);
             const [d, m, y] = value.split('/').map(Number);
@@ -83,12 +95,12 @@ export function BirthDatePicker({ value, onChange, disabled, className }: { valu
                 <Drawer.Title className="text-center text-lg font-semibold text-slate-900">Data de nascimento</Drawer.Title>
                 <Drawer.Description className="mt-1 text-center text-sm text-slate-500">Deslize para escolher dia, mês e ano.</Drawer.Description>
                 <div className="mt-5 grid grid-cols-[1fr_2fr_1fr] gap-2">
-                    <Wheel label="Dia" options={Array.from({ length: days }, (_, i) => String(i + 1))} value={day - 1} onChange={index => setDate(prev => ({ ...prev, day: index + 1 }))} />
-                    <Wheel label="Mês" options={MONTHS} value={date.month} onChange={month => setDate(prev => ({ ...prev, month, day: Math.min(prev.day, new Date(prev.year, month + 1, 0).getDate()) }))} />
-                    <Wheel label="Ano" options={years} value={currentYear - date.year} onChange={index => setDate(prev => ({ ...prev, year: currentYear - index, day: Math.min(prev.day, new Date(currentYear - index, prev.month + 1, 0).getDate()) }))} />
+                    <Wheel label="Dia" options={Array.from({ length: days }, (_, i) => String(i + 1))} value={day - 1} onChange={index => updateDate(prev => ({ ...prev, day: index + 1 }))} />
+                    <Wheel label="Mês" options={MONTHS} value={date.month} onChange={month => updateDate(prev => ({ ...prev, month, day: Math.min(prev.day, new Date(prev.year, month + 1, 0).getDate()) }))} />
+                    <Wheel label="Ano" options={years} value={currentYear - date.year} onChange={index => updateDate(prev => ({ ...prev, year: currentYear - index, day: Math.min(prev.day, new Date(currentYear - index, prev.month + 1, 0).getDate()) }))} />
                 </div>
                 {error && <p role="alert" className="mt-2 text-center text-xs text-rose-600">{error}</p>}
-                <button type="button" disabled={!!error} onClick={() => { onChange(iso.split('-').reverse().join('/')); setOpen(false); }} className="mt-4 h-11 w-full rounded-xl bg-purple-600 text-sm font-semibold text-white disabled:opacity-40">Confirmar data</button>
+                <button type="button" onClick={confirmDate} className="mt-4 h-11 w-full rounded-xl bg-purple-600 text-sm font-semibold text-white disabled:opacity-40">Confirmar data</button>
                 <Drawer.Close className="mt-2 h-9 w-full text-sm text-slate-500">Cancelar</Drawer.Close>
             </Drawer.Content>
         </Drawer.Portal>
