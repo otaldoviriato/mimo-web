@@ -4,6 +4,8 @@ import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
 import { AppSettings } from '@/models/AppSettings';
 import { Subscription } from '@/models/Subscription';
+import { ProfilePromotion } from '@/models/ProfilePromotion';
+import { checkAndExpirePromotions } from '@/lib/profilePromotion';
 
 // GET /api/users/[id] - Get user by Clerk ID
 export async function GET(
@@ -72,14 +74,24 @@ export async function GET(
         const audioPriceMultiplier = settings?.audioEquivalentCharsPerSecond ?? 5;
         let effectiveSubscribers = user.subscribers || [];
 
+        let isAvailable = false;
         if (user.isProfessional) {
-            const activeSubscriptions = await Subscription.find({
-                professionalId: user.clerkId,
-                status: { $in: ['ACTIVE', 'CANCELED'] },
-                expiresAt: { $gt: new Date() },
-            }).select('subscriberId').lean();
+            await checkAndExpirePromotions(user.clerkId);
+            const [activeSubscriptions, activePromo] = await Promise.all([
+                Subscription.find({
+                    professionalId: user.clerkId,
+                    status: { $in: ['ACTIVE', 'CANCELED'] },
+                    expiresAt: { $gt: new Date() },
+                }).select('subscriberId').lean(),
+                ProfilePromotion.findOne({
+                    professionalId: user.clerkId,
+                    status: 'active',
+                    expiresAt: { $gt: new Date() },
+                }).select('_id').lean(),
+            ]);
 
             effectiveSubscribers = activeSubscriptions.map((sub) => sub.subscriberId);
+            isAvailable = Boolean(activePromo);
         }
 
         return NextResponse.json({
@@ -106,6 +118,7 @@ export async function GET(
                 isOnline: user.isOnline ?? false,
                 lastSeen: user.lastSeen ?? null,
                 freeIntroEnabled: user.freeIntroEnabled === true,
+                isAvailable,
             },
         });
     } catch (error: any) {

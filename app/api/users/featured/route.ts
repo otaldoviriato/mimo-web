@@ -4,7 +4,7 @@ import { connectToDatabase } from '@/lib/db';
 import { rankExploreUsers } from '@/lib/exploreRanking';
 import { getProfessionalsEarningsMap } from '@/lib/professionalEarnings';
 import { checkAndExpirePromotions } from '@/lib/profilePromotion';
-import { AppSettings, GalleryItem, Room, User } from '@/models';
+import { AppSettings, GalleryItem, ProfilePromotion, Room, User } from '@/models';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -43,12 +43,21 @@ export async function GET(request: NextRequest) {
         ]);
 
         const professionalIds = professionals.map(user => user.clerkId);
-        const galleryItems = await GalleryItem.find({
-            ownerId: { $in: professionalIds },
-            galleryType: 'public',
-            visibility: 'public',
-            mediaType: 'photo',
-        }).sort({ createdAt: -1 }).lean();
+        const [galleryItems, activePromotions] = await Promise.all([
+            GalleryItem.find({
+                ownerId: { $in: professionalIds },
+                galleryType: 'public',
+                visibility: 'public',
+                mediaType: 'photo',
+            }).sort({ createdAt: -1 }).lean(),
+            ProfilePromotion.find({
+                professionalId: { $in: professionalIds },
+                status: 'active',
+                expiresAt: { $gt: new Date() },
+            }).select('professionalId').lean(),
+        ]);
+
+        const activePromotedIds = new Set(activePromotions.map(p => p.professionalId));
 
         const photosByOwner = new Map<string, string[]>();
         for (const item of galleryItems) {
@@ -98,7 +107,7 @@ export async function GET(request: NextRequest) {
                 avgResponseTimeMinutes: user.avgResponseTimeMinutes ?? null,
                 freeIntroEnabled: user.freeIntroEnabled === true,
                 isOnline: user.isOnline === true,
-                isAvailable: user.isAvailable === true,
+                isAvailable: activePromotedIds.has(user.clerkId),
                 lastSeen: user.lastSeen ?? user.lastAccessAt ?? null,
                 lastAccessAt: user.lastAccessAt ?? null,
                 lastActiveTime,

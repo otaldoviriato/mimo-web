@@ -287,7 +287,7 @@ const UserSchema = new Schema<IUser>({
     },
     isAvailable: {
         type: Boolean,
-        default: true,
+        default: false,
     },
     lastSeen: {
         type: Date,

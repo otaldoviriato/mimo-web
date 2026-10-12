@@ -9,6 +9,8 @@ import { Room } from '@/models/Room';
 import { Message } from '@/models/Message';
 import { Subscription } from '@/models/Subscription';
 import { ProfessionalActivation } from '@/models/ProfessionalActivation';
+import { ProfilePromotion } from '@/models/ProfilePromotion';
+import { checkAndExpirePromotions } from '@/lib/profilePromotion';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -55,6 +57,17 @@ export async function GET(
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        }
+
+        let isAvailable = false;
+        if (user.isProfessional) {
+            await checkAndExpirePromotions(user.clerkId);
+            const activePromo = await ProfilePromotion.findOne({
+                professionalId: user.clerkId,
+                status: 'active',
+                expiresAt: { $gt: new Date() },
+            }).select('_id').lean();
+            isAvailable = Boolean(activePromo);
         }
 
 
@@ -426,6 +439,7 @@ export async function GET(
                 mediaGiftsLastWeekCount: user.isProfessional ? mediaGiftsLastWeekCount : 0,
                 teamActivationContact,
                 freeIntroEnabled: user.freeIntroEnabled === true,
+                isAvailable,
             },
         });
     } catch (error: any) {

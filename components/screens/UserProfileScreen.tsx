@@ -559,14 +559,14 @@ export default function UserProfilePage({ params, username: propUsername, initia
                 <div className={`fixed bottom-0 left-0 right-0 z-30 border-t border-slate-100 bg-white/95 px-5 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-sm ${user.isProfessional ? 'lg:left-1/2 lg:px-10 lg:py-5 xl:px-16' : ''}`}>
                     <div className="mx-auto w-full max-w-2xl">
                         <Button
-                            title={isBlockedByOtherTeamMember ? 'Em atendimento' : startingTeamChat ? 'Abrindo...' : professionalUnavailableNewChat ? 'Indisponível para novos contatos' : 'Enviar mensagem'}
+                            title={isBlockedByOtherTeamMember ? 'Em atendimento' : startingTeamChat ? 'Abrindo...' : professionalUnavailableNewChat ? 'Não está recebendo novas conversas no momento' : 'Enviar mensagem'}
                             onClick={handleMessageClick}
                             disabled={startingTeamChat || isBlockedByOtherTeamMember || professionalUnavailableNewChat}
                             size="lg"
                             className="w-full"
                         />
                         {isBlockedByOtherTeamMember && <p className="mt-2 text-center text-xs text-slate-500">Em atendimento por {teamActivationContact?.assignedTeamMemberName || 'outro membro da equipe'}</p>}
-                        {professionalUnavailableNewChat && <p className="mt-2 text-center text-xs text-slate-500">Novas conversas só podem ser iniciadas quando o perfil estiver disponível.</p>}
+                        {professionalUnavailableNewChat && <p className="mt-2 text-center text-xs text-slate-500">Este perfil não está recebendo novas conversas no momento.</p>}
                     </div>
                 </div>
             )}
