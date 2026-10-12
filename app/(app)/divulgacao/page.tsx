@@ -163,17 +163,27 @@ export default function DivulgacaoPage() {
     const formattedTimer = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col">
-            <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm border-b border-slate-100 px-4 py-3 flex items-center justify-between">
-                <button
-                    onClick={() => router.back()}
-                    className="p-2 -ml-2 text-slate-700 hover:text-slate-900 rounded-full hover:bg-slate-100 transition-colors"
-                    aria-label="Voltar"
-                >
-                    <ChevronLeft className="w-6 h-6" />
-                </button>
-                <h1 className="text-base font-bold text-slate-900">Divulgação do perfil</h1>
-                <div className="w-10" />
+        <div className="min-h-screen bg-slate-50 flex flex-col antialiased">
+            {/* Header seguindo exatamente o padrão do aplicativo (conversas, carteira e perfil) */}
+            <header className="shared-header bg-gradient-to-r from-purple-600 to-purple-700 px-5 h-[72px] shrink-0 flex items-center justify-between z-30 sticky top-0 shadow-md">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => router.back()}
+                        className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 active:bg-white/30 flex items-center justify-center text-white transition-all cursor-pointer -ml-1"
+                        aria-label="Voltar"
+                    >
+                        <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <img
+                        src="/Logo.svg"
+                        alt="MimoChat"
+                        className="w-8 h-8 object-contain shrink-0"
+                    />
+                    <h1 className="text-2xl font-black text-white tracking-tighter">Mimo</h1>
+                    <span className="bg-white/20 border border-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">
+                        Divulgação
+                    </span>
+                </div>
             </header>
 
             <main className="flex-1 max-w-lg w-full mx-auto p-4 space-y-4 pb-12">
@@ -202,19 +212,59 @@ export default function DivulgacaoPage() {
                         Carregando informações da divulgação...
                     </div>
                 ) : data?.activePromotion ? (
-                    <div className="bg-white rounded-2xl p-5 border border-purple-200 shadow-xs space-y-4">
-                        <div className="flex items-center justify-between">
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                Divulgação ativa
-                            </span>
-                            <div className="flex items-center gap-1 text-slate-600 text-sm font-semibold">
+                    <div className="bg-white rounded-2xl p-5 border border-purple-200 shadow-xs space-y-5 relative overflow-hidden">
+                        {/* Efeito de ondas/radar em movimento no fundo quando a divulgação está ativada */}
+                        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-48 h-48 pointer-events-none">
+                            <span className="absolute inset-0 rounded-full bg-purple-400/10 animate-ping duration-1000" />
+                            <span className="absolute inset-4 rounded-full bg-purple-400/15 animate-pulse" />
+                        </div>
+
+                        {/* Switch de controle da divulgação */}
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-100 relative z-10">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <h3 className="text-sm font-bold text-slate-900">Status da divulgação</h3>
+                                    <span className="relative flex h-2.5 w-2.5">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                                    </span>
+                                </div>
+                                <p className="text-xs text-emerald-700 font-semibold mt-0.5">Ativada e transmitindo no Explorar</p>
+                            </div>
+
+                            {/* Switch Ativado (toggle para desativar) */}
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={true}
+                                aria-label="Desativar divulgação"
+                                disabled={submitting}
+                                onClick={handleCancelPromotion}
+                                className="relative inline-flex h-8 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-emerald-500 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50"
+                            >
+                                <span
+                                    className="pointer-events-none inline-block h-7 w-7 translate-x-6 rounded-full bg-white shadow-md transform ring-0 transition duration-200 ease-in-out"
+                                />
+                            </button>
+                        </div>
+
+                        {/* Indicador de Transmissão Ativa em Movimento */}
+                        <div className="flex items-center justify-between p-3.5 rounded-xl bg-purple-50/70 border border-purple-100">
+                            <div className="flex items-center gap-2.5">
+                                <div className="flex items-center gap-1">
+                                    <span className="w-1.5 h-3 bg-purple-600 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                                    <span className="w-1.5 h-4.5 bg-purple-600 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                                    <span className="w-1.5 h-3 bg-purple-600 rounded-full animate-bounce" />
+                                </div>
+                                <span className="text-xs font-semibold text-purple-900">Em destaque agora</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-purple-900 text-sm font-bold bg-white/80 px-2.5 py-1 rounded-lg border border-purple-100">
                                 <Clock className="w-4 h-4 text-purple-600" />
                                 <span>{formattedTimer}</span>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2 pt-1">
+                        <div className="grid grid-cols-3 gap-2">
                             <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 text-center">
                                 <Eye className="w-4 h-4 text-slate-500 mx-auto mb-1" />
                                 <div className="text-lg font-black text-slate-900">{data.activePromotion.metrics.profileViews}</div>
@@ -237,17 +287,41 @@ export default function DivulgacaoPage() {
                         <p className="text-[11px] text-slate-500 text-center">
                             Ganhos acumulados com os clientes conquistados nesta divulgação.
                         </p>
-
-                        <button
-                            onClick={handleCancelPromotion}
-                            disabled={submitting}
-                            className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors disabled:opacity-50"
-                        >
-                            {submitting ? 'Encerrando...' : 'Encerrar divulgação'}
-                        </button>
                     </div>
                 ) : (
                     <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-xs space-y-4">
+                        {/* Switch Desativado */}
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-900">Começar divulgação</h3>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                    {data?.canActivate
+                                        ? 'Ative o switch para colocar seu perfil no ar por 1 hora'
+                                        : 'A divulgação não está disponível no momento'}
+                                </p>
+                            </div>
+
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={false}
+                                aria-label="Ativar divulgação"
+                                disabled={!data?.canActivate || submitting || isPending}
+                                onClick={handleStartPromotion}
+                                className={`relative inline-flex h-8 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+                                    data?.canActivate && !submitting && !isPending
+                                        ? 'bg-slate-300 hover:bg-slate-400'
+                                        : 'bg-slate-200 cursor-not-allowed opacity-60'
+                                }`}
+                            >
+                                <span
+                                    className={`pointer-events-none inline-block h-7 w-7 translate-x-0 rounded-full bg-white shadow-md transform ring-0 transition duration-200 ease-in-out ${
+                                        submitting || isPending ? 'animate-pulse' : ''
+                                    }`}
+                                />
+                            </button>
+                        </div>
+
                         {!data?.isEligible ? (
                             <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs">
                                 <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
@@ -279,14 +353,6 @@ export default function DivulgacaoPage() {
                                 </div>
                             </div>
                         ) : null}
-
-                        <button
-                            onClick={handleStartPromotion}
-                            disabled={!data?.canActivate || submitting || isPending}
-                            className="w-full py-3.5 px-4 rounded-xl text-sm font-bold text-white bg-purple-600 hover:bg-purple-700 active:scale-[0.99] transition-all shadow-md shadow-purple-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {submitting || isPending ? 'Iniciando divulgação...' : 'Começar divulgação'}
-                        </button>
                     </div>
                 )}
 

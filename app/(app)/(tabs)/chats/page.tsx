@@ -995,13 +995,13 @@ export default function ChatsPage() {
                     type="button"
                     onClick={() => router.push('/divulgacao')}
                     aria-label="Divulgação do perfil"
-                    className={`fixed bottom-[calc(76px+env(safe-area-inset-bottom))] right-4 z-30 flex items-center justify-center w-14 h-14 rounded-full bg-purple-50/95 hover:bg-purple-100 text-purple-900 border border-purple-200/80 shadow-md hover:shadow-lg transition-all active:scale-95 ${
+                    className={`fixed bottom-[calc(76px+env(safe-area-inset-bottom))] right-4 z-30 flex items-center justify-center w-16 h-16 rounded-full bg-purple-50/95 hover:bg-purple-100 text-purple-900 border border-purple-200 shadow-lg hover:shadow-xl transition-all active:scale-95 ${
                         promotionData?.activePromotion
                             ? 'motion-safe:animate-pulse ring-4 ring-purple-300/40'
                             : ''
                     }`}
                 >
-                    <Megaphone className="w-6 h-6 text-purple-900 shrink-0" />
+                    <Megaphone className="w-7 h-7 text-purple-900 shrink-0" />
                 </button>
             )}
 
