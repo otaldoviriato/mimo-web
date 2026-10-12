@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
         
         try {
             processedBuffer = await sharp(buffer)
+                .rotate()
                 .resize(1200, null, { withoutEnlargement: true }) // Redimensionar largura máxima para 1200px, mantendo proporção
                 .webp({ quality: 80 })
                 .toBuffer();

@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
         
         try {
             processedBuffer = await sharp(buffer)
+                .rotate()
                 .resize(800, 800, { fit: 'cover', withoutEnlargement: true })
                 .webp({ quality: 80 })
                 .toBuffer();

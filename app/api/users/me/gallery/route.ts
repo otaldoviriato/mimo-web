@@ -111,6 +111,7 @@ export async function POST(request: NextRequest) {
 
             try {
                 processedBuffer = await sharp(buffer)
+                    .rotate()
                     .resize(1600, null, { withoutEnlargement: true }) // Redimensionar fotos muito gigantes (largura max 1600px)
                     .webp({ quality: 80 })
                     .toBuffer();
