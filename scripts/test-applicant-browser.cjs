@@ -61,12 +61,9 @@ const fs = require('node:fs');
             await page.setViewportSize({ width, height });
             const layout = await page.evaluate(() => {
                 const main = document.querySelector('main');
-                const avatar = document.querySelector('button[aria-label="Trocar foto de perfil"]');
-                const rect = avatar.getBoundingClientRect();
-                return { height: main.getBoundingClientRect().height, viewport: innerHeight, centered: Math.abs((rect.left + rect.right) / 2 - innerWidth / 2) < 2 };
+                return { height: main.getBoundingClientRect().height, viewport: innerHeight };
             });
             assert.ok(layout.height <= layout.viewport + 1, `form must fit ${width}x${height}: ${JSON.stringify(layout)}`);
-            assert.equal(layout.centered, true);
         }
         await page.setViewportSize({ width: 390, height: 780 });
         await page.evaluate(() => window.scrollTo(0, 0));

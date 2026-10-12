@@ -108,20 +108,18 @@ export default function ApplicantRegistration() {
     return <main className="relative min-h-dvh flex items-center bg-gradient-to-b from-purple-100 via-[#faf7ff] to-white px-4 py-3 selection:bg-purple-600 selection:text-white">
         <div className="relative z-10 mx-auto w-full min-w-0 max-w-sm">
             {/* Header com identidade oficial MimoChat */}
-            <header className="mb-3 text-center">
-                <div className="mb-2 flex items-center justify-center gap-2 text-sm font-bold text-purple-700">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-600"><img src="/Logo.svg" alt="" className="h-5 w-5" /></span>
+            <header aria-label="Mimo" className="mb-5">
+                <div className="flex items-center justify-center gap-3 text-2xl font-bold tracking-tight text-purple-700">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-purple-600 shadow-sm shadow-purple-600/20"><img src="/Logo.svg" alt="" className="h-7 w-7" /></span>
                     Mimo
                 </div>
-                <h1 className="text-xl font-bold tracking-tight text-gray-900">Seu perfil no Mimo</h1>
-                <p className="mt-1 text-xs text-slate-500">Só mais alguns detalhes para começar.</p>
             </header>
 
             {ready ? (
                 <div className="rounded-3xl border border-purple-100 bg-white p-4 shadow-xl shadow-purple-950/5">
                     <form className="space-y-3" onSubmit={event => { event.preventDefault(); void save(); }}>
                         {/* Seção Foto de Perfil */}
-                        <section className="flex flex-col items-center text-center">
+                        <section className="flex items-center gap-4 border-b border-purple-100/70 pb-4">
                             <button
                                 type="button"
                                 disabled={busy}
@@ -139,6 +137,7 @@ export default function ApplicantRegistration() {
                                 </span>
                             </button>
                             <div className="min-w-0">
+                                <h1 className="text-xl font-semibold tracking-tight text-slate-900">Crie seu perfil</h1>
                                 <button
                                     type="button"
                                     disabled={busy}
