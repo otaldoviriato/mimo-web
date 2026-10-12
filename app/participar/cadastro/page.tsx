@@ -83,54 +83,54 @@ export default function ApplicantRegistration() {
             else setNotice('Cadastro salvo. Você pode continuar mais tarde.');
         } catch (err) { setError((err as Error).message); } finally { setBusy(false); }
     }
-    const fieldClass = "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 transition-colors placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-60";
-    return <main className="relative min-h-screen bg-radial from-[#eee0ff] via-[#faf8fd] to-white px-4 py-10 sm:py-14 selection:bg-purple-600 selection:text-white">
-        <div className="relative z-10 mx-auto w-full max-w-md">
+    const fieldClass = "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 transition-colors placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-60";
+    return <main className="relative min-h-dvh flex flex-col justify-between overflow-y-auto sm:overflow-hidden bg-radial from-[#eee0ff] via-[#faf8fd] to-white px-4 py-3 sm:py-6 selection:bg-purple-600 selection:text-white">
+        <div className="relative z-10 mx-auto w-full max-w-sm flex-1 flex flex-col justify-between my-auto py-1">
             {/* Header com identidade oficial MimoChat */}
-            <header className="mb-8 text-center">
-                <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-600 to-purple-700 shadow-lg shadow-purple-600/20 mb-4">
+            <header className="text-center mb-2 sm:mb-3">
+                <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-purple-600 to-purple-700 shadow-md shadow-purple-600/20 mb-2">
                     <img
                         src="/Logo.svg"
                         alt="MimoChat"
-                        className="h-10 w-10 object-contain"
+                        className="h-7 w-7 object-contain"
                     />
                 </div>
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Crie seu perfil</h1>
-                <p className="mt-1.5 text-sm text-slate-500">Defina como você deseja aparecer no MimoChat.</p>
+                <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">Crie seu perfil</h1>
+                <p className="mt-0.5 text-xs text-slate-500">Defina como você deseja aparecer no MimoChat.</p>
             </header>
 
             {ready ? (
-                <div className="rounded-2xl border border-purple-100/80 bg-white/95 p-6 shadow-xl shadow-purple-950/5 backdrop-blur-md sm:p-7">
-                    <form className="space-y-6" onSubmit={event => { event.preventDefault(); void save(true); }}>
+                <div className="rounded-2xl border border-purple-100/80 bg-white/95 p-4 sm:p-5 shadow-lg shadow-purple-950/5 backdrop-blur-md">
+                    <form className="space-y-3.5" onSubmit={event => { event.preventDefault(); void save(true); }}>
                         {/* Seção Foto de Perfil */}
-                        <section className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 p-4 transition-colors hover:bg-slate-50">
+                        <section className="flex items-center gap-3.5 rounded-xl border border-slate-100 bg-slate-50/70 p-2.5 sm:p-3 transition-colors hover:bg-slate-50">
                             <button
                                 type="button"
                                 disabled={busy}
                                 onClick={() => photoInput.current?.click()}
                                 aria-label={draft.photoUrl ? 'Trocar foto de perfil' : 'Adicionar foto de perfil'}
-                                className="group relative h-20 w-20 shrink-0 overflow-hidden rounded-full bg-purple-50 text-purple-400 ring-2 ring-purple-200/80 transition focus-visible:outline-2 focus-visible:outline-purple-500 hover:ring-purple-400"
+                                className="group relative h-14 w-14 shrink-0 overflow-hidden rounded-full bg-purple-50 text-purple-400 ring-2 ring-purple-200/80 transition focus-visible:outline-2 focus-visible:outline-purple-500 hover:ring-purple-400"
                             >
                                 {draft.photoUrl ? (
                                     <img src={draft.photoUrl} alt="Sua foto de perfil" className="h-full w-full object-cover" />
                                 ) : (
-                                    <UserRound aria-hidden="true" className="mx-auto h-10 w-10 text-purple-300 transition group-hover:text-purple-400" strokeWidth={1.5} />
+                                    <UserRound aria-hidden="true" className="mx-auto h-7 w-7 text-purple-300 transition group-hover:text-purple-400" strokeWidth={1.5} />
                                 )}
-                                <span className="absolute bottom-0 inset-x-0 bg-black/40 py-1 text-[10px] font-medium text-white opacity-0 transition group-hover:opacity-100 flex items-center justify-center gap-1">
-                                    <Camera size={11} /> Alterar
+                                <span className="absolute bottom-0 inset-x-0 bg-black/40 py-0.5 text-[9px] font-medium text-white opacity-0 transition group-hover:opacity-100 flex items-center justify-center gap-0.5">
+                                    <Camera size={10} /> Alterar
                                 </span>
-                                <span className="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-purple-600 text-white shadow-sm">
-                                    <Camera size={12} />
+                                <span className="absolute bottom-0 right-0 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-purple-600 text-white shadow-sm">
+                                    <Camera size={10} />
                                 </span>
                             </button>
                             <div className="min-w-0 flex-1">
-                                <h2 className="text-sm font-semibold text-slate-900">Foto de perfil</h2>
-                                <p className="mt-0.5 text-xs text-slate-500 leading-relaxed">Uma foto nítida e bem iluminada do seu rosto.</p>
+                                <h2 className="text-xs font-semibold text-slate-900">Foto de perfil</h2>
+                                <p className="text-[11px] text-slate-500 leading-tight">Uma foto nítida e bem iluminada do seu rosto.</p>
                                 <button
                                     type="button"
                                     disabled={busy}
                                     onClick={() => photoInput.current?.click()}
-                                    className="mt-2 text-xs font-semibold text-purple-600 transition hover:text-purple-700"
+                                    className="mt-1 text-xs font-semibold text-purple-600 transition hover:text-purple-700"
                                 >
                                     {busy ? 'Enviando...' : draft.photoUrl ? 'Trocar foto' : 'Enviar foto'}
                                 </button>
@@ -158,9 +158,9 @@ export default function ApplicantRegistration() {
                         </section>
 
                         {/* Campos do formulário */}
-                        <div className="space-y-4">
+                        <div className="space-y-2.5">
                             <div>
-                                <label htmlFor="applicant-name" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                <label htmlFor="applicant-name" className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                                     Nome público
                                 </label>
                                 <input
@@ -177,17 +177,17 @@ export default function ApplicantRegistration() {
                             </div>
 
                             <div>
-                                <label htmlFor="applicant-username" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                <label htmlFor="applicant-username" className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                                     Nome de usuário
                                 </label>
                                 <div className="relative">
-                                    <span aria-hidden="true" className="pointer-events-none absolute left-3.5 top-3 text-sm font-medium text-slate-400">
+                                    <span aria-hidden="true" className="pointer-events-none absolute left-3 top-2.5 text-sm font-medium text-slate-400">
                                         @
                                     </span>
                                     <input
                                         id="applicant-username"
                                         aria-describedby="username-help"
-                                        className={`${fieldClass} pl-8`}
+                                        className={`${fieldClass} pl-7`}
                                         placeholder="seu_usuario"
                                         autoCapitalize="none"
                                         autoComplete="off"
@@ -207,14 +207,14 @@ export default function ApplicantRegistration() {
                                 <p
                                     id="username-help"
                                     aria-live="polite"
-                                    className={`mt-1.5 text-xs ${availability === 'Username disponível' ? 'text-emerald-600 font-medium' : 'text-slate-400'}`}
+                                    className={`mt-1 text-[11px] ${availability === 'Username disponível' ? 'text-emerald-600 font-medium' : 'text-slate-400'}`}
                                 >
                                     {availability || 'Use letras, números, ponto ou underline.'}
                                 </p>
                             </div>
 
                             <div>
-                                <label htmlFor="applicant-birth" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                <label htmlFor="applicant-birth" className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                                     Data de nascimento
                                 </label>
                                 <input
@@ -231,32 +231,32 @@ export default function ApplicantRegistration() {
                                     disabled={busy}
                                     onChange={event => setDraft(current => ({ ...current, birthDate: maskDate(event.target.value) }))}
                                 />
-                                <p id="birth-help" className="mt-1.5 text-xs text-slate-400">
+                                <p id="birth-help" className="mt-1 text-[11px] text-slate-400">
                                     Você precisa ter 18 anos ou mais. Esta informação não é pública.
                                 </p>
                             </div>
                         </div>
 
                         {error && (
-                            <div role="alert" className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-xs text-rose-700">
+                            <div role="alert" className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs text-rose-700">
                                 {error}
                             </div>
                         )}
                         {notice && (
-                            <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs text-emerald-700">
-                                <Check size={15} />
+                            <div role="status" className="flex items-center gap-1.5 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                                <Check size={14} />
                                 {notice}
                             </div>
                         )}
 
-                        <div className="space-y-3 pt-2">
+                        <div className="space-y-1.5 pt-1">
                             <button
-                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 py-3.5 text-sm font-semibold text-white shadow-md shadow-purple-600/25 transition hover:bg-purple-700 active:bg-purple-800 disabled:opacity-60 cursor-pointer"
+                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 sm:py-3 text-sm font-semibold text-white shadow-md shadow-purple-600/25 transition hover:bg-purple-700 active:bg-purple-800 disabled:opacity-60 cursor-pointer"
                                 type="submit"
                                 disabled={busy}
                             >
                                 {busy ? 'Salvando...' : 'Concluir cadastro'}
-                                {!busy && <ArrowRight size={16} />}
+                                {!busy && <ArrowRight size={15} />}
                             </button>
                             <button
                                 type="button"
@@ -268,14 +268,14 @@ export default function ApplicantRegistration() {
                             </button>
                         </div>
 
-                        <div className="flex items-center justify-center gap-2 border-t border-slate-100 pt-4 text-[11px] text-slate-400">
-                            <ShieldCheck size={14} className="text-purple-500" />
+                        <div className="flex items-center justify-center gap-1.5 border-t border-slate-100 pt-2.5 text-[10px] text-slate-400">
+                            <ShieldCheck size={13} className="text-purple-500" />
                             <span>Seu perfil é verificado de forma segura antes da ativação.</span>
                         </div>
                     </form>
                 </div>
             ) : (
-                <div className="rounded-2xl border border-purple-100/80 bg-white/95 p-12 text-center shadow-xl shadow-purple-950/5 backdrop-blur-md">
+                <div className="rounded-2xl border border-purple-100/80 bg-white/95 p-8 text-center shadow-lg shadow-purple-950/5 backdrop-blur-md">
                     <div className="mx-auto h-7 w-7 animate-spin rounded-full border-2 border-purple-600 border-t-transparent" />
                     <p role={error ? 'alert' : 'status'} className="mt-3 text-xs font-medium text-slate-400">
                         {error || 'Carregando suas informações...'}
@@ -283,7 +283,7 @@ export default function ApplicantRegistration() {
                 </div>
             )}
 
-            <footer className="mt-6 text-center">
+            <footer className="mt-2 text-center">
                 <button
                     type="button"
                     className="text-xs text-slate-400 transition hover:text-slate-600 cursor-pointer"
