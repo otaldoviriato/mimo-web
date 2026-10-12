@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
         }
 
         const receiver = await User.findOne({ clerkId: professionalId }) as any;
-        if (!receiver || !receiver.isProfessional) {
+        if (!receiver || (!receiver.isProfessional && !receiver.applicantEnrollment)) {
             return NextResponse.json({ error: 'Profissional não encontrada' }, { status: 404 });
         }
 

@@ -71,6 +71,7 @@ const MENU_SECTIONS: MenuSection[] = [
             { href: '/admin/clients', label: 'Clientes', icon: Users },
             { href: '/admin/professionals', label: 'Profissionais', icon: UserCheck },
             { href: '/admin/team', label: 'Equipe', icon: ShieldCheck },
+            { href: '/admin/settings/admins', label: 'Administradores', icon: ShieldCheck },
         ],
     },
     {
@@ -92,7 +93,6 @@ const MENU_SECTIONS: MenuSection[] = [
             { href: '/admin/settings/profiles', label: 'Perfis & Galeria', icon: Camera },
             { href: '/admin/settings/payments', label: 'Meios de Pagamento', icon: CreditCard },
             { href: '/admin/settings/app', label: 'App & Experiência', icon: Smartphone },
-            { href: '/admin/settings/admins', label: 'Administradores', icon: ShieldCheck },
         ],
     },
 ];

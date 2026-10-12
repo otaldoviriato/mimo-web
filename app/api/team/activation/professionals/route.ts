@@ -23,6 +23,10 @@ type ProfessionalRow = {
     email?: string;
     photoUrl?: string;
     createdAt: Date | string;
+    professionalStatus?: 'pending' | 'approved' | 'rejected' | null;
+    applicantCompletedAt?: Date | string | null;
+    applicantEnrollment?: boolean;
+    bio?: string;
 };
 
 type ActivationRow = {
@@ -42,8 +46,7 @@ type TeamMemberRow = {
 };
 
 type UserFilter = {
-    isProfessional: boolean;
-    $or?: Array<Record<string, { $regex: RegExp }>>;
+    $and: any[];
 };
 
 function hasTeamContact(activation?: ActivationRow) {
@@ -73,20 +76,33 @@ export async function GET(request: NextRequest) {
 
         const searchParams = request.nextUrl.searchParams;
         const query = searchParams.get('q') || '';
-        const filterStatus = searchParams.get('status') || 'all';
+        const filterStatus = searchParams.get('status') || 'pending_approval';
 
-        const userFilter: UserFilter = { isProfessional: true };
+        // Base: foca prioritariamente em profissionais em análise
+        // (isProfessional: true com professionalStatus != 'approved', ou pending/null)
+        const baseConditions: any[] = [
+            {
+                $or: [
+                    { isProfessional: true, professionalStatus: { $ne: 'approved' } },
+                    { applicantEnrollment: true, professionalStatus: { $ne: 'approved' } },
+                    { isProfessional: true, professionalStatus: 'pending' },
+                ]
+            }
+        ];
+
         if (query.trim().length > 0) {
             const cleanQuery = query.trim().replace('@', '');
-            userFilter.$or = [
-                { username: { $regex: new RegExp(cleanQuery, 'i') } },
-                { name: { $regex: new RegExp(cleanQuery, 'i') } },
-                { email: { $regex: new RegExp(cleanQuery, 'i') } },
-            ];
+            baseConditions.push({
+                $or: [
+                    { username: { $regex: new RegExp(cleanQuery, 'i') } },
+                    { name: { $regex: new RegExp(cleanQuery, 'i') } },
+                    { email: { $regex: new RegExp(cleanQuery, 'i') } },
+                ]
+            });
         }
 
-        const professionals = await User.find(userFilter)
-            .select('clerkId username name email photoUrl createdAt')
+        const professionals = await User.find({ $and: baseConditions })
+            .select('clerkId username name email photoUrl createdAt professionalStatus applicantCompletedAt applicantEnrollment bio')
             .sort({ createdAt: -1 })
             .lean() as ProfessionalRow[];
 
@@ -120,13 +136,19 @@ export async function GET(request: NextRequest) {
                 name: professional.name,
                 photoUrl: professional.photoUrl,
                 createdAt: professional.createdAt,
+                professionalStatus: professional.professionalStatus || 'pending',
+                applicantCompletedAt: professional.applicantCompletedAt,
+                applicantEnrollment: professional.applicantEnrollment,
+                bio: professional.bio,
                 activation,
                 isUnviewed,
             };
         });
 
         let filteredList = resultList;
-        if (filterStatus === 'unviewed') {
+        if (filterStatus === 'pending_approval' || filterStatus === 'all') {
+            filteredList = resultList;
+        } else if (filterStatus === 'unviewed') {
             filteredList = resultList.filter(item => item.isUnviewed);
         } else if (filterStatus === 'pending') {
             filteredList = resultList.filter(item => !hasTeamContact(item.activation));
