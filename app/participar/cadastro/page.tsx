@@ -2,6 +2,7 @@
 import { useAuth } from '@clerk/nextjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, UserRound, ArrowRight, LoaderCircle } from 'lucide-react';
+import { BirthDatePicker } from '@/components/BirthDatePicker';
 import { ImageCropper } from '@/components/ImageCropper';
 import { validateApplicantBirthDate } from '@/lib/applicant';
 import { POST_AUTH_REDIRECT_STORAGE_KEY } from '@/lib/postAuthRedirect';
@@ -91,7 +92,11 @@ export default function ApplicantRegistration() {
             setDraft(current => ({ ...current, photoUrl: data.photoUrl }));
         } catch (err) { setError((err as Error).message); } finally { setBusy(false); }
     }
+    const canSubmit = !!draft.photoUrl && !!draft.name.trim() && draft.name.trim().length <= 80
+        && /^[a-z0-9._-]{2,30}$/.test(draft.username) && availability === 'Nome de usuário disponível'
+        && !validateApplicantBirthDate(isoDate(draft.birthDate));
     async function save() {
+        if (busy || !canSubmit) return;
         const birthError = validateApplicantBirthDate(isoDate(draft.birthDate));
         if (birthError) { setError(birthError); return; }
         if (!draft.photoUrl) { setError('Envie sua foto de perfil.'); return; }
@@ -99,6 +104,7 @@ export default function ApplicantRegistration() {
         try {
             const response = await fetch('/api/participar', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: draft.name, username: draft.username, birthDate: isoDate(draft.birthDate), complete: true }) });
             const data = await response.json();
+            if (response.status === 409) setAvailability('Este nome já está em uso. Escolha outro.');
             if (!response.ok) throw new Error(data.error || 'Não foi possível salvar.');
             if (data.profile.completed) enterApp();
             else throw new Error('Não foi possível concluir seu cadastro. Tente novamente.');
@@ -246,19 +252,8 @@ export default function ApplicantRegistration() {
                                 <label htmlFor="applicant-birth" className="mb-1 block text-xs font-medium text-slate-800">
                                     Data de nascimento
                                 </label>
-                                <input
-                                    id="applicant-birth"
-                                    className={fieldClass}
-                                    type="text"
-                                    inputMode="numeric"
-                                    placeholder="DD/MM/AAAA"
-                                    maxLength={10}
-                                    autoComplete="bday"
-                                    value={draft.birthDate}
-                                    required
-                                    disabled={busy}
-                                    onChange={event => setDraft(current => ({ ...current, birthDate: maskDate(event.target.value) }))}
-                                />
+                                <BirthDatePicker value={draft.birthDate} disabled={busy} className={fieldClass}
+                                    onChange={birthDate => { setDraft(current => ({ ...current, birthDate })); setError(''); }} />
                             </div>
                         </div>
 
@@ -272,7 +267,7 @@ export default function ApplicantRegistration() {
                             <button
                                 className="flex w-full items-center justify-center gap-2 h-11 rounded-xl bg-purple-600 px-4 text-sm font-semibold text-white shadow-sm shadow-purple-600/15 transition hover:bg-purple-700 active:bg-purple-800 disabled:opacity-60 cursor-pointer"
                                 type="submit"
-                                disabled={busy}
+                                disabled={busy || !canSubmit}
                             >
                                 {busy && <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />}
                                 {busy ? 'Aguarde...' : 'Concluir cadastro'}
