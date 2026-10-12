@@ -39,7 +39,9 @@ import {
     ArrowDownLeft,
     ArrowUpRight,
     PlusCircle,
-    Minus
+    Minus,
+    Edit3,
+    ExternalLink
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -107,12 +109,14 @@ interface ChatMessage {
 
 interface ChatRoom {
     id: string;
+    roomIdStr?: string;
     userA: { name: string; email: string; clerkId: string };
     userB: { name: string; email: string; clerkId: string };
     messagesCount: number;
     lastMessage: string;
     time: string;
     totalRevenue: number;
+    violationCount?: number;
     history: ChatMessage[];
 }
 
@@ -160,7 +164,8 @@ export default function UserDetailPage() {
     const [saving, setSaving] = useState(false);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
-    // Estados do Formulário
+    // Estados do Formulário e Modo de Edição
+    const [isEditing, setIsEditing] = useState(false);
     const [user, setUser] = useState<UserDetail | null>(null);
     const [gallery, setGallery] = useState<GalleryItemType[]>([]);
     const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>([]);
@@ -222,6 +227,31 @@ export default function UserDetailPage() {
     const [photoUrl, setPhotoUrl] = useState('');
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Cancela edição e reseta inputs para os valores originais
+    const handleCancelEditing = () => {
+        if (user) {
+            setName(user.name || '');
+            setEmail(user.email || '');
+            setUsername(user.username || '');
+            setTaxId(user.taxId || '');
+            setPhone(user.phone || '');
+            setPixKey(user.pixKey || '');
+            setSubscriptionPrice(user.subscriptionPrice || 0);
+            setPhotoUrl(user.photoUrl || '');
+            setIsProfessional(user.isProfessional || false);
+            if (user.isAdmin) {
+                setRole('admin');
+            } else if (user.isTeam) {
+                setRole('team');
+            } else if (user.isProfessional) {
+                setRole('professional');
+            } else {
+                setRole('client');
+            }
+        }
+        setIsEditing(false);
+    };
 
     // Busca as salas de chat envolvidas e sessões
     const fetchRooms = async () => {
@@ -460,6 +490,7 @@ export default function UserDetailPage() {
                 } else {
                     setRole('client');
                 }
+                setIsEditing(false);
                 toast.success('Perfil atualizado com sucesso!', {
                     style: { borderRadius: '12px', background: '#1E293B', color: '#FFF', fontWeight: 600 }
                 });
@@ -807,101 +838,146 @@ export default function UserDetailPage() {
                         </div>
                     </div>
 
-                    {/* Formulário de Dados */}
-                    <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        {/* Coluna Dados Cadastrais */}
-                        <div className="md:col-span-2 space-y-6">
-                            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
-                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-3 flex items-center gap-2">
-                                    <User size={16} className="text-purple-600" />
-                                    Informações Cadastrais
-                                </h3>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Nome de Exibição</label>
-                                        <input 
-                                            type="text" 
-                                            required
-                                            value={name}
-                                            onChange={(e) => setName(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700"
-                                        />
+                    {/* Cards Principais: Informações Cadastrais (Esquerda) e Painel Financeiro / Cargo (Direita) */}
+                    <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                        {/* Card 1: Informações Cadastrais com Botão de Editar */}
+                        <div className="lg:col-span-2 bg-white border border-slate-200/80 rounded-3xl p-6 md:p-7 shadow-xs space-y-5">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+                                        <User size={16} />
                                     </div>
-
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Username</label>
-                                        <input 
-                                            type="text" 
-                                            required
-                                            value={username}
-                                            onChange={(e) => setUsername(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700"
-                                        />
+                                    <div>
+                                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
+                                            Informações Cadastrais
+                                        </h3>
+                                        <p className="text-[11px] text-slate-400 font-medium">
+                                            {isEditing ? 'Edite os campos desejados e clique em salvar.' : 'Visualização protegida. Clique em Editar para alterar.'}
+                                        </p>
                                     </div>
+                                </div>
 
-                                    <div className="space-y-1 sm:col-span-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">E-mail</label>
-                                        <input 
-                                            type="email" 
-                                            required
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700"
-                                        />
+                                {!isEditing ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsEditing(true)}
+                                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-xs active:scale-95"
+                                    >
+                                        <Edit3 size={13} />
+                                        Editar Perfil
+                                    </button>
+                                ) : (
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={handleCancelEditing}
+                                            disabled={saving}
+                                            className="px-3 py-2 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            disabled={saving}
+                                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                                        >
+                                            {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                                            {saving ? 'Gravando...' : 'Salvar'}
+                                        </button>
                                     </div>
+                                )}
+                            </div>
 
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                                            <FileText size={12} />
-                                            CPF ou CNPJ
-                                        </label>
-                                        <input 
-                                            type="text" 
-                                            value={taxId}
-                                            onChange={(e) => setTaxId(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700"
-                                            placeholder="Apenas números"
-                                        />
-                                    </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Nome de Exibição</label>
+                                    <input 
+                                        type="text" 
+                                        required
+                                        disabled={!isEditing}
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700 disabled:bg-slate-100/70 disabled:text-slate-600 disabled:cursor-not-allowed"
+                                    />
+                                </div>
 
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                                            <Phone size={12} />
-                                            Telefone / WhatsApp
-                                        </label>
-                                        <input 
-                                            type="text" 
-                                            value={phone}
-                                            onChange={(e) => setPhone(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700"
-                                            placeholder="(00) 00000-0000"
-                                        />
-                                    </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Username</label>
+                                    <input 
+                                        type="text" 
+                                        required
+                                        disabled={!isEditing}
+                                        value={username}
+                                        onChange={(e) => setUsername(e.target.value)}
+                                        className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700 disabled:bg-slate-100/70 disabled:text-slate-600 disabled:cursor-not-allowed"
+                                    />
+                                </div>
 
-                                    <div className="space-y-1 sm:col-span-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                                            <ImageIcon size={12} />
-                                            URL da Foto de Perfil
-                                        </label>
-                                        <input 
-                                            type="text" 
-                                            value={photoUrl}
-                                            onChange={(e) => setPhotoUrl(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700"
-                                            placeholder="https://..."
-                                        />
-                                    </div>
+                                <div className="space-y-1 sm:col-span-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">E-mail</label>
+                                    <input 
+                                        type="email" 
+                                        required
+                                        disabled={!isEditing}
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700 disabled:bg-slate-100/70 disabled:text-slate-600 disabled:cursor-not-allowed"
+                                    />
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                        <FileText size={12} />
+                                        CPF ou CNPJ
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        disabled={!isEditing}
+                                        value={taxId}
+                                        onChange={(e) => setTaxId(e.target.value)}
+                                        className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700 disabled:bg-slate-100/70 disabled:text-slate-600 disabled:cursor-not-allowed"
+                                        placeholder="Apenas números"
+                                    />
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                        <Phone size={12} />
+                                        Telefone / WhatsApp
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        disabled={!isEditing}
+                                        value={phone}
+                                        onChange={(e) => setPhone(e.target.value)}
+                                        className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700 disabled:bg-slate-100/70 disabled:text-slate-600 disabled:cursor-not-allowed"
+                                        placeholder="(00) 00000-0000"
+                                    />
+                                </div>
+
+                                <div className="space-y-1 sm:col-span-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                        <ImageIcon size={12} />
+                                        URL da Foto de Perfil
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        disabled={!isEditing}
+                                        value={photoUrl}
+                                        onChange={(e) => setPhotoUrl(e.target.value)}
+                                        className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700 disabled:bg-slate-100/70 disabled:text-slate-600 disabled:cursor-not-allowed"
+                                        placeholder="https://..."
+                                    />
                                 </div>
                             </div>
 
-                            {/* Seção Profissional */}
+                            {/* Seção adicional exclusiva para perfil profissional */}
                             {role === 'professional' && (
-                                <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-4">
-                                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-3 flex items-center gap-2">
-                                        <Coins size={16} className="text-purple-600 animate-pulse" />
+                                <div className="pt-4 border-t border-slate-100 space-y-4">
+                                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                                        <Coins size={14} className="text-purple-600" />
                                         Configuração de Ganhos e Assinatura
-                                    </h3>
+                                    </h4>
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-1">
@@ -909,9 +985,10 @@ export default function UserDetailPage() {
                                             <input 
                                                 type="number" 
                                                 step="0.01"
+                                                disabled={!isEditing}
                                                 value={subscriptionPrice}
                                                 onChange={(e) => setSubscriptionPrice(Number(e.target.value))}
-                                                className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700"
+                                                className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700 disabled:bg-slate-100/70 disabled:text-slate-600 disabled:cursor-not-allowed"
                                             />
                                         </div>
 
@@ -922,70 +999,69 @@ export default function UserDetailPage() {
                                             </label>
                                             <input 
                                                 type="text" 
+                                                disabled={!isEditing}
                                                 value={pixKey}
                                                 onChange={(e) => setPixKey(e.target.value)}
-                                                className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700"
+                                                className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700 disabled:bg-slate-100/70 disabled:text-slate-600 disabled:cursor-not-allowed"
                                                 placeholder="CPF, E-mail ou Telefone"
                                             />
                                         </div>
                                     </div>
                                 </div>
                             )}
+
+                            {/* Botão de Excluir Conta no rodapé do card cadastral */}
+                            <div className="pt-3 border-t border-slate-100 flex justify-end">
+                                <button 
+                                    type="button"
+                                    onClick={handleDeleteUser}
+                                    disabled={saving}
+                                    className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-600 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 border border-rose-100 disabled:opacity-50"
+                                >
+                                    <Trash2 size={13} />
+                                    Excluir Conta Permanentemente
+                                </button>
+                            </div>
                         </div>
 
-                        {/* Coluna Financeira e Tipo de Conta */}
+                        {/* Coluna Direita: Cards Separados de Cargo da Conta e Saldo da Carteira */}
                         <div className="space-y-6">
-                            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-5">
-                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-3 flex items-center gap-2">
-                                    <ShieldCheck size={16} className="text-purple-600" />
-                                    Saldo e Cargo
-                                </h3>
-
-                                {/* Card Informativo de Saldo Atual + Ação Oficial de Ajuste */}
-                                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Saldo da Carteira</span>
-                                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full">
-                                            Saldo Real
-                                        </span>
+                            {/* Card de Cargo da Conta */}
+                            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-xs space-y-4">
+                                <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                                    <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+                                        <ShieldCheck size={16} />
                                     </div>
                                     <div>
-                                        <span className="text-2xl font-black text-slate-900 tracking-tight block">
-                                            {balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                        </span>
-                                        <span className="text-[10px] text-slate-400 font-medium mt-0.5 block">
-                                            Alterações de saldo geram registro oficial com justificativa.
-                                        </span>
+                                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
+                                            Cargo da Conta
+                                        </h3>
+                                        <p className="text-[11px] text-slate-400 font-medium">
+                                            Nível de permissão no sistema
+                                        </p>
                                     </div>
-                                    <button 
-                                        type="button"
-                                        onClick={handleOpenAdjustmentModal}
-                                        className="w-full py-2.5 px-3 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm shadow-purple-600/10"
-                                    >
-                                        <PlusCircle size={14} />
-                                        Inserir ou Debitar Saldo
-                                    </button>
                                 </div>
 
-                                <div className="pt-2 border-t border-slate-100 space-y-2">
+                                <div className="space-y-2">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
-                                        Cargo da Conta
+                                        Selecione o Cargo
                                     </label>
                                     <select
+                                        disabled={!isEditing}
                                         value={role}
                                         onChange={(e) => {
                                             const newRole = e.target.value as 'client' | 'professional' | 'team' | 'admin';
                                             setRole(newRole);
                                             setIsProfessional(newRole === 'professional');
                                         }}
-                                        className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700 cursor-pointer"
+                                        className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-slate-700 cursor-pointer disabled:bg-slate-100/70 disabled:text-slate-600 disabled:cursor-not-allowed"
                                     >
                                         <option value="client">Cliente</option>
                                         <option value="professional">Profissional</option>
                                         <option value="team">Equipe</option>
                                         <option value="admin">Administrador</option>
                                     </select>
-                                    <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
+                                    <p className="text-[11px] text-slate-500 font-medium leading-relaxed bg-slate-50 border border-slate-200/70 p-3 rounded-xl">
                                         {role === 'client' && 'Usuário regular que consome saldo e conversa com criadoras.'}
                                         {role === 'professional' && 'Criadora que possui perfil público, vende assinaturas e monetiza conversas.'}
                                         {role === 'team' && 'Membro do time interno com permissões de suporte e ativação de perfis.'}
@@ -994,30 +1070,63 @@ export default function UserDetailPage() {
                                 </div>
                             </div>
 
-                            {/* Ações do Formulário */}
-                            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-3">
-                                <button 
-                                    type="submit"
-                                    disabled={saving}
-                                    className="w-full py-3 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-purple-600/10"
-                                >
-                                    {saving ? (
-                                        <Loader2 size={14} className="animate-spin" />
-                                    ) : (
-                                        <Save size={14} />
-                                    )}
-                                    {saving ? 'Gravando dados...' : 'Salvar Alterações'}
-                                </button>
+                            {/* Card de Saldo da Carteira com Ação e Detalhamento */}
+                            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-xs space-y-4">
+                                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                                            <Coins size={16} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
+                                                Saldo da Carteira
+                                            </h3>
+                                            <p className="text-[11px] text-slate-400 font-medium">
+                                                Disponível em conta
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                        Saldo Real
+                                    </span>
+                                </div>
 
-                                <button 
-                                    type="button"
-                                    onClick={handleDeleteUser}
-                                    disabled={saving}
-                                    className="w-full py-3 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 disabled:opacity-50 text-rose-600 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 border border-rose-100"
-                                >
-                                    <Trash2 size={14} />
-                                    Excluir Conta Permanentemente
-                                </button>
+                                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-2">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                                        Saldo Atual
+                                    </span>
+                                    <span className="text-3xl font-black text-slate-900 tracking-tight block">
+                                        {balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 font-medium block">
+                                        Alterações geram registro contábil auditado.
+                                    </span>
+                                </div>
+
+                                <div className="space-y-2 pt-1">
+                                    <button 
+                                        type="button"
+                                        onClick={handleOpenAdjustmentModal}
+                                        className="w-full py-2.5 px-3 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs"
+                                    >
+                                        <PlusCircle size={14} />
+                                        Inserir ou Debitar Saldo
+                                    </button>
+
+                                    <button 
+                                        type="button"
+                                        onClick={() => {
+                                            setShowAllFinancialModal(true);
+                                            setFinancialPage(1);
+                                            setFinancialFilter('all');
+                                            setFinancialSearch('');
+                                        }}
+                                        className="w-full py-2.5 px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
+                                    >
+                                        <TrendingUp size={14} className="text-purple-600" />
+                                        Detalhamento do Saldo ({financialHistory.length})
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </form>
@@ -1434,411 +1543,165 @@ export default function UserDetailPage() {
                         </div>
                     )}
 
-                    {/* Histórico Financeiro do Cliente (Depósitos, Recargas e Cupons) */}
-                    {!isProfessional && (
-                        <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-6">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                    {/* Lista Simples de Conversas com Clientes */}
+                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 md:p-7 shadow-xs space-y-5">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+                                    <MessageCircle size={16} />
+                                </div>
                                 <div>
                                     <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                                        <TrendingUp size={16} className="text-purple-600" />
-                                        Histórico Financeiro (Depósitos, Recargas e Cupons)
+                                        Conversas com Clientes
+                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-extrabold border border-purple-100">
+                                            {rooms.length}
+                                        </span>
                                     </h3>
-                                    <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-                                        Acompanhe os depósitos efetuados, recargas de saldo (PIX/Cartão) e resgates de cupons deste cliente.
+                                    <p className="text-[11px] text-slate-400 font-medium">
+                                        Lista de salas e interações diretas. Salas com alerta indicam suspeitas de violação de regras.
                                     </p>
                                 </div>
-                                {financialHistory.length > 5 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => { setShowAllFinancialModal(true); setFinancialPage(1); setFinancialFilter('all'); setFinancialSearch(''); }}
-                                        className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
-                                    >
-                                        <Maximize2 size={13} />
-                                        Ver Todos ({financialHistory.length})
-                                    </button>
-                                )}
                             </div>
+                        </div>
 
-                            {/* Cards de Resumo do Cliente */}
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                <div className="bg-slate-900 text-white rounded-2xl p-4 shadow-sm border border-slate-800">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Saldo Atual na Carteira</span>
-                                    <span className="text-xl font-black text-emerald-400 mt-1 block">
-                                        {balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                    </span>
-                                </div>
-                                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 shadow-sm">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block flex items-center gap-1">
-                                        <CreditCard size={12} className="text-blue-500" />
-                                        Total Recarregado (PIX/CC)
-                                    </span>
-                                    <span className="text-xl font-black text-slate-800 mt-1 block">
-                                        {financialHistory
-                                            .filter(f => f.category === 'recharge' && (f.status === 'PAID' || f.status === 'COMPLETED' || f.status === 'debit'))
-                                            .reduce((acc, item) => acc + item.amount, 0)
-                                            .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                    </span>
-                                </div>
-                                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 shadow-sm">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block flex items-center gap-1">
-                                        <Ticket size={12} className="text-purple-500" />
-                                        Total em Cupons / Prêmios
-                                    </span>
-                                    <span className="text-xl font-black text-slate-800 mt-1 block">
-                                        {financialHistory
-                                            .filter(f => (f.category === 'gift' || f.category === 'campaign') && (f.status === 'PAID' || f.status === 'COMPLETED' || f.status === 'debit'))
-                                            .reduce((acc, item) => acc + item.amount, 0)
-                                            .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Tabela das Últimas Movimentações */}
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                                            <th className="py-4 px-6">Tipo / Movimentação</th>
-                                            <th className="py-4 px-6">Valor / Movimentação</th>
-                                            <th className="py-4 px-6">Data & Hora</th>
-                                            <th className="py-4 px-6">Status</th>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+                                        <th className="py-3.5 px-5">Cliente / Contato</th>
+                                        <th className="py-3.5 px-5 text-center">Alertas</th>
+                                        <th className="py-3.5 px-5">Mensagens</th>
+                                        <th className="py-3.5 px-5">Faturamento Acumulado</th>
+                                        <th className="py-3.5 px-5">Última Mensagem</th>
+                                        <th className="py-3.5 px-5">Último Contato</th>
+                                        <th className="py-3.5 px-5 text-center">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {loadingRooms ? (
+                                        <tr>
+                                            <td colSpan={7} className="py-12 text-center text-xs font-semibold text-slate-400">
+                                                <div className="flex flex-col items-center gap-2 justify-center">
+                                                    <Loader2 size={16} className="animate-spin text-purple-600" />
+                                                    <span>Carregando conversas...</span>
+                                                </div>
+                                            </td>
                                         </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {financialHistory.length > 0 ? (
-                                            financialHistory.slice(0, 5).map((item) => (
-                                                <tr key={item.id} className="hover:bg-slate-50/40 transition-colors group">
-                                                    <td className="py-4 px-6">
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
-                                                                item.category === 'gift' ? 'bg-purple-50 text-purple-600 border border-purple-100' :
-                                                                item.category === 'campaign' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
-                                                                item.category === 'adjustment' ? (item.isDebit ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100') :
-                                                                'bg-blue-50 text-blue-600 border border-blue-100'
-                                                            }`}>
-                                                                {item.category === 'gift' ? <Ticket size={14} /> :
-                                                                 item.category === 'campaign' ? <Coins size={14} /> :
-                                                                 item.category === 'adjustment' ? (item.isDebit ? <Minus size={14} /> : <Plus size={14} />) :
-                                                                 <CreditCard size={14} />}
+                                    ) : rooms.length > 0 ? (
+                                        rooms.map((chat) => {
+                                            const otherParticipant = chat.userA.clerkId === clerkId ? chat.userB : chat.userA;
+                                            const otherInitials = otherParticipant.name ? 
+                                                (otherParticipant.name.split(' ').length >= 2 
+                                                    ? `${otherParticipant.name.split(' ')[0][0]}${otherParticipant.name.split(' ')[1][0]}` 
+                                                    : otherParticipant.name.substring(0, 2)) 
+                                                : 'CL';
+                                            const hasViolation = Boolean(chat.violationCount && chat.violationCount > 0);
+                                            const targetRoomKey = chat.roomIdStr || [chat.userA.clerkId, chat.userB.clerkId].sort().join('_');
+
+                                            return (
+                                                <tr key={chat.id} className="hover:bg-slate-50/50 transition-colors group">
+                                                    <td className="py-4 px-5">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 border border-purple-100 flex items-center justify-center font-bold text-xs shrink-0">
+                                                                {otherInitials.toUpperCase()}
                                                             </div>
                                                             <div className="flex flex-col min-w-0">
-                                                                <span className="text-xs font-bold text-slate-800 leading-tight">{item.label}</span>
-                                                                {item.justification && (
-                                                                    <span className="text-[10px] text-slate-500 font-medium italic mt-0.5">Motivo: {item.justification}</span>
-                                                                )}
-                                                                {item.couponCode && (
-                                                                    <span className="text-[10px] text-purple-600 font-mono font-bold">Código: {item.couponCode}</span>
-                                                                )}
+                                                                <span className="text-xs font-bold text-slate-900 leading-tight truncate">
+                                                                    {otherParticipant.name}
+                                                                </span>
+                                                                <span className="text-[10px] text-slate-400 font-semibold truncate">
+                                                                    {otherParticipant.email}
+                                                                </span>
                                                             </div>
                                                         </div>
                                                     </td>
-                                                    <td className="py-4 px-6">
-                                                        <span className={`text-sm font-extrabold ${item.isDebit ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                                            {item.isDebit ? '- ' : '+ '}
-                                                            {item.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                                        </span>
-                                                    </td>
-                                                    <td className="py-4 px-6 text-xs text-slate-500 font-semibold">
-                                                        {item.createdAt}
-                                                    </td>
-                                                    <td className="py-4 px-6">
-                                                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${
-                                                            item.statusLabel === 'Aprovado' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
-                                                            item.statusLabel === 'Pendente' ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                                                            'bg-rose-50 text-rose-700 border-rose-100'
-                                                        }`}>
-                                                            <span className={`w-1.5 h-1.5 rounded-full ${
-                                                                item.statusLabel === 'Aprovado' ? 'bg-emerald-500' :
-                                                                item.statusLabel === 'Pendente' ? 'bg-amber-500' : 'bg-rose-500'
-                                                            }`} />
-                                                            {item.statusLabel}
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                <td colSpan={4} className="py-12 text-center text-xs font-semibold text-slate-400">
-                                                    Nenhum depósito ou cupom encontrado para este cliente até o momento.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
 
-                            {financialHistory.length > 5 && (
-                                <div className="pt-2 text-center">
-                                    <button
-                                        type="button"
-                                        onClick={() => { setShowAllFinancialModal(true); setFinancialPage(1); setFinancialFilter('all'); setFinancialSearch(''); }}
-                                        className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200/80 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-xs flex items-center justify-center gap-2"
-                                    >
-                                        <Maximize2 size={14} />
-                                        Ver Histórico Completo de Depósitos e Cupons ({financialHistory.length})
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Salas de Chat e Auditoria com Sub-abas */}
-                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-6">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-                            <div>
-                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                                    <MessageCircle size={16} className="text-purple-600" />
-                                    Salas de Chat e Auditoria
-                                </h3>
-                                <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-                                    Visualize relacionamentos ou sessões com pelo menos {(minimumEarningsCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}, separadas após {timeoutMinutes} min sem mensagens.
-                                </p>
-                            </div>
-
-                            <div className="flex items-center p-1 bg-slate-100/90 rounded-xl border border-slate-200/60 self-start sm:self-auto">
-                                <button
-                                    type="button"
-                                    onClick={() => setChatSubTab('relationships')}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                                        chatSubTab === 'relationships'
-                                            ? 'bg-white text-purple-700 shadow-xs border border-slate-200/40 font-extrabold'
-                                            : 'text-slate-500 hover:text-slate-800'
-                                    }`}
-                                >
-                                    Clientes (Relacionamentos)
-                                    <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-purple-50 text-purple-700 font-black">
-                                        {rooms.length}
-                                    </span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setChatSubTab('sessions')}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                                        chatSubTab === 'sessions'
-                                            ? 'bg-white text-purple-700 shadow-xs border border-slate-200/40 font-extrabold'
-                                            : 'text-slate-500 hover:text-slate-800'
-                                    }`}
-                                >
-                                    Conversas (Sessões)
-                                    <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-purple-50 text-purple-700 font-black">
-                                        {sessions.length}
-                                    </span>
-                                </button>
-                            </div>
-                        </div>
-
-                        {chatSubTab === 'relationships' ? (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                                            <th className="py-4 px-6">Contato / Participante</th>
-                                            <th className="py-4 px-6">Mensagens</th>
-                                            <th className="py-4 px-6">Faturamento Acumulado</th>
-                                            <th className="py-4 px-6">Última Mensagem</th>
-                                            <th className="py-4 px-6">Último Contato</th>
-                                            <th className="py-4 px-6 text-center">Ações</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {loadingRooms ? (
-                                            <tr>
-                                                <td colSpan={6} className="py-12 text-center text-xs font-semibold text-slate-400">
-                                                    <div className="flex flex-col items-center gap-2 justify-center">
-                                                        <Loader2 size={16} className="animate-spin text-purple-600" />
-                                                        <span>Buscando conversas reais...</span>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ) : rooms.length > 0 ? (
-                                            rooms.map((chat) => {
-                                                const otherParticipant = chat.userA.clerkId === clerkId ? chat.userB : chat.userA;
-                                                const otherInitials = otherParticipant.name ? 
-                                                    (otherParticipant.name.split(' ').length >= 2 ? `${otherParticipant.name.split(' ')[0][0]}${otherParticipant.name.split(' ')[1][0]}` : otherParticipant.name.substring(0,2)) : 'US';
-                                                return (
-                                                    <tr key={chat.id} className="hover:bg-slate-50/40 transition-colors group">
-                                                        <td className="py-4 px-6">
-                                                            <div className="flex items-center gap-2.5">
-                                                                <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-700 border border-blue-100 flex items-center justify-center font-bold text-xs">
-                                                                    {otherInitials.toUpperCase()}
-                                                                </div>
-                                                                <div className="flex flex-col min-w-0">
-                                                                    <span className="text-xs font-bold text-slate-800 leading-tight truncate">{otherParticipant.name}</span>
-                                                                    <span className="text-[10px] text-slate-400 font-semibold truncate">{otherParticipant.email}</span>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td className="py-4 px-6 text-xs text-slate-650 font-bold">
-                                                            {chat.messagesCount}
-                                                        </td>
-                                                        <td className="py-4 px-6">
-                                                            <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                                                                <Coins size={12} className="text-amber-500" />
-                                                                {chat.totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                                            </span>
-                                                        </td>
-                                                        <td className="py-4 px-6 text-xs text-slate-550 max-w-xs truncate" title={chat.lastMessage}>
-                                                            {chat.lastMessage}
-                                                        </td>
-                                                        <td className="py-4 px-6 text-xs text-slate-500 font-bold">
-                                                            {chat.time}
-                                                        </td>
-                                                        <td className="py-4 px-6 text-center" onClick={(e) => e.stopPropagation()}>
-                                                            <div className="flex justify-center gap-2">
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setPendingAuditChat(chat);
-                                                                        setPendingAuditSessionRange(null);
-                                                                        setJustificationText('');
-                                                                    }}
-                                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-100 text-purple-600 text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-xs active:scale-95"
-                                                                >
-                                                                    <Eye size={12} />
-                                                                    Auditar
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleDeleteRoom(chat.id, otherParticipant.name)}
-                                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-100 text-rose-600 text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-xs active:scale-95"
-                                                                >
-                                                                    <Trash2 size={12} />
-                                                                    Excluir
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })
-                                        ) : (
-                                            <tr>
-                                                <td colSpan={6} className="py-12 text-center text-xs font-semibold text-slate-400">
-                                                    Nenhum relacionamento de cliente encontrado até o momento.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                                            <th className="py-4 px-6">Cliente (Relacionamento)</th>
-                                            <th className="py-4 px-6">Horário da Sessão</th>
-                                            <th className="py-4 px-6">Composição</th>
-                                            <th className="py-4 px-6">Faturamento da Sessão</th>
-                                            <th className="py-4 px-6 text-center">Ações</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {loadingRooms ? (
-                                            <tr>
-                                                <td colSpan={5} className="py-12 text-center text-xs font-semibold text-slate-400">
-                                                    <div className="flex flex-col items-center gap-2 justify-center">
-                                                        <Loader2 size={16} className="animate-spin text-purple-600" />
-                                                        <span>Calculando sessões de conversa...</span>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ) : sessions.length > 0 ? (
-                                            sessions.map((session) => {
-                                                const clientObj = session.userA.clerkId === clerkId ? session.userB : session.userA;
-                                                const clientInitials = clientObj.name ? 
-                                                    (clientObj.name.split(' ').length >= 2 ? `${clientObj.name.split(' ')[0][0]}${clientObj.name.split(' ')[1][0]}` : clientObj.name.substring(0,2)) : 'CL';
-                                                
-                                                const matchingRoom = rooms.find(r => 
-                                                    (r.userA.clerkId === clientObj.clerkId || r.userB.clerkId === clientObj.clerkId)
-                                                ) || {
-                                                    id: session.roomId || `${clerkId}_${clientObj.clerkId}`,
-                                                    userA: session.userA,
-                                                    userB: session.userB,
-                                                    messagesCount: session.messagesCount,
-                                                    lastMessage: 'Sessão de conversa auditada',
-                                                    time: session.timeRangeLabel,
-                                                    totalRevenue: session.totalRevenue,
-                                                    history: []
-                                                };
-
-                                                return (
-                                                    <tr key={session.id} className="hover:bg-slate-50/40 transition-colors group">
-                                                        <td className="py-4 px-6">
-                                                            <div className="flex items-center gap-2.5">
-                                                                <div className="w-8 h-8 rounded-full bg-purple-50 text-purple-700 border border-purple-100 flex items-center justify-center font-bold text-xs">
-                                                                    {clientInitials.toUpperCase()}
-                                                                </div>
-                                                                <div className="flex flex-col min-w-0">
-                                                                    <span className="text-xs font-bold text-slate-800 leading-tight truncate">{clientObj.name}</span>
-                                                                    <span className="text-[10px] text-slate-400 font-semibold truncate">{clientObj.email}</span>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td className="py-4 px-6">
-                                                            <div className="flex flex-col">
-                                                                <span className="text-xs font-bold text-slate-800">{session.timeRangeLabel}</span>
-                                                                <span className="text-[10px] text-slate-400 font-medium">Duração: {session.durationMinutes} min</span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="py-4 px-6">
-                                                            <div className="flex items-center gap-1 flex-wrap">
-                                                                {session.messagesCount > 0 && (
-                                                                    <span className="text-[9.5px] bg-purple-50 text-purple-700 border border-purple-100 px-2 py-0.5 rounded-md font-bold">
-                                                                        {session.messagesCount} msgs ({session.professionalMessages} prof. / {session.clientMessages} cliente)
-                                                                    </span>
-                                                                )}
-                                                                {session.mediaCount > 0 && (
-                                                                    <span className="text-[9.5px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-md font-bold">
-                                                                        {session.mediaCount} mídias
-                                                                    </span>
-                                                                )}
-                                                                {session.giftCount > 0 && (
-                                                                    <span className="text-[9.5px] bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-md font-bold">
-                                                                        {session.giftCount} presentes
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                        <td className="py-4 px-6">
-                                                            <div className="flex flex-col gap-0.5">
-                                                                <span className="text-xs font-black text-emerald-600 flex items-center gap-1">
-                                                                    + {session.totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                                                </span>
-                                                                <span className="text-[9.5px] text-slate-400 font-semibold">
-                                                                    Mensagens {session.messageRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                                                    {session.mediaRevenue > 0 ? ` · Mídias ${session.mediaRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : ''}
-                                                                    {session.giftRevenue > 0 ? ` · Presentes ${session.giftRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : ''}
-                                                                </span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="py-4 px-6 text-center" onClick={(e) => e.stopPropagation()}>
+                                                    {/* Alerta de Violação com Triângulo Laranja */}
+                                                    <td className="py-4 px-5 text-center">
+                                                        {hasViolation ? (
                                                             <button
+                                                                type="button"
+                                                                onClick={() => router.push(`/admin/rooms?roomId=${encodeURIComponent(targetRoomKey)}`)}
+                                                                title={`${chat.violationCount} violação(ões) detectada(s). Clique para auditar.`}
+                                                                className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 text-[10px] font-black rounded-lg transition-all cursor-pointer shadow-xs active:scale-95 animate-pulse"
+                                                            >
+                                                                <AlertTriangle size={13} className="text-amber-500 fill-amber-500/20" />
+                                                                <span>{chat.violationCount} {chat.violationCount === 1 ? 'Alerta' : 'Alertas'}</span>
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-[10px] text-slate-300 font-medium select-none">
+                                                                —
+                                                            </span>
+                                                        )}
+                                                    </td>
+
+                                                    <td className="py-4 px-5 text-xs text-slate-700 font-bold">
+                                                        {chat.messagesCount}
+                                                    </td>
+
+                                                    <td className="py-4 px-5">
+                                                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                                                            <Coins size={12} className="text-amber-500" />
+                                                            {chat.totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                        </span>
+                                                    </td>
+
+                                                    <td className="py-4 px-5 text-xs text-slate-500 max-w-xs truncate" title={chat.lastMessage}>
+                                                        {chat.lastMessage}
+                                                    </td>
+
+                                                    <td className="py-4 px-5 text-xs text-slate-500 font-semibold whitespace-nowrap">
+                                                        {chat.time}
+                                                    </td>
+
+                                                    <td className="py-4 px-5 text-center" onClick={(e) => e.stopPropagation()}>
+                                                        <div className="flex justify-center gap-2">
+                                                            {hasViolation && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => router.push(`/admin/rooms?roomId=${encodeURIComponent(targetRoomKey)}`)}
+                                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-xs active:scale-95"
+                                                                    title="Ver na Auditoria de Conversas"
+                                                                >
+                                                                    <ExternalLink size={12} />
+                                                                    Auditoria
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                type="button"
                                                                 onClick={() => {
-                                                                    setPendingAuditChat(matchingRoom);
-                                                                    setPendingAuditSessionRange({
-                                                                        startTime: session.startTime,
-                                                                        endTime: session.endTime
-                                                                    });
+                                                                    setPendingAuditChat(chat);
+                                                                    setPendingAuditSessionRange(null);
                                                                     setJustificationText('');
                                                                 }}
-                                                                className="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-100 text-purple-600 text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-xs active:scale-95"
+                                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-100 text-purple-700 text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-xs active:scale-95"
                                                             >
                                                                 <Eye size={12} />
-                                                                Auditar Sessão
+                                                                Ver Chat
                                                             </button>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })
-                                        ) : (
-                                            <tr>
-                                                <td colSpan={5} className="py-12 text-center text-xs font-semibold text-slate-400">
-                                                    Nenhuma sessão de conversa encontrada para este perfil até o momento.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleDeleteRoom(chat.id, otherParticipant.name)}
+                                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-100 text-rose-600 text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-xs active:scale-95"
+                                                            >
+                                                                <Trash2 size={12} />
+                                                                Excluir
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={7} className="py-12 text-center text-xs font-semibold text-slate-400">
+                                                Nenhuma conversa de cliente encontrada até o momento.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
 
             {/* MODAL DE AUDITORIA DE CONVERSAS (WhatsApp Style) */}

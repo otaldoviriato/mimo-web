@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
 
         const filtered = q
             ? enriched.filter(item => {
-                const searchStr = `${item.excerpts.join(' ')} ${item.sender?.name} ${item.sender?.username} ${item.receiver?.name} ${item.receiver?.username} ${item.targetMessage?.content || ''}`.toLowerCase();
+                const searchStr = `${item.roomId || ''} ${item.excerpts.join(' ')} ${item.sender?.name} ${item.sender?.username} ${item.receiver?.name} ${item.receiver?.username} ${item.targetMessage?.content || ''}`.toLowerCase();
                 return searchStr.includes(q);
             })
             : enriched;

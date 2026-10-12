@@ -6,6 +6,7 @@ import { Room } from '@/models/Room';
 import { Message } from '@/models/Message';
 import { MicroTransaction } from '@/models/MicroTransaction';
 import { AppSettings } from '@/models/AppSettings';
+import { ModerationReview } from '@/models/ModerationReview';
 import { buildEarningsSessions } from '@/lib/earningsSessions';
 
 const FALLBACK_ADMIN = 'user_39WqqlzJvRKuC6Xhp9ToiGmBFNM';
@@ -58,10 +59,25 @@ export async function GET(request: NextRequest) {
 
         const now = new Date();
 
+        // Buscar violações em aberto de todas as salas mapeadas
+        const allRoomIdStrings = rooms.map(room => [...room.participants].sort().join('_'));
+        const pendingViolations = await ModerationReview.find({
+            roomId: { $in: allRoomIdStrings },
+            status: { $in: ['pending_review', 'confirmed_violation'] }
+        }).select('roomId status matchedRules').lean() as any[];
+
+        const violationsByRoomId = new Map<string, number>();
+        pendingViolations.forEach(v => {
+            if (v.roomId) {
+                violationsByRoomId.set(v.roomId, (violationsByRoomId.get(v.roomId) || 0) + 1);
+            }
+        });
+
         // 3. Mapear cada sala (Relacionamento) com estatísticas totais
         const enrichedRooms = await Promise.all(rooms.map(async (room) => {
             const sortedParticipants = [...room.participants].sort();
             const roomIdStr = sortedParticipants.join('_');
+            const violationCount = violationsByRoomId.get(roomIdStr) || 0;
 
             // Usuário A e Usuário B
             const clerkIdA = room.participants[0];
@@ -111,12 +127,14 @@ export async function GET(request: NextRequest) {
 
             return {
                 id: room._id.toString(),
+                roomIdStr,
                 userA,
                 userB,
                 messagesCount,
                 lastMessage: room.lastMessage || 'Nenhuma mensagem enviada',
                 time: timeAgo,
                 totalRevenue,
+                violationCount,
             };
         }));
 

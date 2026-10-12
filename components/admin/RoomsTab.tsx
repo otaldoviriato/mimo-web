@@ -19,6 +19,7 @@ import {
     MessageSquare
 } from 'lucide-react';
 import Image from 'next/image';
+import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 
 interface ReviewItem {
@@ -92,11 +93,14 @@ const RULE_LABELS: Record<string, { label: string; badgeClass: string }> = {
 };
 
 export function RoomsTab() {
+    const searchParams = useSearchParams();
+    const initialQuery = searchParams.get('roomId') || searchParams.get('q') || '';
+
     const [reviews, setReviews] = useState<ReviewItem[]>([]);
     const [counts, setCounts] = useState({ pending: 0, violation: 0, dismissed: 0, total: 0 });
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState<'pending_review' | 'confirmed_violation' | 'dismissed' | ''>('pending_review');
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState(initialQuery);
     const [scanning, setScanning] = useState(false);
 
     // Modal de Contexto (5 antes + 5 depois)
