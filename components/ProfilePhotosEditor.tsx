@@ -14,6 +14,7 @@ import {
     useDeleteFromGallery,
     useReorderGallery 
 } from '@/hooks/useQueries';
+import { DeleteConfirmModal } from '@/components/DeleteConfirmModal';
 import type { ProfileGalleryItem } from '@/components/ProfessionalProfilePresentation';
 
 interface Props {
@@ -37,6 +38,7 @@ export function ProfilePhotosEditor({ photoUrl, onOrderChange }: Props) {
     const reorderGallery = useReorderGallery();
 
     const [uploading, setUploading] = useState(false);
+    const [photoToDelete, setPhotoToDelete] = useState<ProfileGalleryItem | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Estado local das fotos para reordenação puramente no front-end
@@ -144,19 +146,33 @@ export function ProfilePhotosEditor({ photoUrl, onOrderChange }: Props) {
         }
     };
 
-    // Excluir foto
-    const handleDeleteItem = async (item: ProfileGalleryItem) => {
-        if (!window.confirm('Deseja remover esta foto do seu perfil?')) return;
+    const handleDeleteClick = (item: ProfileGalleryItem) => {
+        if (orderedItems.length <= 1) {
+            toast.error('Você deve manter pelo menos uma foto no seu perfil.');
+            return;
+        }
+        setPhotoToDelete(item);
+    };
+
+    // Excluir foto com abordagem otimista
+    const confirmDeletePhoto = async () => {
+        if (!photoToDelete) return;
+        const targetItem = photoToDelete;
+        setPhotoToDelete(null);
+
+        const previousItems = [...orderedItems];
+        setOrderedItems(prev => prev.filter(item => item._id !== targetItem._id));
 
         try {
-            if (item._id && item._id !== 'profile-photo') {
-                await deletePhoto.mutateAsync(item._id);
+            if (targetItem._id && targetItem._id !== 'profile-photo') {
+                await deletePhoto.mutateAsync(targetItem._id);
             }
             hasInitializedRef.current = false;
             await queryClient.invalidateQueries({ queryKey: QueryKeys.me });
             await queryClient.invalidateQueries({ queryKey: ['gallery', 'me'] });
             toast.success('Foto removida!');
         } catch (error: any) {
+            setOrderedItems(previousItems);
             toast.error(error?.message || 'Erro ao remover foto.');
         }
     };
@@ -248,7 +264,7 @@ export function ProfilePhotosEditor({ photoUrl, onOrderChange }: Props) {
                                     onTouchStart={(e) => e.stopPropagation()}
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        handleDeleteItem(item);
+                                        handleDeleteClick(item);
                                     }}
                                     aria-label="Excluir foto"
                                     title="Excluir foto"
@@ -283,6 +299,17 @@ export function ProfilePhotosEditor({ photoUrl, onOrderChange }: Props) {
                     </button>
                 </div>
             )}
+
+            {/* Modal de Confirmação de Exclusão */}
+            <DeleteConfirmModal
+                isOpen={!!photoToDelete}
+                title="Remover foto do perfil"
+                description="Tem certeza de que deseja remover esta foto? Ela deixará de aparecer no seu perfil."
+                confirmText="Remover"
+                cancelText="Cancelar"
+                onClose={() => setPhotoToDelete(null)}
+                onConfirm={confirmDeletePhoto}
+            />
 
             {/* Ghost Preview Flutuante que acompanha o cursor ou toque */}
             {typeof document !== 'undefined' && dragPosition && draggedIndex !== null && orderedItems[draggedIndex] && createPortal(

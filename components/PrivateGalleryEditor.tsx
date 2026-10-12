@@ -1,11 +1,12 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Plus, Trash2, Loader2, Lock, Video } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { QueryKeys, useMyGallery, useUploadToGallery, useDeleteFromGallery } from '@/hooks/useQueries';
+import { DeleteConfirmModal } from '@/components/DeleteConfirmModal';
 import type { ProfileGalleryItem } from '@/components/ProfessionalProfilePresentation';
 
 export function PrivateGalleryEditor() {
@@ -15,13 +16,20 @@ export function PrivateGalleryEditor() {
     const deletePhoto = useDeleteFromGallery();
 
     const [uploading, setUploading] = useState(false);
+    const [itemToDelete, setItemToDelete] = useState<ProfileGalleryItem | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const busy = uploadGallery.isPending || deletePhoto.isPending || uploading;
 
-    const privateItems = useMemo<ProfileGalleryItem[]>(() => {
+    const serverPrivateItems = useMemo<ProfileGalleryItem[]>(() => {
         return Array.isArray(gallery?.privateItems) ? gallery.privateItems : [];
     }, [gallery?.privateItems]);
+
+    const [privateItems, setPrivateItems] = useState<ProfileGalleryItem[]>([]);
+
+    useEffect(() => {
+        setPrivateItems(serverPrivateItems);
+    }, [serverPrivateItems]);
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -51,15 +59,21 @@ export function PrivateGalleryEditor() {
         }
     };
 
-    const handleDeleteItem = async (item: ProfileGalleryItem) => {
-        if (!window.confirm('Deseja remover esta mídia da sua galeria privada?')) return;
+    const confirmDelete = async () => {
+        if (!itemToDelete) return;
+        const target = itemToDelete;
+        setItemToDelete(null);
+
+        const previousItems = [...privateItems];
+        setPrivateItems(prev => prev.filter(i => i._id !== target._id));
 
         try {
-            await deletePhoto.mutateAsync(item._id);
+            await deletePhoto.mutateAsync(target._id);
             await queryClient.invalidateQueries({ queryKey: QueryKeys.me });
             await queryClient.invalidateQueries({ queryKey: ['gallery', 'me'] });
             toast.success('Mídia removida da galeria privada!');
         } catch (error: any) {
+            setPrivateItems(previousItems);
             toast.error(error?.message || 'Erro ao remover mídia.');
         }
     };
@@ -168,7 +182,7 @@ export function PrivateGalleryEditor() {
                             <button
                                 type="button"
                                 disabled={busy}
-                                onClick={() => handleDeleteItem(item)}
+                                onClick={() => setItemToDelete(item)}
                                 aria-label={`Excluir mídia ${index + 1}`}
                                 className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white hover:bg-rose-600 transition-colors backdrop-blur-xs shadow-xs cursor-pointer"
                                 title="Excluir mídia"
@@ -201,6 +215,17 @@ export function PrivateGalleryEditor() {
                     </button>
                 </div>
             )}
+
+            {/* Modal de Confirmação de Exclusão */}
+            <DeleteConfirmModal
+                isOpen={!!itemToDelete}
+                title="Remover mídia da galeria privada"
+                description="Tem certeza de que deseja remover esta mídia da sua galeria privada? Esta ação não pode ser desfeita."
+                confirmText="Remover"
+                cancelText="Cancelar"
+                onClose={() => setItemToDelete(null)}
+                onConfirm={confirmDelete}
+            />
         </section>
     );
 }

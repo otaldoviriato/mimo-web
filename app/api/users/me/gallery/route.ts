@@ -188,14 +188,31 @@ export async function DELETE(request: NextRequest) {
 
         await connectToDatabase();
 
-        const deletedItem = await GalleryItem.findOneAndDelete({ _id: itemId, ownerId: userId });
+        const itemToDelete = await GalleryItem.findOne({ _id: itemId, ownerId: userId });
 
-        if (!deletedItem) {
+        if (!itemToDelete) {
             return NextResponse.json({ error: 'Item não encontrado ou você não tem permissão' }, { status: 404 });
         }
 
+        const isPublic = !itemToDelete.galleryType || itemToDelete.galleryType === 'public';
+
+        if (isPublic) {
+            const publicPhotosCount = await GalleryItem.countDocuments({
+                ownerId: userId,
+                $or: [{ galleryType: 'public' }, { galleryType: { $exists: false } }]
+            });
+
+            if (publicPhotosCount <= 1) {
+                return NextResponse.json({
+                    error: 'Você deve manter pelo menos uma foto no seu perfil.'
+                }, { status: 400 });
+            }
+        }
+
+        const deletedItem = await GalleryItem.findOneAndDelete({ _id: itemId, ownerId: userId });
+
         // Se a foto deletada era pública, sincroniza a photoUrl com a primeira foto pública restante
-        if (!deletedItem.galleryType || deletedItem.galleryType === 'public') {
+        if (deletedItem && (!deletedItem.galleryType || deletedItem.galleryType === 'public')) {
             const remainingPublicPhotos = await GalleryItem.find({ 
                 ownerId: userId, 
                 $or: [{ galleryType: 'public' }, { galleryType: { $exists: false } }] 
