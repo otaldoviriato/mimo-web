@@ -294,7 +294,7 @@ export default function SearchPage() {
             : (firstName || user.name || `@${user.username}`);
         const mainPhoto = user.photoUrl || (user.publicPhotos && user.publicPhotos[0]) || '/Logo.svg';
 
-        return <ExploreProfessionalCard key={user.clerkId} professionalId={user.clerkId} name={displayName} photoUrl={mainPhoto} online={!!user.isOnline} trackExposure={!username.trim()} onClick={() => handleOpenProfile(user)} />;
+        return <ExploreProfessionalCard key={user.clerkId} professionalId={user.clerkId} name={displayName} photoUrl={mainPhoto} available={Boolean(user.isAvailable)} trackExposure={!username.trim()} onClick={() => handleOpenProfile(user)} />;
     };
 
     const renderCard = (user: any) => {

@@ -791,3 +791,21 @@ export function useResumeSubscription() {
         },
     });
 }
+
+export function useMyPromotion(enabled: boolean = true) {
+    return useQuery({
+        queryKey: ['promotion', 'me'],
+        queryFn: async () => {
+            const response = await fetch('/api/users/me/promotion');
+            if (!response.ok) {
+                return null;
+            }
+            return response.json();
+        },
+        enabled,
+        refetchInterval: (query: any) => {
+            return query.state.data?.activePromotion ? 10000 : 60000;
+        },
+    });
+}
+

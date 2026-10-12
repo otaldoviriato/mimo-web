@@ -6,9 +6,9 @@ import { useTransitionRouter } from '@/hooks/useTransitionRouter';
 import { useUser, useAuth } from '@clerk/nextjs';
 import { useQueryClient } from '@tanstack/react-query';
 import { Avatar, TouchableRipple, PullToRefresh } from '@/components';
-import { useChatRooms, useMyProfile, QueryKeys } from '@/hooks/useQueries';
+import { useChatRooms, useMyProfile, useMyPromotion, QueryKeys } from '@/hooks/useQueries';
 import { useSocket } from '@/hooks/useSocket';
-import { CheckCircle2, X, WalletCards, Clock, AlertCircle, ChevronRight, MessageCircle, Trash2, ShieldCheck, Share2, Star, Lock } from 'lucide-react';
+import { CheckCircle2, X, WalletCards, Clock, AlertCircle, ChevronRight, MessageCircle, Trash2, ShieldCheck, Share2, Star, Lock, Megaphone } from 'lucide-react';
 import { Drawer } from 'vaul';
 import { buildProfileShareUrl } from '@/lib/referral';
 import { recordLinkShared } from '@/lib/clientAcquisitionAnalytics';
@@ -156,6 +156,7 @@ export default function ChatsPage() {
     const { data: cachedRooms = [], isLoading, isRefetching, refetch: refetchRooms } = useChatRooms();
     const visibleRooms = cachedRooms.filter((room: Room) => !hiddenRoomIds.some(id => room._id === id || (room.roomId ?? [...room.participants].sort().join('_')) === id));
     const { data: myProfile, refetch: refetchProfile } = useMyProfile();
+    const { data: promotionData } = useMyPromotion(Boolean(myProfile?.isProfessional));
     const rooms = visibleRooms;
 
     useEffect(() => {
@@ -818,7 +819,7 @@ export default function ChatsPage() {
                         )}
                     </div>
                 ) : (
-                    <ul>
+                    <ul className="pb-32">
                         {[...rooms]
                             .sort((a, b) => {
                                 const getTime = (r: Room) => {
@@ -961,7 +962,7 @@ export default function ChatsPage() {
                                                                 room.lastMessage?.includes('Conteúdo bloqueado');
 
                                                             if (isPendingPrompt) {
-                                                                const isAudio = room.lastMessage?.includes('🎙ï¸') || room.lastMessage?.toLowerCase().includes('áudio') || room.lastMessage?.toLowerCase().includes('audio');
+                                                                const isAudio = room.lastMessage?.includes('🎙ï¸ ') || room.lastMessage?.toLowerCase().includes('áudio') || room.lastMessage?.toLowerCase().includes('audio');
                                                                 return (
                                                                     <span className="text-purple-600 inline-flex items-center gap-1 font-semibold">
                                                                         <Lock className="w-3.5 h-3.5 text-purple-500 shrink-0" />
@@ -988,6 +989,21 @@ export default function ChatsPage() {
                     </ul>
                 )}
             </PullToRefresh>
+
+            {myProfile?.isProfessional && (
+                <button
+                    type="button"
+                    onClick={() => router.push('/divulgacao')}
+                    aria-label="Divulgação do perfil"
+                    className={`fixed bottom-[calc(76px+env(safe-area-inset-bottom))] right-4 z-30 flex items-center justify-center w-14 h-14 rounded-full bg-purple-50/95 hover:bg-purple-100 text-purple-900 border border-purple-200/80 shadow-md hover:shadow-lg transition-all active:scale-95 ${
+                        promotionData?.activePromotion
+                            ? 'motion-safe:animate-pulse ring-4 ring-purple-300/40'
+                            : ''
+                    }`}
+                >
+                    <Megaphone className="w-6 h-6 text-purple-900 shrink-0" />
+                </button>
+            )}
 
         </div>
     );

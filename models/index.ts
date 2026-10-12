@@ -70,3 +70,6 @@ export type { ICampaignUserJourney, ITimelineEvent } from './CampaignUserJourney
 
 export { MicroTransaction } from './MicroTransaction';
 export type { IMicroTransaction } from './MicroTransaction';
+
+export { ProfilePromotion } from './ProfilePromotion';
+export type { IProfilePromotion, PromotionStatus } from './ProfilePromotion';

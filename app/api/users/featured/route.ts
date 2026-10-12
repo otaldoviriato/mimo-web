@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import { rankExploreUsers } from '@/lib/exploreRanking';
 import { getProfessionalsEarningsMap } from '@/lib/professionalEarnings';
+import { checkAndExpirePromotions } from '@/lib/profilePromotion';
 import { AppSettings, GalleryItem, Room, User } from '@/models';
 
 export const dynamic = 'force-dynamic';
@@ -10,12 +11,11 @@ export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
     try {
-        // userId é opcional — a rota é pública para permitir o Explorar sem login
         const { userId } = await auth();
 
         await connectToDatabase();
+        await checkAndExpirePromotions();
 
-        // Profissionais logadas não veem o Explorar
         if (userId) {
             const currentUser = await User.findOne({ clerkId: userId }).select('isProfessional').lean();
             if (currentUser?.isProfessional) return NextResponse.json({ users: [], hasMore: false });
@@ -32,8 +32,8 @@ export async function GET(request: NextRequest) {
 
         const [professionals, rooms, settings] = await Promise.all([
             User.find(clerkIdFilter)
-                .select('clerkId username name email photoUrl coverUrl identityStatus subscriptionPrice bio createdAt avgResponseTimeMinutes freeIntroEnabled isOnline lastSeen lastAccessAt birthDate city state accessCount impressionsCount clicksCount professionalAvailableCents professionalReservedForWithdrawalCents')
-                .sort({ isOnline: -1, lastSeen: -1, lastAccessAt: -1, createdAt: -1, accessCount: -1 })
+                .select('clerkId username name email photoUrl coverUrl identityStatus subscriptionPrice bio createdAt avgResponseTimeMinutes freeIntroEnabled isOnline isAvailable lastSeen lastAccessAt birthDate city state accessCount impressionsCount clicksCount professionalAvailableCents professionalReservedForWithdrawalCents')
+                .sort({ isAvailable: -1, lastSeen: -1, lastAccessAt: -1, createdAt: -1, accessCount: -1 })
                 .limit(100)
                 .lean(),
             userId ? Room.find({ participants: userId }).select('participants').lean() : Promise.resolve([]),
@@ -98,6 +98,7 @@ export async function GET(request: NextRequest) {
                 avgResponseTimeMinutes: user.avgResponseTimeMinutes ?? null,
                 freeIntroEnabled: user.freeIntroEnabled === true,
                 isOnline: user.isOnline === true,
+                isAvailable: user.isAvailable === true,
                 lastSeen: user.lastSeen ?? user.lastAccessAt ?? null,
                 lastAccessAt: user.lastAccessAt ?? null,
                 lastActiveTime,

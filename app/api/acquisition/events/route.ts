@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/lib/db';
 import { recordAcquisitionEvent } from '@/lib/acquisitionAnalytics';
 import { sanitizeReferralValue } from '@/lib/referral';
 import { User } from '@/models/User';
+import { ProfilePromotion } from '@/models/ProfilePromotion';
 import { CampaignVisit } from '@/models/CampaignVisit';
 import { isStaffOrAdmin } from '@/lib/internalStaff';
 
@@ -66,6 +67,25 @@ export async function POST(request: NextRequest) {
         });
 
         if (eventType === 'explore_profile_viewed') {
+            const visitorKey = userId || visitorId;
+            if (visitorKey && visitorKey !== professionalId) {
+                const now = new Date();
+                const activePromotion = await ProfilePromotion.findOne({
+                    professionalId,
+                    status: 'active',
+                    expiresAt: { $gt: now },
+                });
+                if (activePromotion && !activePromotion.viewedVisitorIds?.includes(visitorKey)) {
+                    await ProfilePromotion.updateOne(
+                        { _id: activePromotion._id },
+                        {
+                            $inc: { profileViews: 1 },
+                            $addToSet: { viewedVisitorIds: visitorKey }
+                        }
+                    );
+                }
+            }
+
             const queryOr = [
                 ...(visitorId ? [{ visitorId }] : []),
                 ...(userId ? [{ userId }] : []),

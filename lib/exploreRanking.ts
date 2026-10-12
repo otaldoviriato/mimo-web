@@ -4,7 +4,8 @@ export type ExploreRankingMode = 'algorithm' | 'revenue' | 'recent_visits' | 'la
 
 export type ExploreRankable = {
     clerkId: string;
-    isOnline: boolean;
+    isOnline?: boolean;
+    isAvailable?: boolean;
     lastActiveTime: number;
     accessCount?: number;
     impressionsCount?: number;
@@ -31,7 +32,7 @@ function getTimeValue(val?: number | string | Date | null): number {
 export function compareByAlgorithm(a: ExploreRankable, b: ExploreRankable) {
     const accessA = a.accessCount ?? 0;
     const accessB = b.accessCount ?? 0;
-    return Number(b.isOnline) - Number(a.isOnline)
+    return Number(Boolean(b.isAvailable)) - Number(Boolean(a.isAvailable))
         || b.lastActiveTime - a.lastActiveTime
         || accessB - accessA
         || a.clerkId.localeCompare(b.clerkId);
@@ -40,8 +41,8 @@ export function compareByAlgorithm(a: ExploreRankable, b: ExploreRankable) {
 export function compareByRevenue(a: ExploreRankable, b: ExploreRankable) {
     const revA = a.totalEarningsCents ?? 0;
     const revB = b.totalEarningsCents ?? 0;
-    return revB - revA
-        || Number(b.isOnline) - Number(a.isOnline)
+    return Number(Boolean(b.isAvailable)) - Number(Boolean(a.isAvailable))
+        || revB - revA
         || b.lastActiveTime - a.lastActiveTime
         || a.clerkId.localeCompare(b.clerkId);
 }
@@ -51,16 +52,16 @@ export function compareByRecentVisits(a: ExploreRankable, b: ExploreRankable) {
     const visitB = getTimeValue(b.lastAccessAt) || b.lastActiveTime;
     const accessA = a.accessCount ?? 0;
     const accessB = b.accessCount ?? 0;
-    return visitB - visitA
+    return Number(Boolean(b.isAvailable)) - Number(Boolean(a.isAvailable))
+        || visitB - visitA
         || accessB - accessA
-        || Number(b.isOnline) - Number(a.isOnline)
         || a.clerkId.localeCompare(b.clerkId);
 }
 
 export function compareByLastSeen(a: ExploreRankable, b: ExploreRankable) {
     const seenA = getTimeValue(a.lastSeen) || a.lastActiveTime;
     const seenB = getTimeValue(b.lastSeen) || b.lastActiveTime;
-    return Number(b.isOnline) - Number(a.isOnline)
+    return Number(Boolean(b.isAvailable)) - Number(Boolean(a.isAvailable))
         || seenB - seenA
         || b.lastActiveTime - a.lastActiveTime
         || a.clerkId.localeCompare(b.clerkId);
@@ -81,20 +82,16 @@ export function compareByAttractiveness(a: ExploreRankable, b: ExploreRankable) 
     const impA = a.impressionsCount ?? 0;
     const impB = b.impressionsCount ?? 0;
 
-    // 1. Taxa percentual de atratividade (maior primeiro)
     if (rateB !== rateA) {
         return rateB - rateA;
     }
-    // 2. Desempate por maior volume absoluto de cliques
     if (clicksB !== clicksA) {
         return clicksB - clicksA;
     }
-    // 3. Desempate por maior volume de exibições
     if (impB !== impA) {
         return impB - impA;
     }
-    // 4. Desempate por disponibilidade online e atividade
-    return Number(b.isOnline) - Number(a.isOnline)
+    return Number(Boolean(b.isAvailable)) - Number(Boolean(a.isAvailable))
         || b.lastActiveTime - a.lastActiveTime
         || a.clerkId.localeCompare(b.clerkId);
 }

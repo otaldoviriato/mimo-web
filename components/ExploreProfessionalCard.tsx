@@ -4,7 +4,8 @@ type Props = {
     professionalId: string;
     name: string;
     photoUrl: string;
-    online: boolean;
+    available?: boolean;
+    online?: boolean;
     trackExposure?: boolean;
     onClick: () => void;
 };
@@ -20,16 +21,16 @@ function formatDisplayName(raw: string) {
     return namePart;
 }
 
-export function ExploreProfessionalCard({ professionalId, name, photoUrl, online, trackExposure, onClick }: Props) {
+export function ExploreProfessionalCard({ professionalId, name, photoUrl, available, online, trackExposure, onClick }: Props) {
     const formattedName = formatDisplayName(name);
-    const chatAvailability = online ? 'Chat disponível' : 'Chat indisponível';
+    const isAvailable = available !== undefined ? available : Boolean(online);
 
     return (
         <button
             type="button"
             data-explore-professional-id={trackExposure ? professionalId : undefined}
             onClick={onClick}
-            aria-label={`Abrir perfil de ${formattedName}. ${online ? 'Online' : 'Offline'}. ${chatAvailability}.`}
+            aria-label={`Abrir perfil de ${formattedName}. ${isAvailable ? 'Disponível' : 'Indisponível'}.`}
             className="relative aspect-[3/4] w-full rounded-2xl overflow-hidden shadow-xs hover:shadow-lg transition-shadow duration-300 cursor-pointer motion-safe:active:scale-[0.98] bg-slate-100 group text-left focus-visible:outline-2 focus-visible:outline-purple-600 focus-visible:outline-offset-4"
         >
             <img
@@ -39,7 +40,7 @@ export function ExploreProfessionalCard({ professionalId, name, photoUrl, online
                 className="w-full h-full object-cover motion-safe:transition-transform motion-safe:duration-500 motion-safe:group-hover:scale-105"
             />
 
-            {!online && (
+            {!isAvailable && (
                 <div
                     aria-hidden="true"
                     className="absolute inset-0 bg-black/40 pointer-events-none"
@@ -51,15 +52,15 @@ export function ExploreProfessionalCard({ professionalId, name, photoUrl, online
             <span
                 aria-hidden="true"
                 className={`absolute top-2.5 right-2.5 inline-flex items-center gap-1.5 rounded-full text-[10px] sm:text-xs leading-none backdrop-blur-md ${
-                    online
+                    isAvailable
                         ? 'bg-black/45 px-2 py-1 font-medium text-white'
                         : 'bg-black/25 px-2.5 py-1.5 font-bold text-white/90'
                 }`}
             >
-                {online && (
+                {isAvailable && (
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)] motion-safe:animate-pulse motion-safe:[animation-duration:3s]" />
                 )}
-                {online ? 'Online' : 'Offline'}
+                {isAvailable ? 'Disponível' : 'Indisponível'}
             </span>
 
             <div className="absolute bottom-0 inset-x-0 p-3 min-w-0">

@@ -66,6 +66,11 @@ export interface IAppSettings extends Document {
     welcomeBonusUrlParamValue?: string;
     welcomeBonusLimitByIp?: boolean;
     welcomeBonusBlockSameIpChat?: boolean;
+    promotionDurationMinutes?: number;
+    promotionWindowStartHour?: number;
+    promotionWindowEndHour?: number;
+    promotionTimezone?: string;
+    promotionMaxDailyPerProfessional?: number;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -420,6 +425,34 @@ const AppSettingsSchema = new Schema<IAppSettings>({
     welcomeBonusBlockSameIpChat: {
         type: Boolean,
         default: true,
+    },
+    promotionDurationMinutes: {
+        type: Number,
+        default: 60,
+        min: 10,
+        max: 1440,
+    },
+    promotionWindowStartHour: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 23,
+    },
+    promotionWindowEndHour: {
+        type: Number,
+        default: 24,
+        min: 0,
+        max: 24,
+    },
+    promotionTimezone: {
+        type: String,
+        default: 'America/Sao_Paulo',
+    },
+    promotionMaxDailyPerProfessional: {
+        type: Number,
+        default: 1,
+        min: 1,
+        max: 10,
     },
 }, {
     timestamps: true,

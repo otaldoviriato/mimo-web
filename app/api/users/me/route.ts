@@ -554,6 +554,7 @@ export async function GET(request: NextRequest) {
                 conversationsLastWeekCount,
                 messagesLastWeekCount,
                 freeIntroEnabled: user.freeIntroEnabled === true,
+                isAvailable: user.isAvailable ?? false,
             },
         });
     } catch (error: any) {
