@@ -36,36 +36,6 @@ const formatDate = (dateString?: string | Date) => {
     }
 };
 
-const BRAZILIAN_STATES = [
-    { uf: 'AC', name: 'Acre' },
-    { uf: 'AL', name: 'Alagoas' },
-    { uf: 'AP', name: 'Amapá' },
-    { uf: 'AM', name: 'Amazonas' },
-    { uf: 'BA', name: 'Bahia' },
-    { uf: 'CE', name: 'Ceará' },
-    { uf: 'DF', name: 'Distrito Federal' },
-    { uf: 'ES', name: 'Espírito Santo' },
-    { uf: 'GO', name: 'Goiás' },
-    { uf: 'MA', name: 'Maranhão' },
-    { uf: 'MT', name: 'Mato Grosso' },
-    { uf: 'MS', name: 'Mato Grosso do Sul' },
-    { uf: 'MG', name: 'Minas Gerais' },
-    { uf: 'PA', name: 'Pará' },
-    { uf: 'PB', name: 'Paraíba' },
-    { uf: 'PR', name: 'Paraná' },
-    { uf: 'PE', name: 'Pernambuco' },
-    { uf: 'PI', name: 'Piauí' },
-    { uf: 'RJ', name: 'Rio de Janeiro' },
-    { uf: 'RN', name: 'Rio Grande do Norte' },
-    { uf: 'RS', name: 'Rio Grande do Sul' },
-    { uf: 'RO', name: 'Rondônia' },
-    { uf: 'RR', name: 'Roraima' },
-    { uf: 'SC', name: 'Santa Catarina' },
-    { uf: 'SP', name: 'São Paulo' },
-    { uf: 'SE', name: 'Sergipe' },
-    { uf: 'TO', name: 'Tocantins' },
-];
-
 const formatPriceBRL = (value: string | number) => {
     let valStr = '';
     if (typeof value === 'number') {
@@ -130,12 +100,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const [accountActionError, setAccountActionError] = useState('');
 
     const [birthDate, setBirthDate] = useState('');
-    const [state, setState] = useState('');
-    const [city, setCity] = useState('');
-    const [citiesList, setCitiesList] = useState<string[]>([]);
-    const [loadingCities, setLoadingCities] = useState(false);
-    const [citySearchQuery, setCitySearchQuery] = useState('');
-    const [showCityDropdown, setShowCityDropdown] = useState(false);
 
     const hasPopulated = useRef(false);
 
@@ -169,10 +133,6 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
             setEmailNotificationsEnabled(userData.emailNotificationsEnabled ?? true);
             setNewUserNotificationsEnabled(userData.newUserNotificationsEnabled ?? false);
             setHideFromExplore(userData.hideFromExplore === true);
-            setBirthDate(userData.birthDate ? new Date(userData.birthDate).toISOString().split('T')[0] : '');
-            setState(userData.state || '');
-            setCity(userData.city || '');
-            setCitySearchQuery(userData.city || '');
             hasPopulated.current = true;
         }
     }, [userData]);
@@ -191,38 +151,16 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
         }
     }, [userData?.emailNotificationsEnabled, userData?.newUserNotificationsEnabled, userData?.hideFromExplore]);
 
-    useEffect(() => {
-        if (!state) {
-            setCitiesList([]);
-            return;
-        }
-
-        const fetchCities = async () => {
-            setLoadingCities(true);
-            try {
-                const response = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${state}/municipios`);
-                if (response.ok) {
-                    const data = await response.json();
-                    const names = data.map((item: any) => item.nome).sort((a: string, b: string) => a.localeCompare(b));
-                    setCitiesList(names);
-                }
-            } catch (err) {
-                console.error('Erro ao buscar cidades do IBGE:', err);
-            } finally {
-                setLoadingCities(false);
-            }
-        };
-
-        fetchCities();
-    }, [state]);
-
     const handleSaveAll = async () => {
-        if (usernameStatus === 'checking') {
-            setSaveError('Aguarde a verificação do nome de usuário.');
+        const taxIdDigits = taxId.replace(/\D/g, '');
+        const phoneDigits = phone.replace(/\D/g, '');
+
+        if (taxIdDigits && taxIdDigits.length !== 11) {
+            setSaveError('Informe um CPF válido com 11 dígitos.');
             return;
         }
-        if (usernameStatus === 'taken') {
-            setSaveError('Este nome de usuário já está em uso. Escolha outro.');
+        if (phoneDigits && (phoneDigits.length < 10 || phoneDigits.length > 11)) {
+            setSaveError('Informe um telefone válido com DDD.');
             return;
         }
 
@@ -231,22 +169,12 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
         setSaveSuccess(false);
 
         try {
-            const updateData: any = {
-                name: name.trim(),
-                username: username.trim(),
-                city: city ? city.trim() : '',
-                state: state ? state.trim() : '',
-            };
-
-            await updateProfileMutation.mutateAsync(updateData);
+            await updateProfileMutation.mutateAsync({ taxId: taxIdDigits, phone: phoneDigits });
             setSaveSuccess(true);
             setTimeout(() => setSaveSuccess(false), 3000);
         } catch (error: any) {
-            if (error.response?.status === 409) {
-                setSaveError('Nome de usuário já está em uso');
-            } else {
-                setSaveError('Erro ao salvar alterações');
-            }
+            const message = error?.response?.data?.error;
+            setSaveError(typeof message === 'string' ? message : 'Erro ao salvar alterações');
         } finally {
             setLoading(false);
         }
@@ -373,14 +301,10 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
     const initialPhone = userData?.phone ? formatPhone(userData?.phone) : '';
     const initialBio = userData?.bio || '';
     const initialBirthDate = userData?.birthDate ? new Date(userData.birthDate).toISOString().split('T')[0] : '';
-    const initialCity = userData?.city || '';
-    const initialState = userData?.state || '';
+    const initialTaxId = userData?.taxId ? formatCPF(userData.taxId) : '';
 
     const hasPersonalChanges =
-        name !== initialName ||
-        username !== initialUsername ||
-        city !== initialCity ||
-        state !== initialState;
+        !profileIsProfessional && (taxId !== initialTaxId || phone !== initialPhone);
 
     const initialSubscriptionPrice = userData?.subscriptionPrice ?? 0;
     const initialIsSubscriptionEnabled = userData?.isSubscriptionEnabled ?? false;
@@ -435,136 +359,35 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                     </div>
                 ) : (
                     <>
-                        {/* ── ATALHO: EDITAR PERFIL (Profissionais) ── */}
-                        {profileIsProfessional && (
-                            <div>
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Perfil</p>
-                                <div 
-                                    onClick={() => router.push('/profile/edit')}
-                                    className="bg-white rounded-2xl border border-gray-100 shadow-xs p-4 flex items-center justify-between hover:border-purple-200 active:scale-[0.99] transition-all cursor-pointer group"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0 text-purple-600 group-hover:scale-105 transition-transform">
-                                            <Pencil className="w-5 h-5" />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-sm font-bold text-gray-900 group-hover:text-purple-700 transition-colors">Editar Perfil</h3>
-                                            <p className="text-xs text-gray-400">Fotos do perfil, biografia e galeria privada</p>
-                                        </div>
-                                    </div>
-                                    <ChevronRight className="w-5 h-5 text-gray-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
-                                </div>
-                            </div>
-                        )}
-
-                        {/* ── SEÇÃO: INFORMAÇÕES PESSOAIS (Nome, Username, Localização) ── */}
+                        {/* ── ATALHO: EDITAR PERFIL ── */}
                         <div>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Informações Pessoais</p>
-                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-50">
-                                {/* Nome de exibição */}
-                                <div className="px-4 py-3.5">
-                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Nome de Exibição</label>
-                                    <input
-                                        className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
-                                        placeholder="Seu nome ou apelido"
-                                        value={name}
-                                        onChange={(e) => setName(e.target.value)}
-                                    />
-                                </div>
-
-                                {/* Username */}
-                                <div className="px-4 py-3.5">
-                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Username</label>
-                                    <div className="flex items-center gap-1">
-                                        <span className="text-sm text-gray-300 select-none">@</span>
-                                        <input
-                                            className="flex-1 text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
-                                            placeholder="username"
-                                            value={username}
-                                            onChange={(e) => handleUsernameChange(e.target.value)}
-                                            autoCapitalize="none"
-                                            autoCorrect="off"
-                                        />
-                                        {usernameStatus === 'checking' && (
-                                            <RefreshCw className="animate-spin w-3.5 h-3.5 text-gray-400 shrink-0" />
-                                        )}
-                                        {usernameStatus === 'available' && (
-                                            <span className="text-[11px] font-bold text-emerald-600">Disponível</span>
-                                        )}
-                                        {usernameStatus === 'taken' && (
-                                            <span className="text-[11px] font-bold text-rose-500">Em uso</span>
-                                        )}
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Perfil</p>
+                            <div 
+                                onClick={() => router.push('/profile/edit')}
+                                className="bg-white rounded-2xl border border-gray-100 shadow-xs p-4 flex items-center justify-between hover:border-purple-200 active:scale-[0.99] transition-all cursor-pointer group"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0 text-purple-600 group-hover:scale-105 transition-transform">
+                                        <Pencil className="w-5 h-5" />
                                     </div>
-                                    {usernameStatus === 'taken' && (
-                                        <p className="text-[10px] font-semibold text-rose-500 mt-1">Este nome de usuário já está em uso</p>
-                                    )}
+                                    <div>
+                                        <h3 className="text-sm font-bold text-gray-900 group-hover:text-purple-700 transition-colors">Editar Perfil</h3>
+                                        <p className="text-xs text-gray-400">
+                                            {profileIsProfessional
+                                                ? 'Fotos, nome, username, biografia e galeria privada'
+                                                : 'Foto, nome de exibição e nome de usuário'}
+                                        </p>
+                                    </div>
                                 </div>
-
-                                {/* Estado */}
-                                <div className="px-4 py-3.5">
-                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Estado (Naturalidade)</label>
-                                    <select
-                                        value={state}
-                                        onChange={(e) => {
-                                            setState(e.target.value);
-                                            setCity('');
-                                            setCitySearchQuery('');
-                                        }}
-                                        className="w-full text-sm text-gray-900 font-medium bg-transparent focus:outline-none cursor-pointer"
-                                    >
-                                        <option value="">Selecione seu Estado</option>
-                                        {BRAZILIAN_STATES.map(s => (
-                                            <option key={s.uf} value={s.uf}>{s.name} ({s.uf})</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {/* Cidade */}
-                                <div className="px-4 py-3.5">
-                                    <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Cidade / Município</label>
-                                    <input
-                                        placeholder="Digite sua cidade"
-                                        className="w-full text-sm text-gray-900 font-medium bg-transparent focus:outline-none"
-                                        value={city}
-                                        onChange={(e) => setCity(e.target.value)}
-                                    />
-                                </div>
+                                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
                             </div>
-
-                            {/* Botão Salvar Informações Pessoais */}
-                            {(hasPersonalChanges || loading || saveSuccess || saveError) && (
-                                <div className="mt-2 flex flex-col gap-2">
-                                    {saveError && (
-                                        <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-100 rounded-xl">
-                                            <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-                                            <p className="text-xs text-red-600 font-medium">{saveError}</p>
-                                        </div>
-                                    )}
-                                    {saveSuccess && (
-                                        <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-100 rounded-xl">
-                                            <span className="text-xs text-green-700 font-medium">Informações salvas com sucesso!</span>
-                                        </div>
-                                    )}
-                                    {hasPersonalChanges && (
-                                        <button
-                                            onClick={handleSaveAll}
-                                            disabled={loading}
-                                            className="w-full h-10 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white text-sm font-semibold transition-all shadow-sm active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
-                                        >
-                                            {loading ? (
-                                                <RefreshCw className="animate-spin w-4 h-4 text-white" />
-                                            ) : (
-                                                <span>Salvar Dados Pessoais</span>
-                                            )}
-                                        </button>
-                                    )}
-                                </div>
-                            )}
                         </div>
 
-                        {/* ── SEÇÃO: DADOS DE CADASTRO (Bloqueados) ── */}
+                        {/* ── SEÇÃO: DADOS DE CADASTRO ── */}
                         <div>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">Dados de Cadastro (Bloqueados)</p>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 px-1">
+                                {profileIsProfessional ? 'Dados de Cadastro (Bloqueados)' : 'Dados de Cadastro'}
+                            </p>
                             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-50">
                                 <div className="px-4 py-3.5 bg-slate-50/60">
                                     <div className="flex items-center justify-between mb-1">
@@ -582,39 +405,94 @@ export default function SettingsPage({ isSubPage = false, onBack, isClosing = fa
                                     />
                                 </div>
 
-                                <div className="px-4 py-3.5 bg-slate-50/60">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">CPF</label>
-                                        <span className="text-[9px] font-bold text-gray-400 bg-gray-200/70 px-2 py-0.5 rounded-full flex items-center gap-1 border border-gray-300/40 select-none">
-                                            <Lock className="w-2.5 h-2.5 text-gray-500" />
-                                            Bloqueado
-                                        </span>
-                                    </div>
-                                    <input
-                                        className="w-full text-sm text-gray-600 font-semibold bg-transparent focus:outline-none cursor-not-allowed select-none"
-                                        placeholder="Não informado"
-                                        value={taxId}
-                                        readOnly
-                                        disabled
-                                    />
-                                </div>
+                                {profileIsProfessional ? (
+                                    <>
+                                        <div className="px-4 py-3.5 bg-slate-50/60">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">CPF</label>
+                                                <span className="text-[9px] font-bold text-gray-400 bg-gray-200/70 px-2 py-0.5 rounded-full flex items-center gap-1 border border-gray-300/40 select-none">
+                                                    <Lock className="w-2.5 h-2.5 text-gray-500" />
+                                                    Bloqueado
+                                                </span>
+                                            </div>
+                                            <input
+                                                className="w-full text-sm text-gray-600 font-semibold bg-transparent focus:outline-none cursor-not-allowed select-none"
+                                                placeholder="Não informado"
+                                                value={taxId}
+                                                readOnly
+                                                disabled
+                                            />
+                                        </div>
 
-                                <div className="px-4 py-3.5 bg-slate-50/60">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Data de Nascimento</label>
-                                        <span className="text-[9px] font-bold text-gray-400 bg-gray-200/70 px-2 py-0.5 rounded-full flex items-center gap-1 border border-gray-300/40 select-none">
-                                            <Lock className="w-2.5 h-2.5 text-gray-500" />
-                                            Bloqueado
-                                        </span>
-                                    </div>
-                                    <input
-                                        className="w-full text-sm text-gray-600 font-semibold bg-transparent focus:outline-none cursor-not-allowed select-none"
-                                        value={birthDate ? formatDate(birthDate) : 'Não informada'}
-                                        readOnly
-                                        disabled
-                                    />
-                                </div>
+                                        <div className="px-4 py-3.5 bg-slate-50/60">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Data de Nascimento</label>
+                                                <span className="text-[9px] font-bold text-gray-400 bg-gray-200/70 px-2 py-0.5 rounded-full flex items-center gap-1 border border-gray-300/40 select-none">
+                                                    <Lock className="w-2.5 h-2.5 text-gray-500" />
+                                                    Bloqueado
+                                                </span>
+                                            </div>
+                                            <input
+                                                className="w-full text-sm text-gray-600 font-semibold bg-transparent focus:outline-none cursor-not-allowed select-none"
+                                                value={birthDate ? formatDate(birthDate) : 'Não informada'}
+                                                readOnly
+                                                disabled
+                                            />
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="px-4 py-3.5">
+                                            <label htmlFor="settings-cpf" className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">CPF</label>
+                                            <input
+                                                id="settings-cpf"
+                                                inputMode="numeric"
+                                                className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
+                                                placeholder="000.000.000-00"
+                                                value={taxId}
+                                                onChange={(e) => { setTaxId(formatCPF(e.target.value)); setSaveError(''); }}
+                                            />
+                                        </div>
+
+                                        <div className="px-4 py-3.5">
+                                            <label htmlFor="settings-phone" className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Telefone</label>
+                                            <input
+                                                id="settings-phone"
+                                                inputMode="tel"
+                                                className="w-full text-sm text-gray-900 font-medium placeholder-gray-300 bg-transparent focus:outline-none"
+                                                placeholder="(00) 00000-0000"
+                                                value={phone}
+                                                onChange={(e) => { setPhone(formatPhone(e.target.value)); setSaveError(''); }}
+                                            />
+                                        </div>
+                                    </>
+                                )}
                             </div>
+
+                            {!profileIsProfessional && (hasPersonalChanges || saveSuccess || saveError) && (
+                                <div className="mt-2 flex flex-col gap-2">
+                                    {saveError && (
+                                        <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-100 rounded-xl">
+                                            <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                                            <p className="text-xs text-red-600 font-medium">{saveError}</p>
+                                        </div>
+                                    )}
+                                    {saveSuccess && (
+                                        <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-100 rounded-xl">
+                                            <span className="text-xs text-green-700 font-medium">Dados salvos com sucesso!</span>
+                                        </div>
+                                    )}
+                                    {hasPersonalChanges && (
+                                        <button
+                                            onClick={handleSaveAll}
+                                            disabled={loading}
+                                            className="w-full h-10 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white text-sm font-semibold transition-all shadow-sm active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+                                        >
+                                            {loading ? <RefreshCw className="animate-spin w-4 h-4 text-white" /> : <span>Salvar dados</span>}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         {/* ── SEÇÃO: VERIFICAÇÃO DE IDENTIDADE (Exibida apenas se NÃO for verificado) ── */}

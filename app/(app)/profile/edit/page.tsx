@@ -8,7 +8,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ProfilePhotosEditor } from '@/components/ProfilePhotosEditor';
 import { ConversationBadgesEditor } from '@/components/ConversationBadgesEditor';
 import { PrivateGalleryEditor } from '@/components/PrivateGalleryEditor';
-import { ArrowLeft, Settings, Check, Loader2 } from 'lucide-react';
+import { ProfileIdentityEditor } from '@/components/ProfileIdentityEditor';
+import { ClientPhotoEditor } from '@/components/ClientPhotoEditor';
+import { ArrowLeft, Check, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function EditProfilePage() {
@@ -116,6 +118,9 @@ export default function EditProfilePage() {
                         {/* ── SEÇÃO 1: FOTOS DO PERFIL (PÚBLICAS COM REORDENAÇÃO OTIMISTA) ── */}
                         <ProfilePhotosEditor photoUrl={userData?.photoUrl} />
 
+                        {/* ── NOME DE EXIBIÇÃO E USERNAME ── */}
+                        <ProfileIdentityEditor />
+
                         {/* ── SEÇÃO 2: BIOGRAFIA COM AUTO-SAVE OTIMISTA ── */}
                         <section aria-label="Biografia" className="rounded-2xl border border-slate-100 bg-white p-4 shadow-xs space-y-2">
                             <div className="flex items-center justify-between">
@@ -154,25 +159,11 @@ export default function EditProfilePage() {
                         <PrivateGalleryEditor />
                     </>
                 ) : (
-                    /* Para usuários que não são profissionais */
-                    <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-6 text-center space-y-4 my-8">
-                        <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mx-auto">
-                            <Settings className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <h3 className="text-base font-bold text-slate-900">Configurações da Conta</h3>
-                            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                                Nome, nome de usuário e localização agora são gerenciados na página de Configurações.
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => router.push('/settings')}
-                            className="w-full h-11 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
-                        >
-                            Ir para Configurações
-                        </button>
-                    </div>
+                    /* Clientes: foto única + nome e username */
+                    <>
+                        <ClientPhotoEditor photoUrl={userData?.photoUrl} />
+                        <ProfileIdentityEditor />
+                    </>
                 )}
             </div>
         </div>
