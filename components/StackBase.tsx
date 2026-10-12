@@ -16,6 +16,7 @@ const pages = {
     '/wallet/referrals': dynamic(() => import('@/app/(app)/(tabs)/wallet/referrals/page'), { loading }),
     '/wallet/statement': dynamic(() => import('@/app/(app)/(tabs)/wallet/statement/page'), { loading }),
     '/verificacao-identidade': dynamic(() => import('@/app/(app)/verificacao-identidade/page'), { loading }),
+    '/divulgacao': dynamic(() => import('@/app/(app)/divulgacao/page'), { loading }),
 };
 
 /** A stable base independent of the Next route that delivered the deep link. */

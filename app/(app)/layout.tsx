@@ -36,7 +36,7 @@ const isPublicRoute = (path: string) => {
     if (path === '/search') return true;
     const segments = path.split('/').filter(Boolean);
     if (segments.length === 0) return false;
-    const protectedPrefixes = ['chats', 'profile', 'wallet', 'onboarding', 'settings', 'activation', 'admin', 'verificacao-identidade', 'login', 'sso-callback'];
+    const protectedPrefixes = ['chats', 'profile', 'wallet', 'onboarding', 'settings', 'activation', 'admin', 'verificacao-identidade', 'login', 'sso-callback', 'divulgacao'];
     if (protectedPrefixes.includes(segments[0])) return false;
     // /username ou /username/chat/... são públicos
     return segments.length <= 2;

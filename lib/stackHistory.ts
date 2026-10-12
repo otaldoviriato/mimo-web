@@ -32,7 +32,7 @@ export function isTabPath(path: string) {
 }
 
 export function isStackBasePath(path: string) {
-    return isTabPath(path) || ['/profile/edit', '/wallet/referrals', '/wallet/statement', '/verificacao-identidade'].includes(path);
+    return isTabPath(path) || ['/profile/edit', '/wallet/referrals', '/wallet/statement', '/verificacao-identidade', '/divulgacao'].includes(path);
 }
 
 /** Resolve ancestry without fetching data, visiting routes, or mounting screens. */

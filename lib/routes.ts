@@ -26,6 +26,7 @@ export const RESERVED_BASE_ROUTES = [
     '/admin',
     '/onboarding',
     '/verificacao-identidade',
+    '/divulgacao',
 ] as const;
 
 export function isReservedRoute(path: string) {
