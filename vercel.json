@@ -1,4 +1,11 @@
 {
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "https://www.sexting.com.br/",
+      "permanent": false
+    }
+  ],
   "crons": [
     {
       "path": "/api/cron/renew-subscriptions",
