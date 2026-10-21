@@ -1,13 +1,6 @@
 import { redirect } from 'next/navigation';
-import { auth } from '@clerk/nextjs/server';
 
-export default async function RootPage() {
-    const { userId } = await auth();
-    if (userId) {
-        redirect('/chats');
-    } else {
-        redirect('/login');
-    }
+export default function RootPage() {
+    redirect('https://www.sexting.com.br/');
 }
-
 
